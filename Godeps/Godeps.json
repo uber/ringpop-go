@@ -1,0 +1,48 @@
+{
+	"ImportPath": "github.com/uber/ringpop-go",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.6-25-g82c8de1",
+			"Rev": "82c8de1af23b25ba5a468d801f29077f4f483bce"
+		},
+		{
+			"ImportPath": "github.com/apache/thrift/lib/go/thrift",
+			"Rev": "5bc8b5a3a5da507b6f87436ca629be664496a69f"
+		},
+		{
+			"ImportPath": "github.com/cactus/go-statsd-client/statsd",
+			"Comment": "v2.0.1-3-g8947bd0",
+			"Rev": "8947bd0d9e04e8c27671c33753340b51b835efdc"
+		},
+		{
+			"ImportPath": "github.com/dgryski/go-farm",
+			"Rev": "fc41e106ee0e4394f69a56046e5c5adbaf29d912"
+		},
+		{
+			"ImportPath": "github.com/rcrowley/go-metrics",
+			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+		},
+		{
+			"ImportPath": "github.com/uber/bark",
+			"Rev": "d52ffa061726911f47fcd3d9e8b9b55f22794772"
+		},
+		{
+			"ImportPath": "github.com/uber/tchannel-go",
+			"Rev": "507b03bdd9eb65a49672006473454d76d1277304"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "5aa7325eaa14d7ed4b520f40d58adf2834c8de01"
+		}
+	]
+}
