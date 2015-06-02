@@ -14,11 +14,6 @@ type RingNode struct {
 	red   bool
 }
 
-type RBIterator struct {
-	tree      *RBTree
-	ancestors []*RingNode
-}
-
 func (this *RBTree) Size() int {
 	return this.size
 }
@@ -31,7 +26,11 @@ func (this *RingNode) Child(right bool) *RingNode {
 	}
 }
 
-func (this *RingNode) SetChild(right bool, n *RingNode) {
+func (this *RingNode) Str() string {
+	return this.str
+}
+
+func (this *RingNode) setChild(right bool, n *RingNode) {
 	if right {
 		this.right = n
 	} else {
@@ -47,8 +46,8 @@ func isRed(node *RingNode) bool {
 func singleRotate(oldroot *RingNode, dir bool) *RingNode {
 	newroot := oldroot.Child(!dir)
 
-	oldroot.SetChild(!dir, newroot.Child(dir))
-	newroot.SetChild(dir, oldroot)
+	oldroot.setChild(!dir, newroot.Child(dir))
+	newroot.setChild(dir, oldroot)
 
 	oldroot.red = true
 	newroot.red = false
@@ -57,7 +56,7 @@ func singleRotate(oldroot *RingNode, dir bool) *RingNode {
 }
 
 func doubleRotate(root *RingNode, dir bool) *RingNode {
-	root.SetChild(!dir, singleRotate(root.Child(!dir), !dir))
+	root.setChild(!dir, singleRotate(root.Child(!dir), !dir))
 	return singleRotate(root, dir)
 }
 
@@ -84,7 +83,7 @@ func (this *RBTree) Insert(val int64, str string) (ret bool) {
 			if node == nil {
 				// insert new node at bottom
 				node = &RingNode{val: val, str: str, red: true}
-				parent.SetChild(dir, node)
+				parent.setChild(dir, node)
 				ret = true
 			} else if isRed(node.left) && isRed(node.right) {
 				// flip colors
@@ -96,9 +95,9 @@ func (this *RBTree) Insert(val int64, str string) (ret bool) {
 				dir2 := ggparent.right == gparent
 
 				if node == parent.Child(last) {
-					ggparent.SetChild(dir2, singleRotate(gparent, !last))
+					ggparent.setChild(dir2, singleRotate(gparent, !last))
 				} else {
-					ggparent.SetChild(dir2, doubleRotate(gparent, !last))
+					ggparent.setChild(dir2, doubleRotate(gparent, !last))
 				}
 			}
 
@@ -173,7 +172,7 @@ func (this *RBTree) Delete(val int64) bool {
 		if !isRed(node) && !isRed(node.Child(dir)) {
 			if isRed(node.Child(!dir)) {
 				sr := singleRotate(node, dir)
-				parent.SetChild(last, sr)
+				parent.setChild(last, sr)
 				parent = sr
 			} else {
 				sibling := parent.Child(!last)
@@ -186,9 +185,9 @@ func (this *RBTree) Delete(val int64) bool {
 						dir2 := gparent.right == parent
 
 						if isRed(sibling.Child(last)) {
-							gparent.SetChild(dir2, doubleRotate(parent, last))
+							gparent.setChild(dir2, doubleRotate(parent, last))
 						} else if isRed(sibling.Child(!last)) {
-							gparent.SetChild(dir2, singleRotate(parent, last))
+							gparent.setChild(dir2, singleRotate(parent, last))
 						}
 
 						gpc := gparent.Child(dir2)
@@ -205,7 +204,7 @@ func (this *RBTree) Delete(val int64) bool {
 	if found != nil {
 		found.val = node.val
 		found.str = node.str
-		parent.SetChild(parent.right == node, node.Child(node.left == nil))
+		parent.setChild(parent.right == node, node.Child(node.left == nil))
 		this.size--
 	}
 
@@ -229,21 +228,6 @@ func (this *RingNode) search(val int64) (string, bool) {
 	}
 	return "", false
 }
-
-// func search(node *RingNode, val int64) (string, bool) {
-
-// 	if node == nil {
-// 		return "", false
-// 	}
-
-// 	if val == node.val {
-// 		return node.str, true
-// 	} else if val < node.val {
-// 		return search(node.left, val)
-// 	} else {
-// 		return search(node.right, val)
-// 	}
-// }
 
 // Search searches for a value in the RBTree
 // Returns the string and true if found, empty string and false if val is not
