@@ -13,20 +13,20 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-var hostPortPattern, hostPortErr = regexp.Compile("^([0-9+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
+var hostPortPattern, hostPortErr = regexp.Compile("^([0-9]+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	R I N G P O P
+//	RINGPOP
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 type Ringpop struct {
-	// E X P O R T E D
+	// Exported
 	App      string
 	HostPort string
 
-	// U N E X P O R T E D
+	// Unexported
 	eventC   chan string
 	emitting bool
 
@@ -53,7 +53,6 @@ type Ringpop struct {
 	// swim
 	suspicion *Suspicion
 	gossip    *Gossip
-	// membershipUpdateRollup
 
 	// statsd
 	statsd       statsd.Statsd
@@ -96,7 +95,7 @@ func NewRingpop(app, hostport string) *Ringpop {
 	// ringpop.launchMembershipChangeHandler()
 	ringpop.membershipUpdateRollup = NewMembershipUpdateRollup(ringpop, 5000*time.Millisecond, 0)
 
-	// ringpop.suspicion = NewSuspicion(ringpop)
+	ringpop.suspicion = NewSuspicion(ringpop, 3000*time.Millisecond)
 	// ringpop.gossip = NewGossip(ringpop)
 
 	// launch event handling functions
@@ -118,6 +117,12 @@ func NewRingpop(app, hostport string) *Ringpop {
 
 	return ringpop
 }
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//  METHODS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (this *Ringpop) Reload(filename string) {
 	// TODO
@@ -176,7 +181,7 @@ func (this *Ringpop) emit(message string) {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	R I N G     E V E N T     H A N D L I N G
+//	RING EVENT HANDLING
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -219,7 +224,7 @@ func (this *Ringpop) launchRingEventHandler() chan<- bool {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	M E M B E R S H I P     E V E N T     H A N D L I N G
+//	MEMBERSHIP EVENT HANDLING
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -233,7 +238,7 @@ func (this *Ringpop) onMemberAlive(change Change) {
 	}).Debug("member is alive")
 
 	this.dissemination.recordChange(change) // Propogate change
-	this.ring.addServer(change.Address)     // Add server from ring
+	this.ring.addServer(change.Address())   // Add server from ring
 	this.suspicion.stop(change)             // Stop suspicion for server
 }
 
@@ -243,12 +248,12 @@ func (this *Ringpop) onMemberFaulty(change Change) {
 
 	this.logger.WithFields(log.Fields{
 		"local":  this.WhoAmI(),
-		"faulty": change.Address,
+		"faulty": change.Address(),
 	}).Debug("member is faulty")
 
-	this.ring.removeServer(change.Address)  // Remove server from ring
-	this.suspicion.stop(change)             // Stop suspicion for server
-	this.dissemination.recordChange(change) // Propogate change
+	this.ring.removeServer(change.Address()) // Remove server from ring
+	this.suspicion.stop(change)              // Stop suspicion for server
+	this.dissemination.recordChange(change)  // Propogate change
 }
 
 func (this *Ringpop) onMemberSuspect(change Change) {
@@ -270,12 +275,12 @@ func (this *Ringpop) onMemberLeave(change Change) {
 
 	this.logger.WithFields(log.Fields{
 		"local": this.WhoAmI(),
-		"leave": change.Address,
+		"leave": change.Address(),
 	}).Debug("member has left")
 
-	this.dissemination.recordChange(change) // Propogate change
-	this.ring.removeServer(change.Address)  // Remove server from ring
-	this.suspicion.stop(change)             // Stop suspicion for server
+	this.dissemination.recordChange(change)  // Propogate change
+	this.ring.removeServer(change.Address()) // Remove server from ring
+	this.suspicion.stop(change)              // Stop suspicion for server
 }
 
 func (this *Ringpop) launchMembershipChangeHandler() chan<- bool {
@@ -292,7 +297,7 @@ func (this *Ringpop) launchMembershipChangeHandler() chan<- bool {
 			select {
 			case changes = <-this.membershipChangeC:
 				for _, change := range changes {
-					switch change.Status {
+					switch change.Status() {
 					case ALIVE:
 						this.onMemberAlive(change)
 						membershipChanged, ringChanged = true, true
@@ -363,7 +368,7 @@ func (this *Ringpop) pingMemberNow(returnCh chan<- string) {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	S T A T S ( D )    H A N D L I N G
+//	STATS(D) HANDLING
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -386,7 +391,7 @@ func (this *Ringpop) stat(statType, key string, val int64) {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	T E S T I N G     F U N C T I O N S
+//	TESTING FUNCTIONS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 

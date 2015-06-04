@@ -40,15 +40,15 @@ func TestLeaveOverrideHigher(t *testing.T) {
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected new member to be found")
-	assert.Equal(t, ALIVE, member.Status, "expected member to start as alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected member to start as alive")
 
 	ringpop.membership.update([]Change{Change{
-		Address:     member.Address,
-		Status:      LEAVE,
-		Incarnation: member.Incarnation + 1,
+		address:     member.Address(),
+		status:      LEAVE,
+		incarnation: member.Incarnation() + 1,
 	}})
 
-	assert.Equal(t, LEAVE, member.Status, "expected member status to be leave")
+	assert.Equal(t, LEAVE, member.Status(), "expected member status to be leave")
 }
 
 // Equal incarnation number should not result in a leave override ... or should it?
@@ -57,15 +57,15 @@ func TestLeaveOverrideEqual(t *testing.T) {
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, ALIVE, member.Status, "expected member to start as alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected member to start as alive")
 
 	ringpop.membership.update([]Change{Change{
-		Address:     member.Address,
-		Status:      LEAVE,
-		Incarnation: member.Incarnation,
+		address:     member.Address(),
+		status:      LEAVE,
+		incarnation: member.Incarnation(),
 	}})
 
-	assert.Equal(t, LEAVE, member.Status, "expected member status to still be alive")
+	assert.Equal(t, LEAVE, member.Status(), "expected member status to still be alive")
 }
 
 // Lower incarnation should not result in a leave override
@@ -74,15 +74,15 @@ func TestLeaveOverrideLower(t *testing.T) {
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, ALIVE, member.Status, "expected member to start as alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected member to start as alive")
 
 	ringpop.membership.update([]Change{Change{
-		Address:     member.Address,
-		Status:      LEAVE,
-		Incarnation: member.Incarnation - 1,
+		address:     member.Address(),
+		status:      LEAVE,
+		incarnation: member.Incarnation() - 1,
 	}})
 
-	assert.Equal(t, ALIVE, member.Status, "expected member status to still be alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected member status to still be alive")
 }
 
 // Attempting to make the local member faulty should not change local member status
@@ -91,15 +91,15 @@ func TestLocalFaultyOverride(t *testing.T) {
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, ALIVE, member.Status, "expected local member to start as alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected local member to start as alive")
 
 	ringpop.membership.update([]Change{Change{
-		Address:     member.Address,
-		Status:      FAULTY,
-		Incarnation: member.Incarnation + 1,
+		address:     member.Address(),
+		status:      FAULTY,
+		incarnation: member.Incarnation() + 1,
 	}})
 
-	assert.Equal(t, ALIVE, member.Status, "expected local member to still be alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected local member to still be alive")
 }
 
 // Attempting to make the local member faulty should not change local member status
@@ -108,15 +108,15 @@ func TestLocalSuspectOverride(t *testing.T) {
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, ALIVE, member.Status, "expected local member to start as alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected local member to start as alive")
 
 	ringpop.membership.update([]Change{Change{
-		Address:     member.Address,
-		Status:      SUSPECT,
-		Incarnation: member.Incarnation + 1,
+		address:     member.Address(),
+		status:      SUSPECT,
+		incarnation: member.Incarnation() + 1,
 	}})
 
-	assert.Equal(t, ALIVE, member.Status, "expected local member to still be alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected local member to still be alive")
 }
 
 // Update method properly handles multiple updates in input
@@ -128,24 +128,24 @@ func TestHandleMultipleUpdates(t *testing.T) {
 
 	updates := ringpop.membership.update([]Change{
 		Change{
-			Address:     "127.0.0.1:3001",
-			Status:      ALIVE,
-			Incarnation: 1,
+			address:     "127.0.0.1:3001",
+			status:      ALIVE,
+			incarnation: 1,
 		},
 		Change{
-			Address:     "127.0.0.1:3002",
-			Status:      SUSPECT,
-			Incarnation: 1,
+			address:     "127.0.0.1:3002",
+			status:      SUSPECT,
+			incarnation: 1,
 		},
 		Change{
-			Address:     "127.0.0.1:3003",
-			Status:      FAULTY,
-			Incarnation: 1,
+			address:     "127.0.0.1:3003",
+			status:      FAULTY,
+			incarnation: 1,
 		},
 		Change{
-			Address:     "127.0.0.1:3004",
-			Status:      LEAVE,
-			Incarnation: 1,
+			address:     "127.0.0.1:3004",
+			status:      LEAVE,
+			incarnation: 1,
 		},
 	})
 
@@ -153,19 +153,19 @@ func TestHandleMultipleUpdates(t *testing.T) {
 
 	member, found := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, ALIVE, member.Status, "expected member to be alive")
+	assert.Equal(t, ALIVE, member.Status(), "expected member to be alive")
 
 	member, found = ringpop.membership.getMemberByAddress("127.0.0.1:3002")
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, SUSPECT, member.Status, "expected member to be suspect")
+	assert.Equal(t, SUSPECT, member.Status(), "expected member to be suspect")
 
 	member, found = ringpop.membership.getMemberByAddress("127.0.0.1:3003")
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, FAULTY, member.Status, "expected member to be faulty ")
+	assert.Equal(t, FAULTY, member.Status(), "expected member to be faulty ")
 
 	member, found = ringpop.membership.getMemberByAddress("127.0.0.1:3004")
 	assert.True(t, found, "expected member to be found")
-	assert.Equal(t, LEAVE, member.Status, "expected member to be leave")
+	assert.Equal(t, LEAVE, member.Status(), "expected member to be leave")
 
 	assert.NotEqual(t, oldchecksum, ringpop.membership.checksum,
 		"expected checksum to change after updates applied")
@@ -180,27 +180,27 @@ func TestAliveToFaulty(t *testing.T) {
 
 	newMember, found := ringpop.membership.getMemberByAddress(newMemberAddr)
 	assert.True(t, found, "expected new membwer to be found")
-	assert.Equal(t, ALIVE, newMember.Status, "expected new member to start as alive")
+	assert.Equal(t, ALIVE, newMember.Status(), "expected new member to start as alive")
 
 	ringpop.membership.update([]Change{
 		Change{
-			Address:     newMember.Address,
-			Status:      FAULTY,
-			Incarnation: newMember.Incarnation - 1,
+			address:     newMember.Address(),
+			status:      FAULTY,
+			incarnation: newMember.Incarnation() - 1,
 		},
 	})
 
-	assert.Equal(t, ALIVE, newMember.Status, "expected no override with lower incarnation number")
+	assert.Equal(t, ALIVE, newMember.Status(), "expected no override with lower incarnation number")
 
 	ringpop.membership.update([]Change{
 		Change{
-			Address:     newMember.Address,
-			Status:      FAULTY,
-			Incarnation: newMember.Incarnation,
+			address:     newMember.Address(),
+			status:      FAULTY,
+			incarnation: newMember.Incarnation(),
 		},
 	})
 
-	assert.Equal(t, FAULTY, newMember.Status, "expected override with same incarnation number")
+	assert.Equal(t, FAULTY, newMember.Status(), "expected override with same incarnation number")
 }
 
 func TestString(t *testing.T) {

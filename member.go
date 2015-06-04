@@ -7,8 +7,32 @@ const (
 	SUSPECT = "suspect"
 )
 
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// MEMER
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
 type Member struct {
-	Address     string
-	Status      string
-	Incarnation int64
+	address     string
+	status      string
+	incarnation int64
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// METHODS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func (this Member) Address() string {
+	return this.address
+}
+
+func (this Member) Status() string {
+	return this.status
+}
+
+func (this Member) Incarnation() int64 {
+	return this.incarnation
 }

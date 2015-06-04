@@ -12,19 +12,46 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
+type Change struct {
+	source      string
+	address     string
+	status      string
+	incarnation int64
+	timestamp   time.Time
+}
+
+// methods to satisfy `Suspect` interface
+func (this Change) Source() string {
+	return this.source
+}
+
+func (this Change) Address() string {
+	return this.address
+}
+
+func (this Change) Status() string {
+	return this.status
+}
+
+func (this Change) Incarnation() int64 {
+	return this.incarnation
+}
+
+func (this Change) Timestamp() time.Time {
+	return this.timestamp
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	MEMBERSHIP
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
 type Membership struct {
 	ringpop     *Ringpop
 	members     map[string]*Member
 	checksum    uint32
 	localMember *Member
-}
-
-type Change struct {
-	Source      string
-	Address     string
-	Status      string
-	Incarnation int64
-	Timestamp   time.Time
 }
 
 // NewMembership returns a pointer to a new Membership
@@ -35,6 +62,12 @@ func NewMembership(ringpop *Ringpop) *Membership {
 	}
 	return membership
 }
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// METHODS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // computeChecksum calaculates the membership checksum.
 // The membership checksum is a farmhash of the checksum string computed
@@ -57,7 +90,7 @@ func (this *Membership) genChecksumString() string {
 	var checksumStrings sort.StringSlice
 
 	for _, member := range this.members {
-		cstr := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
+		cstr := fmt.Sprintf("%s%s%v", member.Address(), member.Status(), member.Incarnation())
 		checksumStrings = append(checksumStrings, cstr)
 	}
 
@@ -92,7 +125,7 @@ func (this *Membership) randomPingableMembers(n int, exlcuding map[string]bool) 
 	var pingableMembers []*Member
 
 	for _, member := range this.members {
-		if this.isPingable(member) && !exlcuding[member.Address] {
+		if this.isPingable(member) && !exlcuding[member.Address()] {
 			pingableMembers = append(pingableMembers, member)
 		}
 	}
@@ -111,13 +144,13 @@ func (this *Membership) stats() {
 }
 
 func (this *Membership) hasMember(member *Member) bool {
-	_, ok := this.members[member.Address]
+	_, ok := this.members[member.Address()]
 	return ok
 }
 
 func (this *Membership) isPingable(member *Member) bool {
-	return member.Address != this.ringpop.WhoAmI() &&
-		(member.Status == ALIVE || member.Status == SUSPECT)
+	return member.Address() != this.ringpop.WhoAmI() &&
+		(member.Status() == ALIVE || member.Status() == SUSPECT)
 }
 
 func (this *Membership) makeAlive(address string, incarnation int64, source string) []Change {
@@ -126,11 +159,11 @@ func (this *Membership) makeAlive(address string, incarnation int64, source stri
 	}
 
 	return this.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      ALIVE,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		source:      source,
+		address:     address,
+		status:      ALIVE,
+		incarnation: incarnation,
+		timestamp:   time.Now(),
 	}})
 }
 
@@ -140,11 +173,11 @@ func (this *Membership) makeFaulty(address string, incarnation int64, source str
 	}
 
 	return this.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      FAULTY,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		source:      source,
+		address:     address,
+		status:      FAULTY,
+		incarnation: incarnation,
+		timestamp:   time.Now(),
 	}})
 }
 
@@ -154,11 +187,11 @@ func (this *Membership) makeLeave(address string, incarnation int64, source stri
 	}
 
 	return this.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      LEAVE,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		source:      source,
+		address:     address,
+		status:      LEAVE,
+		incarnation: incarnation,
+		timestamp:   time.Now(),
 	}})
 }
 
@@ -168,36 +201,36 @@ func (this *Membership) makeSuspect(address string, incarnation int64, source st
 	}
 
 	return this.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      SUSPECT,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		source:      source,
+		address:     address,
+		status:      SUSPECT,
+		incarnation: incarnation,
+		timestamp:   time.Now(),
 	}})
 }
 
 func (this *Membership) makeUpdate(change Change) {
-	member, ok := this.members[change.Address]
+	member, ok := this.members[change.Address()]
 
 	if !ok {
 		member = &Member{
-			Address:     change.Address,
-			Status:      change.Status,
-			Incarnation: change.Incarnation,
+			address:     change.Address(),
+			status:      change.Status(),
+			incarnation: change.Incarnation(),
 		}
 
-		if member.Address == this.ringpop.WhoAmI() {
+		if member.Address() == this.ringpop.WhoAmI() {
 			this.localMember = member
 		}
 
-		this.members[change.Address] = member
+		this.members[change.Address()] = member
 	}
 
 	// joinpos := this.getJoinPosition()
 	// this.members = append(this.members[:joinpos], append([]*Member{member}, this.members[joinpos:]...)...)
 
-	member.Status = change.Status
-	member.Incarnation = change.Incarnation
+	member.status = change.Status()
+	member.incarnation = change.Incarnation()
 }
 
 func (this *Membership) update(changes []Change) []Change {
@@ -208,7 +241,7 @@ func (this *Membership) update(changes []Change) []Change {
 	}
 
 	for _, change := range changes {
-		member, found := this.getMemberByAddress(change.Address)
+		member, found := this.getMemberByAddress(change.Address())
 
 		// If this is the first time we see the member, take change wholesale
 		if !found {
@@ -221,11 +254,11 @@ func (this *Membership) update(changes []Change) []Change {
 		if IsLocalSuspectOverride(this.ringpop, member, change) ||
 			IsLocalFaultyOverride(this.ringpop, member, change) {
 			newchange := Change{
-				Source:      change.Source,
-				Address:     change.Address,
-				Status:      ALIVE,
-				Incarnation: time.Now().UnixNano() / 1000000,
-				Timestamp:   change.Timestamp,
+				source:      change.Source(),
+				address:     change.Address(),
+				status:      ALIVE,
+				incarnation: time.Now().UnixNano() / 1000000,
+				timestamp:   change.Timestamp(),
 			}
 
 			this.makeUpdate(newchange)
@@ -279,7 +312,7 @@ func (this *Membership) String() (string, error) {
 	var members []string
 
 	for _, member := range this.members {
-		members = append(members, member.Address)
+		members = append(members, member.Address())
 	}
 
 	str, err := json.Marshal(members)
