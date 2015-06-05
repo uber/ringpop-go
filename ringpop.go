@@ -349,9 +349,7 @@ func (this *Ringpop) pingMemberNow(returnCh chan<- string) {
 
 	// sendPing(this, member) // this should internally block with goroutine
 
-	//
-	// TODO
-	//
+	this.pinging = false
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

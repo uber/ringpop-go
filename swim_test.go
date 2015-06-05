@@ -14,7 +14,7 @@ import (
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// TODO :^)
+// TODO
 
 func TestStartStopGossip(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")

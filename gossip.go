@@ -80,13 +80,11 @@ func (this *Gossip) run() {
 	go func() {
 		for {
 			if this.protocolPeriodTimer != nil {
-				select {
-				case <-this.protocolPeriodTimer.C:
-					// pingStartTime := time.Now()
+				<-this.protocolPeriodTimer.C
+				// pingStartTime := time.Now()
 
-					// do something here - todo
+				// do something here - todo
 
-				}
 			} else {
 				break
 			}
@@ -144,10 +142,8 @@ func (this *Gossip) startProtocolRateTimer() {
 	go func() {
 		for {
 			if this.protocolRateTimer != nil {
-				select {
-				case <-this.protocolRateTimer.C:
-					this.lastProtocolRate = this.computeProtocolRate()
-				}
+				<-this.protocolRateTimer.C
+				this.lastProtocolRate = this.computeProtocolRate()
 			} else {
 				break
 			}
