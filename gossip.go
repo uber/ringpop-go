@@ -33,14 +33,17 @@ type Gossip struct {
 	protocolTiming metrics.StandardHistogram
 }
 
-func NewGossip(ringpop *Ringpop) *Gossip {
-	gossip := &Gossip{
-		ringpop: ringpop,
+func NewGossip(ringpop *Ringpop, minProtocolPeriod time.Duration) *Gossip {
+	if minProtocolPeriod <= 0 {
+		minProtocolPeriod = DefaultMinProtocolPeriod
 	}
 
-	log.Info("ahh")
-
-	// TODO
+	gossip := &Gossip{
+		ringpop:           ringpop,
+		stopped:           true,
+		minProtocolPeriod: minProtocolPeriod,
+		protocolTiming:    metrics.StandardHistogram{},
+	}
 
 	return gossip
 }
@@ -62,38 +65,34 @@ func (this *Gossip) computeProtocolDelay() time.Duration {
 }
 
 func (this *Gossip) computeProtocolRate() int64 {
-	// REVIST THIS LINE!!!
 	observed := this.protocolTiming.Percentiles([]float64{0.5})[1] * 2.0
 	return int64(math.Max(observed, float64(this.minProtocolPeriod)))
 }
 
 // TODO
-// func (this *Gossip) run() {
-// 	protocolDelay := this.computeProtocolDelay()
+func (this *Gossip) run() {
+	protocolDelay := this.computeProtocolDelay()
+	println(protocolDelay)
 
-// 	this.protocolPeriodTimer = time.NewTicker(protocolDelay)
-// 	this.ringpop.stat("timing", "protocol.delay", int64(protocolDelay))
+	this.protocolPeriodTimer = time.NewTicker(protocolDelay + 1)
+	this.ringpop.stat("timing", "protocol.delay", int64(protocolDelay))
 
-// 	go func() {
-// 		returnCh := make(chan string)
-// 		for {
-// 			select {
-// 			case <-this.protocolPeriodTimer.C:
-// 				pingStartTime := time.Now()
+	go func() {
+		for {
+			if this.protocolPeriodTimer != nil {
+				select {
+				case <-this.protocolPeriodTimer.C:
+					// pingStartTime := time.Now()
 
-// 				this.ringpop.pingMemberNow(returnCh)
+					// do something here - todo
 
-// 				go func() {
-// 					select {
-// 					case rtn := <-returnCh:
-// 						// do something
-// 					}
-// 				}()
-// 			}
-// 		}
-// 	}()
-
-// }
+				}
+			} else {
+				break
+			}
+		}
+	}()
+}
 
 func (this *Gossip) start() {
 	if !this.stopped {
@@ -104,8 +103,8 @@ func (this *Gossip) start() {
 		return
 	}
 
-	this.ringpop.membership.shuffle() // REVISIT
-	// this.Run()
+	// this.ringpop.membership.shuffle() // REVISIT
+	this.run()
 	this.startProtocolRateTimer()
 	this.stopped = false
 
@@ -119,6 +118,8 @@ func (this *Gossip) stop() {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local": this.ringpop.WhoAmI(),
 		}).Warn("gossip is already stopped")
+
+		return
 	}
 
 	this.protocolRateTimer.Stop()
@@ -137,23 +138,19 @@ func (this *Gossip) stop() {
 // StartProtocolRateTimer creates a ticker and launches a goroutine that
 // sets lastProtocolRate every 1000ms, returns a channel that can be used
 // to exit out of the function
-func (this *Gossip) startProtocolRateTimer() chan<- bool {
+func (this *Gossip) startProtocolRateTimer() {
 	this.protocolRateTimer = time.NewTicker(1000 * time.Millisecond)
-	quit := make(chan bool, 1)
 	// launch goroutine that calculates last protocol rate periodically
 	go func() {
 		for {
-			select {
-			case <-this.protocolRateTimer.C:
-				this.lastProtocolRate = this.computeProtocolRate()
-			case <-quit:
-				this.protocolRateTimer.Stop()
-				close(quit)
+			if this.protocolRateTimer != nil {
+				select {
+				case <-this.protocolRateTimer.C:
+					this.lastProtocolRate = this.computeProtocolRate()
+				}
+			} else {
 				break
 			}
 		}
 	}()
-
-	// return channel that provides method to break out of goroutine
-	return quit
 }

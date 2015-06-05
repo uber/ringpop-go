@@ -2,7 +2,6 @@ package ringpop
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -96,14 +95,14 @@ func NewRingpop(app, hostport string) *Ringpop {
 	ringpop.membershipUpdateRollup = NewMembershipUpdateRollup(ringpop, 5000*time.Millisecond, 0)
 
 	ringpop.suspicion = NewSuspicion(ringpop, 3000*time.Millisecond)
-	// ringpop.gossip = NewGossip(ringpop)
+	ringpop.gossip = NewGossip(ringpop, -1)
 
 	// launch event handling functions
 	ringpop.ring = NewHashring()
 	// ringpop.launchRingEventHandler()
 
 	ringpop.statsd = statsd.NoopClient{} // TODO: change this to an actual client
-
+	ringpop.statKeys = make(map[string]string, 0)
 	// changes 0.0.0.0:0000 -> 0_0_0_0_0000
 	ringpop.statHostPort = strings.Replace(ringpop.HostPort, ".", "_", -1)
 	ringpop.statHostPort = strings.Replace(ringpop.statHostPort, ":", "_", -1)
@@ -123,10 +122,6 @@ func NewRingpop(app, hostport string) *Ringpop {
 //  METHODS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-func (this *Ringpop) Reload(filename string) {
-	// TODO
-}
 
 func (this *Ringpop) WhoAmI() string {
 	return this.HostPort
@@ -152,11 +147,6 @@ func (this *Ringpop) Lookup(key string) (string, bool) {
 	}
 
 	return dest, true
-}
-
-// request
-func (this *Ringpop) HandleOrProxy(key string, req *http.Request, res *http.Response) {
-	// TODO :^)
 }
 
 // EmitEvents enables or disables the channel returned by EventCh
@@ -348,9 +338,8 @@ func (this *Ringpop) pingMemberNow(returnCh chan<- string) {
 	}
 
 	iter := this.membership.iter()
-	member := <-iter
-
-	if member == nil {
+	_, err := iter.next()
+	if err != nil {
 		this.logger.Warn("no usable nodes at protocol period")
 		returnCh <- "no usable nodes at protocol period"
 		return
@@ -361,9 +350,8 @@ func (this *Ringpop) pingMemberNow(returnCh chan<- string) {
 	// sendPing(this, member) // this should internally block with goroutine
 
 	//
-	// TODOOOOO
+	// TODO
 	//
-
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

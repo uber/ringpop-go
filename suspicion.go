@@ -38,7 +38,7 @@ func NewSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *Suspicion {
 	suspicion := &Suspicion{
 		ringpop: ringpop,
 		period:  period,
-		timers:  map[string]*time.Timer{},
+		timers:  make(map[string]*time.Timer, 0),
 	}
 
 	return suspicion
@@ -74,7 +74,7 @@ func (this *Suspicion) start(suspect Suspect) {
 	}
 
 	// declare member faulty when timer runs out
-	this.timers[suspect.Address()] = time.AfterFunc(time.Millisecond*time.Duration(this.period), func() {
+	this.timers[suspect.Address()] = time.AfterFunc(this.period, func() {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local":  this.ringpop.WhoAmI(),
 			"faulty": suspect.Address(),
@@ -123,7 +123,9 @@ func (this *Suspicion) reenable() {
 func (this *Suspicion) stopAll() {
 	this.stopped = true
 
-	if len(this.timers) == 0 {
+	numtimers := len(this.timers)
+
+	if numtimers == 0 {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local": this.ringpop.WhoAmI(),
 		}).Debug("stopped no suspect timers")
@@ -131,7 +133,6 @@ func (this *Suspicion) stopAll() {
 		return
 	}
 
-	numtimers := len(this.timers)
 	for addr, timer := range this.timers {
 		timer.Stop()
 		delete(this.timers, addr)

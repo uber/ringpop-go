@@ -1,10 +1,18 @@
 package ringpop
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	MEMBERSHIP TESTS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func TestChecksumChanges(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
@@ -22,13 +30,13 @@ func TestChecksumEqual(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 	ringpop2 := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("192.168.1.1:9999", 1, "")
-	ringpop.membership.makeAlive("192.168.1.2:9999", 1, "")
-	ringpop.membership.makeAlive("192.168.1.3:9999", 1, "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", 1, "")
+	ringpop.membership.makeAlive("127.0.0.1:3002", 1, "")
+	ringpop.membership.makeAlive("127.0.0.1:3003", 1, "")
 
-	ringpop2.membership.makeAlive("192.168.1.3:9999", 1, "")
-	ringpop2.membership.makeAlive("192.168.1.1:9999", 1, "")
-	ringpop2.membership.makeAlive("192.168.1.2:9999", 1, "")
+	ringpop2.membership.makeAlive("127.0.0.1:3003", 1, "")
+	ringpop2.membership.makeAlive("127.0.0.1:3001", 1, "")
+	ringpop2.membership.makeAlive("127.0.0.1:3002", 1, "")
 
 	assert.Equal(t, ringpop.membership.checksum, ringpop2.membership.checksum,
 		"expected checksums to be equal, regardless of input order")
@@ -205,13 +213,12 @@ func TestAliveToFaulty(t *testing.T) {
 
 func TestString(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
-	ringpop.membership.makeAlive("127.0.0.2:3000", 1, "")
-	ringpop.membership.makeAlive("127.0.0.3:3000", 1, "")
+
+	ringpop.membership.makeAlive("127.0.0.2:3000", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.3:3000", time.Now().UnixNano(), "")
 
 	_, err := ringpop.membership.String()
 	assert.NoError(t, err, "membership should successfully be marshalled into JSON")
-
-	// println(str)
 }
 
 func TestLeaveEnds(t *testing.T) {
@@ -228,4 +235,88 @@ func TestLeaveEnds(t *testing.T) {
 
 	updates = ringpop.membership.makeLeave(newMemberAddr, newMemberInc, "")
 	assert.Equal(t, 0, len(updates), "expected no update to be applied")
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	MEMBERSHIP ITERATOR TESTS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func TestIterNoUsable(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3000")
+
+	iter := ringpop.membership.iter()
+
+	member, err := iter.next()
+	assert.Error(t, err, "expected error, no usable members")
+	assert.Nil(t, member, "expected member to be nil")
+}
+
+func TestIterNoUsableWithNonLocal(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3000")
+
+	ringpop.membership.makeFaulty("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeLeave("127.0.0.1:3002", time.Now().UnixNano(), "")
+
+	iter := ringpop.membership.iter()
+
+	member, err := iter.next()
+	assert.Error(t, err, "expected error, no useable members")
+	assert.Nil(t, member, "expected member to be nil")
+}
+
+func TestIterOverTen(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3000")
+
+	for i := 1; i < 11; i++ {
+		ringpop.membership.makeAlive(fmt.Sprintf("127.0.0.1:300%s", i),
+			time.Now().UnixNano(), "")
+	}
+
+	iter := ringpop.membership.iter()
+	iterated := make(map[string]bool)
+
+	for i := 0; i < 15; i++ {
+		member, err := iter.next()
+		assert.NoError(t, err, "expected no error")
+		assert.NotNil(t, member, "expected useable member")
+		iterated[member.Address()] = true
+	}
+
+	assert.Len(t, iterated, 10, "expected 10 members to be iterated over")
+}
+
+func TestIterSkipsFaultyAndLocal(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3000")
+
+	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeFaulty("127.0.0.1:3002", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3003", time.Now().UnixNano(), "")
+
+	iter := ringpop.membership.iter()
+
+	iterated := make(map[string]bool)
+
+	member, err := iter.next()
+	assert.NoError(t, err, "expected no error")
+	assert.NotNil(t, member, "expected useable member")
+	iterated[member.Address()] = true
+
+	member, err = iter.next()
+	assert.NoError(t, err, "expected no error")
+	assert.NotNil(t, member, "expected useable member")
+	iterated[member.Address()] = true
+
+	member, err = iter.next()
+	assert.NoError(t, err, "expected no error")
+	assert.NotNil(t, member, "expected useable member")
+	iterated[member.Address()] = true
+
+	member, err = iter.next()
+	assert.NoError(t, err, "expected no error")
+	assert.NotNil(t, member, "expected useable member")
+	iterated[member.Address()] = true
+
+	assert.Len(t, iterated, 2, "expected two pingable members to be iterated on")
 }

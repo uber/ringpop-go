@@ -3,6 +3,7 @@ package ringpop
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -13,11 +14,11 @@ import (
 )
 
 type Change struct {
-	source      string
-	address     string
-	status      string
-	incarnation int64
-	timestamp   time.Time
+	source      string    `json:"source"`
+	address     string    `json:"address"`
+	status      string    `json:"status"`
+	incarnation int64     `json:"incarnation"`
+	timestamp   time.Time `json:"timestamp"`
 }
 
 // methods to satisfy `Suspect` interface
@@ -322,18 +323,56 @@ func (this *Membership) String() (string, error) {
 	return string(str), err
 }
 
-// Iter returns a channel containing all pingable members in the membership
-func (this *Membership) iter() <-chan *Member {
-	members := this.shuffle()
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	MEMBERSHIP ITERATOR
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-	iterCh := make(chan *Member)
-	go func() {
-		for _, member := range members {
-			if this.isPingable(member) {
-				iterCh <- member
-			}
+func (this *Membership) iter() MembershipIter {
+	return NewMembershipIter(this)
+}
+
+type MembershipIter struct {
+	membership   *Membership
+	members      []*Member
+	currentIndex int
+	currentRound int
+}
+
+func NewMembershipIter(membership *Membership) MembershipIter {
+	iter := MembershipIter{
+		membership:   membership,
+		currentIndex: -1,
+		currentRound: 0,
+	}
+
+	iter.members = iter.membership.shuffle()
+
+	return iter
+}
+
+// Returns the next pingable member in the membership list
+func (this *MembershipIter) next() (*Member, error) {
+	maxToVisit := len(this.members)
+	visited := make(map[string]bool)
+
+	for len(visited) < maxToVisit {
+		this.currentIndex++
+
+		if this.currentIndex >= len(this.members) {
+			this.currentIndex = 0
+			this.currentRound++
+			this.members = this.membership.shuffle()
 		}
-		close(iterCh)
-	}()
-	return iterCh
+
+		member := this.members[this.currentIndex]
+		visited[member.Address()] = true
+
+		if this.membership.isPingable(member) {
+			return member, nil
+		}
+	}
+
+	return nil, errors.New("no usable members")
 }
