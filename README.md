@@ -21,7 +21,7 @@ ringpop leverages consistent hashing to minimize the number of keys that need to
 ## Proxying
 ringpop offers proxying as a convenience. You may use ringpop to route your application's requests.
 
-## tchannel
+## TChannel
 TChannel is the transport of choice for ringpop's gossip and proxying capabilities. For more information about tchannel, go here: https://github.com/uber/tchannel.
 
 ## Developer's Guide
