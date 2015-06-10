@@ -158,7 +158,6 @@ func NewRingpop(app, hostport string, options *RingpopOptions) *Ringpop {
 	if ringpop.proxyReqTimeout = _PROXY_REQ_TIMEOUT_; options.ProxyReqTimeout.Nanoseconds() != 0 {
 		ringpop.proxyReqTimeout = options.ProxyReqTimeout
 	}
-
 	// membership and gossip
 	ringpop.dissemination = newDissemination(ringpop)
 	ringpop.membership = newMembership(ringpop)
@@ -166,10 +165,9 @@ func NewRingpop(app, hostport string, options *RingpopOptions) *Ringpop {
 		ringpop.membershipUpdateFlushInterval, 0)
 	ringpop.suspicion = newSuspicion(ringpop, options.SuspicionTimeout)
 	ringpop.gossip = newGossip(ringpop, 0)
-
 	// statsd
-	ringpop.statKeys = make(map[string]string, 0)
 	// changes 0.0.0.0:0000 -> 0_0_0_0_0000
+	ringpop.statKeys = make(map[string]string, 0)
 	ringpop.statHostPort = strings.Replace(ringpop.HostPort, ".", "_", -1)
 	ringpop.statHostPort = strings.Replace(ringpop.statHostPort, ":", "_", -1)
 	ringpop.statPrefix = fmt.Sprintf("ringpop.%s", ringpop.statHostPort)
@@ -409,20 +407,22 @@ func (this *Ringpop) PingMember(address string) error {
 	return nil
 }
 
-func (this *Ringpop) pingMemberNow() error {
+func (this *Ringpop) PingMemberNow() error {
 	if this.pinging {
 		this.logger.Warn("aborting ping because one is already in progress")
 		return errors.New("ping aborted because a ping already in progress")
 	}
 
-	if !this.ready {
-		this.logger.Warn("ping started before ring is initialized")
-		return errors.New("ping started before ring is initialized")
-	}
+	// if !this.ready {
+	// 	this.logger.Warn("ping started before ring is initialized")
+	// 	return errors.New("ping started before ring is initialized")
+	// }
+
+	this.membership.makeAlive("127.0.0.1:3002", time.Now().UnixNano(), "")
 
 	iter := this.membership.iter()
-	member, err := iter.next()
-	if err != nil {
+	member, ok := iter.next()
+	if !ok {
 		this.logger.Warn("no usable nodes at protocol period")
 		return errors.New("no usable nodes at protocol period")
 	}
@@ -431,12 +431,18 @@ func (this *Ringpop) pingMemberNow() error {
 
 	res, err := sendPing(this, member.Address)
 
-	this.logger.Infof("Ping response checksum: %v", res.Checksum)
-
 	if err == nil {
 		this.pinging = false
 		//this.membership.update(responseBody.changes)
 		// TODO
+
+		fmt.Printf("Checksum: %v\n", res.Checksum)
+		fmt.Printf("Source: %s\n", res.Source)
+		for _, change := range res.Changes {
+			fmt.Printf("Address: %s, Status: %s, Incarnation: %v\n",
+				change.Address, change.Status, change.Incarnation)
+		}
+
 		return nil
 	}
 

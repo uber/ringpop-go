@@ -3,7 +3,6 @@ package ringpop
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -345,7 +344,7 @@ func newMembershipIter(membership *membership) membershipIter {
 }
 
 // Returns the next pingable member in the membership list
-func (this *membershipIter) next() (*Member, error) {
+func (this *membershipIter) next() (*Member, bool) {
 	maxToVisit := len(this.members)
 	visited := make(map[string]bool)
 
@@ -362,9 +361,9 @@ func (this *membershipIter) next() (*Member, error) {
 		visited[member.Address] = true
 
 		if this.membership.isPingable(member) {
-			return member, nil
+			return member, true
 		}
 	}
 
-	return nil, errors.New("no usable members")
+	return nil, false
 }
