@@ -431,6 +431,8 @@ func (this *Ringpop) pingMemberNow() error {
 
 	res, err := sendPing(this, member.Address)
 
+	this.logger.Infof("Ping response checksum: %v", res.Checksum)
+
 	if err == nil {
 		this.pinging = false
 		//this.membership.update(responseBody.changes)
