@@ -9,7 +9,7 @@ func TimeNow() int64 {
 // Testing functions
 
 func testPop(hostport string) *Ringpop {
-	ringpop := NewRingpop("test", hostport)
+	ringpop := NewRingpop("test", hostport, nil)
 	ringpop.membership.makeAlive(hostport, 1, "")
 
 	return ringpop

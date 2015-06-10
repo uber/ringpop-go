@@ -14,9 +14,9 @@ const (
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 type Member struct {
-	address     string
-	status      string
-	incarnation int64
+	Address     string
+	Status      string
+	Incarnation int64
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -25,14 +25,14 @@ type Member struct {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (this Member) Address() string {
-	return this.address
+func (this Member) suspectAddress() string {
+	return this.Address
 }
 
-func (this Member) Status() string {
-	return this.status
+func (this Member) suspectStatus() string {
+	return this.Status
 }
 
-func (this Member) Incarnation() int64 {
-	return this.incarnation
+func (this Member) suspectIncarnation() int64 {
+	return this.Incarnation
 }

@@ -1,12 +1,14 @@
 package ringpop
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/uber/tchannel/golang"
 
 	"github.com/quipo/statsd"
 	"github.com/rcrowley/go-metrics"
@@ -14,11 +16,41 @@ import (
 
 var hostPortPattern, hostPortErr = regexp.Compile("^([0-9]+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
 
+const (
+	_MAX_JOIN_DURATOIN_               = 300000
+	_MEMBERSHIP_UPDATE_FLUSH_INTERVAL = 5000
+	_PROXY_REQ_TIMEOUT_               = 30000
+)
+
+var (
+	_PROXY_REQ_PROPS_ = []string{"keys", "dest", "req", "res"}
+)
+
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //	RINGPOP
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+type RingpopOptions struct {
+	Channel *tchannel.Channel
+	Logger  *log.Logger
+	Statsd  statsd.Statsd
+
+	BootstrapFile string
+
+	JoinSize                      int
+	SetTimeout                    time.Duration
+	ProxyReqTimeout               time.Duration
+	MaxJoinDuration               time.Duration
+	MembershipUpdateFlushInterval time.Duration
+
+	RequestProxyMaxRetries    int
+	RequestProxyRetrySchedule time.Duration // revist
+
+	MinProtocolPeriod time.Duration
+	SuspicionTimeout  time.Duration
+}
 
 type Ringpop struct {
 	// Exported
@@ -26,6 +58,8 @@ type Ringpop struct {
 	HostPort string
 
 	// Unexported
+	channel *tchannel.Channel
+
 	eventC   chan string
 	emitting bool
 
@@ -36,22 +70,27 @@ type Ringpop struct {
 	pinging   bool
 	destroyed bool
 
-	pingReqSize    int
-	pingReqTimeout time.Duration
-	pingTimeout    time.Duration
+	pingReqSize int
+
+	pingReqTimeout                time.Duration
+	pingTimeout                   time.Duration
+	proxyReqTimeout               time.Duration
+	maxJoinDuration               time.Duration
+	membershipUpdateFlushInterval time.Duration
 
 	ring       *HashRing
 	ringEventC chan string
 
 	// membership
-	dissemination          *Dissemination
-	membership             *Membership
+	dissemination          *dissemination
+	membership             *membership
+	MembershipIter         *membershipIter
 	membershipChangeC      chan []Change
-	membershipUpdateRollup *MembershipUpdateRollup
+	membershipUpdateRollup *membershipUpdateRollup
 
-	// swim
-	suspicion *Suspicion
-	gossip    *Gossip
+	// gossip
+	suspicion *suspicion
+	gossip    *gossip
 
 	// statsd
 	statsd       statsd.Statsd
@@ -71,7 +110,13 @@ type Ringpop struct {
 	isDenyingJoins bool
 }
 
-func NewRingpop(app, hostport string) *Ringpop {
+// TODO: Finish`
+func NewRingpop(app, hostport string, options *RingpopOptions) *Ringpop {
+	// use default options if nothing is passed into options
+	if options == nil {
+		options = &RingpopOptions{}
+	}
+
 	// verify valid hostport
 	if match := hostPortPattern.Match([]byte(hostport)); !match {
 		log.Fatal("Invalid host port ", hostport)
@@ -82,39 +127,60 @@ func NewRingpop(app, hostport string) *Ringpop {
 		HostPort: hostport,
 	}
 
-	ringpop.pingReqSize = 3
-	ringpop.pingReqTimeout = time.Millisecond * 3000
-	ringpop.pingTimeout = time.Millisecond * 200
-
 	ringpop.ready = false
 	ringpop.pinging = false
 
-	ringpop.membership = NewMembership(ringpop)
-	ringpop.membershipChangeC = make(chan []Change)
-	// ringpop.launchMembershipChangeHandler()
-	ringpop.membershipUpdateRollup = NewMembershipUpdateRollup(ringpop, 5000*time.Millisecond, 0)
+	// set channel to option
+	if ringpop.channel = nil; options.Channel != nil {
+		ringpop.channel = options.Channel
+	}
+	// set logger to option or default value
+	if ringpop.logger = log.StandardLogger(); options.Logger != nil {
+		ringpop.logger = options.Logger
+	}
+	// set statsd client to option or default value
+	if ringpop.statsd = (&statsd.NoopClient{}); options.Statsd != nil {
+		ringpop.statsd = options.Statsd
+	}
 
-	ringpop.suspicion = NewSuspicion(ringpop, 3000*time.Millisecond)
-	ringpop.gossip = NewGossip(ringpop, -1)
+	ringpop.bootstrapFile = options.BootstrapFile
+	ringpop.joinSize = options.JoinSize
+	// set maxJoinDuration to option or default value
+	if ringpop.maxJoinDuration = _MAX_JOIN_DURATOIN_; options.MaxJoinDuration.Nanoseconds() != 0 {
+		ringpop.maxJoinDuration = options.MaxJoinDuration
+	}
 
-	// launch event handling functions
-	ringpop.ring = NewHashring()
-	// ringpop.launchRingEventHandler()
+	ringpop.pingTimeout = time.Millisecond * 1500
+	ringpop.pingReqSize = 3
+	ringpop.pingReqTimeout = time.Millisecond * 5000
 
-	ringpop.statsd = statsd.NoopClient{} // TODO: change this to an actual client
+	// set proxyReqTimeout to option or default value
+	if ringpop.proxyReqTimeout = _PROXY_REQ_TIMEOUT_; options.ProxyReqTimeout.Nanoseconds() != 0 {
+		ringpop.proxyReqTimeout = options.ProxyReqTimeout
+	}
+
+	// membership and gossip
+	ringpop.dissemination = newDissemination(ringpop)
+	ringpop.membership = newMembership(ringpop)
+	ringpop.membershipUpdateRollup = newMembershipUpdateRollup(ringpop,
+		ringpop.membershipUpdateFlushInterval, 0)
+	ringpop.suspicion = newSuspicion(ringpop, options.SuspicionTimeout)
+	ringpop.gossip = newGossip(ringpop, 0)
+
+	// statsd
 	ringpop.statKeys = make(map[string]string, 0)
 	// changes 0.0.0.0:0000 -> 0_0_0_0_0000
 	ringpop.statHostPort = strings.Replace(ringpop.HostPort, ".", "_", -1)
 	ringpop.statHostPort = strings.Replace(ringpop.statHostPort, ":", "_", -1)
 	ringpop.statPrefix = fmt.Sprintf("ringpop.%s", ringpop.statHostPort)
 
-	ringpop.logger = log.StandardLogger() // temporary
-	ringpop.logger.Formatter = new(log.JSONFormatter)
-
 	ringpop.destroyed = false
-	// ringpop.joiner = nil TODO
 
 	return ringpop
+}
+
+func (this *Ringpop) SetupChannel() {
+	NewRingpopTChannel(this, this.channel)
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -164,8 +230,9 @@ func (this *Ringpop) EventC() <-chan string {
 // Emit sends a message on the ringpop's eventC in a nonblocking fashion
 func (this *Ringpop) emit(message string) {
 	if this.emitting {
-		// make this happen in a goroutine for non-blocking mode?
-		this.eventC <- message
+		go func() {
+			this.eventC <- message
+		}()
 	}
 }
 
@@ -228,7 +295,7 @@ func (this *Ringpop) onMemberAlive(change Change) {
 	}).Debug("member is alive")
 
 	this.dissemination.recordChange(change) // Propogate change
-	this.ring.addServer(change.Address())   // Add server from ring
+	this.ring.addServer(change.Address)     // Add server from ring
 	this.suspicion.stop(change)             // Stop suspicion for server
 }
 
@@ -238,12 +305,12 @@ func (this *Ringpop) onMemberFaulty(change Change) {
 
 	this.logger.WithFields(log.Fields{
 		"local":  this.WhoAmI(),
-		"faulty": change.Address(),
+		"faulty": change.Address,
 	}).Debug("member is faulty")
 
-	this.ring.removeServer(change.Address()) // Remove server from ring
-	this.suspicion.stop(change)              // Stop suspicion for server
-	this.dissemination.recordChange(change)  // Propogate change
+	this.ring.removeServer(change.Address)  // Remove server from ring
+	this.suspicion.stop(change)             // Stop suspicion for server
+	this.dissemination.recordChange(change) // Propogate change
 }
 
 func (this *Ringpop) onMemberSuspect(change Change) {
@@ -265,12 +332,12 @@ func (this *Ringpop) onMemberLeave(change Change) {
 
 	this.logger.WithFields(log.Fields{
 		"local": this.WhoAmI(),
-		"leave": change.Address(),
+		"leave": change.Address,
 	}).Debug("member has left")
 
-	this.dissemination.recordChange(change)  // Propogate change
-	this.ring.removeServer(change.Address()) // Remove server from ring
-	this.suspicion.stop(change)              // Stop suspicion for server
+	this.dissemination.recordChange(change) // Propogate change
+	this.ring.removeServer(change.Address)  // Remove server from ring
+	this.suspicion.stop(change)             // Stop suspicion for server
 }
 
 func (this *Ringpop) launchMembershipChangeHandler() chan<- bool {
@@ -287,7 +354,7 @@ func (this *Ringpop) launchMembershipChangeHandler() chan<- bool {
 			select {
 			case changes = <-this.membershipChangeC:
 				for _, change := range changes {
-					switch change.Status() {
+					switch change.Status {
 					case ALIVE:
 						this.onMemberAlive(change)
 						membershipChanged, ringChanged = true, true
@@ -324,32 +391,64 @@ func (this *Ringpop) launchMembershipChangeHandler() chan<- bool {
 	return stop
 }
 
-func (this *Ringpop) pingMemberNow(returnCh chan<- string) {
+// testing func
+func (this *Ringpop) PingMember(address string) error {
+	res, err := sendPing(this, address)
+	if err != nil {
+		this.logger.Errorf("error: %v", err)
+		return err
+	}
+	this.pinging = false
+	//this.membership.update(responseBody.changes)
+	fmt.Printf("Checksum: %v\n", res.Checksum)
+	fmt.Printf("Source: %s\n", res.Source)
+	for _, change := range res.Changes {
+		fmt.Printf("Address: %s, Status: %s, Incarnation: %v\n",
+			change.Address, change.Status, change.Incarnation)
+	}
+	return nil
+}
+
+func (this *Ringpop) pingMemberNow() error {
 	if this.pinging {
 		this.logger.Warn("aborting ping because one is already in progress")
-		returnCh <- "already pinging"
-		return
+		return errors.New("ping aborted because a ping already in progress")
 	}
 
 	if !this.ready {
 		this.logger.Warn("ping started before ring is initialized")
-		returnCh <- "not ready"
-		return
+		return errors.New("ping started before ring is initialized")
 	}
 
 	iter := this.membership.iter()
-	_, err := iter.next()
+	member, err := iter.next()
 	if err != nil {
 		this.logger.Warn("no usable nodes at protocol period")
-		returnCh <- "no usable nodes at protocol period"
-		return
+		return errors.New("no usable nodes at protocol period")
 	}
 
 	this.pinging = true
 
-	// sendPing(this, member) // this should internally block with goroutine
+	res, err := sendPing(this, member.Address)
 
-	this.pinging = false
+	if err == nil {
+		this.pinging = false
+		//this.membership.update(responseBody.changes)
+		// TODO
+		return nil
+	}
+
+	if this.destroyed {
+		return errors.New("destroyed whilst pinging")
+	}
+
+	// Do a ping request otherwise
+
+	return nil
+}
+
+func (this *Ringpop) TestPing(target string) {
+
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

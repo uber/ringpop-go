@@ -3,7 +3,7 @@ package ringpop
 import "time"
 import log "github.com/Sirupsen/logrus"
 
-const MAX_NUM_UPDATES = 250
+const _MAX_NUM_UPDATES_ = 250
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
@@ -11,7 +11,7 @@ const MAX_NUM_UPDATES = 250
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type MembershipUpdateRollup struct {
+type membershipUpdateRollup struct {
 	ringpop       *Ringpop
 	flushInterval time.Duration
 	maxNumUpdates int
@@ -25,12 +25,12 @@ type MembershipUpdateRollup struct {
 }
 
 // NewMembershipUpdateRollup returns a new MembershipUpdateRollup
-func NewMembershipUpdateRollup(ringpop *Ringpop, flushInterval time.Duration, maxNumUpdates int) *MembershipUpdateRollup {
+func newMembershipUpdateRollup(ringpop *Ringpop, flushInterval time.Duration, maxNumUpdates int) *membershipUpdateRollup {
 	if maxNumUpdates <= 0 {
-		maxNumUpdates = MAX_NUM_UPDATES
+		maxNumUpdates = _MAX_NUM_UPDATES_
 	}
 
-	membershipUpdateRollup := &MembershipUpdateRollup{
+	membershipUpdateRollup := &membershipUpdateRollup{
 		ringpop:       ringpop,
 		flushInterval: flushInterval,
 		maxNumUpdates: maxNumUpdates,
@@ -48,18 +48,18 @@ func NewMembershipUpdateRollup(ringpop *Ringpop, flushInterval time.Duration, ma
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // addUpdates adds changes to the buffer
-func (this *MembershipUpdateRollup) addUpdates(changes []Change) {
+func (this *membershipUpdateRollup) addUpdates(changes []Change) {
 	ts := time.Now()
 
 	for _, change := range changes {
 		// update timestamp
-		change.timestamp = ts
+		change.Timestamp = ts
 		// add change to corresponding slice of changes
-		this.buffer[change.Address()] = append(this.buffer[change.Address()], change)
+		this.buffer[change.Address] = append(this.buffer[change.Address], change)
 	}
 }
 
-func (this *MembershipUpdateRollup) trackUpdates(changes []Change) {
+func (this *membershipUpdateRollup) trackUpdates(changes []Change) {
 	if len(changes) == 0 {
 		return
 	}
@@ -80,7 +80,7 @@ func (this *MembershipUpdateRollup) trackUpdates(changes []Change) {
 }
 
 // numUpdates returns the total number of changes contained in the buffer
-func (this *MembershipUpdateRollup) numUpdates() int {
+func (this *membershipUpdateRollup) numUpdates() int {
 	total := 0
 
 	for _, changes := range this.buffer {
@@ -90,7 +90,7 @@ func (this *MembershipUpdateRollup) numUpdates() int {
 }
 
 // renewFlushTimer starts or restarts the flush timer
-func (this *MembershipUpdateRollup) renewFlushTimer() {
+func (this *membershipUpdateRollup) renewFlushTimer() {
 	this.flushTimer = nil
 	this.flushTimer = time.NewTicker(this.flushInterval)
 
@@ -110,7 +110,7 @@ func (this *MembershipUpdateRollup) renewFlushTimer() {
 }
 
 // flushBuffer flushes contents of buffer and resets update times to zero
-func (this *MembershipUpdateRollup) flushBuffer() {
+func (this *membershipUpdateRollup) flushBuffer() {
 	// nothing to flush if no updates in buffer
 	if len(this.buffer) == 0 {
 		return
@@ -148,7 +148,7 @@ func (this *MembershipUpdateRollup) flushBuffer() {
 }
 
 // Destroy stops timer
-func (this *MembershipUpdateRollup) destroy() {
+func (this *membershipUpdateRollup) destroy() {
 	if this.flushTimer == nil {
 		return
 	}

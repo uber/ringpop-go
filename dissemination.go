@@ -14,17 +14,17 @@ var LOG10 = math.Log(10)
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type Dissemination struct {
+type dissemination struct {
 	ringpop           *Ringpop
-	changes           []Change
+	changes           map[string]Change
 	maxPiggybackCount uint32
 	piggybackFactor   uint32
 }
 
-func NewDissemination(ringpop *Ringpop) *Dissemination {
-	return &Dissemination{
+func newDissemination(ringpop *Ringpop) *dissemination {
+	return &dissemination{
 		ringpop:           ringpop,
-		changes:           make([]Change, 0, 10),
+		changes:           make(map[string]Change),
 		maxPiggybackCount: 1,
 		piggybackFactor:   15, // lower factor -> more full syncs
 	}
@@ -36,7 +36,7 @@ func NewDissemination(ringpop *Ringpop) *Dissemination {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (this *Dissemination) adjustPiggybackCount() {
+func (this *dissemination) adjustPiggybackCount() {
 	serverCount := this.ringpop.ring.serverCount()
 	prevPiggybackCount := this.maxPiggybackCount
 
@@ -54,25 +54,49 @@ func (this *Dissemination) adjustPiggybackCount() {
 	}
 }
 
-func (this *Dissemination) fullSync() []Change {
-	changes := []Change{}
+func (this *dissemination) fullSync() []Change {
+	changes := make([]Change, len(this.ringpop.membership.members))
 
 	for _, member := range this.ringpop.membership.members {
 		changes = append(changes, Change{
-			source:      this.ringpop.WhoAmI(),
-			address:     member.Address(),
-			status:      member.Status(),
-			incarnation: member.Incarnation(),
+			Source:      this.ringpop.WhoAmI(),
+			Address:     member.Address,
+			Status:      member.Status,
+			Incarnation: member.Incarnation,
 		})
 	}
 
 	return changes
 }
 
-func (this *Dissemination) recordChange(change Change) {
+func (this *dissemination) recordChange(change Change) {
 	// TODO
 }
 
-func (this *Dissemination) issueChanges() {
+func (this *dissemination) issueChanges(checksum uint32, source string) []Change {
+	var changesToDisseminate []Change
+	var changedNodes []string
 
+	for _, change := range this.changes {
+		changedNodes = append(changedNodes, change.Address)
+	}
+
+	// for _, node := range changedNodes {
+
+	// }
+
+	this.ringpop.stat("gauge", "changes.disseminate", int64(len(changesToDisseminate)))
+
+	if len(changesToDisseminate) > 0 {
+		return changesToDisseminate
+	} else if this.ringpop.membership.checksum != checksum {
+		this.ringpop.stat("increment", "full-sync", 1)
+		this.ringpop.logger.WithFields(log.Fields{
+			"localChecksum":  this.ringpop.membership.checksum,
+			"remoteChecksum": checksum,
+			"remoteNode":     source,
+		}).Info("full sync")
+	}
+
+	return []Change{}
 }

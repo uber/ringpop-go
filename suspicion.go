@@ -9,10 +9,10 @@ import (
 const defaultTimeout = time.Millisecond * 5000
 
 // interface so that both changes and members can be passed to Suspicion methods
-type Suspect interface {
-	Address() string
-	Status() string
-	Incarnation() int64
+type suspect interface {
+	suspectAddress() string
+	suspectStatus() string
+	suspectIncarnation() int64
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -21,7 +21,7 @@ type Suspect interface {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type Suspicion struct {
+type suspicion struct {
 	ringpop *Ringpop
 	period  time.Duration
 	stopped bool
@@ -29,13 +29,13 @@ type Suspicion struct {
 }
 
 // NewSuspicion creates a new suspicion protocol
-func NewSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *Suspicion {
+func newSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *suspicion {
 	period := defaultTimeout
 	if suspicionTimeout != time.Duration(0) {
 		period = suspicionTimeout
 	}
 
-	suspicion := &Suspicion{
+	suspicion := &suspicion{
 		ringpop: ringpop,
 		period:  period,
 		timers:  make(map[string]*time.Timer, 0),
@@ -51,7 +51,7 @@ func NewSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *Suspicion {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // Start enables suspicion protocol for a particular member given by a change
-func (this *Suspicion) start(suspect Suspect) {
+func (this *suspicion) start(suspect suspect) {
 	if this.stopped {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local": this.ringpop.WhoAmI(),
@@ -60,50 +60,50 @@ func (this *Suspicion) start(suspect Suspect) {
 		return
 	}
 
-	if suspect.Address() == this.ringpop.WhoAmI() {
+	if suspect.suspectAddress() == this.ringpop.WhoAmI() {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local":   this.ringpop.WhoAmI(),
-			"suspect": suspect.Address(),
+			"suspect": suspect.suspectAddress(),
 		}).Debug("cannot start a suspect period for the local member")
 
 		return
 	}
 
-	if timer, ok := this.timers[suspect.Address()]; ok {
+	if timer, ok := this.timers[suspect.suspectAddress()]; ok {
 		timer.Stop()
 	}
 
 	// declare member faulty when timer runs out
-	this.timers[suspect.Address()] = time.AfterFunc(this.period, func() {
+	this.timers[suspect.suspectAddress()] = time.AfterFunc(this.period, func() {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local":  this.ringpop.WhoAmI(),
-			"faulty": suspect.Address(),
+			"faulty": suspect.suspectAddress(),
 		}).Info("ringpop declares member faulty")
 
-		this.ringpop.membership.makeFaulty(suspect.Address(), suspect.Incarnation(), "")
+		this.ringpop.membership.makeFaulty(suspect.suspectAddress(), suspect.suspectIncarnation(), "")
 	})
 
 	this.ringpop.logger.WithFields(log.Fields{
 		"local":   this.ringpop.WhoAmI(),
-		"suspect": suspect.Address(),
+		"suspect": suspect.suspectAddress(),
 	}).Debug("started suspect period")
 }
 
 // Stop stops the suspicion timer for a specific member
-func (this *Suspicion) stop(suspect Suspect) {
-	if timer, ok := this.timers[suspect.Address()]; ok {
+func (this *suspicion) stop(suspect suspect) {
+	if timer, ok := this.timers[suspect.suspectAddress()]; ok {
 		timer.Stop()
-		delete(this.timers, suspect.Address())
+		delete(this.timers, suspect.suspectAddress())
 
 		this.ringpop.logger.WithFields(log.Fields{
 			"local":   this.ringpop.WhoAmI(),
-			"suspect": suspect.Address(),
+			"suspect": suspect.suspectAddress(),
 		}).Debug("stopped members suspect timer")
 	}
 }
 
 // Reenable reenables the suspicion protocol
-func (this *Suspicion) reenable() {
+func (this *suspicion) reenable() {
 	if !this.stopped {
 		this.ringpop.logger.WithFields(log.Fields{
 			"local": this.ringpop.WhoAmI(),
@@ -120,7 +120,7 @@ func (this *Suspicion) reenable() {
 }
 
 // StopAll stops all suspicion timers
-func (this *Suspicion) stopAll() {
+func (this *suspicion) stopAll() {
 	this.stopped = true
 
 	numtimers := len(this.timers)
