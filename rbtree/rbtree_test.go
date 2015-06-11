@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"strconv"
 	"testing"
 
@@ -13,11 +12,11 @@ import (
 
 // TODO: add more realistic benchmarks
 
-//---------------------------------------------------------------------------//
-//																			//
-// TESTS														 		   //
-//																 		  //
-//-----------------------------------------------------------------------//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// TESTS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func makeTree() RBTree {
 	tree := RBTree{}
@@ -648,39 +647,11 @@ func TestBig(t *testing.T) {
 	}
 }
 
-func TesHuge(t *testing.T) {
-	tree := RBTree{}
-	for i := 0; i < 1000000; i++ {
-		tree.Insert(i, strconv.Itoa(i))
-	}
-
-	assert.Equal(t, 1000000, tree.size, "really big tree")
-
-	rdm := rand.New(rand.NewSource(4815162342))
-
-	for i := 0; i < 500000; i++ {
-		tree.Delete(rdm.Int() % 1000000)
-	}
-
-	_, err := validateRBTree(tree.root)
-	assert.NoError(t, err, "expected tree to be a valid red black tree")
-
-	iter := tree.Iter(0)
-	for x := range iter {
-		x = x
-	}
-
-	iter = tree.Iter(1000000)
-	_, ok := <-iter
-
-	assert.False(t, ok, "iter should contain nothing")
-}
-
-//---------------------------------------------------------------------------//
-//																			//
-// BENCHMARKS													 		   //
-//																 		  //
-//-----------------------------------------------------------------------//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// BENCHMARKS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func benchmarkRBTreeInsert(b *testing.B) {
 	for n := 0; n < b.N; n++ {
@@ -719,18 +690,6 @@ func benchmarkRBTreeSearch(b *testing.B) {
 			tree.Search(i)
 		}
 	}
-}
-
-func benchmarkRBTreeInsertRealistic(b *testing.B) {
-
-}
-
-func benchmarkRBTreeDeleteRealistic(b *testing.B) {
-
-}
-
-func benchmarkRBTreeSearchRealistic(b *testing.B) {
-
 }
 
 func opsPerSec(nspop int64) int64 {

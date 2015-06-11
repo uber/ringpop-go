@@ -1,18 +1,26 @@
 package ringpop
 
 const (
-	ALIVE   = "alive"
-	FAULTY  = "fault"
-	LEAVE   = "leave"
+	// ALIVE is the member "alive" state
+	ALIVE = "alive"
+
+	// FAULTY is the member "faulty" state
+	FAULTY = "faulty"
+
+	// LEAVE is the member "leave" state
+	LEAVE = "leave"
+
+	// SUSPECT is the memeber "suspect" state
 	SUSPECT = "suspect"
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-// MEMER
+// MEMBER
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+// Member is a node in the membership list
 type Member struct {
 	Address     string
 	Status      string
@@ -25,14 +33,14 @@ type Member struct {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (this Member) suspectAddress() string {
-	return this.Address
+func (m Member) suspectAddress() string {
+	return m.Address
 }
 
-func (this Member) suspectStatus() string {
-	return this.Status
+func (m Member) suspectStatus() string {
+	return m.Status
 }
 
-func (this Member) suspectIncarnation() int64 {
-	return this.Incarnation
+func (m Member) suspectIncarnation() int64 {
+	return m.Incarnation
 }

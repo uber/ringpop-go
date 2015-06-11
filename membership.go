@@ -12,6 +12,7 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
+// Change is a struct used to make changes to the membership
 type Change struct {
 	Source      string    `json:"source"`
 	Address     string    `json:"address"`
@@ -20,17 +21,17 @@ type Change struct {
 	Timestamp   time.Time `json:"timestamp"`
 }
 
-// methods to satisfy `Suspect` interface
-func (this Change) suspectAddress() string {
-	return this.Address
+// methods to satisfy `suspect` interface
+func (c Change) suspectAddress() string {
+	return c.Address
 }
 
-func (this Change) suspectStatus() string {
-	return this.Status
+func (c Change) suspectStatus() string {
+	return c.Status
 }
 
-func (this Change) suspectIncarnation() int64 {
-	return this.Incarnation
+func (c Change) suspectIncarnation() int64 {
+	return c.Incarnation
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -43,14 +44,14 @@ type membership struct {
 	ringpop     *Ringpop
 	members     map[string]*Member
 	checksum    uint32
-	localMember *Member
+	localmember *Member
 }
 
-// NewMembership returns a pointer to a new Membership
+// NewMembership returns a pointer to a new membership
 func newMembership(ringpop *Ringpop) *membership {
 	membership := &membership{
 		ringpop: ringpop,
-		members: map[string]*Member{},
+		members: make(map[string]*Member),
 	}
 	return membership
 }
@@ -74,14 +75,14 @@ func newMembership(ringpop *Ringpop) *membership {
 //
 // The member fields that are part of the checksum string are:
 // address, status, incarnation number
-func (this *membership) computeChecksum() {
-	this.checksum = farm.Hash32([]byte(this.genChecksumString()))
+func (m *membership) computeChecksum() {
+	m.checksum = farm.Hash32([]byte(m.genChecksumString()))
 }
 
-func (this *membership) genChecksumString() string {
+func (m *membership) genChecksumString() string {
 	var checksumStrings sort.StringSlice
 
-	for _, member := range this.members {
+	for _, member := range m.members {
 		cstr := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
 		checksumStrings = append(checksumStrings, cstr)
 	}
@@ -97,60 +98,60 @@ func (this *membership) genChecksumString() string {
 	return buffer.String()
 }
 
-func (this *membership) getMemberByAddress(address string) (*Member, bool) {
-	member, ok := this.members[address]
+func (m *membership) getMemberByAddress(address string) (*Member, bool) {
+	member, ok := m.members[address]
 	if !ok {
 		member = nil
 	}
 	return member, ok
 }
 
-func (this *membership) getJoinPosition() int {
-	return int(math.Floor(rand.Float64() * float64(len(this.members))))
+func (m *membership) getJoinPosition() int {
+	return int(math.Floor(rand.Float64() * float64(len(m.members))))
 }
 
-func (this *membership) memberCount() int {
-	return len(this.members)
+func (m *membership) memberCount() int {
+	return len(m.members)
 }
 
-func (this *membership) randomPingableMembers(n int, exlcuding map[string]bool) []*Member {
-	var pingableMembers []*Member
+func (m *membership) randomPingablemembers(n int, exlcuding map[string]bool) []*Member {
+	var pingablemembers []*Member
 
-	for _, member := range this.members {
-		if this.isPingable(member) && !exlcuding[member.Address] {
-			pingableMembers = append(pingableMembers, member)
+	for _, member := range m.members {
+		if m.isPingable(member) && !exlcuding[member.Address] {
+			pingablemembers = append(pingablemembers, member)
 		}
 	}
 
 	// shuffle members and take first n
-	pingableMembers = shuffle(pingableMembers)
+	pingablemembers = shuffle(pingablemembers)
 
-	if n > len(pingableMembers) {
-		return pingableMembers
+	if n > len(pingablemembers) {
+		return pingablemembers
 	}
-	return pingableMembers[:n]
+	return pingablemembers[:n]
 }
 
-func (this *membership) stats() {
-	// TODO: decide what to make this return (stuct?)
+func (m *membership) stats() {
+	// TODO: decide what to make m return (stuct?)
 }
 
-func (this *membership) hasMember(member *Member) bool {
-	_, ok := this.members[member.Address]
+func (m *membership) hasmember(member *Member) bool {
+	_, ok := m.members[member.Address]
 	return ok
 }
 
-func (this *membership) isPingable(member *Member) bool {
-	return member.Address != this.ringpop.WhoAmI() &&
+func (m *membership) isPingable(member *Member) bool {
+	return member.Address != m.ringpop.WhoAmI() &&
 		(member.Status == ALIVE || member.Status == SUSPECT)
 }
 
-func (this *membership) makeAlive(address string, incarnation int64, source string) []Change {
+func (m *membership) makeAlive(address string, incarnation int64, source string) []Change {
 	if source == "" {
-		source = this.ringpop.WhoAmI()
+		source = m.ringpop.WhoAmI()
 	}
 
-	return this.update([]Change{Change{
+	return m.update([]Change{Change{
 		Source:      source,
 		Address:     address,
 		Status:      ALIVE,
@@ -159,12 +160,12 @@ func (this *membership) makeAlive(address string, incarnation int64, source stri
 	}})
 }
 
-func (this *membership) makeFaulty(address string, incarnation int64, source string) []Change {
+func (m *membership) makeFaulty(address string, incarnation int64, source string) []Change {
 	if source == "" {
-		source = this.ringpop.WhoAmI()
+		source = m.ringpop.WhoAmI()
 	}
 
-	return this.update([]Change{Change{
+	return m.update([]Change{Change{
 		Source:      source,
 		Address:     address,
 		Status:      FAULTY,
@@ -173,12 +174,12 @@ func (this *membership) makeFaulty(address string, incarnation int64, source str
 	}})
 }
 
-func (this *membership) makeLeave(address string, incarnation int64, source string) []Change {
+func (m *membership) makeLeave(address string, incarnation int64, source string) []Change {
 	if source == "" {
-		source = this.ringpop.WhoAmI()
+		source = m.ringpop.WhoAmI()
 	}
 
-	return this.update([]Change{Change{
+	return m.update([]Change{Change{
 		Source:      source,
 		Address:     address,
 		Status:      LEAVE,
@@ -187,12 +188,12 @@ func (this *membership) makeLeave(address string, incarnation int64, source stri
 	}})
 }
 
-func (this *membership) makeSuspect(address string, incarnation int64, source string) []Change {
+func (m *membership) makeSuspect(address string, incarnation int64, source string) []Change {
 	if source == "" {
-		source = this.ringpop.WhoAmI()
+		source = m.ringpop.WhoAmI()
 	}
 
-	return this.update([]Change{Change{
+	return m.update([]Change{Change{
 		Source:      source,
 		Address:     address,
 		Status:      SUSPECT,
@@ -201,8 +202,8 @@ func (this *membership) makeSuspect(address string, incarnation int64, source st
 	}})
 }
 
-func (this *membership) makeUpdate(change Change) {
-	member, ok := this.members[change.Address]
+func (m *membership) makeUpdate(change Change) {
+	member, ok := m.members[change.Address]
 
 	if !ok {
 		member = &Member{
@@ -211,21 +212,21 @@ func (this *membership) makeUpdate(change Change) {
 			Incarnation: change.Incarnation,
 		}
 
-		if member.Address == this.ringpop.WhoAmI() {
-			this.localMember = member
+		if member.Address == m.ringpop.WhoAmI() {
+			m.localmember = member
 		}
 
-		this.members[change.Address] = member
+		m.members[change.Address] = member
 	}
 
-	// joinpos := this.getJoinPosition()
-	// this.members = append(this.members[:joinpos], append([]*Member{member}, this.members[joinpos:]...)...)
+	// joinpos := m.getJoinPosition()
+	// m.members = append(m.members[:joinpos], append([]*Member{member}, m.members[joinpos:]...)...)
 
 	member.Status = change.Status
 	member.Incarnation = change.Incarnation
 }
 
-func (this *membership) update(changes []Change) []Change {
+func (m *membership) update(changes []Change) []Change {
 	var updates []Change
 
 	if len(changes) == 0 {
@@ -233,18 +234,18 @@ func (this *membership) update(changes []Change) []Change {
 	}
 
 	for _, change := range changes {
-		member, found := this.getMemberByAddress(change.Address)
+		member, found := m.getMemberByAddress(change.Address)
 
-		// If this is the first time we see the member, take change wholesale
+		// If m is the first time we see the member, take change wholesale
 		if !found {
-			this.makeUpdate(change)
+			m.makeUpdate(change)
 			updates = append(updates, change)
 			continue
 		}
 
 		// If the change is a local override, reassert member is alive
-		if IsLocalSuspectOverride(this.ringpop, member, change) ||
-			IsLocalFaultyOverride(this.ringpop, member, change) {
+		if isLocalSuspectOverride(m.ringpop, member, change) ||
+			isLocalFaultyOverride(m.ringpop, member, change) {
 			newchange := Change{
 				Source:      change.Source,
 				Address:     change.Address,
@@ -253,22 +254,22 @@ func (this *membership) update(changes []Change) []Change {
 				Timestamp:   change.Timestamp,
 			}
 
-			this.makeUpdate(newchange)
+			m.makeUpdate(newchange)
 			updates = append(updates, newchange)
 			continue
 		}
 
 		// If non-local update, take change wholesale
-		if IsAliveOverride(member, change) || IsSuspectOverride(member, change) ||
-			IsFaultyOverride(member, change) || IsLeaveOverride(member, change) {
-			this.makeUpdate(change)
+		if isAliveOverride(member, change) || isSuspectOverride(member, change) ||
+			isFaultyOverride(member, change) || isLeaveOverride(member, change) {
+			m.makeUpdate(change)
 			updates = append(updates, change)
 		}
 	}
 
 	if len(updates) > 0 {
-		this.computeChecksum()
-		this.ringpop.emit("updated")
+		m.computeChecksum()
+		m.ringpop.emit("updated")
 	}
 
 	return updates
@@ -276,21 +277,21 @@ func (this *membership) update(changes []Change) []Change {
 
 // shuffles slice of members pseudo-randomly
 func shuffle(members []*Member) []*Member {
-	newMembers := make([]*Member, len(members), cap(members))
+	newmembers := make([]*Member, len(members), cap(members))
 	newIndexes := rand.Perm(len(members))
 
 	for o, n := range newIndexes {
-		newMembers[n] = members[o]
+		newmembers[n] = members[o]
 	}
 
-	return newMembers
+	return newmembers
 }
 
 // Shuffle returns a slice containing the members in the membership in a random order
-func (this *membership) shuffle() []*Member {
+func (m *membership) shuffle() []*Member {
 	shuffled := []*Member{}
 
-	for _, member := range this.members {
+	for _, member := range m.members {
 		shuffled = append(shuffled, member)
 	}
 
@@ -300,10 +301,10 @@ func (this *membership) shuffle() []*Member {
 }
 
 // String returns a JSON string
-func (this *membership) String() (string, error) {
+func (m *membership) String() (string, error) {
 	var members []string
 
-	for _, member := range this.members {
+	for _, member := range m.members {
 		members = append(members, member.Address)
 	}
 
@@ -320,8 +321,8 @@ func (this *membership) String() (string, error) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (this *membership) iter() membershipIter {
-	return newMembershipIter(this)
+func (m *membership) iter() membershipIter {
+	return newmembershipIter(m)
 }
 
 type membershipIter struct {
@@ -331,7 +332,7 @@ type membershipIter struct {
 	currentRound int
 }
 
-func newMembershipIter(membership *membership) membershipIter {
+func newmembershipIter(membership *membership) membershipIter {
 	iter := membershipIter{
 		membership:   membership,
 		currentIndex: -1,
@@ -344,23 +345,23 @@ func newMembershipIter(membership *membership) membershipIter {
 }
 
 // Returns the next pingable member in the membership list
-func (this *membershipIter) next() (*Member, bool) {
-	maxToVisit := len(this.members)
+func (it *membershipIter) next() (*Member, bool) {
+	maxToVisit := len(it.members)
 	visited := make(map[string]bool)
 
 	for len(visited) < maxToVisit {
-		this.currentIndex++
+		it.currentIndex++
 
-		if this.currentIndex >= len(this.members) {
-			this.currentIndex = 0
-			this.currentRound++
-			this.members = this.membership.shuffle()
+		if it.currentIndex >= len(it.members) {
+			it.currentIndex = 0
+			it.currentRound++
+			it.members = it.membership.shuffle()
 		}
 
-		member := this.members[this.currentIndex]
+		member := it.members[it.currentIndex]
 		visited[member.Address] = true
 
-		if this.membership.isPingable(member) {
+		if it.membership.isPingable(member) {
 			return member, true
 		}
 	}

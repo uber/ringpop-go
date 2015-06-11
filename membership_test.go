@@ -16,11 +16,11 @@ import (
 
 func TestChecksumChanges(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
-	ringpop.membership.makeAlive("127.0.0.1:3000", TimeNow(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3000", unixMilliseconds(), "")
 
 	oldchecksum := ringpop.membership.checksum
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", TimeNow(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
 
 	assert.NotEqual(t, oldchecksum, ringpop.membership.checksum,
 		"expected checksum to have changed on membership change")
@@ -184,7 +184,7 @@ func TestAliveToFaulty(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
 	newMemberAddr := "127.0.0.2:3001"
-	ringpop.membership.makeAlive(newMemberAddr, TimeNow(), "")
+	ringpop.membership.makeAlive(newMemberAddr, unixMilliseconds(), "")
 
 	newMember, found := ringpop.membership.getMemberByAddress(newMemberAddr)
 	assert.True(t, found, "expected new membwer to be found")
@@ -225,7 +225,7 @@ func TestLeaveEnds(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
 	newMemberAddr := "127.0.0.1:3001"
-	newMemberInc := TimeNow()
+	newMemberInc := unixMilliseconds()
 
 	updates := ringpop.membership.makeAlive(newMemberAddr, newMemberInc, "")
 	assert.Equal(t, 1, len(updates), "expected alive update to be applied")
@@ -248,8 +248,8 @@ func TestIterNoUsable(t *testing.T) {
 
 	iter := ringpop.membership.iter()
 
-	member, err := iter.next()
-	assert.Error(t, err, "expected error, no usable members")
+	member, ok := iter.next()
+	assert.False(t, ok, "expected error, no usable members")
 	assert.Nil(t, member, "expected member to be nil")
 }
 
@@ -261,8 +261,8 @@ func TestIterNoUsableWithNonLocal(t *testing.T) {
 
 	iter := ringpop.membership.iter()
 
-	member, err := iter.next()
-	assert.Error(t, err, "expected error, no useable members")
+	member, ok := iter.next()
+	assert.False(t, ok, "expected error, no useable members")
 	assert.Nil(t, member, "expected member to be nil")
 }
 
@@ -270,7 +270,7 @@ func TestIterOverTen(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
 	for i := 1; i < 11; i++ {
-		ringpop.membership.makeAlive(fmt.Sprintf("127.0.0.1:300%s", i),
+		ringpop.membership.makeAlive(fmt.Sprintf("127.0.0.1:300%v", i),
 			time.Now().UnixNano(), "")
 	}
 
@@ -278,8 +278,8 @@ func TestIterOverTen(t *testing.T) {
 	iterated := make(map[string]bool)
 
 	for i := 0; i < 15; i++ {
-		member, err := iter.next()
-		assert.NoError(t, err, "expected no error")
+		member, ok := iter.next()
+		assert.True(t, ok, "expected no error")
 		assert.NotNil(t, member, "expected useable member")
 		iterated[member.Address] = true
 	}
@@ -298,23 +298,23 @@ func TestIterSkipsFaultyAndLocal(t *testing.T) {
 
 	iterated := make(map[string]bool)
 
-	member, err := iter.next()
-	assert.NoError(t, err, "expected no error")
+	member, ok := iter.next()
+	assert.True(t, ok, "expected no error")
 	assert.NotNil(t, member, "expected useable member")
 	iterated[member.Address] = true
 
-	member, err = iter.next()
-	assert.NoError(t, err, "expected no error")
+	member, ok = iter.next()
+	assert.True(t, ok, "expected no error")
 	assert.NotNil(t, member, "expected useable member")
 	iterated[member.Address] = true
 
-	member, err = iter.next()
-	assert.NoError(t, err, "expected no error")
+	member, ok = iter.next()
+	assert.True(t, ok, "expected no error")
 	assert.NotNil(t, member, "expected useable member")
 	iterated[member.Address] = true
 
-	member, err = iter.next()
-	assert.NoError(t, err, "expected no error")
+	member, ok = iter.next()
+	assert.True(t, ok, "expected no error")
 	assert.NotNil(t, member, "expected useable member")
 	iterated[member.Address] = true
 

@@ -6,7 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-var LOG10 = math.Log(10)
+var log10 = math.Log(10)
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
@@ -17,8 +17,8 @@ var LOG10 = math.Log(10)
 type dissemination struct {
 	ringpop           *Ringpop
 	changes           map[string]Change
-	maxPiggybackCount uint32
-	piggybackFactor   uint32
+	maxPiggybackCount int
+	piggybackFactor   int
 }
 
 func newDissemination(ringpop *Ringpop) *dissemination {
@@ -36,30 +36,30 @@ func newDissemination(ringpop *Ringpop) *dissemination {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (this *dissemination) adjustPiggybackCount() {
-	serverCount := this.ringpop.ring.serverCount()
-	prevPiggybackCount := this.maxPiggybackCount
+func (d *dissemination) adjustPiggybackCount() {
+	serverCount := d.ringpop.ring.serverCount()
+	prevPiggybackCount := d.maxPiggybackCount
 
-	newPiggybackCount := this.piggybackFactor * uint32(math.Ceil(math.Log(float64(serverCount+1))/LOG10))
+	newPiggybackCount := d.piggybackFactor * int(math.Ceil(math.Log(float64(serverCount+1))/log10))
 
 	if newPiggybackCount != prevPiggybackCount {
-		this.maxPiggybackCount = newPiggybackCount
-		this.ringpop.stat("gauge", "max-piggyback", int64(this.maxPiggybackCount))
-		this.ringpop.logger.WithFields(log.Fields{
-			"newPiggybackCount": this.maxPiggybackCount,
+		d.maxPiggybackCount = newPiggybackCount
+		d.ringpop.stat("gauge", "max-piggyback", int64(d.maxPiggybackCount))
+		d.ringpop.logger.WithFields(log.Fields{
+			"newPiggybackCount": d.maxPiggybackCount,
 			"oldPiggybackCount": prevPiggybackCount,
-			"piggybackFactor":   this.piggybackFactor,
+			"piggybackFactor":   d.piggybackFactor,
 			"serverCount":       serverCount,
 		}).Debug("adjusted max piggyback count")
 	}
 }
 
-func (this *dissemination) fullSync() []Change {
-	changes := make([]Change, len(this.ringpop.membership.members))
+func (d *dissemination) fullSync() []Change {
+	changes := make([]Change, len(d.ringpop.membership.members))
 
-	for _, member := range this.ringpop.membership.members {
+	for _, member := range d.ringpop.membership.members {
 		changes = append(changes, Change{
-			Source:      this.ringpop.WhoAmI(),
+			Source:      d.ringpop.WhoAmI(),
 			Address:     member.Address,
 			Status:      member.Status,
 			Incarnation: member.Incarnation,
@@ -69,34 +69,46 @@ func (this *dissemination) fullSync() []Change {
 	return changes
 }
 
-func (this *dissemination) recordChange(change Change) {
-	// TODO
-}
-
-func (this *dissemination) issueChanges(checksum uint32, source string) []Change {
+// issuechanges returns a slice of changes to be propogated
+func (d *dissemination) issuechanges(checksum uint32, source string) []Change {
 	var changesToDisseminate []Change
-	var changedNodes []string
+	var piggybacks = make(map[string]int)
 
-	for _, change := range this.changes {
+	var changedNodes []string
+	for _, change := range d.changes {
 		changedNodes = append(changedNodes, change.Address)
 	}
 
-	// for _, node := range changedNodes {
+	for _, change := range d.changes {
+		piggybacks[change.Address]++
 
-	// }
+		if piggybacks[change.Address] > d.maxPiggybackCount {
+			delete(d.changes, change.Address)
+			continue
+		}
 
-	this.ringpop.stat("gauge", "changes.disseminate", int64(len(changesToDisseminate)))
+		changesToDisseminate = append(changesToDisseminate, change)
+	}
+
+	d.ringpop.stat("gauge", "changes.disseminate", int64(len(changesToDisseminate)))
 
 	if len(changesToDisseminate) > 0 {
 		return changesToDisseminate
-	} else if this.ringpop.membership.checksum != checksum {
-		this.ringpop.stat("increment", "full-sync", 1)
-		this.ringpop.logger.WithFields(log.Fields{
-			"localChecksum":  this.ringpop.membership.checksum,
+	} else if checksum != 0 && d.ringpop.membership.checksum != checksum {
+		d.ringpop.stat("increment", "full-sync", 1)
+		d.ringpop.logger.WithFields(log.Fields{
+			"localChecksum":  d.ringpop.membership.checksum,
 			"remoteChecksum": checksum,
 			"remoteNode":     source,
 		}).Info("full sync")
+
+		return d.fullSync()
 	}
 
 	return []Change{}
+}
+
+// recordchange records a change in the dissemination for later propogation
+func (d *dissemination) recordChange(change Change) {
+	d.changes[change.Address] = change
 }

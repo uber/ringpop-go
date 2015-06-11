@@ -7,34 +7,34 @@ type RBTree struct {
 }
 
 type RingNode struct {
-	val   int64
+	val   int
 	str   string
 	left  *RingNode
 	right *RingNode
 	red   bool
 }
 
-func (this *RBTree) Size() int {
-	return this.size
+func (t *RBTree) Size() int {
+	return t.size
 }
 
-func (this *RingNode) Child(right bool) *RingNode {
+func (n *RingNode) Child(right bool) *RingNode {
 	if right {
-		return this.right
+		return n.right
 	} else {
-		return this.left
+		return n.left
 	}
 }
 
-func (this *RingNode) Str() string {
-	return this.str
+func (n *RingNode) Str() string {
+	return n.str
 }
 
-func (this *RingNode) setChild(right bool, n *RingNode) {
+func (n *RingNode) setChild(right bool, node *RingNode) {
 	if right {
-		this.right = n
+		n.right = node
 	} else {
-		this.left = n
+		n.left = node
 	}
 }
 
@@ -62,9 +62,9 @@ func doubleRotate(root *RingNode, dir bool) *RingNode {
 
 // Insert inserts a value and string into the tree
 // Returns true on succesful insertion, false if duplicate exists
-func (this *RBTree) Insert(val int64, str string) (ret bool) {
-	if this.root == nil {
-		this.root = &RingNode{val: val, str: str}
+func (t *RBTree) Insert(val int, str string) (ret bool) {
+	if t.root == nil {
+		t.root = &RingNode{val: val, str: str}
 		ret = true
 	} else {
 		var head = &RingNode{}
@@ -75,9 +75,9 @@ func (this *RBTree) Insert(val int64, str string) (ret bool) {
 		var parent *RingNode  // parent
 		var gparent *RingNode // grandparent
 		var ggparent = head   // great grandparent
-		var node = this.root
+		var node = t.root
 
-		ggparent.right = this.root
+		ggparent.right = t.root
 
 		for {
 			if node == nil {
@@ -121,14 +121,14 @@ func (this *RBTree) Insert(val int64, str string) (ret bool) {
 			node = node.Child(dir)
 		}
 
-		this.root = head.right
+		t.root = head.right
 	}
 
 	// make root black
-	this.root.red = false
+	t.root.red = false
 
 	if ret {
-		this.size++
+		t.size++
 	}
 
 	return ret
@@ -136,8 +136,8 @@ func (this *RBTree) Insert(val int64, str string) (ret bool) {
 
 // Delete removes a value from the RBTree
 // Returns true on succesful deletion, false if val is not in tree
-func (this *RBTree) Delete(val int64) bool {
-	if this.root == nil {
+func (t *RBTree) Delete(val int) bool {
+	if t.root == nil {
 		return false
 	}
 
@@ -149,7 +149,7 @@ func (this *RBTree) Delete(val int64) bool {
 
 	var dir = true
 
-	node.right = this.root
+	node.right = t.root
 
 	for node.Child(dir) != nil {
 		last := dir
@@ -205,26 +205,26 @@ func (this *RBTree) Delete(val int64) bool {
 		found.val = node.val
 		found.str = node.str
 		parent.setChild(parent.right == node, node.Child(node.left == nil))
-		this.size--
+		t.size--
 	}
 
-	this.root = head.right
-	if this.root != nil {
-		this.root.red = false
+	t.root = head.right
+	if t.root != nil {
+		t.root.red = false
 	}
 
 	return found != nil
 }
 
-func (this *RingNode) search(val int64) (string, bool) {
-	if this.val == val {
-		return this.str, true
-	} else if val < this.val {
-		if this.left != nil {
-			return this.left.search(val)
+func (n *RingNode) search(val int) (string, bool) {
+	if n.val == val {
+		return n.str, true
+	} else if val < n.val {
+		if n.left != nil {
+			return n.left.search(val)
 		}
-	} else if this.right != nil {
-		return this.right.search(val)
+	} else if n.right != nil {
+		return n.right.search(val)
 	}
 	return "", false
 }
@@ -232,18 +232,18 @@ func (this *RingNode) search(val int64) (string, bool) {
 // Search searches for a value in the RBTree
 // Returns the string and true if found, empty string and false if val is not
 // in the tree
-func (this *RBTree) Search(val int64) (string, bool) {
-	if this.root == nil {
+func (t *RBTree) Search(val int) (string, bool) {
+	if t.root == nil {
 		return "", false
 	} else {
-		return this.root.search(val)
+		return t.root.search(val)
 	}
 }
 
 // Min returns the node in the tree with the smallest value, or nil if the tree
 // is empty
-func (this *RBTree) Min() *RingNode {
-	node := this.root
+func (t *RBTree) Min() *RingNode {
+	node := t.root
 
 	if node == nil {
 		return nil
@@ -256,25 +256,25 @@ func (this *RBTree) Min() *RingNode {
 	return node
 }
 
-func (this *RingNode) genIter(val int64, ch chan<- *RingNode) {
-	cmp := this.val >= val
-	if cmp && this.left != nil {
-		this.left.genIter(val, ch)
+func (n *RingNode) genIter(val int, ch chan<- *RingNode) {
+	cmp := n.val >= val
+	if cmp && n.left != nil {
+		n.left.genIter(val, ch)
 	}
 	if cmp {
-		ch <- this
+		ch <- n
 	}
-	if this.right != nil {
-		this.right.genIter(val, ch)
+	if n.right != nil {
+		n.right.genIter(val, ch)
 	}
 }
 
-func (this *RBTree) MinIter() <-chan *RingNode {
+func (t *RBTree) MinIter() <-chan *RingNode {
 	ch := make(chan *RingNode)
-	if this.root != nil {
-		min := this.Min()
+	if t.root != nil {
+		min := t.Min()
 		go func() {
-			this.root.genIter(min.val, ch)
+			t.root.genIter(min.val, ch)
 			close(ch)
 		}()
 	}
@@ -283,11 +283,11 @@ func (this *RBTree) MinIter() <-chan *RingNode {
 
 // Iter returns a channel of RingNodes containing only those nodes in the tree
 // with a value greater than or equal to the given val
-func (this *RBTree) Iter(val int64) <-chan *RingNode {
+func (t *RBTree) Iter(val int) <-chan *RingNode {
 	ch := make(chan *RingNode)
-	if this.root != nil {
+	if t.root != nil {
 		go func() {
-			this.root.genIter(val, ch)
+			t.root.genIter(val, ch)
 			close(ch)
 		}()
 	}

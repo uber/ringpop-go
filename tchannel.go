@@ -7,13 +7,15 @@ import (
 	"golang.org/x/net/context"
 )
 
-type RingpopTChannel struct {
+type headers map[string]string
+
+type ringpopTChannel struct {
 	ringpop *Ringpop
 	channel *tchannel.Channel
 }
 
-func NewRingpopTChannel(ringpop *Ringpop, channel *tchannel.Channel) {
-	ringpopTChannel := &RingpopTChannel{
+func newRingpopTChannel(ringpop *Ringpop, channel *tchannel.Channel) *ringpopTChannel {
+	ringpopTChannel := &ringpopTChannel{
 		ringpop: ringpop,
 		channel: channel,
 	}
@@ -50,56 +52,52 @@ func NewRingpopTChannel(ringpop *Ringpop, channel *tchannel.Channel) {
 			ringpopTChannel.channel.Register(handler, service, operation)
 		}
 	}
+
+	return ringpopTChannel
 }
 
-type Headers map[string]string
-
-type Ping struct {
-	Message string `json:"message"`
-}
-
-func (this *RingpopTChannel) protocolPing() tchannel.HandlerFunc {
+func (rc *ringpopTChannel) protocolPing() tchannel.HandlerFunc {
 	handler := func(ctx context.Context, call *tchannel.InboundCall) {
-		var headers Headers
+		var headers headers
 		if err := call.ReadArg2(tchannel.NewJSONInput(&headers)); err != nil {
-			this.ringpop.logger.Warnf("Could not read request headers: %v", err)
+			rc.ringpop.logger.Warnf("Could not read request headers: %v", err)
 			return
 		}
 
-		var body PingBody
+		var body pingBody
 		if err := call.ReadArg3(tchannel.NewJSONInput(&body)); err != nil {
-			this.ringpop.logger.Warnf("Could not read request body: %v", err)
+			rc.ringpop.logger.Warnf("Could not read request body: %v", err)
 			return
 		}
 
 		// TODO: do something with body
 
-		// changes := receivePing(this.ringpop)
+		// changes := receivePing(rc.ringpop)
 
 		// TODO: Real version ...
-		resBody := PingBody{
-			Checksum: this.ringpop.membership.checksum,
+		resBody := pingBody{
+			Checksum: rc.ringpop.membership.checksum,
 			Changes: []Change{Change{
 				Address:     "127.0.0.1:9001",
 				Status:      ALIVE,
 				Incarnation: time.Now().UnixNano(),
-				Source:      this.ringpop.WhoAmI(),
+				Source:      rc.ringpop.WhoAmI(),
 			}, Change{
 				Address:     "127.0.0.1:9002",
 				Status:      ALIVE,
 				Incarnation: time.Now().UnixNano(),
-				Source:      this.ringpop.WhoAmI(),
+				Source:      rc.ringpop.WhoAmI(),
 			}},
-			Source: this.ringpop.WhoAmI(),
+			Source: rc.ringpop.WhoAmI(),
 		}
 
 		if err := call.Response().WriteArg2(tchannel.NewJSONOutput(headers)); err != nil {
-			this.ringpop.logger.Warnf("Could not write response headers: %v", err)
+			rc.ringpop.logger.Warnf("Could not write response headers: %v", err)
 			return
 		}
 
 		if err := call.Response().WriteArg3(tchannel.NewJSONOutput(resBody)); err != nil {
-			this.ringpop.logger.Warnf("Could not write response body: %v", err)
+			rc.ringpop.logger.Warnf("Could not write response body: %v", err)
 			return
 		}
 	}

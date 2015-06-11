@@ -19,16 +19,15 @@ func farmhash32(address string, off int) uint32 {
 	return farm.Hash32([]byte(hashstr))
 }
 
-type HashRing struct {
+type hashRing struct {
 	rbtree        rbtree.RBTree
 	servers       map[string]bool
 	checksum      uint32
 	replicaPoints int
-	//TODO: give event channel? do we need one?
 }
 
-func NewHashring() *HashRing {
-	hashring := &HashRing{
+func newHashrRing() *hashRing {
+	hashring := &hashRing{
 		rbtree: rbtree.RBTree{},
 	}
 
@@ -36,11 +35,11 @@ func NewHashring() *HashRing {
 }
 
 // computeChecksum computes checksum of all servers in the ring
-func (this *HashRing) computeChecksum() {
+func (r *hashRing) computeChecksum() {
 	var addresses sort.StringSlice
 	var buffer bytes.Buffer
 
-	for address := range this.servers {
+	for address := range r.servers {
 		addresses = append(addresses, address)
 	}
 
@@ -51,61 +50,61 @@ func (this *HashRing) computeChecksum() {
 		buffer.WriteString(";")
 	}
 
-	this.checksum = farmhash32(buffer.String(), -1)
+	r.checksum = farmhash32(buffer.String(), -1)
 }
 
 // AddServer does what you would expect
-func (this *HashRing) addServer(address string) {
-	if this.hasServer(address) {
+func (r *hashRing) addServer(address string) {
+	if r.hasServer(address) {
 		return
 	}
 	// add server to servers
-	this.servers[address] = true
+	r.servers[address] = true
 	// insert replications into ring
-	for i := 0; i < this.replicaPoints; i++ {
-		this.rbtree.Insert(int64(farmhash32(address, i)), address)
+	for i := 0; i < r.replicaPoints; i++ {
+		r.rbtree.Insert(int(farmhash32(address, i)), address)
 	}
 
-	this.computeChecksum()
+	r.computeChecksum()
 }
 
 // removeServer does what you would expect
-func (this *HashRing) removeServer(address string) {
-	if !this.hasServer(address) {
+func (r *hashRing) removeServer(address string) {
+	if !r.hasServer(address) {
 		return
 	}
 
-	delete(this.servers, address)
+	delete(r.servers, address)
 
-	for i := 0; i < this.replicaPoints; i++ {
-		this.rbtree.Delete(int64(farmhash32(address, i)))
+	for i := 0; i < r.replicaPoints; i++ {
+		r.rbtree.Delete(int(farmhash32(address, i)))
 	}
 
-	this.computeChecksum()
+	r.computeChecksum()
 }
 
 // hasServer returns true if the server exists in the ring, false otherwise
-func (this *HashRing) hasServer(address string) bool {
-	exists, ok := this.servers[address]
+func (r *hashRing) hasServer(address string) bool {
+	exists, ok := r.servers[address]
 	return ok && exists
 }
 
 // ServerCount returns the number of servers in the ring
-func (this *HashRing) serverCount() int {
-	return len(this.servers)
+func (r *hashRing) serverCount() int {
+	return len(r.servers)
 }
 
-func (this *HashRing) lookup(key string) (string, bool) {
+func (r *hashRing) lookup(key string) (string, bool) {
 	hash := farm.Hash32([]byte(key))
 	iter := make(<-chan *rbtree.RingNode)
-	iter = this.rbtree.Iter(int64(hash))
+	iter = r.rbtree.Iter(int(hash))
 
 	if node, ok := <-iter; ok {
 		return node.Str(), true
-	} else {
-		if node = this.rbtree.Min(); node != nil {
-			return node.Str(), true
-		}
+	}
+
+	if node := r.rbtree.Min(); node != nil {
+		return node.Str(), true
 	}
 
 	return "", false
