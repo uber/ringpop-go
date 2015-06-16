@@ -55,7 +55,7 @@ func (d *dissemination) adjustPiggybackCount() {
 }
 
 func (d *dissemination) fullSync() []Change {
-	changes := make([]Change, len(d.ringpop.membership.members))
+	changes := make([]Change, 0, len(d.ringpop.membership.members))
 
 	for _, member := range d.ringpop.membership.members {
 		changes = append(changes, Change{
@@ -70,7 +70,7 @@ func (d *dissemination) fullSync() []Change {
 }
 
 // issuechanges returns a slice of changes to be propogated
-func (d *dissemination) issuechanges(checksum uint32, source string) []Change {
+func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 	var changesToDisseminate []Change
 	var piggybacks = make(map[string]int)
 
