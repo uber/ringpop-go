@@ -12,7 +12,15 @@ func unixMilliseconds() int64 {
 	return time.Now().UnixNano() / 1000000
 }
 
-// Testing functions
+func indexOf(slice []string, element string) int {
+	for i, e := range slice {
+		if e == element {
+			return i
+		}
+	}
+
+	return -1
+}
 
 // takes x.x.x.x:y and returns x.x.x.x
 func captureHost(hostport string) string {
@@ -23,14 +31,14 @@ func captureHost(hostport string) string {
 	return ""
 }
 
-func selectNumDefault(opt, def int) int {
+func selectNumOrDefault(opt, def int) int {
 	if opt == 0 {
 		return def
 	}
 	return opt
 }
 
-func selectDurationDefault(opt, def time.Duration) time.Duration {
+func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 	if opt == time.Duration(0) {
 		return def
 	}
@@ -38,7 +46,7 @@ func selectDurationDefault(opt, def time.Duration) time.Duration {
 }
 
 func testPop(hostport string) *Ringpop {
-	ringpop := NewRingpop("test", hostport, nil)
+	ringpop := NewRingpop("test", hostport, Options{})
 	ringpop.membership.makeAlive(hostport, 1, "")
 
 	return ringpop

@@ -51,7 +51,7 @@ func (p *pinger) send() (*pingBody, error) {
 	// changes := p.ringpop.dissemination.issueChanges()
 	var changes []Change
 
-	ctx, cancel := context.WithTimeout(context.Background(), p.ringpop.pingTimeout)
+	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()), p.ringpop.pingTimeout)
 	defer cancel()
 
 	// begin call

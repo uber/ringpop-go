@@ -51,8 +51,8 @@ func receiveJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
 		return res, err
 	}
 
-	ringpop.serverRate.Mark(1)
-	ringpop.totalRate.Mark(1)
+	// ringpop.serverRate.Mark(1)
+	// ringpop.totalRate.Mark(1)
 
 	ringpop.membership.makeAlive(body.Source, body.Incarnation, "")
 

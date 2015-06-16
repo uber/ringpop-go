@@ -2,6 +2,7 @@ package ringpop
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"golang.org/x/net/context"
@@ -36,7 +37,11 @@ const (
 func isSingleNodeCluster(ringpop *Ringpop) bool {
 	_, ok := ringpop.bootstrapHosts[captureHost(ringpop.HostPort)]
 
-	return ok && len(ringpop.bootstrapHosts) == 1
+	var numHosts = 0
+	for _, hosts := range ringpop.bootstrapHosts {
+		numHosts += len(hosts)
+	}
+	return ok && numHosts == 1
 }
 
 func takeNode(hosts []string) ([]string, string) {
@@ -110,7 +115,7 @@ type joiner struct {
 	roundNonPreferredNodes []string
 }
 
-func newJoiner(ringpop *Ringpop, opts *joinerOptions) *joiner {
+func newJoiner(ringpop *Ringpop, opts joinerOptions) *joiner {
 	if ringpop == nil {
 		return nil
 	}
@@ -204,6 +209,11 @@ func (j *joiner) selectGroup(nodesJoined []string) []string {
 	var group []string
 	var host string
 
+	// if fully exhausted or first round, initialize this round's nodes
+	if len(j.roundPreferredNodes) == 0 && len(j.roundNonPreferredNodes) == 0 {
+		j.init(nodesJoined)
+	}
+
 	preferredNodes := j.roundPreferredNodes
 	nonPreferredNodes := j.nonPreferredNodes
 	numNodesLeft := j.joinSize - len(nodesJoined)
@@ -249,12 +259,65 @@ func (j *joiner) join() ([]string, error) {
 	}
 
 	var nodesJoined []string
-	// var numGroups = 0
-	// var numJoined = 0
-	// var jumFailed = 0
-	// var startTime = time.Now()
+	var numGroups = 0
+	var numJoined = 0
+	var numFailed = 0
+	var startTime = time.Now()
 
-	j.joinGroup(nodesJoined)
+	for {
+		// join group of nodes
+		successes, failures := j.joinGroup(nodesJoined)
+
+		if j.ringpop.destroyed {
+			return nil, errors.New("joiner was destroyed")
+		}
+
+		nodesJoined = append(nodesJoined, successes...)
+		numJoined += len(successes)
+		numFailed += len(failures)
+		numGroups++
+
+		// if done condition is satisfied, join is successful, break
+		if numJoined >= j.joinSize {
+			j.ringpop.stat("increment", "join.complete", 1)
+			j.ringpop.logger.WithFields(log.Fields{
+				"local":     j.ringpop.WhoAmI(),
+				"joinSize":  j.joinSize,
+				"joinTime":  time.Now().Sub(startTime),
+				"numJoined": numJoined,
+				"numFailed": numFailed,
+				"numGroups": numGroups,
+			}).Info("ringpop join complete")
+
+			break
+		}
+
+		joinDuration := time.Now().Sub(startTime)
+
+		if joinDuration > j.maxJoinDuration {
+			j.ringpop.logger.WithFields(log.Fields{
+				"local":           j.ringpop.WhoAmI(),
+				"joinDuration":    joinDuration,
+				"maxJoinDuration": j.maxJoinDuration,
+				"numJoined":       numJoined,
+				"numFailed":       numFailed,
+				"startTime":       startTime,
+			}).Warn("ringpop max join duration exceeded")
+
+			message := fmt.Sprintf("Join duration of %v exceeded max %v.",
+				joinDuration, j.maxJoinDuration)
+
+			return nodesJoined, errors.New(message)
+		}
+
+		j.ringpop.logger.WithFields(log.Fields{
+			"local":     j.ringpop.WhoAmI(),
+			"joinSize":  j.ringpop.joinSize,
+			"numJoined": numJoined,
+			"numFailed": numFailed,
+			"startTime": startTime,
+		}).Debug("ringpop join not yet complete")
+	}
 
 	return nodesJoined, nil
 }
@@ -278,7 +341,7 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 		numCompleted := len(nodesJoined) + len(nodesFailed)
 
 		// Finished when either all joins have completed or enough to satisfy requirement
-		// specified by `joinSize`
+		// specified by joinSize
 		if len(nodesJoined) >= numNodesLeft || numCompleted >= len(group) {
 			break
 		}
@@ -294,13 +357,13 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 		"numNodesLeft": numNodesLeft,
 		"failures":     nodesFailed,
 		"successes":    nodesJoined,
-	})
+	}).Debug("ringpop join group complete")
 
 	return nodesJoined, nodesFailed
 }
 
 func (j *joiner) joinNode(node string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), j.timeout)
+	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()), j.timeout)
 	defer cancel()
 
 	// begin call
@@ -316,7 +379,6 @@ func (j *joiner) joinNode(node string) error {
 	// send request
 	var reqHeaders headers
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-
 		return err
 	}
 
@@ -341,11 +403,14 @@ func (j *joiner) joinNode(node string) error {
 		return err
 	}
 
+	// update membership if call was successful
+	j.ringpop.membership.update(resBody.Membership)
+
 	return nil
 }
 
 func sendJoin(ringpop *Ringpop) ([]string, error) {
-	joiner := newJoiner(ringpop, nil)
+	joiner := newJoiner(ringpop, joinerOptions{})
 	joiner.collectPotentialNodes(nil)
 	return joiner.join()
 }
