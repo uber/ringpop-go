@@ -26,7 +26,7 @@ type hashRing struct {
 	replicaPoints int
 }
 
-func newHashrRing() *hashRing {
+func newHashRing() *hashRing {
 	hashring := &hashRing{
 		rbtree: rbtree.RBTree{},
 	}
