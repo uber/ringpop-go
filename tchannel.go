@@ -2,7 +2,6 @@ package ringpop
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/uber/tchannel/golang"
 	"golang.org/x/net/context"
@@ -60,13 +59,13 @@ func newRingpopTChannel(ringpop *Ringpop, channel *tchannel.Channel) *ringpopTCh
 
 func (rc *ringpopTChannel) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
 	var reqHeaders headers
-	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(reqHeaders); err != nil {
+	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
 		rc.ringpop.logger.Warnf("Could not read request headers: %v", err)
 		return
 	}
 
 	var reqBody joinBody
-	if err := tchannel.NewArgReader(call.Arg3Reader()).ReadJSON(reqBody); err != nil {
+	if err := tchannel.NewArgReader(call.Arg3Reader()).ReadJSON(&reqBody); err != nil {
 		rc.ringpop.logger.Warnf("Could not read request body: %v", err)
 		return
 	}
@@ -111,12 +110,12 @@ func (rc *ringpopTChannel) protocolPingHandler(ctx context.Context, call *tchann
 		Changes: []Change{Change{
 			Address:     "127.0.0.1:9001",
 			Status:      ALIVE,
-			Incarnation: time.Now().UnixNano(),
+			Incarnation: unixMilliseconds(),
 			Source:      rc.ringpop.WhoAmI(),
 		}, Change{
 			Address:     "127.0.0.1:9002",
 			Status:      ALIVE,
-			Incarnation: time.Now().UnixNano(),
+			Incarnation: unixMilliseconds(),
 			Source:      rc.ringpop.WhoAmI(),
 		}},
 		Source: rc.ringpop.WhoAmI(),

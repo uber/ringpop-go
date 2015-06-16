@@ -250,7 +250,7 @@ func (m *membership) update(changes []Change) []Change {
 				Source:      change.Source,
 				Address:     change.Address,
 				Status:      ALIVE,
-				Incarnation: time.Now().UnixNano() / 1000000,
+				Incarnation: unixMilliseconds(),
 				Timestamp:   change.Timestamp,
 			}
 

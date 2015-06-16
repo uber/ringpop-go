@@ -3,7 +3,6 @@ package ringpop
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -214,8 +213,8 @@ func TestAliveToFaulty(t *testing.T) {
 func TestString(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("127.0.0.2:3000", time.Now().UnixNano(), "")
-	ringpop.membership.makeAlive("127.0.0.3:3000", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.2:3000", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.3:3000", unixMilliseconds(), "")
 
 	_, err := ringpop.membership.String()
 	assert.NoError(t, err, "membership should successfully be marshalled into JSON")
@@ -256,8 +255,8 @@ func TestIterNoUsable(t *testing.T) {
 func TestIterNoUsableWithNonLocal(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeFaulty("127.0.0.1:3001", time.Now().UnixNano(), "")
-	ringpop.membership.makeLeave("127.0.0.1:3002", time.Now().UnixNano(), "")
+	ringpop.membership.makeFaulty("127.0.0.1:3001", unixMilliseconds(), "")
+	ringpop.membership.makeLeave("127.0.0.1:3002", unixMilliseconds(), "")
 
 	iter := ringpop.membership.iter()
 
@@ -271,7 +270,7 @@ func TestIterOverTen(t *testing.T) {
 
 	for i := 1; i < 11; i++ {
 		ringpop.membership.makeAlive(fmt.Sprintf("127.0.0.1:300%v", i),
-			time.Now().UnixNano(), "")
+			unixMilliseconds(), "")
 	}
 
 	iter := ringpop.membership.iter()
@@ -290,9 +289,9 @@ func TestIterOverTen(t *testing.T) {
 func TestIterSkipsFaultyAndLocal(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
-	ringpop.membership.makeFaulty("127.0.0.1:3002", time.Now().UnixNano(), "")
-	ringpop.membership.makeAlive("127.0.0.1:3003", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
+	ringpop.membership.makeFaulty("127.0.0.1:3002", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3003", unixMilliseconds(), "")
 
 	iter := ringpop.membership.iter()
 

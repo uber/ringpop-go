@@ -37,7 +37,7 @@ func TestStartStopGossip(t *testing.T) {
 func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
 
 	ringpop.suspicion.stopAll()
 	assert.True(t, ringpop.suspicion.stopped, "expected suspicion protocol to be stopped")
@@ -56,7 +56,7 @@ func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 func TestSuspectMember(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
@@ -81,7 +81,7 @@ func TestSuspectBecomesFaulty(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 	ringpop.suspicion.period = time.Duration(1 * time.Millisecond)
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
@@ -96,7 +96,7 @@ func TestSuspectTimerStoppedOnDuplicateSuspicion(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
@@ -115,7 +115,7 @@ func TestStopTimer(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
@@ -130,8 +130,8 @@ func TestStopAllStopsAllTimers(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", time.Now().UnixNano(), "")
-	ringpop.membership.makeAlive("127.0.0.1:3002", time.Now().UnixNano(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3002", unixMilliseconds(), "")
 
 	member1, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 	member2, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3002")
