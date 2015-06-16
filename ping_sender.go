@@ -11,7 +11,7 @@ func sendPing(ringpop *Ringpop, target string) (*pingBody, error) {
 	// TODO
 	ringpop.stat("increment", "ping.send", 1)
 
-	pingsender := newPingSender(ringpop, target)
+	pingsender := newPinger(ringpop, target)
 	return pingsender.send()
 }
 
@@ -27,18 +27,18 @@ type pingBody struct {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type pingSender struct {
+type pinger struct {
 	ringpop *Ringpop
 	address string
 }
 
-func newPingSender(ringpop *Ringpop, address string) *pingSender {
-	pingsender := &pingSender{
+func newPinger(ringpop *Ringpop, address string) *pinger {
+	pinger := &pinger{
 		ringpop: ringpop,
 		address: address,
 	}
 
-	return pingsender
+	return pinger
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -47,51 +47,53 @@ func newPingSender(ringpop *Ringpop, address string) *pingSender {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (ps *pingSender) send() (*pingBody, error) {
-	// changes := ps.ringpop.dissemination.issueChanges()
+func (p *pinger) send() (*pingBody, error) {
+	// changes := p.ringpop.dissemination.issueChanges()
 	var changes []Change
 
-	body := pingBody{
-		Checksum: ps.ringpop.membership.checksum,
-		Changes:  changes,
-		Source:   ps.ringpop.WhoAmI(),
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), ps.ringpop.pingTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), p.ringpop.pingTimeout)
 	defer cancel()
 
-	call, err := ps.ringpop.channel.BeginCall(ctx, ps.address, "protocol", "ping", nil)
+	// begin call
+	call, err := p.ringpop.channel.BeginCall(ctx, p.address, "ringpop", "/protocol/ping", nil)
 	if err != nil {
-		ps.ringpop.logger.WithFields(log.Fields{
-			"local":  ps.ringpop.WhoAmI(),
-			"remote": ps.address,
+		p.ringpop.logger.WithFields(log.Fields{
+			"local":  p.ringpop.WhoAmI(),
+			"remote": p.address,
 		}).Errorf("Could not begin call to remote ping service: %v", err)
 		return nil, err
 	}
 
-	// Make call
-	if err := call.WriteArg2(tchannel.NewJSONOutput(headers{})); err != nil {
+	// send request
+	var reqHeaders headers
+	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
 		log.Errorf("Could not write headers: %v", err)
 		return nil, err
 	}
 
-	if err := call.WriteArg3(tchannel.NewJSONOutput(body)); err != nil {
+	changes = p.ringpop.dissemination.issueChanges(0, "")
+	reqBody := pingBody{
+		Checksum: p.ringpop.membership.checksum,
+		Changes:  changes,
+		Source:   p.ringpop.WhoAmI(),
+	}
+	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
 		log.Errorf("Could not write ping body: %v", err)
 		return nil, err
 	}
 
-	// Get response
+	// get response
 	var resHeaders headers
-	if err := call.Response().ReadArg2(tchannel.NewJSONInput(&resHeaders)); err != nil {
+	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
 		log.Errorf("Could not read response headers: %v", err)
 		return nil, err
 	}
 
-	var res pingBody
-	if err := call.Response().ReadArg3(tchannel.NewJSONInput(&res)); err != nil {
+	var resBody pingBody
+	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
 		log.Errorf("Could not read response body: %v", err)
 		return nil, err
 	}
 
-	return &res, nil
+	return &resBody, nil
 }
