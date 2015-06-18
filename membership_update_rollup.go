@@ -94,7 +94,6 @@ func (mr *membershipUpdateRollup) renewFlushTimer() {
 	mr.flushTimer = nil
 	mr.flushTimer = time.NewTicker(mr.flushInterval)
 
-	// shits so broke man fk
 	go func() {
 		for {
 			if mr.flushTimer != nil {
