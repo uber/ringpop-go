@@ -256,7 +256,7 @@ func (m *membership) update(changes []Change) []Change {
 				Source:      change.Source,
 				Address:     change.Address,
 				Status:      ALIVE,
-				Incarnation: unixMilliseconds(),
+				Incarnation: unixMilliseconds(time.Now()),
 				Timestamp:   change.Timestamp,
 			}
 
