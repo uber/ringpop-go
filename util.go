@@ -1,6 +1,7 @@
 package ringpop
 
 import (
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -8,8 +9,12 @@ import (
 
 var hostPortPattern = regexp.MustCompile("^([0-9]+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
 
-func unixMilliseconds() int64 {
-	return time.Now().UnixNano() / 1000000
+func unixMilliseconds(t time.Time) int64 {
+	return t.UnixNano() / 1000000
+}
+
+func milliseconds(d time.Duration) int64 {
+	return d.Nanoseconds() / 1000000
 }
 
 func indexOf(slice []string, element string) int {
@@ -20,6 +25,20 @@ func indexOf(slice []string, element string) int {
 	}
 
 	return -1
+}
+
+// mutates nodes
+func takeNode(nodes *[]string) string {
+	if len(*nodes) == 0 {
+		return ""
+	}
+
+	i := rand.Intn(len(*nodes))
+	node := (*nodes)[i]
+
+	*nodes = append((*nodes)[:i], (*nodes)[i+1:]...)
+
+	return node
 }
 
 // takes x.x.x.x:y and returns x.x.x.x
