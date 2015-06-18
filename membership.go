@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/dgryski/go-farm"
@@ -45,6 +46,7 @@ type membership struct {
 	members     map[string]*Member
 	checksum    uint32
 	localmember *Member
+	mut         sync.Mutex
 }
 
 // NewMembership returns a pointer to a new membership
@@ -52,6 +54,7 @@ func newMembership(ringpop *Ringpop) *membership {
 	membership := &membership{
 		ringpop: ringpop,
 		members: make(map[string]*Member),
+		mut:     sync.Mutex{},
 	}
 	return membership
 }
@@ -136,7 +139,7 @@ func (m *membership) stats() {
 	// TODO: decide what to make m return (stuct?)
 }
 
-func (m *membership) hasmember(member *Member) bool {
+func (m *membership) hasMember(member *Member) bool {
 	_, ok := m.members[member.Address]
 	return ok
 }
@@ -233,6 +236,9 @@ func (m *membership) update(changes []Change) []Change {
 		return updates
 	}
 
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
 	for _, change := range changes {
 		member, found := m.getMemberByAddress(change.Address)
 
@@ -270,6 +276,7 @@ func (m *membership) update(changes []Change) []Change {
 	if len(updates) > 0 {
 		m.computeChecksum()
 		m.ringpop.emit("updated")
+		m.ringpop.membershipChangeC <- updates
 	}
 
 	return updates
@@ -277,14 +284,14 @@ func (m *membership) update(changes []Change) []Change {
 
 // shuffles slice of members pseudo-randomly
 func shuffle(members []*Member) []*Member {
-	newmembers := make([]*Member, len(members), cap(members))
+	newMembers := make([]*Member, len(members), cap(members))
 	newIndexes := rand.Perm(len(members))
 
 	for o, n := range newIndexes {
-		newmembers[n] = members[o]
+		newMembers[n] = members[o]
 	}
 
-	return newmembers
+	return newMembers
 }
 
 // Shuffle returns a slice containing the members in the membership in a random order
