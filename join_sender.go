@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"golang.org/x/net/context"
 
-	"math/rand"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -28,7 +28,7 @@ const (
 	//   - Gives an operator some time to bootstrap a newly
 	//   provisioned cluster
 	//   - Trying forever is futile
-	defaultMaxJoinDuration   = 120000 * time.Millisecond
+	defaultMaxJoinDuration   = 4000 * time.Millisecond
 	defaultJoinTimeout       = 1000 * time.Millisecond
 	defaultJoinSize          = 3
 	defaultParallelismFactor = 2
@@ -44,16 +44,10 @@ func isSingleNodeCluster(ringpop *Ringpop) bool {
 	return ok && numHosts == 1
 }
 
-func takeNode(hosts []string) ([]string, string) {
-	if len(hosts) == 0 {
-		return hosts, ""
-	}
-
-	i := rand.Intn(len(hosts))
-	host := hosts[i]
-	hosts = append(hosts[:i], hosts[i+1:]...)
-
-	return hosts, host
+func sendJoin(ringpop *Ringpop) ([]string, error) {
+	joiner := newJoiner(ringpop, joinerOptions{})
+	joiner.collectPotentialNodes(nil)
+	return joiner.join()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -141,6 +135,12 @@ func newJoiner(ringpop *Ringpop, opts joinerOptions) *joiner {
 	return joiner
 }
 
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	METHODS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
 func (j *joiner) init(nodesJoined []string) {
 	j.potentialNodes = j.collectPotentialNodes(nodesJoined)
 	j.preferredNodes = j.collectPreferredNodes()
@@ -148,14 +148,8 @@ func (j *joiner) init(nodesJoined []string) {
 
 	j.roundPotentialNodes = append(j.roundPotentialNodes, j.potentialNodes...)
 	j.roundPreferredNodes = append(j.roundPreferredNodes, j.preferredNodes...)
-
+	j.roundNonPreferredNodes = append(j.roundNonPreferredNodes, j.nonPreferredNodes...)
 }
-
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
-//	METHODS
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // potential nodes are nodes that are not this instance of ringpop
 func (j *joiner) collectPotentialNodes(nodesJoined []string) []string {
@@ -207,15 +201,13 @@ func (j *joiner) collectNonPreferredNodes() []string {
 
 func (j *joiner) selectGroup(nodesJoined []string) []string {
 	var group []string
-	var host string
-
 	// if fully exhausted or first round, initialize this round's nodes
 	if len(j.roundPreferredNodes) == 0 && len(j.roundNonPreferredNodes) == 0 {
 		j.init(nodesJoined)
 	}
 
-	preferredNodes := j.roundPreferredNodes
-	nonPreferredNodes := j.nonPreferredNodes
+	// preferredNodes := j.roundPreferredNodes
+	// nonPreferredNodes := j.roundNonPreferredNodes
 	numNodesLeft := j.joinSize - len(nodesJoined)
 
 	cont := func() bool {
@@ -224,7 +216,7 @@ func (j *joiner) selectGroup(nodesJoined []string) []string {
 			return false
 		}
 
-		numNodesAvailable := len(preferredNodes) + len(nonPreferredNodes)
+		numNodesAvailable := len(j.roundPreferredNodes) + len(j.roundNonPreferredNodes)
 		if numNodesAvailable == 0 {
 			return false
 		}
@@ -233,12 +225,10 @@ func (j *joiner) selectGroup(nodesJoined []string) []string {
 	}
 
 	for cont() {
-		if len(preferredNodes) > 0 {
-			preferredNodes, host = takeNode(preferredNodes)
-			group = append(group, host)
-		} else if len(nonPreferredNodes) > 0 {
-			nonPreferredNodes, host = takeNode(nonPreferredNodes)
-			group = append(group, host)
+		if len(j.roundPreferredNodes) > 0 {
+			group = append(group, takeNode(&j.roundPreferredNodes))
+		} else if len(j.roundNonPreferredNodes) > 0 {
+			group = append(group, takeNode(&j.roundNonPreferredNodes))
 		}
 	}
 
@@ -329,23 +319,47 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 	var nodesFailed []string
 	var numNodesLeft = j.joinSize - len(totalNodesJoined)
 	var startTime = time.Now()
+	var mut sync.Mutex
+	var wg sync.WaitGroup
 
 	for _, node := range group {
-		err := j.joinNode(node)
-		if err != nil {
-			nodesFailed = append(nodesFailed, node)
-		} else {
-			nodesJoined = append(nodesJoined, node)
-		}
+		wg.Add(1)
+		go func(n string) {
+			ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()), j.timeout)
+			defer cancel()
+			errC := make(chan error)
+			defer close(errC)
 
-		numCompleted := len(nodesJoined) + len(nodesFailed)
+			// attemp a join
+			go j.joinNode(ctx, n, errC)
 
-		// Finished when either all joins have completed or enough to satisfy requirement
-		// specified by joinSize
-		if len(nodesJoined) >= numNodesLeft || numCompleted >= len(group) {
-			break
-		}
+			select {
+			// call either succeeded or failed
+			case err := <-errC:
+				mut.Lock()
+				defer mut.Unlock()
+				if err != nil {
+					nodesFailed = append(nodesFailed, n)
+				} else {
+					nodesJoined = append(nodesJoined, n)
+				}
+			// call timed out
+			case <-ctx.Done():
+				j.ringpop.logger.WithFields(log.Fields{
+					"local":   j.ringpop.WhoAmI(),
+					"remote":  n,
+					"timeout": j.timeout,
+				}).Debug("attempt to join node timed out")
+				mut.Lock()
+				defer mut.Unlock()
+				nodesFailed = append(nodesFailed, n)
+			}
+
+			wg.Done()
+		}(node)
 	}
+	// wait for joins to complete
+	wg.Wait()
 
 	j.ringpop.logger.WithFields(log.Fields{
 		"local":        j.ringpop.WhoAmI(),
@@ -362,24 +376,24 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 	return nodesJoined, nodesFailed
 }
 
-func (j *joiner) joinNode(node string) error {
-	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()), j.timeout)
-	defer cancel()
-
+func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
 	// begin call
 	call, err := j.ringpop.channel.BeginCall(ctx, node, "ringpop", "/protocol/join", nil)
 	if err != nil {
 		j.ringpop.logger.WithFields(log.Fields{
 			"local":  j.ringpop.WhoAmI(),
 			"remote": node,
-		}).Warnf("could not begin call to remote member: %v", err)
-		return err
+		}).Debugf("could not begin call to remote member: %v", err)
+
+		errC <- err
+		return
 	}
 
 	// send request
 	var reqHeaders headers
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-		return err
+		errC <- err
+		return
 	}
 
 	reqBody := joinBody{
@@ -389,28 +403,24 @@ func (j *joiner) joinNode(node string) error {
 		Timeout:     j.timeout,
 	}
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
-		return err
+		errC <- err
+		return
 	}
 
 	// get response
 	var resHeaders headers
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
-		return err
+		errC <- err
+		return
 	}
 
 	var resBody joinResBody
 	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
-		return err
+		errC <- err
+		return
 	}
 
 	// update membership if call was successful
 	j.ringpop.membership.update(resBody.Membership)
-
-	return nil
-}
-
-func sendJoin(ringpop *Ringpop) ([]string, error) {
-	joiner := newJoiner(ringpop, joinerOptions{})
-	joiner.collectPotentialNodes(nil)
-	return joiner.join()
+	errC <- nil
 }
