@@ -8,9 +8,7 @@ import (
 )
 
 func sendPing(ringpop *Ringpop, target string) (*pingBody, error) {
-	// TODO
 	ringpop.stat("increment", "ping.send", 1)
-
 	pingsender := newPinger(ringpop, target)
 	return pingsender.send()
 }
@@ -51,7 +49,8 @@ func (p *pinger) send() (*pingBody, error) {
 	// changes := p.ringpop.dissemination.issueChanges()
 	var changes []Change
 
-	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()), p.ringpop.pingTimeout)
+	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()),
+		p.ringpop.pingTimeout)
 	defer cancel()
 
 	// begin call
@@ -60,14 +59,14 @@ func (p *pinger) send() (*pingBody, error) {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local":  p.ringpop.WhoAmI(),
 			"remote": p.address,
-		}).Errorf("Could not begin call to remote ping service: %v", err)
+		}).Debugf("Could not begin call to remote ping service: %v", err)
 		return nil, err
 	}
 
 	// send request
 	var reqHeaders headers
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-		log.Errorf("Could not write headers: %v", err)
+		log.Debugf("Could not write headers: %v", err)
 		return nil, err
 	}
 
@@ -78,20 +77,20 @@ func (p *pinger) send() (*pingBody, error) {
 		Source:   p.ringpop.WhoAmI(),
 	}
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
-		log.Errorf("Could not write ping body: %v", err)
+		log.Debugf("Could not write ping body: %v", err)
 		return nil, err
 	}
 
 	// get response
 	var resHeaders headers
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
-		log.Errorf("Could not read response headers: %v", err)
+		log.Debugf("Could not read response headers: %v", err)
 		return nil, err
 	}
 
 	var resBody pingBody
 	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
-		log.Errorf("Could not read response body: %v", err)
+		log.Debugf("Could not read response body: %v", err)
 		return nil, err
 	}
 

@@ -7,6 +7,5 @@ func receivePing(ringpop *Ringpop, body pingBody) []Change {
 	// ringpop.totalRate.Mark(1)
 
 	ringpop.membership.update(body.Changes)
-
 	return ringpop.dissemination.issueChanges(body.Checksum, body.Source)
 }
