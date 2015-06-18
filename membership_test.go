@@ -3,6 +3,7 @@ package ringpop
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,11 +16,11 @@ import (
 
 func TestChecksumChanges(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
-	ringpop.membership.makeAlive("127.0.0.1:3000", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3000", unixMilliseconds(time.Now()), "")
 
 	oldchecksum := ringpop.membership.checksum
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 
 	assert.NotEqual(t, oldchecksum, ringpop.membership.checksum,
 		"expected checksum to have changed on membership change")
@@ -183,7 +184,7 @@ func TestAliveToFaulty(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
 	newMemberAddr := "127.0.0.2:3001"
-	ringpop.membership.makeAlive(newMemberAddr, unixMilliseconds(), "")
+	ringpop.membership.makeAlive(newMemberAddr, unixMilliseconds(time.Now()), "")
 
 	newMember, found := ringpop.membership.getMemberByAddress(newMemberAddr)
 	assert.True(t, found, "expected new membwer to be found")
@@ -213,8 +214,8 @@ func TestAliveToFaulty(t *testing.T) {
 func TestString(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("127.0.0.2:3000", unixMilliseconds(), "")
-	ringpop.membership.makeAlive("127.0.0.3:3000", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.2:3000", unixMilliseconds(time.Now()), "")
+	ringpop.membership.makeAlive("127.0.0.3:3000", unixMilliseconds(time.Now()), "")
 
 	_, err := ringpop.membership.String()
 	assert.NoError(t, err, "membership should successfully be marshalled into JSON")
@@ -224,7 +225,7 @@ func TestLeaveEnds(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
 	newMemberAddr := "127.0.0.1:3001"
-	newMemberInc := unixMilliseconds()
+	newMemberInc := unixMilliseconds(time.Now())
 
 	updates := ringpop.membership.makeAlive(newMemberAddr, newMemberInc, "")
 	assert.Equal(t, 1, len(updates), "expected alive update to be applied")
@@ -255,8 +256,8 @@ func TestIterNoUsable(t *testing.T) {
 func TestIterNoUsableWithNonLocal(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeFaulty("127.0.0.1:3001", unixMilliseconds(), "")
-	ringpop.membership.makeLeave("127.0.0.1:3002", unixMilliseconds(), "")
+	ringpop.membership.makeFaulty("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
+	ringpop.membership.makeLeave("127.0.0.1:3002", unixMilliseconds(time.Now()), "")
 
 	iter := ringpop.membership.iter()
 
@@ -270,7 +271,7 @@ func TestIterOverTen(t *testing.T) {
 
 	for i := 1; i < 11; i++ {
 		ringpop.membership.makeAlive(fmt.Sprintf("127.0.0.1:300%v", i),
-			unixMilliseconds(), "")
+			unixMilliseconds(time.Now()), "")
 	}
 
 	iter := ringpop.membership.iter()
@@ -289,9 +290,9 @@ func TestIterOverTen(t *testing.T) {
 func TestIterSkipsFaultyAndLocal(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
 
-	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(), "")
-	ringpop.membership.makeFaulty("127.0.0.1:3002", unixMilliseconds(), "")
-	ringpop.membership.makeAlive("127.0.0.1:3003", unixMilliseconds(), "")
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
+	ringpop.membership.makeFaulty("127.0.0.1:3002", unixMilliseconds(time.Now()), "")
+	ringpop.membership.makeAlive("127.0.0.1:3003", unixMilliseconds(time.Now()), "")
 
 	iter := ringpop.membership.iter()
 
