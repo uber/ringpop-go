@@ -19,15 +19,20 @@ type dissemination struct {
 	changes           map[string]Change
 	maxPiggybackCount int
 	piggybackFactor   int
+	eventC            chan string
 }
 
 func newDissemination(ringpop *Ringpop) *dissemination {
-	return &dissemination{
+	d := &dissemination{
 		ringpop:           ringpop,
 		changes:           make(map[string]Change),
 		maxPiggybackCount: 1,
 		piggybackFactor:   15, // lower factor -> more full syncs
+		eventC:            make(chan string),
 	}
+	d.launchChangeHandler()
+
+	return d
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -69,7 +74,7 @@ func (d *dissemination) fullSync() []Change {
 	return changes
 }
 
-// issuechanges returns a slice of changes to be propogated
+// issueChanges returns a slice of changes to be propogated
 func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 	var changesToDisseminate []Change
 	var piggybacks = make(map[string]int)
@@ -111,4 +116,18 @@ func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 // recordchange records a change in the dissemination for later propogation
 func (d *dissemination) recordChange(change Change) {
 	d.changes[change.Address] = change
+}
+
+// launchChangeHandler launches a goroutine that will adjust the dissemination's
+// piggyback count whenever it receives on eventC
+func (d *dissemination) launchChangeHandler() {
+	go func() {
+		for {
+			if d.eventC != nil {
+				<-d.eventC
+				d.adjustPiggybackCount()
+			}
+			break
+		}
+	}()
 }
