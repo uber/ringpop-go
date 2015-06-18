@@ -24,11 +24,14 @@ type hashRing struct {
 	servers       map[string]bool
 	checksum      uint32
 	replicaPoints int
+	eventC        chan string
 }
 
 func newHashRing() *hashRing {
 	hashring := &hashRing{
-		rbtree: rbtree.RBTree{},
+		rbtree:  rbtree.RBTree{},
+		servers: make(map[string]bool),
+		eventC:  make(chan string, 10),
 	}
 
 	return hashring
@@ -51,6 +54,8 @@ func (r *hashRing) computeChecksum() {
 	}
 
 	r.checksum = farmhash32(buffer.String(), -1)
+
+	r.eventC <- "checksumComputed"
 }
 
 // AddServer does what you would expect
@@ -66,6 +71,8 @@ func (r *hashRing) addServer(address string) {
 	}
 
 	r.computeChecksum()
+
+	r.eventC <- "added"
 }
 
 // removeServer does what you would expect
@@ -81,6 +88,8 @@ func (r *hashRing) removeServer(address string) {
 	}
 
 	r.computeChecksum()
+
+	r.eventC <- "removed"
 }
 
 // hasServer returns true if the server exists in the ring, false otherwise
