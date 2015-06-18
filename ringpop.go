@@ -17,8 +17,8 @@ import (
 
 const (
 	// defaultMaxJoinDuration                = 300000 * time.Millisecond
-	deafaultMembershipUpdateFlushInterval = 5000 * time.Millisecond
-	defaultProxyReqTimeout                = 30000 * time.Millisecond
+	defaultMembershipUpdateFlushInterval = 5000 * time.Millisecond
+	defaultProxyReqTimeout               = 30000 * time.Millisecond
 )
 
 var (
@@ -85,8 +85,7 @@ type Ringpop struct {
 	maxJoinDuration               time.Duration
 	membershipUpdateFlushInterval time.Duration
 
-	ring       *hashRing
-	ringEventC chan string
+	ring *hashRing
 
 	// membership
 	dissemination          *dissemination
@@ -129,6 +128,8 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 		HostPort: hostport,
 	}
 
+	ringpop.eventC = make(chan string, 10)
+
 	ringpop.ready = false
 	ringpop.pinging = false
 
@@ -157,7 +158,12 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 	// set proxyReqTimeout to option or default value
 	ringpop.proxyReqTimeout = selectDurationOrDefault(opts.ProxyReqTimeout, defaultProxyReqTimeout)
 
+	ringpop.membershipUpdateFlushInterval = selectDurationOrDefault(
+		opts.MembershipUpdateFlushInterval,
+		defaultMembershipUpdateFlushInterval)
+
 	// membership and gossip
+	ringpop.ring = newHashRing()
 	ringpop.dissemination = newDissemination(ringpop)
 	ringpop.membership = newMembership(ringpop)
 	ringpop.membershipUpdateRollup = newMembershipUpdateRollup(ringpop,
@@ -217,8 +223,13 @@ func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
 	rp.checkForMissingBootstrapHost()
 	rp.checkForHostnameIPMismatch()
 
+	rp.launchMembershipChangeHandler()
+	rp.launchRingEventHandler()
+
+	time.Sleep(100 * time.Millisecond)
+
 	// make self alive
-	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(), "")
+	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
 
 	nodesJoined, err := sendJoin(rp)
 	if err != nil {
@@ -237,6 +248,7 @@ func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
 
 	// rp.gossip.start()
 	rp.ready = true
+	rp.emit("ready")
 
 	return nodesJoined, nil
 }
@@ -339,11 +351,11 @@ func (rp *Ringpop) seedBootstrapHosts(opts BootstrapOptions) error {
 			}
 			fallthrough
 		case true:
-			hosts, err = rp.readHostsFile("memes.json")
+			hosts, err = rp.readHostsFile("./hosts.json")
 			if err == nil {
 				break
 			}
-			rp.logger.WithField("file", "memes.json").Warnf("Could not read host file: %v", err)
+			rp.logger.WithField("file", "./hosts.json").Warnf("Could not read host file: %v", err)
 			return errors.New("unable to read hosts file")
 		}
 	}
@@ -394,8 +406,8 @@ func (rp *Ringpop) Ready() bool {
 // Lookup hashes a key to a node and returns that node, and true. If no node can
 // be found, it returns the hostport of the local ringpop and false.
 func (rp *Ringpop) Lookup(key string) (string, bool) {
-	dest, found := rp.ring.lookup(key)
-	if !found {
+	dest, ok := rp.ring.lookup(key)
+	if !ok {
 		rp.logger.WithField("key", key).Debug("could not find destination for a key")
 		return rp.WhoAmI(), false
 	}
@@ -403,8 +415,8 @@ func (rp *Ringpop) Lookup(key string) (string, bool) {
 	return dest, true
 }
 
-// EmitEvents enables or disables the channel returned by EventC.
-func (rp *Ringpop) EmitEvents(emit bool) {
+// SetEmitting enables or disables the channel returned by EventC.
+func (rp *Ringpop) SetEmitting(emit bool) {
 	rp.emitting = emit
 }
 
@@ -449,7 +461,7 @@ func (rp *Ringpop) launchRingEventHandler() chan<- bool {
 	go func() {
 		for {
 			select {
-			case event := <-rp.ringEventC:
+			case event := <-rp.ring.eventC:
 				switch event {
 				case "added":
 					rp.onRingServerAdded()
@@ -472,9 +484,7 @@ func (rp *Ringpop) launchRingEventHandler() chan<- bool {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (rp *Ringpop) onMemberAlive(change Change) {
-	// TODO: add .stat call see .js for detail)
-	// rp.stat('increment', 'membership-update.alive');
-
+	rp.stat("increment", "membership-update.alive", 1)
 	rp.logger.WithFields(log.Fields{
 		"local": rp.WhoAmI(),
 		"alive": change.Address,
@@ -486,9 +496,7 @@ func (rp *Ringpop) onMemberAlive(change Change) {
 }
 
 func (rp *Ringpop) onMemberFaulty(change Change) {
-	// TODO: add .stat call (see .js for detail)
-	// rp.stat('increment', 'membership-update.faulty');
-
+	rp.stat("increment", "membership-update.faulty", 1)
 	rp.logger.WithFields(log.Fields{
 		"local":  rp.WhoAmI(),
 		"faulty": change.Address,
@@ -500,9 +508,7 @@ func (rp *Ringpop) onMemberFaulty(change Change) {
 }
 
 func (rp *Ringpop) onMemberSuspect(change Change) {
-	// TODO: add .stat call and .log call (see .js for detail)
-	// rp.stat('increment', 'membership-update.suspect');
-
+	rp.stat("increment", "membership-update.suspect", 1)
 	rp.logger.WithFields(log.Fields{
 		"local":   rp.WhoAmI(),
 		"suspect": change.Address,
@@ -513,9 +519,7 @@ func (rp *Ringpop) onMemberSuspect(change Change) {
 }
 
 func (rp *Ringpop) onMemberLeave(change Change) {
-	// TODO: add .stat call (see .js for detail)
-	// rp.stat('increment', 'membership-update.leave');
-
+	rp.stat("increment", "membership-update.leave", 1)
 	rp.logger.WithFields(log.Fields{
 		"local": rp.WhoAmI(),
 		"leave": change.Address,
@@ -530,6 +534,10 @@ func (rp *Ringpop) launchMembershipChangeHandler() chan<- bool {
 	var changes []Change
 
 	stop := make(chan bool, 1)
+
+	if rp.membershipChangeC == nil {
+		rp.membershipChangeC = make(chan []Change, 5)
+	}
 
 	go func() {
 		var membershipChanged, ringChanged bool
@@ -564,6 +572,7 @@ func (rp *Ringpop) launchMembershipChangeHandler() chan<- bool {
 			}
 
 			if ringChanged {
+				rp.dissemination.eventC <- "changed"
 				rp.emit("ringChanged")
 			}
 
@@ -677,4 +686,13 @@ func (rp *Ringpop) allowJoins() {
 
 func (rp *Ringpop) denyJoins() {
 	rp.isDenyingJoins = true
+}
+
+// SetDebug enables or disables the logging debug flag
+func (rp *Ringpop) SetDebug(debug bool) {
+	if debug {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
 }
