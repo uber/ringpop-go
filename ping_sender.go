@@ -1,6 +1,9 @@
 package ringpop
 
 import (
+	"errors"
+	"time"
+
 	"golang.org/x/net/context"
 
 	log "github.com/Sirupsen/logrus"
@@ -10,7 +13,7 @@ import (
 func sendPing(ringpop *Ringpop, target string) (*pingBody, error) {
 	ringpop.stat("increment", "ping.send", 1)
 	pingsender := newPinger(ringpop, target)
-	return pingsender.send()
+	return pingsender.sendPing()
 }
 
 type pingBody struct {
@@ -28,12 +31,14 @@ type pingBody struct {
 type pinger struct {
 	ringpop *Ringpop
 	address string
+	timeout time.Duration
 }
 
 func newPinger(ringpop *Ringpop, address string) *pinger {
 	pinger := &pinger{
 		ringpop: ringpop,
 		address: address,
+		timeout: ringpop.pingTimeout,
 	}
 
 	return pinger
@@ -45,54 +50,69 @@ func newPinger(ringpop *Ringpop, address string) *pinger {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (p *pinger) send() (*pingBody, error) {
-	// changes := p.ringpop.dissemination.issueChanges()
-	var changes []Change
-
+func (p *pinger) sendPing() (*pingBody, error) {
 	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()),
-		p.ringpop.pingTimeout)
+		p.timeout)
 	defer cancel()
+	errC := make(chan error)
+	defer close(errC)
 
+	var resBody pingBody
+
+	go p.send(ctx, &resBody, errC)
+	select {
+	// ping succeeded or failed
+	case err := <-errC:
+		if err != nil {
+			return nil, err
+		}
+		return &resBody, nil
+
+	// ping timed out
+	case <-ctx.Done():
+		return nil, errors.New("ping timed out")
+	}
+}
+
+func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	// begin call
 	call, err := p.ringpop.channel.BeginCall(ctx, p.address, "ringpop", "/protocol/ping", nil)
 	if err != nil {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local":  p.ringpop.WhoAmI(),
 			"remote": p.address,
-		}).Debugf("Could not begin call to remote ping service: %v", err)
-		return nil, err
+		}).Debugf("could not begin call to remote ping service: %v", err)
+		errC <- err
 	}
 
 	// send request
 	var reqHeaders headers
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-		log.Debugf("Could not write headers: %v", err)
-		return nil, err
+		log.Debugf("could not write headers: %v", err)
+		errC <- err
 	}
 
-	changes = p.ringpop.dissemination.issueChanges(0, "")
 	reqBody := pingBody{
 		Checksum: p.ringpop.membership.checksum,
-		Changes:  changes,
+		Changes:  p.ringpop.dissemination.issueChanges(0, ""),
 		Source:   p.ringpop.WhoAmI(),
 	}
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
-		log.Debugf("Could not write ping body: %v", err)
-		return nil, err
+		log.Debugf("could not write ping body: %v", err)
+		errC <- err
 	}
 
 	// get response
 	var resHeaders headers
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
-		log.Debugf("Could not read response headers: %v", err)
-		return nil, err
+		log.Debugf("could not read response headers: %v", err)
+		errC <- err
 	}
 
-	var resBody pingBody
-	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
-		log.Debugf("Could not read response body: %v", err)
-		return nil, err
+	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(resBody); err != nil {
+		log.Debugf("could not read response body: %v", err)
+		errC <- err
 	}
 
-	return &resBody, nil
+	errC <- nil
 }

@@ -643,27 +643,29 @@ func (rp *Ringpop) PingMemberNow() error {
 	rp.pinging = true
 
 	res, err := sendPing(rp, member.Address)
+	if err != nil {
+		rp.logger.WithFields(log.Fields{
+			"local":  rp.WhoAmI(),
+			"remote": member.Address,
+		}).Debugf("ping failed: %v", err)
 
-	if err == nil {
-		rp.pinging = false
-		// rp.membership.update(res.Changes)
-		// TODO
-
-		fmt.Printf("Checksum: %v\n", res.Checksum)
-		fmt.Printf("Source: %s\n", res.Source)
-		for _, change := range res.Changes {
-			fmt.Printf("Address: %s, Status: %s, Incarnation: %v\n",
-				change.Address, change.Status, change.Incarnation)
-		}
-
-		return nil
+		// do a ping-req
 	}
 
 	if rp.destroyed {
 		return errors.New("destroyed whilst pinging")
 	}
 
-	// Do a ping request otherwise
+	rp.pinging = false
+	// rp.membership.update(res.Changes)
+	// TODO
+
+	fmt.Printf("Checksum: %v\n", res.Checksum)
+	fmt.Printf("Source: %s\n", res.Source)
+	for _, change := range res.Changes {
+		fmt.Printf("Address: %s, Status: %s, Incarnation: %v\n",
+			change.Address, change.Status, change.Incarnation)
+	}
 
 	return nil
 }
