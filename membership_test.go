@@ -16,6 +16,8 @@ import (
 
 func TestChecksumChanges(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
+
 	ringpop.membership.makeAlive("127.0.0.1:3000", unixMilliseconds(time.Now()), "")
 
 	oldchecksum := ringpop.membership.checksum
@@ -28,7 +30,9 @@ func TestChecksumChanges(t *testing.T) {
 
 func TestChecksumEqual(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 	ringpop2 := testPop("127.0.0.1:3000")
+	defer ringpop2.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", 1, "")
 	ringpop.membership.makeAlive("127.0.0.1:3002", 1, "")
@@ -45,6 +49,7 @@ func TestChecksumEqual(t *testing.T) {
 // Higher incarnation should result in a leave override
 func TestLeaveOverrideHigher(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected new member to be found")
@@ -62,6 +67,7 @@ func TestLeaveOverrideHigher(t *testing.T) {
 // Equal incarnation number should not result in a leave override ... or should it?
 func TestLeaveOverrideEqual(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
@@ -79,6 +85,7 @@ func TestLeaveOverrideEqual(t *testing.T) {
 // Lower incarnation should not result in a leave override
 func TestLeaveOverrideLower(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
@@ -96,6 +103,7 @@ func TestLeaveOverrideLower(t *testing.T) {
 // Attempting to make the local member faulty should not change local member status
 func TestLocalFaultyOverride(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
@@ -113,6 +121,7 @@ func TestLocalFaultyOverride(t *testing.T) {
 // Attempting to make the local member faulty should not change local member status
 func TestLocalSuspectOverride(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 	assert.True(t, found, "expected member to be found")
@@ -131,6 +140,7 @@ func TestLocalSuspectOverride(t *testing.T) {
 // Also tests that an update for a never before seen member works for all statuses
 func TestHandleMultipleUpdates(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	oldchecksum := ringpop.membership.checksum
 
@@ -138,17 +148,17 @@ func TestHandleMultipleUpdates(t *testing.T) {
 		Change{
 			Address:     "127.0.0.1:3001",
 			Status:      ALIVE,
-			Incarnation: 1,
+			Incarnation: unixMilliseconds(time.Now()),
 		},
 		Change{
 			Address:     "127.0.0.1:3002",
 			Status:      SUSPECT,
-			Incarnation: 1,
+			Incarnation: unixMilliseconds(time.Now()),
 		},
 		Change{
 			Address:     "127.0.0.1:3003",
 			Status:      FAULTY,
-			Incarnation: 1,
+			Incarnation: unixMilliseconds(time.Now()),
 		},
 		Change{
 			Address:     "127.0.0.1:3004",
@@ -182,6 +192,7 @@ func TestHandleMultipleUpdates(t *testing.T) {
 // A member should be able to go from alive -> faulty immediately without having to be suspect inbetween
 func TestAliveToFaulty(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	newMemberAddr := "127.0.0.2:3001"
 	ringpop.membership.makeAlive(newMemberAddr, unixMilliseconds(time.Now()), "")
@@ -213,6 +224,7 @@ func TestAliveToFaulty(t *testing.T) {
 
 func TestString(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.2:3000", unixMilliseconds(time.Now()), "")
 	ringpop.membership.makeAlive("127.0.0.3:3000", unixMilliseconds(time.Now()), "")
@@ -223,6 +235,7 @@ func TestString(t *testing.T) {
 
 func TestLeaveEnds(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	newMemberAddr := "127.0.0.1:3001"
 	newMemberInc := unixMilliseconds(time.Now())
@@ -245,6 +258,7 @@ func TestLeaveEnds(t *testing.T) {
 
 func TestIterNoUsable(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	iter := ringpop.membership.iter()
 
@@ -255,6 +269,7 @@ func TestIterNoUsable(t *testing.T) {
 
 func TestIterNoUsableWithNonLocal(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	ringpop.membership.makeFaulty("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 	ringpop.membership.makeLeave("127.0.0.1:3002", unixMilliseconds(time.Now()), "")
@@ -268,6 +283,7 @@ func TestIterNoUsableWithNonLocal(t *testing.T) {
 
 func TestIterOverTen(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	for i := 1; i < 11; i++ {
 		ringpop.membership.makeAlive(fmt.Sprintf("127.0.0.1:300%v", i),
@@ -289,6 +305,7 @@ func TestIterOverTen(t *testing.T) {
 
 func TestIterSkipsFaultyAndLocal(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 	ringpop.membership.makeFaulty("127.0.0.1:3002", unixMilliseconds(time.Now()), "")
