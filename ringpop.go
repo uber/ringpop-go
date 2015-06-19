@@ -128,7 +128,8 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 		HostPort: hostport,
 	}
 
-	ringpop.eventC = make(chan string, 10)
+	ringpop.eventC = make(chan string, 25)
+	ringpop.membershipChangeC = make(chan []Change)
 
 	ringpop.ready = false
 	ringpop.pinging = false
@@ -190,8 +191,12 @@ func (rp *Ringpop) Destroy() {
 	rp.suspicion.stopAll()
 	rp.membershipUpdateRollup.destroy()
 
-	rp.membershipChangeC = nil
-	rp.eventC = nil
+	close(rp.membershipChangeC)
+	// Sleep momentarily to allow sends on the ring event channel that may
+	// have been started by the membership change channel to complete
+	time.Sleep(100 * time.Nanosecond)
+	close(rp.ring.eventC)
+	close(rp.eventC)
 
 	// clientRate/serverRate/totalRate stuff
 
@@ -241,10 +246,11 @@ func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
 	rp.checkForMissingBootstrapHost()
 	rp.checkForHostnameIPMismatch()
 
-	rp.launchMembershipChangeHandler()
-	rp.launchRingEventHandler()
+	// launch event handlers
+	go rp.membershipChangeHandler()
+	go rp.ringEventHandler()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// make self alive
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
@@ -473,28 +479,17 @@ func (rp *Ringpop) onRingServerRemoved() {
 	rp.emit("ringServerRemoved")
 }
 
-func (rp *Ringpop) launchRingEventHandler() {
-	if rp.eventC == nil {
-		rp.eventC = make(chan string)
-	}
-
-	go func() {
-		for {
-			if rp.eventC != nil {
-				event := <-rp.ring.eventC
-				switch event {
-				case "added":
-					rp.onRingServerAdded()
-				case "removed":
-					rp.onRingServerRemoved()
-				case "checksumComputed":
-					rp.onRingChecksumComputed()
-				}
-			} else {
-				break
-			}
+func (rp *Ringpop) ringEventHandler() {
+	for event := range rp.ring.eventC {
+		switch event {
+		case "added":
+			rp.onRingServerAdded()
+		case "removed":
+			rp.onRingServerRemoved()
+		case "checksumComputed":
+			rp.onRingChecksumComputed()
 		}
-	}()
+	}
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -554,60 +549,50 @@ func (rp *Ringpop) onMemberLeave(change Change) {
 	rp.suspicion.stop(change)             // Stop suspicion for node
 }
 
-func (rp *Ringpop) launchMembershipChangeHandler() {
-	if rp.membershipChangeC == nil {
-		rp.membershipChangeC = make(chan []Change, 5)
-	}
+func (rp *Ringpop) membershipChangeHandler() {
+	var membershipChanged, ringChanged bool
 
-	go func() {
-		var membershipChanged, ringChanged bool
+	for changes := range rp.membershipChangeC {
+		membershipChanged, ringChanged = false, false
 
-		for {
-			membershipChanged, ringChanged = false, false
-
-			if rp.membershipChangeC != nil {
-				changes := <-rp.membershipChangeC
-				for _, change := range changes {
-					switch change.Status {
-					case ALIVE:
-						rp.onMemberAlive(change)
-						membershipChanged, ringChanged = true, true
-					case FAULTY:
-						rp.onMemberFaulty(change)
-						membershipChanged, ringChanged = true, true
-					case SUSPECT:
-						rp.onMemberSuspect(change)
-						membershipChanged, ringChanged = true, false
-					case LEAVE:
-						rp.onMemberLeave(change)
-						membershipChanged, ringChanged = true, true
-					}
-				}
-				if membershipChanged {
-					rp.emit("membershipChanged")
-				}
-
-				if ringChanged {
-					rp.dissemination.eventC <- "changed"
-					rp.emit("ringChanged")
-				}
-
-				rp.membershipUpdateRollup.trackUpdates(changes)
-
-				rp.stat("gauge", "num-members", int64(rp.membership.memberCount()))
-				rp.stat("timing", "updates", int64(len(changes)))
-			} else {
-				break
+		for _, change := range changes {
+			switch change.Status {
+			case ALIVE:
+				rp.onMemberAlive(change)
+				membershipChanged, ringChanged = true, true
+			case FAULTY:
+				rp.onMemberFaulty(change)
+				membershipChanged, ringChanged = true, true
+			case SUSPECT:
+				rp.onMemberSuspect(change)
+				membershipChanged, ringChanged = true, false
+			case LEAVE:
+				rp.onMemberLeave(change)
+				membershipChanged, ringChanged = true, true
 			}
 		}
-	}()
+
+		if membershipChanged {
+
+		}
+
+		if ringChanged {
+			rp.dissemination.eventC <- "changed"
+			rp.emit("ringChanged")
+		}
+
+		rp.membershipUpdateRollup.trackUpdates(changes)
+
+		rp.stat("gauge", "num-members", int64(rp.membership.memberCount()))
+		rp.stat("timing", "updates", int64(len(changes)))
+	}
 }
 
 // PingMember is temporary testing func
 func (rp *Ringpop) PingMember(address string) error {
 	res, err := sendPing(rp, address)
 	if err != nil {
-		rp.logger.Errorf("error: %v", err)
+		rp.logger.Debugf("ping failed: %v", err)
 		return err
 	}
 	rp.pinging = false
@@ -708,9 +693,10 @@ func (rp *Ringpop) denyJoins() {
 }
 
 func (rp *Ringpop) testBootstrapper() {
-	rp.launchMembershipChangeHandler()
-	rp.launchRingEventHandler()
+	go rp.membershipChangeHandler()
+	go rp.ringEventHandler()
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
+	rp.ready = true
 }
 
 // SetDebug enables or disables the logging debug flag
