@@ -182,6 +182,24 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 	return ringpop
 }
 
+// Destroy stops Ringpops
+func (rp *Ringpop) Destroy() {
+	rp.logger.WithField("local", rp.WhoAmI()).Debug("destroyed ringpop")
+	rp.destroyed = true
+	rp.gossip.stop()
+	rp.suspicion.stopAll()
+	rp.membershipUpdateRollup.destroy()
+
+	rp.membershipChangeC = nil
+	rp.eventC = nil
+
+	// clientRate/serverRate/totalRate stuff
+
+	if rp.channel != nil {
+		rp.channel.Close()
+	}
+}
+
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //  RINGPOP SETUP AND BOOTSTRAPPING
@@ -455,13 +473,15 @@ func (rp *Ringpop) onRingServerRemoved() {
 	rp.emit("ringServerRemoved")
 }
 
-func (rp *Ringpop) launchRingEventHandler() chan<- bool {
-	stop := make(chan bool, 1)
+func (rp *Ringpop) launchRingEventHandler() {
+	if rp.eventC == nil {
+		rp.eventC = make(chan string)
+	}
 
 	go func() {
 		for {
-			select {
-			case event := <-rp.ring.eventC:
+			if rp.eventC != nil {
+				event := <-rp.ring.eventC
 				switch event {
 				case "added":
 					rp.onRingServerAdded()
@@ -470,11 +490,11 @@ func (rp *Ringpop) launchRingEventHandler() chan<- bool {
 				case "checksumComputed":
 					rp.onRingChecksumComputed()
 				}
+			} else {
+				break
 			}
 		}
 	}()
-
-	return stop
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -486,8 +506,9 @@ func (rp *Ringpop) launchRingEventHandler() chan<- bool {
 func (rp *Ringpop) onMemberAlive(change Change) {
 	rp.stat("increment", "membership-update.alive", 1)
 	rp.logger.WithFields(log.Fields{
-		"local": rp.WhoAmI(),
-		"alive": change.Address,
+		"local":       rp.WhoAmI(),
+		"alive":       change.Address,
+		"incarnation": change.Incarnation,
 	}).Debug("member is alive")
 
 	rp.dissemination.recordChange(change) // Propogate change
@@ -498,8 +519,9 @@ func (rp *Ringpop) onMemberAlive(change Change) {
 func (rp *Ringpop) onMemberFaulty(change Change) {
 	rp.stat("increment", "membership-update.faulty", 1)
 	rp.logger.WithFields(log.Fields{
-		"local":  rp.WhoAmI(),
-		"faulty": change.Address,
+		"local":       rp.WhoAmI(),
+		"faulty":      change.Address,
+		"incarnation": change.Incarnation,
 	}).Debug("member is faulty")
 
 	rp.ring.removeServer(change.Address)  // Remove node from ring
@@ -510,8 +532,9 @@ func (rp *Ringpop) onMemberFaulty(change Change) {
 func (rp *Ringpop) onMemberSuspect(change Change) {
 	rp.stat("increment", "membership-update.suspect", 1)
 	rp.logger.WithFields(log.Fields{
-		"local":   rp.WhoAmI(),
-		"suspect": change.Address,
+		"local":       rp.WhoAmI(),
+		"suspect":     change.Address,
+		"incarnation": change.Incarnation,
 	}).Debug("member is suspect")
 
 	rp.suspicion.start(change)            // Start suspicion for node
@@ -521,8 +544,9 @@ func (rp *Ringpop) onMemberSuspect(change Change) {
 func (rp *Ringpop) onMemberLeave(change Change) {
 	rp.stat("increment", "membership-update.leave", 1)
 	rp.logger.WithFields(log.Fields{
-		"local": rp.WhoAmI(),
-		"leave": change.Address,
+		"local":       rp.WhoAmI(),
+		"leave":       change.Address,
+		"incarnation": change.Incarnation,
 	}).Debug("member has left")
 
 	rp.dissemination.recordChange(change) // Propogate change
@@ -530,11 +554,7 @@ func (rp *Ringpop) onMemberLeave(change Change) {
 	rp.suspicion.stop(change)             // Stop suspicion for node
 }
 
-func (rp *Ringpop) launchMembershipChangeHandler() chan<- bool {
-	var changes []Change
-
-	stop := make(chan bool, 1)
-
+func (rp *Ringpop) launchMembershipChangeHandler() {
 	if rp.membershipChangeC == nil {
 		rp.membershipChangeC = make(chan []Change, 5)
 	}
@@ -545,8 +565,8 @@ func (rp *Ringpop) launchMembershipChangeHandler() chan<- bool {
 		for {
 			membershipChanged, ringChanged = false, false
 
-			select {
-			case changes = <-rp.membershipChangeC:
+			if rp.membershipChangeC != nil {
+				changes := <-rp.membershipChangeC
 				for _, change := range changes {
 					switch change.Status {
 					case ALIVE:
@@ -563,27 +583,24 @@ func (rp *Ringpop) launchMembershipChangeHandler() chan<- bool {
 						membershipChanged, ringChanged = true, true
 					}
 				}
-			case <-stop:
+				if membershipChanged {
+					rp.emit("membershipChanged")
+				}
+
+				if ringChanged {
+					rp.dissemination.eventC <- "changed"
+					rp.emit("ringChanged")
+				}
+
+				rp.membershipUpdateRollup.trackUpdates(changes)
+
+				rp.stat("gauge", "num-members", int64(rp.membership.memberCount()))
+				rp.stat("timing", "updates", int64(len(changes)))
+			} else {
 				break
 			}
-
-			if membershipChanged {
-				rp.emit("membershipChanged")
-			}
-
-			if ringChanged {
-				rp.dissemination.eventC <- "changed"
-				rp.emit("ringChanged")
-			}
-
-			rp.membershipUpdateRollup.trackUpdates(changes)
-
-			rp.stat("gauge", "num-members", int64(rp.membership.memberCount()))
-			rp.stat("timing", "updates", int64(len(changes)))
 		}
 	}()
-
-	return stop
 }
 
 // PingMember is temporary testing func
@@ -686,6 +703,12 @@ func (rp *Ringpop) allowJoins() {
 
 func (rp *Ringpop) denyJoins() {
 	rp.isDenyingJoins = true
+}
+
+func (rp *Ringpop) testBootstrapper() {
+	rp.launchMembershipChangeHandler()
+	rp.launchRingEventHandler()
+	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
 }
 
 // SetDebug enables or disables the logging debug flag

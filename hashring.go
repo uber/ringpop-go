@@ -71,7 +71,6 @@ func (r *hashRing) addServer(address string) {
 	}
 
 	r.computeChecksum()
-
 	r.eventC <- "added"
 }
 

@@ -66,7 +66,7 @@ func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 
 func testPop(hostport string) *Ringpop {
 	ringpop := NewRingpop("test", hostport, Options{})
-	ringpop.membership.makeAlive(hostport, 1, "")
+	ringpop.testBootstrapper()
 
 	return ringpop
 }

@@ -126,8 +126,9 @@ func (d *dissemination) launchChangeHandler() {
 			if d.eventC != nil {
 				<-d.eventC
 				d.adjustPiggybackCount()
+			} else {
+				break
 			}
-			break
 		}
 	}()
 }

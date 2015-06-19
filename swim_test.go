@@ -18,14 +18,13 @@ import (
 
 func TestStartStopGossip(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	ringpop.gossip.start()
 	assert.NotNil(t, ringpop.gossip.protocolRateTimer, "expected protocol rate timer to be set")
-	assert.NotNil(t, ringpop.gossip.protocolPeriodTimer, "expected protocol period timer to be set")
 
 	ringpop.gossip.stop()
 	assert.Nil(t, ringpop.gossip.protocolRateTimer, "expected protocol rate timer to be cleared")
-	assert.Nil(t, ringpop.gossip.protocolPeriodTimer, "expected protocol period timer to be cleared")
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -36,6 +35,7 @@ func TestStartStopGossip(t *testing.T) {
 
 func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 
@@ -55,6 +55,7 @@ func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 
 func TestSuspectMember(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 
@@ -68,6 +69,7 @@ func TestSuspectMember(t *testing.T) {
 
 func TestSuspectLocalMember(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
 
 	member, _ := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
 
@@ -79,14 +81,16 @@ func TestSuspectLocalMember(t *testing.T) {
 
 func TestSuspectBecomesFaulty(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
+
 	ringpop.suspicion.period = time.Duration(1 * time.Millisecond)
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
+	time.Sleep(1 * time.Millisecond)
 	ringpop.suspicion.start(member)
-
 	time.Sleep(1 * time.Millisecond)
 
 	assert.Equal(t, FAULTY, member.Status, "expected suspicion to make member faulty")
@@ -94,6 +98,8 @@ func TestSuspectBecomesFaulty(t *testing.T) {
 
 func TestSuspectTimerStoppedOnDuplicateSuspicion(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
+
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
@@ -113,6 +119,8 @@ func TestSuspectTimerStoppedOnDuplicateSuspicion(t *testing.T) {
 
 func TestStopTimer(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
+
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
@@ -128,6 +136,8 @@ func TestStopTimer(t *testing.T) {
 
 func TestStopAllStopsAllTimers(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000")
+	defer ringpop.Destroy()
+
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
