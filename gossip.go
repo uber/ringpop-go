@@ -22,15 +22,14 @@ type gossip struct {
 	ringpop *Ringpop
 	stopped bool
 
-	minProtocolPeriod   time.Duration
-	numProtocolPeriods  int64
-	protocolPeriodTimer *time.Ticker
+	minProtocolPeriod  time.Duration
+	numProtocolPeriods int64
 
-	lastProtocolPeriod time.Duration
-	lastProtocolRate   int64
+	lastProtocolPeriod time.Time
+	lastProtocolRate   time.Duration
 	protocolRateTimer  *time.Ticker
 
-	protocolTiming metrics.StandardHistogram
+	protocolTiming metrics.Histogram
 }
 
 func newGossip(ringpop *Ringpop, minProtocolPeriod time.Duration) *gossip {
@@ -42,8 +41,10 @@ func newGossip(ringpop *Ringpop, minProtocolPeriod time.Duration) *gossip {
 		ringpop:           ringpop,
 		stopped:           true,
 		minProtocolPeriod: minProtocolPeriod,
-		protocolTiming:    metrics.StandardHistogram{},
+		protocolTiming:    metrics.NewHistogram(metrics.NilSample{}),
 	}
+
+	gossip.protocolTiming.Update(int64(gossip.minProtocolPeriod))
 
 	return gossip
 }
@@ -56,37 +57,38 @@ func newGossip(ringpop *Ringpop, minProtocolPeriod time.Duration) *gossip {
 
 func (g *gossip) computeProtocolDelay() time.Duration {
 	if g.numProtocolPeriods != 0 {
-		target := g.lastProtocolPeriod + time.Duration(g.lastProtocolRate)
-		return time.Duration(math.Max(float64(int64(target)-unixMilliseconds()), float64(g.minProtocolPeriod))) // REVISIT
+		target := g.lastProtocolPeriod.Add(g.lastProtocolRate)
+		return time.Duration(math.Max(float64(target.UnixNano()-time.Now().UnixNano()), float64(g.minProtocolPeriod))) // REVISIT
 	}
 
 	// delay for first tick staggered in [0, minProtocolPeriod] ms
 	return time.Duration(math.Floor(rand.Float64() * float64(g.minProtocolPeriod+1)))
 }
 
-func (g *gossip) computeProtocolRate() int64 {
+func (g *gossip) computeProtocolRate() time.Duration {
 	observed := g.protocolTiming.Percentiles([]float64{0.5})[1] * 2.0
-	return int64(math.Max(observed, float64(g.minProtocolPeriod)))
+	return time.Duration(math.Max(observed, float64(g.minProtocolPeriod)))
 }
 
 // TODO
 func (g *gossip) run() {
-	protocolDelay := g.computeProtocolDelay()
-
-	g.protocolPeriodTimer = time.NewTicker(protocolDelay + 1)
-	g.ringpop.stat("timing", "protocol.delay", int64(protocolDelay))
-
 	go func() {
 		for {
-			if g.protocolPeriodTimer != nil {
-				<-g.protocolPeriodTimer.C
-				// pingStartTime := time.Now()
+			protocolDelay := g.computeProtocolDelay()
+			g.ringpop.stat("timing", "protocol.delay", milliseconds(protocolDelay))
+			time.Sleep(protocolDelay)
 
-				// TODO: ...something something ping something something
-
-			} else {
+			if g.stopped {
+				g.ringpop.logger.WithField("local", g.ringpop.WhoAmI()).
+					Debug("stopped recurring gossip loop")
 				break
 			}
+
+			// pingStartTime := time.Now()
+			// err := g.ringpop.PingMemberNow()
+
+			g.lastProtocolPeriod = time.Now()
+			g.numProtocolPeriods++
 		}
 	}()
 }
@@ -114,16 +116,12 @@ func (g *gossip) stop() {
 	if g.stopped {
 		g.ringpop.logger.WithFields(log.Fields{
 			"local": g.ringpop.WhoAmI(),
-		}).Warn("gossip is already stopped")
+		}).Debug("gossip is already stopped")
 
 		return
 	}
 
 	g.protocolRateTimer.Stop()
-	g.protocolRateTimer = nil
-
-	g.protocolPeriodTimer.Stop()
-	g.protocolPeriodTimer = nil
 
 	g.stopped = true
 
@@ -133,19 +131,13 @@ func (g *gossip) stop() {
 }
 
 // StartProtocolRateTimer creates a ticker and launches a goroutine that
-// sets lastProtocolRate every 1000ms, returns a channel that can be used
-// to exit out of the function
+// sets lastProtocolRate every 1000ms
 func (g *gossip) startProtocolRateTimer() {
 	g.protocolRateTimer = time.NewTicker(1000 * time.Millisecond)
 	// launch goroutine that calculates last protocol rate periodically
 	go func() {
-		for {
-			if g.protocolRateTimer != nil {
-				<-g.protocolRateTimer.C
-				g.lastProtocolRate = g.computeProtocolRate()
-			} else {
-				break
-			}
+		for _ = range g.protocolRateTimer.C {
+			g.lastProtocolRate = g.computeProtocolRate()
 		}
 	}()
 }

@@ -1,6 +1,7 @@
 package ringpop
 
 import (
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -26,6 +27,7 @@ type suspicion struct {
 	period  time.Duration
 	stopped bool
 	timers  map[string]*time.Timer
+	lock    sync.Mutex
 }
 
 // NewSuspicion creates a new suspicion protocol
@@ -39,6 +41,7 @@ func newSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *suspicion {
 		ringpop: ringpop,
 		period:  period,
 		timers:  make(map[string]*time.Timer),
+		lock:    sync.Mutex{},
 	}
 
 	return suspicion
@@ -69,6 +72,9 @@ func (s *suspicion) start(suspect suspect) {
 		return
 	}
 
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if timer, ok := s.timers[suspect.suspectAddress()]; ok {
 		timer.Stop()
 	}
@@ -91,6 +97,9 @@ func (s *suspicion) start(suspect suspect) {
 
 // Stop stops the suspicion timer for a specific member
 func (s *suspicion) stop(suspect suspect) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if timer, ok := s.timers[suspect.suspectAddress()]; ok {
 		timer.Stop()
 		delete(s.timers, suspect.suspectAddress())
@@ -121,6 +130,9 @@ func (s *suspicion) reenable() {
 
 // StopAll stops all suspicion timers
 func (s *suspicion) stopAll() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.stopped = true
 
 	numtimers := len(s.timers)

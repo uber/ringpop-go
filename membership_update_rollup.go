@@ -1,6 +1,9 @@
 package ringpop
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 import log "github.com/Sirupsen/logrus"
 
 const defaultMaxNumUpdates = 250
@@ -12,16 +15,17 @@ const defaultMaxNumUpdates = 250
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 type membershipUpdateRollup struct {
-	ringpop       *Ringpop
-	flushInterval time.Duration
-	maxNumUpdates int
-
+	ringpop         *Ringpop
+	flushInterval   time.Duration
+	maxNumUpdates   int
 	buffer          map[string][]Change
 	firstUpdateTime time.Time
 	lastFlushTime   time.Time
 	lastUpdateTime  time.Time
-	flushTimer      *time.Ticker
+	flushTimer      *time.Timer
 	eventC          chan string
+
+	lock sync.RWMutex
 }
 
 // NewMembershipUpdateRollup returns a new MembershipUpdateRollup
@@ -64,6 +68,9 @@ func (mr *membershipUpdateRollup) trackUpdates(changes []Change) {
 		return
 	}
 
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
 	sinceLastUpdate := time.Duration(mr.lastUpdateTime.UnixNano() - time.Now().UnixNano())
 	if sinceLastUpdate >= mr.flushInterval {
 		mr.flushBuffer()
@@ -91,25 +98,21 @@ func (mr *membershipUpdateRollup) numUpdates() int {
 
 // renewFlushTimer starts or restarts the flush timer
 func (mr *membershipUpdateRollup) renewFlushTimer() {
-	mr.flushTimer = nil
-	mr.flushTimer = time.NewTicker(mr.flushInterval)
+	if mr.flushTimer != nil {
+		mr.flushTimer.Stop()
+	}
 
-	go func() {
-		for {
-			if mr.flushTimer != nil {
-				select {
-				case <-mr.flushTimer.C:
-					mr.flushBuffer()
-				}
-			} else {
-				break
-			}
-		}
-	}()
+	mr.flushTimer = time.AfterFunc(mr.flushInterval, func() {
+		mr.flushBuffer()
+		mr.renewFlushTimer()
+	})
 }
 
 // flushBuffer flushes contents of buffer and resets update times to zero
 func (mr *membershipUpdateRollup) flushBuffer() {
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
 	// nothing to flush if no updates in buffer
 	if len(mr.buffer) == 0 {
 		return
@@ -136,7 +139,7 @@ func (mr *membershipUpdateRollup) flushBuffer() {
 		"numUpdates":       numUpdates,
 	}).Info("ringpop flushed membership update buffer")
 
-	mr.buffer = map[string][]Change{}
+	mr.buffer = make(map[string][]Change)
 	mr.firstUpdateTime = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC) // Zero time
 	mr.lastUpdateTime = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
 	mr.lastFlushTime = now
@@ -148,10 +151,11 @@ func (mr *membershipUpdateRollup) flushBuffer() {
 
 // Destroy stops timer
 func (mr *membershipUpdateRollup) destroy() {
-	if mr.flushTimer == nil {
-		return
-	}
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
 
-	mr.flushTimer.Stop()
-	mr.flushTimer = nil
+	if mr.flushTimer != nil {
+		mr.flushTimer.Stop()
+		mr.flushTimer = nil
+	}
 }

@@ -30,7 +30,7 @@ func newDissemination(ringpop *Ringpop) *dissemination {
 		piggybackFactor:   15, // lower factor -> more full syncs
 		eventC:            make(chan string),
 	}
-	d.launchChangeHandler()
+	go d.eventLoop()
 
 	return d
 }
@@ -118,17 +118,8 @@ func (d *dissemination) recordChange(change Change) {
 	d.changes[change.Address] = change
 }
 
-// launchChangeHandler launches a goroutine that will adjust the dissemination's
-// piggyback count whenever it receives on eventC
-func (d *dissemination) launchChangeHandler() {
-	go func() {
-		for {
-			if d.eventC != nil {
-				<-d.eventC
-				d.adjustPiggybackCount()
-			} else {
-				break
-			}
-		}
-	}()
+func (d *dissemination) eventLoop() {
+	for _ = range d.eventC {
+		d.adjustPiggybackCount()
+	}
 }

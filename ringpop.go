@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -91,7 +92,6 @@ type Ringpop struct {
 	dissemination          *dissemination
 	membership             *membership
 	MembershipIter         *membershipIter
-	membershipChangeC      chan []Change
 	membershipUpdateRollup *membershipUpdateRollup
 
 	// gossip
@@ -104,6 +104,7 @@ type Ringpop struct {
 	statPrefix   string
 	statKeys     map[string]string
 	statHooks    []string // type?
+	statLock     sync.Mutex
 
 	clientRate metrics.Meter
 	serverRate metrics.Meter
@@ -129,7 +130,6 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 	}
 
 	ringpop.eventC = make(chan string, 25)
-	ringpop.membershipChangeC = make(chan []Change)
 
 	ringpop.ready = false
 	ringpop.pinging = false
@@ -164,7 +164,7 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 		defaultMembershipUpdateFlushInterval)
 
 	// membership and gossip
-	ringpop.ring = newHashRing()
+	ringpop.ring = newHashRing(ringpop)
 	ringpop.dissemination = newDissemination(ringpop)
 	ringpop.membership = newMembership(ringpop)
 	ringpop.membershipUpdateRollup = newMembershipUpdateRollup(ringpop,
@@ -173,7 +173,7 @@ func NewRingpop(app, hostport string, opts Options) *Ringpop {
 	ringpop.gossip = newGossip(ringpop, 0)
 	// statsd
 	// changes 0.0.0.0:0000 -> 0_0_0_0_0000
-	ringpop.statKeys = make(map[string]string, 0)
+	ringpop.statKeys = make(map[string]string)
 	ringpop.statHostPort = strings.Replace(ringpop.HostPort, ".", "_", -1)
 	ringpop.statHostPort = strings.Replace(ringpop.statHostPort, ":", "_", -1)
 	ringpop.statPrefix = fmt.Sprintf("ringpop.%s", ringpop.statHostPort)
@@ -191,11 +191,8 @@ func (rp *Ringpop) Destroy() {
 	rp.suspicion.stopAll()
 	rp.membershipUpdateRollup.destroy()
 
-	close(rp.membershipChangeC)
 	// Sleep momentarily to allow sends on the ring event channel that may
 	// have been started by the membership change channel to complete
-	time.Sleep(100 * time.Nanosecond)
-	close(rp.ring.eventC)
 	close(rp.eventC)
 
 	// clientRate/serverRate/totalRate stuff
@@ -245,12 +242,6 @@ func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
 
 	rp.checkForMissingBootstrapHost()
 	rp.checkForHostnameIPMismatch()
-
-	// launch event handlers
-	go rp.membershipChangeHandler()
-	go rp.ringEventHandler()
-
-	time.Sleep(10 * time.Millisecond)
 
 	// make self alive
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
@@ -479,16 +470,14 @@ func (rp *Ringpop) onRingServerRemoved() {
 	rp.emit("ringServerRemoved")
 }
 
-func (rp *Ringpop) ringEventHandler() {
-	for event := range rp.ring.eventC {
-		switch event {
-		case "added":
-			rp.onRingServerAdded()
-		case "removed":
-			rp.onRingServerRemoved()
-		case "checksumComputed":
-			rp.onRingChecksumComputed()
-		}
+func (rp *Ringpop) handleRingEvent(event string) {
+	switch event {
+	case "added":
+		rp.onRingServerAdded()
+	case "removed":
+		rp.onRingServerRemoved()
+	case "checksumComputed":
+		rp.onRingChecksumComputed()
 	}
 }
 
@@ -549,43 +538,39 @@ func (rp *Ringpop) onMemberLeave(change Change) {
 	rp.suspicion.stop(change)             // Stop suspicion for node
 }
 
-func (rp *Ringpop) membershipChangeHandler() {
+func (rp *Ringpop) handleChanges(changes []Change) {
 	var membershipChanged, ringChanged bool
 
-	for changes := range rp.membershipChangeC {
-		membershipChanged, ringChanged = false, false
-
-		for _, change := range changes {
-			switch change.Status {
-			case ALIVE:
-				rp.onMemberAlive(change)
-				membershipChanged, ringChanged = true, true
-			case FAULTY:
-				rp.onMemberFaulty(change)
-				membershipChanged, ringChanged = true, true
-			case SUSPECT:
-				rp.onMemberSuspect(change)
-				membershipChanged, ringChanged = true, false
-			case LEAVE:
-				rp.onMemberLeave(change)
-				membershipChanged, ringChanged = true, true
-			}
+	for _, change := range changes {
+		switch change.Status {
+		case ALIVE:
+			rp.onMemberAlive(change)
+			membershipChanged, ringChanged = true, true
+		case FAULTY:
+			rp.onMemberFaulty(change)
+			membershipChanged, ringChanged = true, true
+		case SUSPECT:
+			rp.onMemberSuspect(change)
+			membershipChanged, ringChanged = true, false
+		case LEAVE:
+			rp.onMemberLeave(change)
+			membershipChanged, ringChanged = true, true
 		}
-
-		if membershipChanged {
-
-		}
-
-		if ringChanged {
-			rp.dissemination.eventC <- "changed"
-			rp.emit("ringChanged")
-		}
-
-		rp.membershipUpdateRollup.trackUpdates(changes)
-
-		rp.stat("gauge", "num-members", int64(rp.membership.memberCount()))
-		rp.stat("timing", "updates", int64(len(changes)))
 	}
+
+	if membershipChanged {
+
+	}
+
+	if ringChanged {
+		rp.dissemination.eventC <- "changed"
+		rp.emit("ringChanged")
+	}
+
+	rp.membershipUpdateRollup.trackUpdates(changes)
+
+	rp.stat("gauge", "num-members", int64(rp.membership.memberCount()))
+	rp.stat("timing", "updates", int64(len(changes)))
 }
 
 // PingMember is temporary testing func
@@ -662,11 +647,13 @@ func (rp *Ringpop) PingMemberNow() error {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (rp *Ringpop) stat(statType, key string, val int64) {
+	rp.statLock.Lock()
 	fqkey, ok := rp.statKeys[key]
 	if !ok {
 		fqkey = fmt.Sprintf("%s.%s", rp.statPrefix, key)
 		rp.statKeys[key] = fqkey
 	}
+	rp.statLock.Unlock()
 
 	switch statType {
 	case "increment":
@@ -693,8 +680,6 @@ func (rp *Ringpop) denyJoins() {
 }
 
 func (rp *Ringpop) testBootstrapper() {
-	go rp.membershipChangeHandler()
-	go rp.ringEventHandler()
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
 	rp.ready = true
 }

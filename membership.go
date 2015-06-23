@@ -44,9 +44,10 @@ func (c Change) suspectIncarnation() int64 {
 type membership struct {
 	ringpop     *Ringpop
 	members     map[string]*Member
-	checksum    uint32
+	memberlist  []*Member
 	localmember *Member
-	mut         sync.Mutex
+	checksum    uint32
+	lock        sync.RWMutex
 }
 
 // NewMembership returns a pointer to a new membership
@@ -54,7 +55,6 @@ func newMembership(ringpop *Ringpop) *membership {
 	membership := &membership{
 		ringpop: ringpop,
 		members: make(map[string]*Member),
-		mut:     sync.Mutex{},
 	}
 	return membership
 }
@@ -86,8 +86,8 @@ func (m *membership) genChecksumString() string {
 	var checksumStrings sort.StringSlice
 
 	for _, member := range m.members {
-		cstr := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
-		checksumStrings = append(checksumStrings, cstr)
+		s := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
+		checksumStrings = append(checksumStrings, s)
 	}
 
 	checksumStrings.Sort()
@@ -110,33 +110,31 @@ func (m *membership) getMemberByAddress(address string) (*Member, bool) {
 }
 
 func (m *membership) getJoinPosition() int {
-	return int(math.Floor(rand.Float64() * float64(len(m.members))))
+	return int(math.Floor(rand.Float64() * float64(len(m.memberlist))))
 }
 
 func (m *membership) memberCount() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	return len(m.members)
 }
 
 func (m *membership) randomPingablemembers(n int, exlcuding map[string]bool) []*Member {
-	var pingablemembers []*Member
+	var pingableMembers []*Member
 
-	for _, member := range m.members {
+	for _, member := range m.memberlist {
 		if m.isPingable(member) && !exlcuding[member.Address] {
-			pingablemembers = append(pingablemembers, member)
+			pingableMembers = append(pingableMembers, member)
 		}
 	}
 
 	// shuffle members and take first n
-	pingablemembers = shuffle(pingablemembers)
+	pingableMembers = shuffle(pingableMembers)
 
-	if n > len(pingablemembers) {
-		return pingablemembers
+	if n > len(pingableMembers) {
+		return pingableMembers
 	}
-	return pingablemembers[:n]
-}
-
-func (m *membership) stats() {
-	// TODO: decide what to make m return (stuct?)
+	return pingableMembers[:n]
 }
 
 func (m *membership) hasMember(member *Member) bool {
@@ -220,10 +218,10 @@ func (m *membership) makeUpdate(change Change) {
 		}
 
 		m.members[change.Address] = member
+		joinpos := m.getJoinPosition()
+		m.memberlist = append(m.memberlist[:joinpos], append([]*Member{member},
+			m.memberlist[joinpos:]...)...)
 	}
-
-	// joinpos := m.getJoinPosition()
-	// m.members = append(m.members[:joinpos], append([]*Member{member}, m.members[joinpos:]...)...)
 
 	member.Status = change.Status
 	member.Incarnation = change.Incarnation
@@ -236,8 +234,7 @@ func (m *membership) update(changes []Change) []Change {
 		return updates
 	}
 
-	m.mut.Lock()
-	defer m.mut.Unlock()
+	m.lock.Lock()
 
 	for _, change := range changes {
 		member, found := m.getMemberByAddress(change.Address)
@@ -273,10 +270,12 @@ func (m *membership) update(changes []Change) []Change {
 		}
 	}
 
+	m.lock.Unlock()
+
 	if len(updates) > 0 {
 		m.computeChecksum()
 		m.ringpop.emit("updated")
-		m.ringpop.membershipChangeC <- updates
+		m.ringpop.handleChanges(changes)
 	}
 
 	return updates
@@ -295,16 +294,15 @@ func shuffle(members []*Member) []*Member {
 }
 
 // Shuffle returns a slice containing the members in the membership in a random order
-func (m *membership) shuffle() []*Member {
+func (m *membership) shuffle() {
 	shuffled := []*Member{}
 
-	for _, member := range m.members {
+	for _, member := range m.memberlist {
 		shuffled = append(shuffled, member)
 	}
 
-	shuffled = shuffle(shuffled)
+	m.memberlist = shuffle(shuffled)
 
-	return shuffled
 }
 
 // String returns a JSON string
@@ -329,43 +327,43 @@ func (m *membership) String() (string, error) {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (m *membership) iter() membershipIter {
-	return newmembershipIter(m)
+	return newMembershipIter(m)
 }
 
 type membershipIter struct {
 	membership   *membership
-	members      []*Member
 	currentIndex int
 	currentRound int
 }
 
-func newmembershipIter(membership *membership) membershipIter {
+func newMembershipIter(membership *membership) membershipIter {
 	iter := membershipIter{
 		membership:   membership,
 		currentIndex: -1,
 		currentRound: 0,
 	}
 
-	iter.members = iter.membership.shuffle()
+	iter.membership.shuffle()
 
 	return iter
 }
 
-// Returns the next pingable member in the membership list
+// Returns the next pingable member in the membership list, if it
+// visits all members but none are pingable, returns nil, false
 func (it *membershipIter) next() (*Member, bool) {
-	maxToVisit := len(it.members)
+	maxToVisit := len(it.membership.memberlist)
 	visited := make(map[string]bool)
 
 	for len(visited) < maxToVisit {
 		it.currentIndex++
 
-		if it.currentIndex >= len(it.members) {
+		if it.currentIndex >= len(it.membership.memberlist) {
 			it.currentIndex = 0
 			it.currentRound++
-			it.members = it.membership.shuffle()
+			it.membership.shuffle()
 		}
 
-		member := it.members[it.currentIndex]
+		member := it.membership.memberlist[it.currentIndex]
 		visited[member.Address] = true
 
 		if it.membership.isPingable(member) {
