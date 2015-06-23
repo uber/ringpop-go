@@ -26,7 +26,7 @@ func testRollup(interval time.Duration) *membershipUpdateRollup {
 	if interval == time.Duration(0) {
 		interval = time.Duration(math.MaxInt64)
 	}
-	return newMembershipUpdateRollup(testPop("127.0.0.1:3000"), interval, 0)
+	return newMembershipUpdateRollup(testPop("127.0.0.1:3000", 0), interval, 0)
 }
 
 func TestTrackUpdatesEmpty(t *testing.T) {
@@ -55,7 +55,6 @@ func TestBufferFlushedOnIntervalExceed(t *testing.T) {
 	// revisit... should this be flushing even the updates we are adding
 	// or only what's previously in the buffer?
 	rollup.trackUpdates(updates)
-
 	assert.Equal(t, "flushed", <-rollup.eventC, "expected flush")
 	assert.Equal(t, 0, len(rollup.buffer), "expected buffer to be empty")
 }

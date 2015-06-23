@@ -15,7 +15,7 @@ import (
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func TestChecksumChanges(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3000", unixMilliseconds(time.Now()), "")
@@ -29,9 +29,9 @@ func TestChecksumChanges(t *testing.T) {
 }
 
 func TestChecksumEqual(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 1)
 	defer ringpop.Destroy()
-	ringpop2 := testPop("127.0.0.1:3000")
+	ringpop2 := testPop("127.0.0.1:3000", 1)
 	defer ringpop2.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", 1, "")
@@ -48,7 +48,7 @@ func TestChecksumEqual(t *testing.T) {
 
 // Higher incarnation should result in a leave override
 func TestLeaveOverrideHigher(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
@@ -66,7 +66,7 @@ func TestLeaveOverrideHigher(t *testing.T) {
 
 // Equal incarnation number should not result in a leave override ... or should it?
 func TestLeaveOverrideEqual(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
@@ -84,7 +84,7 @@ func TestLeaveOverrideEqual(t *testing.T) {
 
 // Lower incarnation should not result in a leave override
 func TestLeaveOverrideLower(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
@@ -102,7 +102,7 @@ func TestLeaveOverrideLower(t *testing.T) {
 
 // Attempting to make the local member faulty should not change local member status
 func TestLocalFaultyOverride(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
@@ -120,7 +120,7 @@ func TestLocalFaultyOverride(t *testing.T) {
 
 // Attempting to make the local member faulty should not change local member status
 func TestLocalSuspectOverride(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	member, found := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
@@ -139,7 +139,7 @@ func TestLocalSuspectOverride(t *testing.T) {
 // Update method properly handles multiple updates in input
 // Also tests that an update for a never before seen member works for all statuses
 func TestHandleMultipleUpdates(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	oldchecksum := ringpop.membership.checksum
@@ -191,7 +191,7 @@ func TestHandleMultipleUpdates(t *testing.T) {
 
 // A member should be able to go from alive -> faulty immediately without having to be suspect inbetween
 func TestAliveToFaulty(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	newMemberAddr := "127.0.0.2:3001"
@@ -223,7 +223,7 @@ func TestAliveToFaulty(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.2:3000", unixMilliseconds(time.Now()), "")
@@ -234,7 +234,7 @@ func TestString(t *testing.T) {
 }
 
 func TestLeaveEnds(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	newMemberAddr := "127.0.0.1:3001"
@@ -257,7 +257,7 @@ func TestLeaveEnds(t *testing.T) {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func TestIterNoUsable(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	iter := ringpop.membership.iter()
@@ -268,7 +268,7 @@ func TestIterNoUsable(t *testing.T) {
 }
 
 func TestIterNoUsableWithNonLocal(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	ringpop.membership.makeFaulty("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
@@ -282,7 +282,7 @@ func TestIterNoUsableWithNonLocal(t *testing.T) {
 }
 
 func TestIterOverTen(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	for i := 1; i < 11; i++ {
@@ -304,7 +304,7 @@ func TestIterOverTen(t *testing.T) {
 }
 
 func TestIterSkipsFaultyAndLocal(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000")
+	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")

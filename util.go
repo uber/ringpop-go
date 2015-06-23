@@ -8,6 +8,7 @@ import (
 )
 
 var hostPortPattern = regexp.MustCompile("^([0-9]+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
+var hpp2 = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 
 func unixMilliseconds(t time.Time) int64 {
 	return t.UnixNano() / 1000000
@@ -64,9 +65,12 @@ func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 	return opt
 }
 
-func testPop(hostport string) *Ringpop {
+func testPop(hostport string, incarnation int64) *Ringpop {
 	ringpop := NewRingpop("test", hostport, Options{})
 	ringpop.testBootstrapper()
+	if incarnation != 0 {
+		ringpop.membership.localmember.Incarnation = incarnation
+	}
 
 	return ringpop
 }
