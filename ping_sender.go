@@ -59,17 +59,17 @@ func (p *pinger) sendPing() (*pingBody, error) {
 
 	var resBody pingBody
 
+	// send ping
 	go p.send(ctx, &resBody, errC)
+	// wait for response
 	select {
-	// ping succeeded or failed
-	case err := <-errC:
+	case err := <-errC: // ping succeeded or failed
 		if err != nil {
 			return nil, err
 		}
 		return &resBody, nil
 
-	// ping timed out
-	case <-ctx.Done():
+	case <-ctx.Done(): // ping timed out
 		return nil, errors.New("ping timed out")
 	}
 }
@@ -83,6 +83,7 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 			"remote": p.address,
 		}).Debugf("could not begin call to remote ping service: %v", err)
 		errC <- err
+		return
 	}
 
 	// send request
@@ -90,6 +91,7 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
 		log.Debugf("could not write headers: %v", err)
 		errC <- err
+		return
 	}
 
 	reqBody := pingBody{
@@ -97,9 +99,11 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 		Changes:  p.ringpop.dissemination.issueChanges(0, ""),
 		Source:   p.ringpop.WhoAmI(),
 	}
+
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
 		log.Debugf("could not write ping body: %v", err)
 		errC <- err
+		return
 	}
 
 	// get response
@@ -107,11 +111,13 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
 		log.Debugf("could not read response headers: %v", err)
 		errC <- err
+		return
 	}
 
 	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(resBody); err != nil {
 		log.Debugf("could not read response body: %v", err)
 		errC <- err
+		return
 	}
 
 	errC <- nil
