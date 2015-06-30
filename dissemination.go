@@ -55,7 +55,7 @@ func (d *dissemination) adjustPiggybackCount() {
 			"oldPiggybackCount": prevPiggybackCount,
 			"piggybackFactor":   d.piggybackFactor,
 			"serverCount":       serverCount,
-		}).Debug("adjusted max piggyback count")
+		}).Debug("[ringpop] adjusted max piggyback count")
 	}
 }
 
@@ -105,7 +105,7 @@ func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 			"localChecksum":  d.ringpop.membership.checksum,
 			"remoteChecksum": checksum,
 			"remoteNode":     source,
-		}).Info("full sync")
+		}).Info("[ringpop] full sync")
 
 		return d.fullSync()
 	}

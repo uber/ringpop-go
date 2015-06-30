@@ -115,6 +115,7 @@ func (mr *membershipUpdateRollup) flushBuffer() {
 
 	// nothing to flush if no updates in buffer
 	if len(mr.buffer) == 0 {
+		// mr.ringpop.logger.WithField("local", mr.ringpop.WhoAmI()).Info("ringpop flushed no updates")
 		return
 	}
 
@@ -137,7 +138,7 @@ func (mr *membershipUpdateRollup) flushBuffer() {
 		"sinceFirstUpdate": sinceLastUpdate,
 		"sinceLastFlush":   sinceLastFlush,
 		"numUpdates":       numUpdates,
-	}).Info("ringpop flushed membership update buffer")
+	}).Info("[ringpop] flushed membership update buffer")
 
 	mr.buffer = make(map[string][]Change)
 	mr.firstUpdateTime = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC) // Zero time

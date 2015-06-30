@@ -18,7 +18,7 @@ type suspect interface {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	S U S P I C I O N
+//	SUSPICION
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -49,7 +49,7 @@ func newSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *suspicion {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	M E T H O D S
+// SUSPICION METHODS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
@@ -58,7 +58,7 @@ func (s *suspicion) start(suspect suspect) {
 	if s.stopped {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local": s.ringpop.WhoAmI(),
-		}).Debug("cannot start a suspect period because suspicion has not been reenabled")
+		}).Debug("[ringpop] cannot start a suspect period because suspicion has not been reenabled")
 
 		return
 	}
@@ -67,7 +67,7 @@ func (s *suspicion) start(suspect suspect) {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local":   s.ringpop.WhoAmI(),
 			"suspect": suspect.suspectAddress(),
-		}).Debug("cannot start a suspect period for the local member")
+		}).Debug("[ringpop] cannot start a suspect period for the local member")
 
 		return
 	}
@@ -77,6 +77,11 @@ func (s *suspicion) start(suspect suspect) {
 
 	if timer, ok := s.timers[suspect.suspectAddress()]; ok {
 		timer.Stop()
+		// s.ringpop.logger.WithFields(log.Fields{
+		// 	"local":   s.ringpop.WhoAmI(),
+		// 	"suspect": suspect.suspectAddress(),
+		// }).Warn("[ringpop] member is already suspect")
+		// return
 	}
 
 	// declare member faulty when timer runs out
@@ -84,18 +89,19 @@ func (s *suspicion) start(suspect suspect) {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local":  s.ringpop.WhoAmI(),
 			"faulty": suspect.suspectAddress(),
-		}).Info("ringpop declares member faulty")
+		}).Info("[ringpop] member declared faulty")
 
 		s.ringpop.membership.makeFaulty(suspect.suspectAddress(), suspect.suspectIncarnation(), "")
 	})
 
 	s.ringpop.logger.WithFields(log.Fields{
-		"local":   s.ringpop.WhoAmI(),
-		"suspect": suspect.suspectAddress(),
-	}).Debug("started suspect period")
+		"local":     s.ringpop.WhoAmI(),
+		"suspect":   suspect.suspectAddress(),
+		"timestamp": time.Now(),
+	}).Debug("[ringpop] started suspect period")
 }
 
-// Stop stops the suspicion timer for a specific member
+// stops the suspicion timer for a specific member
 func (s *suspicion) stop(suspect suspect) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -107,16 +113,16 @@ func (s *suspicion) stop(suspect suspect) {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local":   s.ringpop.WhoAmI(),
 			"suspect": suspect.suspectAddress(),
-		}).Debug("stopped members suspect timer")
+		}).Debug("[ringpop] stopped members suspect timer")
 	}
 }
 
-// Reenable reenables the suspicion protocol
+// reenables the suspicion protocol
 func (s *suspicion) reenable() {
 	if !s.stopped {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local": s.ringpop.WhoAmI(),
-		}).Warn("cannot reenable suspicion protocol because it was never disabled")
+		}).Warn("[ringpop] cannot reenable suspicion protocol because it was never disabled")
 
 		return
 	}
@@ -125,10 +131,10 @@ func (s *suspicion) reenable() {
 
 	s.ringpop.logger.WithFields(log.Fields{
 		"local": s.ringpop.WhoAmI(),
-	}).Debug("reenabled suspicion protocol")
+	}).Debug("[ringpop] reenabled suspicion protocol")
 }
 
-// StopAll stops all suspicion timers
+// stops all suspicion timers
 func (s *suspicion) stopAll() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -140,7 +146,7 @@ func (s *suspicion) stopAll() {
 	if numtimers == 0 {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local": s.ringpop.WhoAmI(),
-		}).Debug("stopped no suspect timers")
+		}).Debug("[ringpop] stopped no suspect timers")
 
 		return
 	}
@@ -153,5 +159,5 @@ func (s *suspicion) stopAll() {
 	s.ringpop.logger.WithFields(log.Fields{
 		"local":     s.ringpop.WhoAmI(),
 		"numTimers": numtimers,
-	}).Debug("stopped all suspect timers")
+	}).Debug("[ringpop] stopped all suspect timers")
 }

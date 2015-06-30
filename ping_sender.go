@@ -10,11 +10,11 @@ import (
 	"github.com/uber/tchannel/golang"
 )
 
-func sendPing(ringpop *Ringpop, target string) (*pingBody, error) {
-	ringpop.stat("increment", "ping.send", 1)
-	pingsender := newPinger(ringpop, target)
-	return pingsender.sendPing()
-}
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// HELPER STRUCTS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 type pingBody struct {
 	Checksum uint32   `json:"checksum"`
@@ -28,32 +28,33 @@ type pingBody struct {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type pinger struct {
+type pingSender struct {
 	ringpop *Ringpop
 	address string
 	timeout time.Duration
 }
 
-func newPinger(ringpop *Ringpop, address string) *pinger {
-	pinger := &pinger{
+func newPingSender(ringpop *Ringpop, address string, timeout time.Duration) *pingSender {
+	pingSender := &pingSender{
 		ringpop: ringpop,
 		address: address,
-		timeout: ringpop.pingTimeout,
+		timeout: timeout,
 	}
 
-	return pinger
+	return pingSender
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-// METHODS
+// PING SENDER METHODS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (p *pinger) sendPing() (*pingBody, error) {
+func (p *pingSender) sendPing() (*pingBody, error) {
 	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()),
 		p.timeout)
 	defer cancel()
+
 	errC := make(chan error)
 	defer close(errC)
 
@@ -74,14 +75,16 @@ func (p *pinger) sendPing() (*pingBody, error) {
 	}
 }
 
-func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
+func (p *pingSender) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	// begin call
 	call, err := p.ringpop.channel.BeginCall(ctx, p.address, "ringpop", "/protocol/ping", nil)
 	if err != nil {
 		p.ringpop.logger.WithFields(log.Fields{
-			"local":  p.ringpop.WhoAmI(),
-			"remote": p.address,
-		}).Debugf("could not begin call to remote ping service: %v", err)
+			"local":   p.ringpop.WhoAmI(),
+			"remote":  p.address,
+			"service": "ping-send",
+			"error":   err,
+		}).Debug("[ringpop] could not begin call")
 		errC <- err
 		return
 	}
@@ -89,7 +92,11 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	// send request
 	var reqHeaders headers
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-		log.Debugf("could not write headers: %v", err)
+		p.ringpop.logger.WithFields(log.Fields{
+			"local":   p.ringpop.WhoAmI(),
+			"error":   err,
+			"service": "ping-send",
+		}).Debug("[ringpop] could not write request headers")
 		errC <- err
 		return
 	}
@@ -101,7 +108,11 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	}
 
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
-		log.Debugf("could not write ping body: %v", err)
+		p.ringpop.logger.WithFields(log.Fields{
+			"local":   p.ringpop.WhoAmI(),
+			"error":   err,
+			"service": "ping-send",
+		}).Debug("[ringpop] could not write request body")
 		errC <- err
 		return
 	}
@@ -109,16 +120,41 @@ func (p *pinger) send(ctx context.Context, resBody *pingBody, errC chan error) {
 	// get response
 	var resHeaders headers
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
-		log.Debugf("could not read response headers: %v", err)
+		p.ringpop.logger.WithFields(log.Fields{
+			"local":   p.ringpop.WhoAmI(),
+			"error":   err,
+			"service": "ping-send",
+		}).Debug("[ringpop] could not read response body")
 		errC <- err
 		return
 	}
 
-	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(resBody); err != nil {
-		log.Debugf("could not read response body: %v", err)
+	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
+		p.ringpop.logger.WithFields(log.Fields{
+			"local":   p.ringpop.WhoAmI(),
+			"error":   err,
+			"service": "ping-send",
+		}).Debug("[ringpop] could not read response body")
 		errC <- err
 		return
 	}
 
 	errC <- nil
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// METHODS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func sendPing(ringpop *Ringpop, target string, timeout time.Duration) (*pingBody, error) {
+	ringpop.stat("increment", "ping.send", 1)
+	ringpop.logger.WithFields(log.Fields{
+		"local":  ringpop.WhoAmI(),
+		"target": target,
+	}).Debug("[ringpop] ping send")
+
+	pingsender := newPingSender(ringpop, target, timeout)
+	return pingsender.sendPing()
 }

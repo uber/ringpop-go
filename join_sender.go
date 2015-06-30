@@ -35,7 +35,7 @@ const (
 )
 
 func isSingleNodeCluster(ringpop *Ringpop) bool {
-	_, ok := ringpop.bootstrapHosts[captureHost(ringpop.HostPort)]
+	_, ok := ringpop.bootstrapHosts[captureHost(ringpop.hostPort)]
 
 	var numHosts = 0
 	for _, hosts := range ringpop.bootstrapHosts {
@@ -116,7 +116,7 @@ func newJoiner(ringpop *Ringpop, opts joinerOptions) *joiner {
 
 	joiner := &joiner{
 		ringpop:             ringpop,
-		host:                captureHost(ringpop.HostPort),
+		host:                captureHost(ringpop.hostPort),
 		preferredNodes:      make([]string, 0),
 		nonPreferredNodes:   make([]string, 0),
 		roundPotentialNodes: make([]string, 0),
@@ -161,7 +161,7 @@ func (j *joiner) collectPotentialNodes(nodesJoined []string) []string {
 
 	for _, hostports := range j.ringpop.bootstrapHosts {
 		for _, hostport := range hostports {
-			if j.ringpop.HostPort != hostport && indexOf(nodesJoined, hostport) == -1 {
+			if j.ringpop.hostPort != hostport && indexOf(nodesJoined, hostport) == -1 {
 				potentialNodes = append(potentialNodes, hostport)
 			}
 		}
@@ -175,7 +175,7 @@ func (j *joiner) collectPreferredNodes() []string {
 	var preferredNodes []string
 
 	for host, hostports := range j.ringpop.bootstrapHosts {
-		if host != captureHost(j.ringpop.HostPort) {
+		if host != captureHost(j.ringpop.hostPort) {
 			preferredNodes = append(preferredNodes, hostports...)
 		}
 	}
@@ -191,8 +191,8 @@ func (j *joiner) collectNonPreferredNodes() []string {
 
 	var nonPreferredNodes []string
 
-	for _, host := range j.ringpop.bootstrapHosts[captureHost(j.ringpop.HostPort)] {
-		if host != j.ringpop.HostPort {
+	for _, host := range j.ringpop.bootstrapHosts[captureHost(j.ringpop.hostPort)] {
+		if host != j.ringpop.hostPort {
 			nonPreferredNodes = append(nonPreferredNodes, host)
 		}
 	}
@@ -243,7 +243,7 @@ func (j *joiner) join() ([]string, error) {
 
 	if isSingleNodeCluster(j.ringpop) {
 		j.ringpop.logger.WithField("local", j.ringpop.WhoAmI()).
-			Info("ringpop received a single node cluster to join")
+			Info("[ringpop] got a single node cluster to join")
 
 		return nil, nil
 	}
@@ -277,7 +277,7 @@ func (j *joiner) join() ([]string, error) {
 				"numJoined": numJoined,
 				"numFailed": numFailed,
 				"numGroups": numGroups,
-			}).Info("ringpop join complete")
+			}).Info("[ringpop] join complete")
 
 			break
 		}
@@ -292,11 +292,10 @@ func (j *joiner) join() ([]string, error) {
 				"numJoined":       numJoined,
 				"numFailed":       numFailed,
 				"startTime":       startTime,
-			}).Warn("ringpop max join duration exceeded")
+			}).Warn("[ringpop] max join duration exceeded")
 
 			message := fmt.Sprintf("Join duration of %v exceeded max %v.",
 				joinDuration, j.maxJoinDuration)
-
 			return nodesJoined, errors.New(message)
 		}
 
@@ -306,7 +305,7 @@ func (j *joiner) join() ([]string, error) {
 			"numJoined": numJoined,
 			"numFailed": numFailed,
 			"startTime": startTime,
-		}).Debug("ringpop join not yet complete")
+		}).Debug("[ringpop] join not yet complete")
 	}
 
 	return nodesJoined, nil
@@ -319,7 +318,8 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 	var nodesFailed []string
 	var numNodesLeft = j.joinSize - len(totalNodesJoined)
 	var startTime = time.Now()
-	var mut sync.Mutex
+
+	var l sync.Mutex
 	var wg sync.WaitGroup
 
 	for _, node := range group {
@@ -336,8 +336,8 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 			select {
 			// call either succeeded or failed
 			case err := <-errC:
-				mut.Lock()
-				defer mut.Unlock()
+				l.Lock()
+				defer l.Unlock()
 				if err != nil {
 					nodesFailed = append(nodesFailed, n)
 				} else {
@@ -349,9 +349,9 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 					"local":   j.ringpop.WhoAmI(),
 					"remote":  n,
 					"timeout": j.timeout,
-				}).Debug("attempt to join node timed out")
-				mut.Lock()
-				defer mut.Unlock()
+				}).Debug("[ringpop] attempt to join node timed out")
+				l.Lock()
+				defer l.Unlock()
 				nodesFailed = append(nodesFailed, n)
 			}
 
@@ -371,7 +371,7 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 		"numNodesLeft": numNodesLeft,
 		"failures":     nodesFailed,
 		"successes":    nodesJoined,
-	}).Debug("ringpop join group complete")
+	}).Debug("[ringpop] join group complete")
 
 	return nodesJoined, nodesFailed
 }
@@ -381,10 +381,11 @@ func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
 	call, err := j.ringpop.channel.BeginCall(ctx, node, "ringpop", "/protocol/join", nil)
 	if err != nil {
 		j.ringpop.logger.WithFields(log.Fields{
-			"local":  j.ringpop.WhoAmI(),
-			"remote": node,
-		}).Debugf("could not begin call to remote member: %v", err)
-
+			"local":   j.ringpop.WhoAmI(),
+			"remote":  node,
+			"service": "join-send",
+			"error":   err,
+		}).Debug("[ringpop] could not begin call to remote member")
 		errC <- err
 		return
 	}
@@ -392,17 +393,27 @@ func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
 	// send request
 	var reqHeaders headers
 	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
+		j.ringpop.logger.WithFields(log.Fields{
+			"local":   j.ringpop.WhoAmI(),
+			"service": "join-send",
+			"error":   err,
+		}).Debug("[ringpop] could not write request headers")
 		errC <- err
 		return
 	}
 
 	reqBody := joinBody{
-		App:         j.ringpop.App,
+		App:         j.ringpop.app,
 		Source:      j.ringpop.WhoAmI(),
 		Incarnation: j.ringpop.membership.localmember.Incarnation,
 		Timeout:     j.timeout,
 	}
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
+		j.ringpop.logger.WithFields(log.Fields{
+			"local":   j.ringpop.WhoAmI(),
+			"service": "join-send",
+			"error":   err,
+		}).Debug("[ringpop] could not write request body")
 		errC <- err
 		return
 	}
@@ -410,12 +421,22 @@ func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
 	// get response
 	var resHeaders headers
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
+		j.ringpop.logger.WithFields(log.Fields{
+			"local":   j.ringpop.WhoAmI(),
+			"service": "join-send",
+			"error":   err,
+		}).Debug("[ringpop] could not read response headers")
 		errC <- err
 		return
 	}
 
 	var resBody joinResBody
 	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
+		j.ringpop.logger.WithFields(log.Fields{
+			"local":   j.ringpop.WhoAmI(),
+			"service": "join-send",
+			"error":   err,
+		}).Debug("[ringpop] could not read response body")
 		errC <- err
 		return
 	}
