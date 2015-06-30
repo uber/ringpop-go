@@ -627,7 +627,10 @@ func (rp *Ringpop) PingMemberNow() error {
 		rp.logger.WithFields(log.Fields{
 			"local":  rp.WhoAmI(),
 			"remote": member.Address,
-		}).Debugf("ping failed: %v", err)
+			"error":  err,
+		}).Info("[ringpop] ping failed")
+
+		sendPingReqs(rp, *member, rp.pingReqSize)
 
 		// rp.membership.makeSuspect(member.Address, member.Incarnation, rp.WhoAmI())
 
@@ -640,17 +643,20 @@ func (rp *Ringpop) PingMemberNow() error {
 	}
 
 	rp.pinging = false
-	// rp.membership.update(res.Changes)
+	rp.membership.update(res.Changes)
 	// TODO
 
-	fmt.Printf("Checksum: %v\n", res.Checksum)
-	fmt.Printf("Source: %s\n", res.Source)
-	for _, change := range res.Changes {
-		fmt.Printf("Address: %s, Status: %s, Incarnation: %v\n",
-			change.Address, change.Status, change.Incarnation)
-	}
+	rp.logger.WithFields(log.Fields{
+		"local":  rp.WhoAmI(),
+		"remote": member.Address,
+	}).Debug("[ringpop] ping success")
 
 	return nil
+}
+
+// PingReqNow is for testing
+func (rp *Ringpop) PingReqNow(peer, target string) {
+	sendPingReq(rp, peer, target)
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
