@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/uber/tchannel/golang"
 )
 
 var hostPortPattern = regexp.MustCompile("^([0-9]+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
@@ -66,7 +68,8 @@ func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 }
 
 func testPop(hostport string, incarnation int64) *Ringpop {
-	ringpop := NewRingpop("test", hostport, Options{})
+	testCh, _ := tchannel.NewChannel("test-service", nil)
+	ringpop := NewRingpop("test", hostport, testCh, nil)
 	ringpop.testBootstrapper()
 	if incarnation != 0 {
 		ringpop.membership.localmember.Incarnation = incarnation
