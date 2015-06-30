@@ -9,8 +9,7 @@ import (
 	"github.com/uber/tchannel/golang"
 )
 
-var hostPortPattern = regexp.MustCompile("^([0-9]+.[0-9]+.[0-9]+.[0-9]+):[0-9]+$")
-var hpp2 = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
+var hostPortPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 
 func unixMilliseconds(t time.Time) int64 {
 	return t.UnixNano() / 1000000
