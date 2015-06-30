@@ -236,7 +236,7 @@ func (m *membership) update(changes []Change) []Change {
 		return updates
 	}
 
-	if m.ringpop.destroyed {
+	if m.ringpop.Destroyed() {
 		return nil
 	}
 

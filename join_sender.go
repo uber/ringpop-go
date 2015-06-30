@@ -237,7 +237,7 @@ func (j *joiner) selectGroup(nodesJoined []string) []string {
 
 // join attempts to join the ringpop to a cluster
 func (j *joiner) join() ([]string, error) {
-	if j.ringpop.destroyed {
+	if j.ringpop.Destroyed() {
 		return nil, errors.New("joiner was destroyed")
 	}
 
@@ -258,7 +258,7 @@ func (j *joiner) join() ([]string, error) {
 		// join group of nodes
 		successes, failures := j.joinGroup(nodesJoined)
 
-		if j.ringpop.destroyed {
+		if j.ringpop.Destroyed() {
 			return nil, errors.New("joiner was destroyed")
 		}
 

@@ -72,9 +72,10 @@ type Ringpop struct {
 	bootstrapHosts    map[string][]string
 	joinSize          int
 
-	ready     bool
-	pinging   bool
-	destroyed bool
+	ready         bool
+	pinging       bool
+	destroyed     bool
+	destroyedLock sync.Mutex
 
 	pingReqSize int
 
@@ -181,14 +182,27 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.statHostPort = strings.Replace(ringpop.statHostPort, ":", "_", -1)
 	ringpop.statPrefix = fmt.Sprintf("ringpop.%s", ringpop.statHostPort)
 
-	ringpop.destroyed = false
+	ringpop.setDestroyed(false)
 
 	return ringpop
 }
 
+// Destroyed returns true if the ringpop has been destryoed, and false otherwise
+func (rp *Ringpop) Destroyed() bool {
+	rp.destroyedLock.Lock()
+	defer rp.destroyedLock.Unlock()
+	return rp.destroyed
+}
+
+func (rp *Ringpop) setDestroyed(destroyed bool) {
+	rp.destroyedLock.Lock()
+	defer rp.destroyedLock.Unlock()
+	rp.destroyed = destroyed
+}
+
 // Destroy kills the ringpop
 func (rp *Ringpop) Destroy() {
-	rp.destroyed = true
+	rp.setDestroyed(true)
 	rp.gossip.stop()
 	rp.suspicion.stopAll()
 	rp.membershipUpdateRollup.destroy()
@@ -261,7 +275,7 @@ func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
 		return nil, err
 	}
 
-	if rp.destroyed {
+	if rp.Destroyed() {
 		message := "[ringpop] destroyed during bootstrap process"
 		rp.logger.WithField("address", rp.hostPort).Error(message)
 		return nil, errors.New(message)
@@ -638,7 +652,7 @@ func (rp *Ringpop) PingMemberNow() error {
 		return err
 	}
 
-	if rp.destroyed {
+	if rp.Destroyed() {
 		return errors.New("destroyed whilst pinging")
 	}
 
