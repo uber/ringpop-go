@@ -160,35 +160,50 @@ func (rc *ringpopTChannel) protocolPingHandler(ctx context.Context, call *tchann
 	}
 }
 
-func (rc *ringpopTChannel) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (rc *ringpopTChannel) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
+	if rc.channel.Closed() {
+		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
+	}
+
+	// receive request
 	var reqHeaders headers
-
 	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
-		rc.ringpop.logger.Debugf("could not read request headers: %v", err)
+		rc.ringpop.logger.WithFields(log.Fields{
+			"local":    rc.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": "ping-req-recv",
+		}).Debug("[ringpop] could not read request headers")
 		return
 	}
 
-	var reqBody pingBody
+	var reqBody pingReqBody
 	if err := tchannel.NewArgReader(call.Arg3Reader()).ReadJSON(&reqBody); err != nil {
-		rc.ringpop.logger.Debugf("could not read request body: %v", err)
+		rc.ringpop.logger.WithFields(log.Fields{
+			"local":    rc.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": "ping-req-recv",
+		}).Debug("[ringpop] could not read request body")
 		return
 	}
 
-	changes := receivePing(rc.ringpop, reqBody)
-	resBody := pingBody{
-		Checksum: rc.ringpop.membership.checksum,
-		Changes:  changes,
-		Source:   rc.ringpop.WhoAmI(),
-	}
-
+	// handle request and send back response
 	var resHeaders headers
 	if err := tchannel.NewArgWriter(call.Response().Arg2Writer()).WriteJSON(resHeaders); err != nil {
-		rc.ringpop.logger.Debugf("Could not write response headers: %v", err)
+		rc.ringpop.logger.WithFields(log.Fields{
+			"local":    rc.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": "ping-req-recv",
+		}).Debug("[ringpop] could not write response headers")
 		return
 	}
 
+	resBody := receivePingReq(rc.ringpop, reqBody)
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
-		rc.ringpop.logger.Debugf("Could not write response body: %v", err)
+		rc.ringpop.logger.WithFields(log.Fields{
+			"local":    rc.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": "ping-req-recv",
+		}).Debug("[ringpop] could not write response body")
 		return
 	}
 }
