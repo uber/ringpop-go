@@ -15,10 +15,9 @@ import (
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func TestChecksumChanges(t *testing.T) {
+	// testPop makes the local member alive
 	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
-
-	ringpop.membership.makeAlive("127.0.0.1:3000", unixMilliseconds(time.Now()), "")
 
 	oldchecksum := ringpop.membership.checksum
 
