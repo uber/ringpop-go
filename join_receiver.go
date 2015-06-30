@@ -28,9 +28,10 @@ func validateJoinerAddress(ringpop *Ringpop, joiner string) error {
 }
 
 func validateJoinerApp(ringpop *Ringpop, app string) error {
-	if app != ringpop.App {
-		message := fmt.Sprintf(`A node tried joining a different app cluster. The 
-			expected app (%s) did not matcht the actual app (%s)`, ringpop.App, app)
+	if app != ringpop.app {
+		// revisit message
+		message := fmt.Sprintf(`A node tried joining a different app cluster. The
+			expected app (%s) did not matcht the actual app (%s)`, ringpop.app, app)
 		return errors.New(message)
 	}
 	return nil
@@ -57,7 +58,7 @@ func receiveJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
 	ringpop.membership.makeAlive(body.Source, body.Incarnation, "")
 
 	res = joinResBody{
-		App:         ringpop.App,
+		App:         ringpop.app,
 		Coordinator: ringpop.WhoAmI(),
 		Membership:  ringpop.dissemination.fullSync(),
 	}
