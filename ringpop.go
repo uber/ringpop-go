@@ -434,6 +434,11 @@ func (rp *Ringpop) WhoAmI() string {
 	return rp.hostPort
 }
 
+// App returns the name of the service ringpop is bound to
+func (rp *Ringpop) App() string {
+	return rp.app
+}
+
 // Ready returns true if the ringpop is ready for use
 func (rp *Ringpop) Ready() bool {
 	return rp.ready
@@ -645,8 +650,6 @@ func (rp *Ringpop) PingMemberNow() error {
 		}).Info("[ringpop] ping failed")
 
 		sendPingReqs(rp, *member, rp.pingReqSize)
-
-		// rp.membership.makeSuspect(member.Address, member.Incarnation, rp.WhoAmI())
 
 		rp.pinging = false
 		return err
