@@ -79,7 +79,9 @@ func newMembership(ringpop *Ringpop) *membership {
 // The member fields that are part of the checksum string are:
 // address, status, incarnation number
 func (m *membership) computeChecksum() {
+	m.lock.Lock()
 	m.checksum = farm.Hash32([]byte(m.genChecksumString()))
+	m.lock.Unlock()
 }
 
 func (m *membership) genChecksumString() string {
@@ -119,11 +121,11 @@ func (m *membership) memberCount() int {
 	return len(m.members)
 }
 
-func (m *membership) randomPingablemembers(n int, exlcuding map[string]bool) []*Member {
+func (m *membership) randomPingablemembers(n int, excluding []string) []*Member {
 	var pingableMembers []*Member
 
 	for _, member := range m.memberlist {
-		if m.isPingable(member) && !exlcuding[member.Address] {
+		if m.isPingable(member) && indexOf(excluding, member.Address) == -1 {
 			pingableMembers = append(pingableMembers, member)
 		}
 	}
@@ -234,6 +236,10 @@ func (m *membership) update(changes []Change) []Change {
 		return updates
 	}
 
+	if m.ringpop.destroyed {
+		return nil
+	}
+
 	m.lock.Lock()
 
 	for _, change := range changes {
@@ -297,6 +303,9 @@ func shuffle(members []*Member) []*Member {
 func (m *membership) shuffle() {
 	shuffled := []*Member{}
 
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	for _, member := range m.memberlist {
 		shuffled = append(shuffled, member)
 	}
@@ -308,6 +317,9 @@ func (m *membership) shuffle() {
 // String returns a JSON string
 func (m *membership) String() (string, error) {
 	var members []string
+
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	for _, member := range m.members {
 		members = append(members, member.Address)
