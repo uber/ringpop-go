@@ -56,7 +56,6 @@ func (p *pingSender) sendPing() (*pingBody, error) {
 	defer cancel()
 
 	errC := make(chan error)
-	defer close(errC)
 
 	var resBody pingBody
 
@@ -76,6 +75,8 @@ func (p *pingSender) sendPing() (*pingBody, error) {
 }
 
 func (p *pingSender) send(ctx context.Context, resBody *pingBody, errC chan error) {
+	defer close(errC)
+
 	// begin call
 	call, err := p.ringpop.channel.BeginCall(ctx, p.address, "ringpop", "/protocol/ping", nil)
 	if err != nil {
