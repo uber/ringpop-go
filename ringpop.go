@@ -226,9 +226,15 @@ func (rp *Ringpop) Destroy() {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (rp *Ringpop) setupChannel() error {
-	newRingpopTChannel(rp, rp.channel)
-	return rp.channel.ListenAndServe(rp.hostPort)
+// listenAndServe registers ringpop's endpoints with its channel and then sets up
+// the server
+func (rp *Ringpop) listenAndServe() error {
+	s, err := newRingpopServer(rp)
+	if err != nil {
+		return err
+	}
+
+	return s.listenAndServe()
 }
 
 // BootstrapOptions provieds options to bootstrap ringpop with. The bootstrapper
@@ -242,21 +248,26 @@ type BootstrapOptions struct {
 // the gossip protocol. Returns a slice of strings containing the hostports of
 // the nodes joined to the ringpop and a nil error, or a nil slice and an error
 // if the bootstrap failed.
-func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
-	err := rp.setupChannel()
-	if err != nil {
+func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
+	var o *BootstrapOptions
+	if o = opts; opts == nil {
+		o = &BootstrapOptions{}
+	}
+
+	// set up channel
+	if err := rp.listenAndServe(); err != nil {
 		rp.logger.WithFields(log.Fields{}).Fatalf("[ringpop] could not setup channel: %v", err)
 		return nil, err
 	}
 
-	if err := rp.seedBootstrapHosts(opts); err != nil {
-		return nil, fmt.Errorf("Failed to bootstrap ringpop: %v", err)
+	if err := rp.seedBootstrapHosts(o); err != nil {
+		return nil, fmt.Errorf("could not seed bootstrap hosts: %v", err)
 	}
 
 	if len(rp.bootstrapHosts) == 0 {
-		message := `Ringpop cannot be bootstrapped without bootstrap hosts.
-			Make sure you specify a valid bootstrap hosts file to the ringpop
-			or have a valid hosts.json file in the current working directory.`
+		message := "Ringpop cannot be bootstrapped without bootstrap hosts. Make sure " +
+			"you specify a valid bootstrap hosts file to the ringpop or have a valid " +
+			"hosts.json file in the current working directory."
 		return nil, errors.New(message)
 	}
 
@@ -291,11 +302,10 @@ func (rp *Ringpop) Bootstrap(opts BootstrapOptions) ([]string, error) {
 // TODO: fix message
 func (rp *Ringpop) checkForMissingBootstrapHost() bool {
 	if indexOf(rp.bootstrapHosts[captureHost(rp.hostPort)], rp.hostPort) == -1 {
-		message := `[ringpop] Bootstrap hosts does not include the host:port of the local
-		node. This may be fine because your hosts file may just be slightly
-		out of date, but it could also be an indication that your node is
-		identifying itself incorrectly.`
-
+		message := "[ringpop] Bootstrap hosts does not include the host:port of the " +
+			"local node. This may be fine because your hosts file may just be slightly " +
+			"out of date, but it could also be an indication that your node is " +
+			"identifying itself incorrectly."
 		rp.logger.WithField("address", rp.hostPort).Warn(message)
 		return false
 	}
@@ -326,18 +336,18 @@ func (rp *Ringpop) checkForHostnameIPMismatch() bool {
 	}
 
 	if hostPortPattern.Match([]byte(rp.hostPort)) {
-		ipMessage := `[ringpop] Your ringpop host identifier looks like an IP address and
-		there are bootstrap hosts that appear to be specified with hostnames.
-		These inconsistencies may lead to subtle node communication issues.`
+		ipMessage := "[ringpop] Your ringpop host identifier looks like an IP address " +
+			"and there are bootstrap hosts that appear to be specified with hostnames. " +
+			"These inconsistencies may lead to subtle node communication issues."
 
 		return testMismatch(ipMessage, func(host string) bool {
 			return !hostPortPattern.Match([]byte(host))
 		})
 	}
 
-	hostMessage := `[ringpop] Your ringpop host identifier looks like a hostname and there
-	are bootstrap hosts that appear to be specified with IP addresses. These
-	inconsistencies may lead to subtle node communication issues`
+	hostMessage := "[ringpop] Your ringpop host identifier looks like a hostname and " +
+		"there are bootstrap hosts that appear to be specified with IP addresses. " +
+		"These inconsistencies may lead to subtle node communication issues"
 
 	return testMismatch(hostMessage, func(host string) bool {
 		return hostPortPattern.Match([]byte(host))
@@ -360,7 +370,7 @@ func (rp *Ringpop) PrintMembership() {
 	}
 }
 
-func (rp *Ringpop) seedBootstrapHosts(opts BootstrapOptions) error {
+func (rp *Ringpop) seedBootstrapHosts(opts *BootstrapOptions) error {
 	var hosts []string
 	var err error
 
