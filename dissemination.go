@@ -2,6 +2,7 @@ package ringpop
 
 import (
 	"math"
+	"sync"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -20,6 +21,7 @@ type dissemination struct {
 	maxPiggybackCount int
 	piggybackFactor   int
 	eventC            chan string
+	lock              sync.RWMutex
 }
 
 func newDissemination(ringpop *Ringpop) *dissemination {
@@ -84,6 +86,7 @@ func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 		changedNodes = append(changedNodes, change.Address)
 	}
 
+	d.lock.Lock()
 	for _, change := range d.changes {
 		piggybacks[change.Address]++
 
@@ -94,6 +97,7 @@ func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 
 		changesToDisseminate = append(changesToDisseminate, change)
 	}
+	d.lock.Unlock()
 
 	d.ringpop.stat("gauge", "changes.disseminate", int64(len(changesToDisseminate)))
 
@@ -115,7 +119,9 @@ func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 
 // recordchange records a change in the dissemination for later propogation
 func (d *dissemination) recordChange(change Change) {
+	d.lock.Lock()
 	d.changes[change.Address] = change
+	d.lock.Unlock()
 }
 
 func (d *dissemination) eventLoop() {
