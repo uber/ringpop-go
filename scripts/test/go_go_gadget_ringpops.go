@@ -168,6 +168,16 @@ func killN(n int) error {
 	return nil
 }
 
+func setDebug(opt string) error {
+	switch opt {
+	case "on":
+
+	case "off":
+	}
+
+	return errors.New("expected opt to be 'on' or 'off'")
+}
+
 func main() {
 	logger.Formatter = &log.TextFormatter{}
 
@@ -188,12 +198,17 @@ INPUT:
 		}
 
 		switch input {
+		case "d", "debug":
+			err := setDebug(opt)
+			if err != nil {
+				fmt.Print(err)
+			}
+
 		// start a ringpop on a specified hostport
 		case "s", "start":
 			err := startRingpop(opt)
 			if err != nil {
 				fmt.Printf("could not start ringpop on %s: %v\n", opt, err)
-				continue
 			}
 
 		// start n ringpops sub-processes, prioritized those that were previously killed
