@@ -11,7 +11,7 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-const defaultMinProtocolPeriod = time.Millisecond * 1500
+const defaultMinProtocolPeriod = time.Millisecond * 200
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
@@ -84,7 +84,17 @@ func (g *gossip) computeProtocolRate() time.Duration {
 	return time.Duration(math.Max(observed, float64(g.minProtocolPeriod)))
 }
 
-// TODO
+// runs a single gossip protocol period
+func (g *gossip) gossip() {
+	pingStartTime := time.Now()
+
+	g.ringpop.PingMemberNow()
+
+	g.lastProtocolPeriod = time.Now()
+	g.numProtocolPeriods++
+	g.protocolTiming.Update(int64(time.Now().Sub(pingStartTime))) // keeps protocol rate in check
+}
+
 func (g *gossip) run() {
 	startTime := time.Now()
 
@@ -100,15 +110,9 @@ func (g *gossip) run() {
 			g.ringpop.stat("timing", "protocol.delay", milliseconds(protocolDelay))
 			time.Sleep(protocolDelay)
 
-			pingStartTime := time.Now()
+			g.gossip()
 
-			g.ringpop.PingMemberNow()
-
-			g.lastProtocolPeriod = time.Now()
-			g.numProtocolPeriods++
-			// TODO: stat call
 			g.ringpop.stat("timing", "protocol.frequency", unixMilliseconds(startTime))
-			g.protocolTiming.Update(int64(time.Now().Sub(pingStartTime))) // keeps protocol rate in check
 		}
 	}()
 }

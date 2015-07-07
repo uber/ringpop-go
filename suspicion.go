@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-const defaultTimeout = time.Millisecond * 5000
+const defaultSuspicionTimeout = time.Millisecond * 5000
 
 // interface so that both changes and members can be passed to Suspicion methods
 type suspect interface {
@@ -32,7 +32,7 @@ type suspicion struct {
 
 // NewSuspicion creates a new suspicion protocol
 func newSuspicion(ringpop *Ringpop, suspicionTimeout time.Duration) *suspicion {
-	period := defaultTimeout
+	period := defaultSuspicionTimeout
 	if suspicionTimeout != time.Duration(0) {
 		period = suspicionTimeout
 	}
