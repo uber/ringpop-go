@@ -51,8 +51,7 @@ func newPingSender(ringpop *Ringpop, address string, timeout time.Duration) *pin
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (p *pingSender) sendPing() (*pingBody, error) {
-	ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()),
-		p.timeout)
+	ctx, cancel := tchannel.NewContext(p.timeout)
 	defer cancel()
 
 	errC := make(chan error)

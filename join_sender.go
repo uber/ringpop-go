@@ -325,7 +325,7 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 	for _, node := range group {
 		wg.Add(1)
 		go func(n string) {
-			ctx, cancel := context.WithTimeout(tchannel.NewRootContext(context.Background()), j.timeout)
+			ctx, cancel := tchannel.NewContext(j.timeout)
 			defer cancel()
 			errC := make(chan error)
 			defer close(errC)
