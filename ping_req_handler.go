@@ -2,7 +2,7 @@ package ringpop
 
 import log "github.com/Sirupsen/logrus"
 
-func receivePingReq(ringpop *Ringpop, body pingReqBody) pingReqRes {
+func handlePingReq(ringpop *Ringpop, body pingReqBody) pingReqRes {
 	ringpop.stat("increment", "ping-req.recv", 1)
 
 	ringpop.membership.update(body.Changes)

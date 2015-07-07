@@ -2,7 +2,7 @@ package ringpop
 
 import log "github.com/Sirupsen/logrus"
 
-func receivePing(ringpop *Ringpop, body pingBody) pingBody {
+func handlePing(ringpop *Ringpop, body pingBody) pingBody {
 	ringpop.stat("increment", "ping.recv", 1)
 
 	// ringpop.serverRate.Mark(1)

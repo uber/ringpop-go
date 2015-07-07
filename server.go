@@ -53,7 +53,8 @@ func (rc *ringpopServer) listenAndServe() error {
 
 func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if rc.channel.Closed() {
-		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
+		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).
+			Error("[ringpop] got call while channel closed!")
 	}
 
 	// receive request
@@ -88,13 +89,13 @@ func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel
 		return
 	}
 
-	resBody, err := receiveJoin(rc.ringpop, reqBody)
+	resBody, err := handleJoin(rc.ringpop, reqBody)
 	if err != nil {
 		rc.ringpop.logger.WithFields(log.Fields{
 			"local":    rc.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "join-recv",
-		}).Debug("[ringpop] could not read request headers")
+		}).Debug("[ringpop] could not complete join")
 		return
 	}
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
@@ -109,7 +110,8 @@ func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel
 
 func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if rc.channel.Closed() {
-		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
+		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).
+			Error("[ringpop] got call while channel closed!")
 	}
 
 	// receive request
@@ -145,7 +147,7 @@ func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel
 		return
 	}
 
-	resBody := receivePing(rc.ringpop, reqBody)
+	resBody := handlePing(rc.ringpop, reqBody)
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
 		rc.ringpop.logger.WithFields(log.Fields{
 			"local":    rc.ringpop.WhoAmI(),
@@ -158,7 +160,8 @@ func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel
 
 func (rc *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if rc.channel.Closed() {
-		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
+		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).
+			Error("[ringpop] got call while channel closed!")
 	}
 
 	// receive request
@@ -193,7 +196,7 @@ func (rc *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchan
 		return
 	}
 
-	resBody := receivePingReq(rc.ringpop, reqBody)
+	resBody := handlePingReq(rc.ringpop, reqBody)
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
 		rc.ringpop.logger.WithFields(log.Fields{
 			"local":    rc.ringpop.WhoAmI(),

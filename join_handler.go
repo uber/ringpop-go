@@ -37,7 +37,7 @@ func validateJoinerApp(ringpop *Ringpop, app string) error {
 	return nil
 }
 
-func receiveJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
+func handleJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
 	var res joinResBody
 
 	ringpop.stat("increment", "join.recv", 1)
