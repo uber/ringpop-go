@@ -272,6 +272,7 @@ func sendPingReqs(ringpop *Ringpop, target Member, size int) {
 	if pingReqBadPings > 0 {
 		ringpop.logger.WithFields(log.Fields{
 			"local":             ringpop.WhoAmI(),
+			"target":            target.Address,
 			"errors":            errs,
 			"numErrors":         len(errs),
 			"numPingReqMembers": len(pingReqMembers),
@@ -284,6 +285,7 @@ func sendPingReqs(ringpop *Ringpop, target Member, size int) {
 
 	ringpop.logger.WithFields(log.Fields{
 		"local":              ringpop.WhoAmI(),
+		"target":             target.Address,
 		"errors":             errs,
 		"numErrors":          len(errs),
 		"numPingReqMemebers": len(pingReqMembers),
