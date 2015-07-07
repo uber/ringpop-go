@@ -1,7 +1,7 @@
 package ringpop
 
 import (
-	"fmt"
+	"errors"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel/golang"
@@ -10,52 +10,48 @@ import (
 
 type headers map[string]string
 
-type ringpopTChannel struct {
+type ringpopServer struct {
 	ringpop *Ringpop
 	channel *tchannel.Channel
 }
 
-func newRingpopTChannel(ringpop *Ringpop, channel *tchannel.Channel) *ringpopTChannel {
-	ringpopTChannel := &ringpopTChannel{
-		ringpop: ringpop,
-		channel: channel,
+func newRingpopServer(ringpop *Ringpop) (*ringpopServer, error) {
+	if ringpop.channel == nil {
+		return nil, errors.New("ringpop channel cannot be nil")
 	}
 
-	var commands = map[string]map[string]tchannel.HandlerFunc{
-		// "health": {
-		// 	"health": health,
-		// },
-		// "admin": {
-		// 	"stats":      adminStats,
-		// 	"debugSet":   debugSet,
-		// 	"debugClear": debugClear,
-		// 	"gossip":     gossip,
-		// 	"leave":      leave,
-		// 	"join":       join,
-		// 	"reload":     reload,
-		// },
-		"protocol": {
-			"join":     ringpopTChannel.protocolJoinHandler,
-			"ping":     ringpopTChannel.protocolPingHandler,
-			"ping-req": ringpopTChannel.protocolPingReqHandler,
-		},
-		// "proxy": {
-		// 	"req": proxyReq,
-		// },
+	ringpopServer := &ringpopServer{
+		ringpop: ringpop,
+		channel: ringpop.channel,
+	}
+
+	var commands = map[string]tchannel.HandlerFunc{
+		// "/health":            ringpopServer.health,
+		// "/admin/stats/":      ringpopServer.adminStats,
+		// "/admin/debugSet":    ringpopServer.adminDebugSet,
+		// "/admin/debugClear":  ringpopServer.adminDebugClear,
+		// "/admin/gossip":      ringpopServer.adminGossip,
+		// "/admin/leave":       ringpopServer.adminLeave,
+		// "/admin/join":        ringpopServer.adminJoin,
+		// "/admin/reload":      ringpopServer.adminReload,
+		"/protocol/join":     ringpopServer.protocolJoinHandler,
+		"/protocol/ping":     ringpopServer.protocolPingHandler,
+		"/protocol/ping-req": ringpopServer.protocolPingReqHandler,
 	}
 
 	// Register endpoints with channel
-	for service, operations := range commands {
-		for operation, handler := range operations {
-			handlerName := fmt.Sprintf("/%s/%s", service, operation)
-			ringpopTChannel.channel.Register(handler, handlerName)
-		}
+	for operation, handler := range commands {
+		ringpopServer.channel.Register(handler, operation)
 	}
 
-	return ringpopTChannel
+	return ringpopServer, nil
 }
 
-func (rc *ringpopTChannel) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (rc *ringpopServer) listenAndServe() error {
+	return rc.channel.ListenAndServe(rc.ringpop.WhoAmI())
+}
+
+func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if rc.channel.Closed() {
 		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
 	}
@@ -111,7 +107,7 @@ func (rc *ringpopTChannel) protocolJoinHandler(ctx context.Context, call *tchann
 	}
 }
 
-func (rc *ringpopTChannel) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if rc.channel.Closed() {
 		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
 	}
@@ -160,7 +156,7 @@ func (rc *ringpopTChannel) protocolPingHandler(ctx context.Context, call *tchann
 	}
 }
 
-func (rc *ringpopTChannel) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (rc *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if rc.channel.Closed() {
 		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).Error("[ringpop] got call while channel closed!")
 	}
