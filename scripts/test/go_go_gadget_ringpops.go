@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -23,6 +24,25 @@ var hostsLock sync.Mutex
 // maps a ringpop hostport to a cmd which contains the process it runs in
 var ringpops = make(map[string]*exec.Cmd)
 var killed = make(map[string]bool)
+
+func getRingpops(n int) []string {
+	var hostports []string
+	for hostport := range ringpops {
+		hostports = append(hostports, hostport)
+	}
+
+	newHostports := make([]string, len(hostports), cap(hostports))
+	newIndexes := rand.Perm(len(hostports))
+
+	for o, n := range newIndexes {
+		newHostports[n] = hostports[o]
+	}
+
+	if len(newHostports) < n {
+		return newHostports
+	}
+	return newHostports[:n]
+}
 
 func quit() (errs []error) {
 	for hostport := range ringpops {
@@ -82,16 +102,22 @@ func startRingpop(hostport string) error {
 func startN(n int) error {
 	numStarted := 0
 
+	// restore killed ringpops first
 	for hostport := range killed {
 		startRingpop(hostport)
+		delete(killed, hostport)
 		numStarted++
 		if numStarted == n {
 			return nil
 		}
 	}
 
-	for i := 1; i <= n; i++ {
+	// spin up new ringpops if need be, starting from lowest available port
+	for i := 1; numStarted != n; i++ {
 		hostport := fmt.Sprintf("127.0.0.1:%v", 3000+i)
+		if _, ok := ringpops[hostport]; ok {
+			continue
+		}
 		time.Sleep(10 * time.Millisecond)
 		err := startRingpop(hostport)
 		if err != nil {
@@ -101,6 +127,7 @@ func startN(n int) error {
 			}).Error("could not start ringpop")
 			continue
 		}
+		numStarted++
 	}
 
 	return nil
@@ -132,7 +159,12 @@ func killRingpop(hostport string) error {
 }
 
 func killN(n int) error {
-	println(n)
+	hostports := getRingpops(n)
+
+	for _, hostport := range hostports {
+		killRingpop(hostport)
+	}
+
 	return nil
 }
 
@@ -141,18 +173,7 @@ func main() {
 
 	flag.Parse()
 
-	for i := 1; i <= *numToStart; i++ {
-		hostport := fmt.Sprintf("127.0.0.1:%v", 3000+i)
-		time.Sleep(10 * time.Millisecond)
-		err := startRingpop(hostport)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error":    err,
-				"hostport": hostport,
-			}).Error("could not start ringpop")
-			continue
-		}
-	}
+	startN(*numToStart)
 
 	var input, opt string
 
