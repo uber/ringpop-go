@@ -26,14 +26,14 @@ func newRingpopServer(ringpop *Ringpop) (*ringpopServer, error) {
 	}
 
 	var commands = map[string]tchannel.HandlerFunc{
-		// "/health":            ringpopServer.health,
-		// "/admin/stats/":      ringpopServer.adminStats,
-		// "/admin/debugSet":    ringpopServer.adminDebugSet,
-		// "/admin/debugClear":  ringpopServer.adminDebugClear,
-		// "/admin/gossip":      ringpopServer.adminGossip,
-		// "/admin/leave":       ringpopServer.adminLeave,
-		// "/admin/join":        ringpopServer.adminJoin,
-		// "/admin/reload":      ringpopServer.adminReload,
+		// "/health":            ringpopServer.healthHandler,
+		// "/admin/stats/":      ringpopServer.adminStatsHandler,
+		"/admin/debugSet":   ringpopServer.adminDebugSetHandler,
+		"/admin/debugClear": ringpopServer.adminDebugClearHandler,
+		// "/admin/gossip":      ringpopServer.adminGossipHandler,
+		// "/admin/leave":       ringpopServer.adminLeaveHandler,
+		// "/admin/join":        ringpopServer.adminJoinHandler,
+		// "/admin/reload":      ringpopServer.adminReloadHandler,
 		"/protocol/join":     ringpopServer.protocolJoinHandler,
 		"/protocol/ping":     ringpopServer.protocolPingHandler,
 		"/protocol/ping-req": ringpopServer.protocolPingReqHandler,
@@ -47,21 +47,27 @@ func newRingpopServer(ringpop *Ringpop) (*ringpopServer, error) {
 	return ringpopServer, nil
 }
 
-func (rc *ringpopServer) listenAndServe() error {
-	return rc.channel.ListenAndServe(rc.ringpop.WhoAmI())
+func (s *ringpopServer) listenAndServe() error {
+	return s.channel.ListenAndServe(s.ringpop.WhoAmI())
 }
 
-func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
-	if rc.channel.Closed() {
-		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// PROTOCOL HANDLERS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func (s *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
+	if s.channel.Closed() {
+		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
 	}
 
 	// receive request
 	var reqHeaders headers
 	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "join-recv",
 		}).Debug("[ringpop] could not read request headers")
@@ -70,8 +76,8 @@ func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel
 
 	var reqBody joinBody
 	if err := tchannel.NewArgReader(call.Arg3Reader()).ReadJSON(&reqBody); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "join-recv",
 		}).Debug("[ringpop] could not read request body")
@@ -81,26 +87,26 @@ func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel
 	// handle request and send back resposne
 	var resHeaders headers
 	if err := tchannel.NewArgWriter(call.Response().Arg2Writer()).WriteJSON(resHeaders); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "join-recv",
 		}).Debug("[ringpop] could not write response headers")
 		return
 	}
 
-	resBody, err := handleJoin(rc.ringpop, reqBody)
+	resBody, err := handleJoin(s.ringpop, reqBody)
 	if err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "join-recv",
 		}).Debug("[ringpop] could not complete join")
 		return
 	}
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "join-recv",
 		}).Debug("[ringpop] could not write response headers")
@@ -108,17 +114,17 @@ func (rc *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel
 	}
 }
 
-func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
-	if rc.channel.Closed() {
-		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).
+func (s *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
+	if s.channel.Closed() {
+		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
 	}
 
 	// receive request
 	var reqHeaders headers
 	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-recv",
 		}).Debug("[ringpop] could not read request headers")
@@ -127,8 +133,8 @@ func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel
 
 	var reqBody pingBody
 	if err := tchannel.NewArgReader(call.Arg3Reader()).ReadJSON(&reqBody); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-recv",
 		}).Debug("[ringpop] could not read request body")
@@ -138,8 +144,8 @@ func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel
 	// handle request and send back response
 	var resHeaders headers
 	if err := tchannel.NewArgWriter(call.Response().Arg2Writer()).WriteJSON(resHeaders); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-recv",
 		}).Debug("[ringpop] could not write response headers")
@@ -147,10 +153,10 @@ func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel
 		return
 	}
 
-	resBody := handlePing(rc.ringpop, reqBody)
+	resBody := handlePing(s.ringpop, reqBody)
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-recv",
 		}).Debug("[ringpop] could not write response body")
@@ -158,17 +164,17 @@ func (rc *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel
 	}
 }
 
-func (rc *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
-	if rc.channel.Closed() {
-		rc.ringpop.logger.WithField("local", rc.ringpop.WhoAmI()).
+func (s *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
+	if s.channel.Closed() {
+		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
 	}
 
 	// receive request
 	var reqHeaders headers
 	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-req-recv",
 		}).Debug("[ringpop] could not read request headers")
@@ -177,8 +183,8 @@ func (rc *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchan
 
 	var reqBody pingReqBody
 	if err := tchannel.NewArgReader(call.Arg3Reader()).ReadJSON(&reqBody); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-req-recv",
 		}).Debug("[ringpop] could not read request body")
@@ -188,21 +194,94 @@ func (rc *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchan
 	// handle request and send back response
 	var resHeaders headers
 	if err := tchannel.NewArgWriter(call.Response().Arg2Writer()).WriteJSON(resHeaders); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-req-recv",
 		}).Debug("[ringpop] could not write response headers")
 		return
 	}
 
-	resBody := handlePingReq(rc.ringpop, reqBody)
+	resBody := handlePingReq(s.ringpop, reqBody)
 	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).WriteJSON(resBody); err != nil {
-		rc.ringpop.logger.WithFields(log.Fields{
-			"local":    rc.ringpop.WhoAmI(),
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
 			"error":    err,
 			"endpoint": "ping-req-recv",
 		}).Debug("[ringpop] could not write response body")
 		return
 	}
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+// ADMIN HANDLERS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func receiveCallNoArgs(s *ringpopServer, call *tchannel.InboundCall, endpoint string, f func()) {
+	var reqHeaders []byte
+	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": endpoint,
+		}).Debug("[ringpop] could not read request headers")
+		return
+	}
+
+	var reqBody []byte
+	if err := tchannel.NewArgReader(call.Arg3Reader()).Read(&reqBody); err != nil {
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": endpoint,
+		}).Debug("[ringpop] could not read request body")
+		return
+	}
+
+	// do whatever is in f
+	f()
+
+	var resHeaders []byte
+	if err := tchannel.NewArgWriter(call.Response().Arg2Writer()).Write(resHeaders); err != nil {
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": endpoint,
+		}).Debug("[ringpop] could not write response headers")
+		return
+	}
+
+	var resBody []byte
+	if err := tchannel.NewArgWriter(call.Response().Arg3Writer()).Write(resBody); err != nil {
+		s.ringpop.logger.WithFields(log.Fields{
+			"local":    s.ringpop.WhoAmI(),
+			"error":    err,
+			"endpoint": endpoint,
+		}).Debug("[ringpop] could not write response body")
+		return
+	}
+}
+
+func (s *ringpopServer) adminDebugSetHandler(ctx context.Context, call *tchannel.InboundCall) {
+	if s.channel.Closed() {
+		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
+			Error("[ringpop] got call while channel closed!")
+	}
+
+	receiveCallNoArgs(s, call, "admin-debug-set", func() {
+		s.ringpop.logger.Level = log.DebugLevel
+	})
+}
+
+func (s *ringpopServer) adminDebugClearHandler(ctx context.Context, call *tchannel.InboundCall) {
+	if s.channel.Closed() {
+		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
+			Error("[ringpop] got call while channel closed!")
+	}
+
+	receiveCallNoArgs(s, call, "admin-debug-clear", func() {
+		s.ringpop.logger.Level = log.InfoLevel
+	})
 }

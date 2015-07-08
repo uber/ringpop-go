@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/uber/tchannel/golang"
 )
 
 var numToStart = flag.Int("start", 0, "number of ringpops to start on execution")
@@ -20,10 +20,46 @@ var numToStart = flag.Int("start", 0, "number of ringpops to start on execution"
 var hostPortPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 var logger = log.StandardLogger()
 var hostsLock sync.Mutex
+var channel, _ = tchannel.NewChannel("ringpop", nil)
 
 // maps a ringpop hostport to a cmd which contains the process it runs in
 var ringpops = make(map[string]*exec.Cmd)
+
+// keeps track of which ringpops have been killed
 var killed = make(map[string]bool)
+
+// InvalidHostportError is an error when a string does not match hostPortPattern
+type InvalidHostportError struct {
+	s string
+}
+
+func (e InvalidHostportError) Error() string {
+	return fmt.Sprintf("%s is not a valid hostport", e.s)
+}
+
+func makeCallNoArgs(call *tchannel.OutboundCall) error {
+	var reqHeaders []byte
+	if err := tchannel.NewArgWriter(call.Arg2Writer()).Write(reqHeaders); err != nil {
+		return err
+	}
+
+	var reqBody []byte
+	if err := tchannel.NewArgWriter(call.Arg3Writer()).Write(reqBody); err != nil {
+		return err
+	}
+
+	var resHeaders []byte
+	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).Read(&resHeaders); err != nil {
+		return err
+	}
+
+	var resBody []byte
+	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).Read(&resBody); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func getRingpops(n int) []string {
 	var hostports []string
@@ -79,7 +115,7 @@ func writeHostsFile(newHostport string) error {
 
 func startRingpop(hostport string) error {
 	if !hostPortPattern.Match([]byte(hostport)) {
-		return errors.New("not a valid hostport pattern")
+		return InvalidHostportError{hostport}
 	}
 
 	cmd := exec.Command("./testpop/testpop", "-hostport", hostport)
@@ -135,7 +171,7 @@ func startN(n int) error {
 
 func killRingpop(hostport string) error {
 	if !hostPortPattern.Match([]byte(hostport)) {
-		return fmt.Errorf("%s is not a valid hostport", hostport)
+		return InvalidHostportError{hostport}
 	}
 
 	cmd, ok := ringpops[hostport]
@@ -168,14 +204,36 @@ func killN(n int) error {
 	return nil
 }
 
-func setDebug(opt string) error {
-	switch opt {
-	case "on":
-
-	case "off":
+func debugSet(hostport string) error {
+	if !hostPortPattern.Match([]byte(hostport)) {
+		return InvalidHostportError{hostport}
 	}
 
-	return errors.New("expected opt to be 'on' or 'off'")
+	ctx, cancel := tchannel.NewContext(time.Second)
+	defer cancel()
+
+	call, err := channel.BeginCall(ctx, hostport, "ringpop", "/admin/debugSet", nil)
+	if err != nil {
+		return err
+	}
+
+	return makeCallNoArgs(call)
+}
+
+func debugClear(hostport string) error {
+	if !hostPortPattern.Match([]byte(hostport)) {
+		return InvalidHostportError{hostport}
+	}
+
+	ctx, cancel := tchannel.NewContext(time.Second)
+	defer cancel()
+
+	call, err := channel.BeginCall(ctx, hostport, "ringpop", "/admin/debugClear", nil)
+	if err != nil {
+		return err
+	}
+
+	return makeCallNoArgs(call)
 }
 
 func main() {
@@ -198,9 +256,13 @@ INPUT:
 		}
 
 		switch input {
-		case "d", "debug":
-			err := setDebug(opt)
-			if err != nil {
+		case "ds", "debugSet":
+			if err := debugSet(opt); err != nil {
+				fmt.Print(err)
+			}
+
+		case "dc", "debugClear":
+			if err := debugClear(opt); err != nil {
 				fmt.Print(err)
 			}
 
