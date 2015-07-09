@@ -275,7 +275,7 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	rp.checkForHostnameIPMismatch()
 
 	// make self alive
-	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
+	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()))
 
 	nodesJoined, err := sendJoin(rp)
 	if err != nil {
@@ -726,7 +726,7 @@ func (rp *Ringpop) denyJoins() {
 }
 
 func (rp *Ringpop) testBootstrapper() {
-	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()), "")
+	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()))
 	rp.ready = true
 }
 

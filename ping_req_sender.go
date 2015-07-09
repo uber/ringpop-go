@@ -278,7 +278,7 @@ func sendPingReqs(ringpop *Ringpop, target Member, size int) {
 			"pingReqAddrs":      pingReqAddresses,
 		}).Info("[ringpop] ping-req determined member is unreachable")
 
-		ringpop.membership.makeSuspect(target.Address, target.Incarnation, ringpop.WhoAmI())
+		ringpop.membership.makeSuspect(target.Address, target.Incarnation)
 		return
 	}
 

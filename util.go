@@ -88,7 +88,7 @@ func testPop(hostport string, incarnation int64) *Ringpop {
 
 	ringpop.testBootstrapper()
 	if incarnation != 0 {
-		ringpop.membership.localmember.Incarnation = incarnation
+		ringpop.membership.localMember.Incarnation = incarnation
 	}
 
 	return ringpop

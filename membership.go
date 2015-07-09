@@ -46,7 +46,7 @@ type membership struct {
 	ringpop     *Ringpop
 	members     map[string]*Member
 	memberlist  []*Member
-	localmember *Member
+	localMember *Member
 	checksum    uint32
 	lock        sync.RWMutex
 }
@@ -150,13 +150,9 @@ func (m *membership) isPingable(member *Member) bool {
 		(member.Status == ALIVE || member.Status == SUSPECT)
 }
 
-func (m *membership) makeAlive(address string, incarnation int64, source string) []Change {
-	if source == "" {
-		source = m.ringpop.WhoAmI()
-	}
-
+func (m *membership) makeAlive(address string, incarnation int64) []Change {
 	return m.update([]Change{Change{
-		Source:      source,
+		Source:      m.localMember.Address,
 		Address:     address,
 		Status:      ALIVE,
 		Incarnation: incarnation,
@@ -164,45 +160,36 @@ func (m *membership) makeAlive(address string, incarnation int64, source string)
 	}})
 }
 
-func (m *membership) makeFaulty(address string, incarnation int64, source string) []Change {
-	if source == "" {
-		source = m.ringpop.WhoAmI()
-	}
-
+func (m *membership) makeFaulty(address string, incarnation int64) []Change {
 	return m.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      FAULTY,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		Source:            m.localMember.Address,
+		SourceIncarnation: m.localMember.Incarnation,
+		Address:           address,
+		Status:            FAULTY,
+		Incarnation:       incarnation,
+		Timestamp:         time.Now(),
 	}})
 }
 
-func (m *membership) makeLeave(address string, incarnation int64, source string) []Change {
-	if source == "" {
-		source = m.ringpop.WhoAmI()
-	}
-
+func (m *membership) makeLeave(address string, incarnation int64) []Change {
 	return m.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      LEAVE,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		Source:            m.localMember.Address,
+		SourceIncarnation: m.localMember.Incarnation,
+		Address:           address,
+		Status:            LEAVE,
+		Incarnation:       incarnation,
+		Timestamp:         time.Now(),
 	}})
 }
 
-func (m *membership) makeSuspect(address string, incarnation int64, source string) []Change {
-	if source == "" {
-		source = m.ringpop.WhoAmI()
-	}
-
+func (m *membership) makeSuspect(address string, incarnation int64) []Change {
 	return m.update([]Change{Change{
-		Source:      source,
-		Address:     address,
-		Status:      SUSPECT,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		Source:            m.localMember.Address,
+		SourceIncarnation: m.localMember.Incarnation,
+		Address:           address,
+		Status:            SUSPECT,
+		Incarnation:       incarnation,
+		Timestamp:         time.Now(),
 	}})
 }
 
@@ -217,7 +204,7 @@ func (m *membership) makeUpdate(change Change) {
 		}
 
 		if member.Address == m.ringpop.WhoAmI() {
-			m.localmember = member
+			m.localMember = member
 		}
 
 		m.members[change.Address] = member

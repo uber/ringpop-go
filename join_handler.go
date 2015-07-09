@@ -55,7 +55,7 @@ func handleJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
 	// ringpop.serverRate.Mark(1)
 	// ringpop.totalRate.Mark(1)
 
-	ringpop.membership.makeAlive(body.Source, body.Incarnation, "")
+	ringpop.membership.makeAlive(body.Source, body.Incarnation)
 
 	res = joinResBody{
 		App:         ringpop.app,

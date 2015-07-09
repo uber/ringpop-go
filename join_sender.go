@@ -403,7 +403,7 @@ func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
 	reqBody := joinBody{
 		App:         j.ringpop.app,
 		Source:      j.ringpop.WhoAmI(),
-		Incarnation: j.ringpop.membership.localmember.Incarnation,
+		Incarnation: j.ringpop.membership.localMember.Incarnation,
 		Timeout:     j.timeout,
 	}
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {

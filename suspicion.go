@@ -91,7 +91,7 @@ func (s *suspicion) start(suspect suspect) {
 			"faulty": suspect.suspectAddress(),
 		}).Info("[ringpop] member declared faulty")
 
-		s.ringpop.membership.makeFaulty(suspect.suspectAddress(), suspect.suspectIncarnation(), "")
+		s.ringpop.membership.makeFaulty(suspect.suspectAddress(), suspect.suspectIncarnation())
 	})
 
 	s.ringpop.logger.WithFields(log.Fields{
