@@ -1,11 +1,13 @@
 package ringpop
 
 import (
+	"io/ioutil"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel/golang"
 )
 
@@ -30,12 +32,21 @@ func indexOf(slice []string, element string) int {
 }
 
 // mutates nodes
-func takeNode(nodes *[]string) string {
+func takeNode(nodes *[]string, index int) string {
 	if len(*nodes) == 0 {
 		return ""
 	}
 
-	i := rand.Intn(len(*nodes))
+	var i int
+	if index >= 0 {
+		if index >= len(*nodes) {
+			return ""
+		}
+		i = index
+	} else {
+		i = rand.Intn(len(*nodes))
+	}
+
 	node := (*nodes)[i]
 
 	*nodes = append((*nodes)[:i], (*nodes)[i+1:]...)
@@ -67,8 +78,14 @@ func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 }
 
 func testPop(hostport string, incarnation int64) *Ringpop {
+	logger := log.New()
+	logger.Out = ioutil.Discard
+
 	testCh, _ := tchannel.NewChannel("test-service", nil)
-	ringpop := NewRingpop("test", hostport, testCh, nil)
+	ringpop := NewRingpop("test", hostport, testCh, &Options{
+		Logger: logger,
+	})
+
 	ringpop.testBootstrapper()
 	if incarnation != 0 {
 		ringpop.membership.localmember.Incarnation = incarnation

@@ -206,8 +206,6 @@ func (j *joiner) selectGroup(nodesJoined []string) []string {
 		j.init(nodesJoined)
 	}
 
-	// preferredNodes := j.roundPreferredNodes
-	// nonPreferredNodes := j.roundNonPreferredNodes
 	numNodesLeft := j.joinSize - len(nodesJoined)
 
 	cont := func() bool {
@@ -226,9 +224,9 @@ func (j *joiner) selectGroup(nodesJoined []string) []string {
 
 	for cont() {
 		if len(j.roundPreferredNodes) > 0 {
-			group = append(group, takeNode(&j.roundPreferredNodes))
+			group = append(group, takeNode(&j.roundPreferredNodes, -1))
 		} else if len(j.roundNonPreferredNodes) > 0 {
-			group = append(group, takeNode(&j.roundNonPreferredNodes))
+			group = append(group, takeNode(&j.roundNonPreferredNodes, -1))
 		}
 	}
 
