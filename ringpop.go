@@ -603,7 +603,7 @@ func (rp *Ringpop) handleChanges(changes []Change) {
 	}
 
 	if ringChanged {
-		rp.dissemination.eventC <- "changed"
+		rp.dissemination.onRingChange()
 		rp.emit("ringChanged")
 	}
 
