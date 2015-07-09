@@ -28,7 +28,6 @@ type gossip struct {
 
 	lastProtocolPeriod time.Time
 	lastProtocolRate   time.Duration
-	protocolRateTimer  *time.Ticker
 
 	protocolTiming metrics.Histogram
 
@@ -128,7 +127,7 @@ func (g *gossip) start() {
 
 	g.ringpop.membership.shuffle()
 	g.run()
-	g.startProtocolRateTimer()
+	g.startProtocolRateLoop()
 	g.SetStopped(false)
 
 	g.ringpop.logger.WithFields(log.Fields{
@@ -145,8 +144,6 @@ func (g *gossip) stop() {
 		return
 	}
 
-	g.protocolRateTimer.Stop()
-
 	g.SetStopped(true)
 
 	g.ringpop.logger.WithFields(log.Fields{
@@ -154,13 +151,12 @@ func (g *gossip) stop() {
 	}).Debug("[ringpop] stopped gossip protocol")
 }
 
-// StartProtocolRateTimer creates a ticker and launches a goroutine that
-// sets lastProtocolRate every 1000ms
-func (g *gossip) startProtocolRateTimer() {
-	g.protocolRateTimer = time.NewTicker(1000 * time.Millisecond)
+// StartProtocolRateTimer launches a goroutine that sets lastProtocolRate every 1000ms
+func (g *gossip) startProtocolRateLoop() {
 	// launch goroutine that calculates last protocol rate periodically
 	go func() {
-		for _ = range g.protocolRateTimer.C {
+		for !g.Stopped() {
+			time.Sleep(1000 * time.Millisecond)
 			g.lastProtocolRate = g.computeProtocolRate()
 		}
 	}()
