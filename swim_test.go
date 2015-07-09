@@ -21,10 +21,36 @@ func TestStartStopGossip(t *testing.T) {
 	defer ringpop.Destroy()
 
 	ringpop.gossip.start()
-	// assert.NotNil(t, ringpop.gossip.protocolRateTimer, "expected protocol rate timer to be set")
+	assert.False(t, ringpop.gossip.Stopped(), "expected gossip to have started")
 
 	ringpop.gossip.stop()
-	// assert.Nil(t, ringpop.gossip.protocolRateTimer, "expected protocol rate timer to be cleared")
+	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to have stopped")
+}
+
+func TestStopWhileStopped(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3001", 0)
+	defer ringpop.Destroy()
+
+	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
+
+	ringpop.gossip.stop()
+	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to still be stopped")
+}
+
+func TestCanRestartGossip(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3001", 0)
+	defer ringpop.Destroy()
+
+	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
+
+	ringpop.gossip.start()
+	assert.False(t, ringpop.gossip.Stopped(), "expected gossip to have started")
+
+	ringpop.gossip.stop()
+	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
+
+	ringpop.gossip.start()
+	assert.False(t, ringpop.gossip.Stopped(), "expected gossip to have started")
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -32,6 +58,20 @@ func TestStartStopGossip(t *testing.T) {
 //	SUSPICION TESTS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func TestReenableWhileEnabled(t *testing.T) {
+	ringpop := testPop("127.0.0.1:3000", 0)
+	defer ringpop.Destroy()
+
+	ringpop.suspicion.stopAll()
+	assert.True(t, ringpop.suspicion.stopped, "expected suspicion protocol to be stopped")
+
+	ringpop.suspicion.reenable()
+	assert.False(t, ringpop.suspicion.stopped, "expected suspicion protocol to be reenabled")
+
+	ringpop.suspicion.reenable()
+	assert.False(t, ringpop.suspicion.stopped, "expected suspicion protocol to still be enabled")
+}
 
 func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0)
@@ -43,14 +83,15 @@ func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 	assert.True(t, ringpop.suspicion.stopped, "expected suspicion protocol to be stopped")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
+
 	ringpop.suspicion.start(*member)
-	assert.Nil(t, ringpop.suspicion.timers[member.Address], "expected timer for member to be nil")
+	assert.Nil(t, ringpop.suspicion.timers[member.Address], "expected suspicion timer to be nil")
 
 	ringpop.suspicion.reenable()
-	assert.False(t, ringpop.suspicion.stopped, "expected suspcion protocol to be reenabled")
+	assert.False(t, ringpop.suspicion.stopped, "expected suspicion protocol to be reenabled")
 
 	ringpop.suspicion.start(*member)
-	assert.NotNil(t, ringpop.suspicion.timers[member.Address], "expected time for member to be set")
+	assert.NotNil(t, ringpop.suspicion.timers[member.Address], "expected suspicion timer to be set")
 }
 
 func TestSuspectMember(t *testing.T) {
@@ -60,23 +101,17 @@ func TestSuspectMember(t *testing.T) {
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()), "")
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
-
 	ringpop.suspicion.start(*member)
-
-	_, ok := ringpop.suspicion.timers[member.Address]
-	assert.True(t, ok, "expected timer to be set for member suspect period")
+	assert.NotNil(t, ringpop.suspicion.timers[member.Address], "expected suspicion timer to be set")
 }
 
 func TestSuspectLocalMember(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0)
 	defer ringpop.Destroy()
 
-	member, _ := ringpop.membership.getMemberByAddress(ringpop.WhoAmI())
-
+	member := ringpop.membership.localmember
 	ringpop.suspicion.start(*member)
-
-	_, ok := ringpop.suspicion.timers[member.Address]
-	assert.False(t, ok, "expected timer to not be set for local member suspect period")
+	assert.Nil(t, ringpop.suspicion.timers[member.Address], "expected suspicion timer to be nil")
 }
 
 func TestSuspectBecomesFaulty(t *testing.T) {
