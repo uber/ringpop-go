@@ -9,7 +9,7 @@ import (
 	"github.com/uber/tchannel/golang"
 )
 
-var hostport = flag.String("hostport", "127.0.0.1:3000", "hostport to start ringpop on")
+var hostport = flag.String("p", "127.0.0.1:3000", "hostport to start ringpop on")
 
 var hostPortPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 

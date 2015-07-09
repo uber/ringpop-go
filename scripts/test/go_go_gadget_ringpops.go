@@ -15,7 +15,7 @@ import (
 	"github.com/uber/tchannel/golang"
 )
 
-var numToStart = flag.Int("start", 0, "number of ringpops to start on execution")
+var numToStart = flag.Int("n", 0, "number of ringpops to start on execution")
 
 var hostPortPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 var logger = log.StandardLogger()
@@ -118,7 +118,7 @@ func startRingpop(hostport string) error {
 		return InvalidHostportError{hostport}
 	}
 
-	cmd := exec.Command("./testpop/testpop", "-hostport", hostport)
+	cmd := exec.Command("./testpop/testpop", "-p", hostport)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

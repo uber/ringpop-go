@@ -281,7 +281,7 @@ func (s *ringpopServer) adminDebugClearHandler(ctx context.Context, call *tchann
 			Error("[ringpop] got call while channel closed!")
 	}
 
-	receiveCallNoArgs(s, call, "admin-debug-clear", func() {
+	receiveCallNoArgs(s, call, "admin-debug-set", func() {
 		s.ringpop.logger.Level = log.InfoLevel
 	})
 }
