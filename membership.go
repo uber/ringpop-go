@@ -15,11 +15,12 @@ import (
 
 // Change is a struct used to make changes to the membership
 type Change struct {
-	Source      string    `json:"source"`
-	Address     string    `json:"address"`
-	Status      string    `json:"status"`
-	Incarnation int64     `json:"incarnation"`
-	Timestamp   time.Time `json:"timestamp"`
+	Source            string    `json:"source"`
+	SourceIncarnation int64     `json:"sourceIncarnation"`
+	Address           string    `json:"address"`
+	Status            string    `json:"status"`
+	Incarnation       int64     `json:"incarnation"`
+	Timestamp         time.Time `json:"timestamp"`
 }
 
 // methods to satisfy `suspect` interface

@@ -78,6 +78,60 @@ func (d *dissemination) fullSync() []Change {
 	return changes
 }
 
+func (d *dissemination) issueChangesAsSender() []Change {
+	return d.issueChangesV2(nil)
+}
+
+func (d *dissemination) issueChangesAsReceiver(senderAddress string,
+	senderIncarnation int64, senderChecksum uint32) ([]Change, bool) {
+
+	filter := func(c disseminationChange) bool {
+		return senderAddress == c.Source &&
+			senderIncarnation == c.SourceIncarnation
+	}
+
+	changes := d.issueChangesV2(filter)
+
+	if len(changes) > 0 {
+		return changes, false
+	} else if d.ringpop.membership.checksum != senderChecksum {
+		d.ringpop.stat("increment", "full-sync", 1)
+		d.ringpop.logger.WithFields(log.Fields{
+			"local":          d.ringpop.WhoAmI(),
+			"localChecksum":  d.ringpop.membership.checksum,
+			"remote":         senderAddress,
+			"remoteChecksum": senderChecksum,
+		}).Warn("[ringpop] full sync")
+
+		return d.fullSync(), true
+	}
+
+	return []Change{}, false
+}
+
+func (d *dissemination) issueChangesV2(filter func(disseminationChange) bool) []Change {
+	var changesToDisseminate []Change
+
+	for _, change := range d.changes {
+		// filter thing?
+		change.piggybackCount++
+
+		if filter != nil && filter(change) {
+			d.ringpop.stat("increment", "filtered-change", 1)
+			continue
+		}
+
+		if change.piggybackCount > d.maxPiggybackCount {
+			delete(d.changes, change.Address)
+			continue
+		}
+
+		changesToDisseminate = append(changesToDisseminate, change.Change)
+	}
+
+	return changesToDisseminate
+}
+
 // issueChanges returns a slice of changes to be propogated
 func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 	var changesToDisseminate []Change
@@ -118,6 +172,12 @@ func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
 func (d *dissemination) recordChange(change Change) {
 	d.lock.Lock()
 	d.changes[change.Address] = disseminationChange{change, 0}
+	d.lock.Unlock()
+}
+
+func (d *dissemination) clearChanges() {
+	d.lock.Lock()
+	d.changes = make(map[string]disseminationChange)
 	d.lock.Unlock()
 }
 
