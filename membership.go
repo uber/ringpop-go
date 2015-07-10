@@ -151,16 +151,25 @@ func (m *membership) isPingable(member *Member) bool {
 }
 
 func (m *membership) makeAlive(address string, incarnation int64) []Change {
+	if m.localMember == nil {
+		m.localMember = &Member{Address: m.ringpop.WhoAmI()}
+	}
+
 	return m.update([]Change{Change{
-		Source:      m.localMember.Address,
-		Address:     address,
-		Status:      ALIVE,
-		Incarnation: incarnation,
-		Timestamp:   time.Now(),
+		Source:            m.localMember.Address,
+		SourceIncarnation: m.localMember.Incarnation,
+		Address:           address,
+		Status:            ALIVE,
+		Incarnation:       incarnation,
+		Timestamp:         time.Now(),
 	}})
 }
 
 func (m *membership) makeFaulty(address string, incarnation int64) []Change {
+	if m.localMember == nil {
+		m.localMember = &Member{Address: m.ringpop.WhoAmI()}
+	}
+
 	return m.update([]Change{Change{
 		Source:            m.localMember.Address,
 		SourceIncarnation: m.localMember.Incarnation,
@@ -172,6 +181,10 @@ func (m *membership) makeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *membership) makeLeave(address string, incarnation int64) []Change {
+	if m.localMember == nil {
+		m.localMember = &Member{Address: m.ringpop.WhoAmI()}
+	}
+
 	return m.update([]Change{Change{
 		Source:            m.localMember.Address,
 		SourceIncarnation: m.localMember.Incarnation,
@@ -183,6 +196,10 @@ func (m *membership) makeLeave(address string, incarnation int64) []Change {
 }
 
 func (m *membership) makeSuspect(address string, incarnation int64) []Change {
+	if m.localMember == nil {
+		m.localMember = &Member{Address: m.ringpop.WhoAmI()}
+	}
+
 	return m.update([]Change{Change{
 		Source:            m.localMember.Address,
 		SourceIncarnation: m.localMember.Incarnation,

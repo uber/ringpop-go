@@ -17,7 +17,7 @@ var log10 = math.Log(10)
 
 type dissemination struct {
 	ringpop           *Ringpop
-	changes           map[string]disseminationChange
+	changes           map[string]*disseminationChange
 	maxPiggybackCount int
 	piggybackFactor   int
 	lock              sync.RWMutex
@@ -31,7 +31,7 @@ type disseminationChange struct {
 func newDissemination(ringpop *Ringpop) *dissemination {
 	d := &dissemination{
 		ringpop:           ringpop,
-		changes:           make(map[string]disseminationChange),
+		changes:           make(map[string]*disseminationChange),
 		maxPiggybackCount: 1,
 		piggybackFactor:   2, // lower factor -> more full syncs
 	}
@@ -79,18 +79,18 @@ func (d *dissemination) fullSync() []Change {
 }
 
 func (d *dissemination) issueChangesAsSender() []Change {
-	return d.issueChangesV2(nil)
+	return d.issueChanges(nil)
 }
 
 func (d *dissemination) issueChangesAsReceiver(senderAddress string,
 	senderIncarnation int64, senderChecksum uint32) ([]Change, bool) {
 
-	filter := func(c disseminationChange) bool {
+	filter := func(c *disseminationChange) bool {
 		return senderAddress == c.Source &&
 			senderIncarnation == c.SourceIncarnation
 	}
 
-	changes := d.issueChangesV2(filter)
+	changes := d.issueChanges(filter)
 
 	if len(changes) > 0 {
 		return changes, false
@@ -109,17 +109,19 @@ func (d *dissemination) issueChangesAsReceiver(senderAddress string,
 	return []Change{}, false
 }
 
-func (d *dissemination) issueChangesV2(filter func(disseminationChange) bool) []Change {
+func (d *dissemination) issueChanges(filter func(*disseminationChange) bool) []Change {
 	var changesToDisseminate []Change
 
-	for _, change := range d.changes {
-		// filter thing?
-		change.piggybackCount++
+	d.lock.Lock()
+	defer d.lock.Unlock()
 
+	for _, change := range d.changes {
 		if filter != nil && filter(change) {
 			d.ringpop.stat("increment", "filtered-change", 1)
 			continue
 		}
+
+		change.piggybackCount++
 
 		if change.piggybackCount > d.maxPiggybackCount {
 			delete(d.changes, change.Address)
@@ -132,52 +134,16 @@ func (d *dissemination) issueChangesV2(filter func(disseminationChange) bool) []
 	return changesToDisseminate
 }
 
-// issueChanges returns a slice of changes to be propogated
-func (d *dissemination) issueChanges(checksum uint32, source string) []Change {
-	var changesToDisseminate []Change
-
-	d.lock.Lock()
-	for _, change := range d.changes {
-		change.piggybackCount++
-
-		if change.piggybackCount > d.maxPiggybackCount {
-			d.ringpop.logger.Warn("deleting change")
-			delete(d.changes, change.Address)
-			continue
-		}
-
-		changesToDisseminate = append(changesToDisseminate, change.Change)
-	}
-	d.lock.Unlock()
-
-	d.ringpop.stat("gauge", "changes.disseminate", int64(len(changesToDisseminate)))
-
-	if len(changesToDisseminate) > 0 {
-		return changesToDisseminate
-	} else if checksum != 0 && d.ringpop.membership.checksum != checksum {
-		d.ringpop.stat("increment", "full-sync", 1)
-		d.ringpop.logger.WithFields(log.Fields{
-			"localChecksum":  d.ringpop.membership.checksum,
-			"remoteChecksum": checksum,
-			"remoteNode":     source,
-		}).Warn("[ringpop] full sync")
-
-		return d.fullSync()
-	}
-
-	return []Change{}
-}
-
 // recordchange records a change in the dissemination for later propogation
 func (d *dissemination) recordChange(change Change) {
 	d.lock.Lock()
-	d.changes[change.Address] = disseminationChange{change, 0}
+	d.changes[change.Address] = &disseminationChange{change, 0}
 	d.lock.Unlock()
 }
 
 func (d *dissemination) clearChanges() {
 	d.lock.Lock()
-	d.changes = make(map[string]disseminationChange)
+	d.changes = make(map[string]*disseminationChange)
 	d.lock.Unlock()
 }
 

@@ -15,9 +15,16 @@ func handlePing(ringpop *Ringpop, body pingBody) pingBody {
 
 	ringpop.membership.update(body.Changes)
 
+	changes, fullSync := ringpop.dissemination.issueChangesAsReceiver(body.Source,
+		body.SourceIncarnation, body.Checksum)
+
+	if fullSync {
+		// TODO: something...
+	}
+
 	resBody := pingBody{
 		Checksum: ringpop.membership.checksum,
-		Changes:  ringpop.dissemination.issueChanges(body.Checksum, body.Source),
+		Changes:  changes,
 		Source:   ringpop.WhoAmI(),
 	}
 

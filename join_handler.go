@@ -6,9 +6,10 @@ import (
 )
 
 type joinResBody struct {
-	App         string
-	Coordinator string
-	Membership  []Change
+	App                string   `json:"app"`
+	Coordinator        string   `json:"coordinator"`
+	Membership         []Change `json:"membership"`
+	MembershipChecksum uint32   `json:"membershipChecksum"`
 }
 
 func validateDenyingJoins(ringpop *Ringpop) error {
@@ -20,8 +21,8 @@ func validateDenyingJoins(ringpop *Ringpop) error {
 
 func validateJoinerAddress(ringpop *Ringpop, joiner string) error {
 	if joiner == ringpop.WhoAmI() {
-		message := fmt.Sprintf(`A node tried joining a cluster by attempting to join itself.
-			The joiner (%s) must join someone else.`, joiner)
+		message := fmt.Sprintf("A node tried joining a cluster by attempting to join itself. "+
+			"The joiner (%s) must join someone else.", joiner)
 		return errors.New(message)
 	}
 	return nil
@@ -30,8 +31,8 @@ func validateJoinerAddress(ringpop *Ringpop, joiner string) error {
 func validateJoinerApp(ringpop *Ringpop, app string) error {
 	if app != ringpop.app {
 		// revisit message
-		message := fmt.Sprintf(`A node tried joining a different app cluster. The
-			expected app (%s) did not matcht the actual app (%s)`, ringpop.app, app)
+		message := fmt.Sprintf("A node tried joining a different app cluster. The "+
+			"expected app (%s) did not match the actual app (%s)", ringpop.app, app)
 		return errors.New(message)
 	}
 	return nil
@@ -58,9 +59,10 @@ func handleJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
 	ringpop.membership.makeAlive(body.Source, body.Incarnation)
 
 	res = joinResBody{
-		App:         ringpop.app,
-		Coordinator: ringpop.WhoAmI(),
-		Membership:  ringpop.dissemination.fullSync(),
+		App:                ringpop.app,
+		Coordinator:        ringpop.WhoAmI(),
+		Membership:         ringpop.dissemination.fullSync(),
+		MembershipChecksum: ringpop.membership.checksum,
 	}
 
 	return res, nil

@@ -30,8 +30,15 @@ func handlePingReq(ringpop *Ringpop, body pingReqBody) pingReqRes {
 
 	ringpop.membership.update(res.Changes)
 
+	changes, fullSync := ringpop.dissemination.issueChangesAsReceiver(body.Source,
+		body.SourceIncarnation, body.Checksum)
+
+	if fullSync {
+		// TODO: something...
+	}
+
 	return pingReqRes{
-		Changes:    ringpop.dissemination.issueChanges(body.Checksum, body.Source),
+		Changes:    changes,
 		PingStatus: true,
 		Target:     body.Target,
 	}
