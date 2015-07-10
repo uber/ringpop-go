@@ -23,10 +23,11 @@ type pingReqErr struct {
 }
 
 type pingReqBody struct {
-	Checksum uint32   `json:"checksum"`
-	Source   string   `json:"source"`
-	Target   string   `json:"target"`
-	Changes  []Change `json:"changes"`
+	Source            string   `json:"source"`
+	SourceIncarnation int64    `json:"sourceIncarnation"`
+	Target            string   `json:"target"`
+	Checksum          uint32   `json:"checksum"`
+	Changes           []Change `json:"changes"`
 }
 
 type pingReqRes struct {
@@ -117,10 +118,11 @@ func (p *pingReqSender) send(ctx context.Context, resBody *pingReqRes, errC chan
 	}
 
 	reqBody := pingReqBody{
-		Checksum: p.ringpop.membership.checksum,
-		Changes:  p.ringpop.dissemination.issueChanges(0, ""),
-		Source:   p.ringpop.WhoAmI(),
-		Target:   p.target,
+		Checksum:          p.ringpop.membership.checksum,
+		Changes:           p.ringpop.dissemination.issueChangesAsSender(),
+		Source:            p.ringpop.WhoAmI(),
+		SourceIncarnation: p.ringpop.membership.localMember.Incarnation,
+		Target:            p.target,
 	}
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
 		log.WithField("error", err).Debugf("[ringpop] could not write request body")

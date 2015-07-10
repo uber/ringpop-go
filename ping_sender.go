@@ -17,9 +17,10 @@ import (
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 type pingBody struct {
-	Checksum uint32   `json:"checksum"`
-	Changes  []Change `json:"changes"`
-	Source   string   `json:"source"`
+	Checksum          uint32   `json:"checksum"`
+	Changes           []Change `json:"changes"`
+	Source            string   `json:"source"`
+	SourceIncarnation int64    `json:"sourceIncarnation"`
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -102,11 +103,11 @@ func (p *pingSender) send(ctx context.Context, resBody *pingBody, errC chan erro
 	}
 
 	reqBody := pingBody{
-		Checksum: p.ringpop.membership.checksum,
-		Changes:  p.ringpop.dissemination.issueChanges(0, ""),
-		Source:   p.ringpop.WhoAmI(),
+		Checksum:          p.ringpop.membership.checksum,
+		Changes:           p.ringpop.dissemination.issueChangesAsSender(),
+		Source:            p.ringpop.WhoAmI(),
+		SourceIncarnation: p.ringpop.membership.localMember.Incarnation,
 	}
-
 	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local":   p.ringpop.WhoAmI(),
