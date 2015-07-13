@@ -84,9 +84,8 @@ func validateRBTree(node *RingNode) (int, error) {
 
 		if isRed(node) {
 			return leftHeight, nil
-		} else {
-			return leftHeight + 1, nil
 		}
+		return leftHeight + 1, nil
 	}
 	return 0, nil
 }
@@ -574,62 +573,6 @@ func TestDelete(t *testing.T) {
 	assert.Equal(t, 1, height, "expected tree to have black height of 1")
 }
 
-func TestIter(t *testing.T) {
-	tree := makeTree()
-
-	// Iter for values >= 6 -- should contain 3 values and then break
-	iter := tree.Iter(6)
-	node, ok := <-iter
-	assert.Equal(t, 6, node.val, "expected 6")
-	node, ok = <-iter
-	assert.Equal(t, 7, node.val, "expected 7")
-	node, ok = <-iter
-	assert.Equal(t, 8, node.val, "expected 8")
-	node, ok = <-iter
-	assert.False(t, ok, "expected closed channel")
-
-	// Iter for values >= 3
-	iter = tree.Iter(3)
-	for i := 3; i < 9; i++ {
-		node, ok = <-iter
-		assert.Equal(t, i, node.val, fmt.Sprint("expected ", i))
-	}
-	node, ok = <-iter
-	assert.False(t, ok, "expected closed channel")
-
-	// Iter for values >= -1 -- should contain all values
-	iter = tree.Iter(-1)
-	for i := 1; i < 9; i++ {
-		node, ok = <-iter
-		assert.Equal(t, i, node.val, fmt.Sprint("expected ", i))
-	}
-	node, ok = <-iter
-	assert.False(t, ok, "expected closed channel")
-
-	// Iter for all values
-	iter = tree.MinIter()
-	for i := 1; i < 9; i++ {
-		node, ok = <-iter
-		assert.Equal(t, i, node.val, fmt.Sprint("expected ", i))
-	}
-	node, ok = <-iter
-	assert.False(t, ok, "expected closed channel")
-
-	// Iter for values >= 9 -- should contain nothing
-	iter = tree.Iter(9)
-	node, ok = <-iter
-	assert.False(t, ok, "expected closed channel")
-
-	tree.Insert(15, "fifteen")
-
-	// Iter for values >= 9 -- should now contain only 15
-	iter = tree.Iter(9)
-	node, ok = <-iter
-	assert.Equal(t, 15, node.val, "expected 15")
-	node, ok = <-iter
-	assert.False(t, ok, "expected closed channel")
-}
-
 func TestBig(t *testing.T) {
 	tree := RBTree{}
 
@@ -641,10 +584,8 @@ func TestBig(t *testing.T) {
 		tree.Delete(i)
 	}
 
-	iter := tree.Iter(0)
-	for node := range iter {
-		assert.Equal(t, strconv.Itoa(node.val), node.str, "node payloads don't match")
-	}
+	_, err := validateRBTree(tree.root)
+	assert.NoError(t, err, "expected tree to be a valid red black tree")
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -696,21 +637,21 @@ func opsPerSec(nspop int64) int64 {
 	return int64(math.Floor(float64(1000000 * float64(1e9) / float64(nspop))))
 }
 
-func TestRunBenchmarks(t *testing.T) {
-	bmres := testing.Benchmark(benchmarkRBTreeInsert)
-
-	fmt.Print("BenchmarkRBTreeInsert - Inserting 1 000 000 items into tree		")
-	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
-
-	bmres = testing.Benchmark(benchmarkRBTreeDelete)
-
-	fmt.Print("BenchmarkRBTreeDelete - Deleting 1 000 000 items from tree		")
-	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
-
-	bmres = testing.Benchmark(benchmarkRBTreeSearch)
-
-	fmt.Print("BenchmarkRBTreeSearch - Searching for each item in tree			")
-	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
-
-	fmt.Println()
-}
+// func TestRunBenchmarks(t *testing.T) {
+// 	bmres := testing.Benchmark(benchmarkRBTreeInsert)
+//
+// 	fmt.Print("BenchmarkRBTreeInsert - Inserting 1 000 000 items into tree		")
+// 	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
+//
+// 	bmres = testing.Benchmark(benchmarkRBTreeDelete)
+//
+// 	fmt.Print("BenchmarkRBTreeDelete - Deleting 1 000 000 items from tree		")
+// 	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
+//
+// 	bmres = testing.Benchmark(benchmarkRBTreeSearch)
+//
+// 	fmt.Print("BenchmarkRBTreeSearch - Searching for each item in tree			")
+// 	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
+//
+// 	fmt.Println()
+// }
