@@ -77,14 +77,17 @@ func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 	return opt
 }
 
-func testPop(hostport string, incarnation int64) *Ringpop {
+func testPop(hostport string, incarnation int64, opts *Options) *Ringpop {
 	logger := log.New()
 	logger.Out = ioutil.Discard
 
+	if opts == nil {
+		opts = &Options{}
+	}
+	opts.Logger = logger
+
 	testCh, _ := tchannel.NewChannel("test-service", nil)
-	ringpop := NewRingpop("test", hostport, testCh, &Options{
-		Logger: logger,
-	})
+	ringpop := NewRingpop("test", hostport, testCh, opts)
 
 	ringpop.testBootstrapper()
 	if incarnation != 0 {

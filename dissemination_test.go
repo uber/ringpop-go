@@ -8,7 +8,7 @@ import (
 )
 
 func TestFullSync(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 1)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	d := ringpop.dissemination
@@ -36,7 +36,7 @@ func TestFullSync(t *testing.T) {
 }
 
 func TestIssueChangesAsSender(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 1)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	d := ringpop.dissemination
@@ -58,7 +58,7 @@ func TestIssueChangesAsSender(t *testing.T) {
 }
 
 func TestIssueChangesAsReceiver(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 1)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	d := ringpop.dissemination
@@ -101,7 +101,7 @@ func TestIssueChangesAsReceiver(t *testing.T) {
 }
 
 func TestPiggybackCountDeletes(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 1)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	d := ringpop.dissemination

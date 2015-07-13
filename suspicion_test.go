@@ -8,59 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
-//	GOSSIP TESTS
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+func TestSetDuration(t *testing.T) {
+	timeout := 1337 * time.Second
 
-// TODO
-
-func TestStartStopGossip(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3001", 0, &Options{
+		SuspicionTimeout: timeout,
+	})
 	defer ringpop.Destroy()
 
-	ringpop.gossip.start()
-	assert.False(t, ringpop.gossip.Stopped(), "expected gossip to have started")
-
-	ringpop.gossip.stop()
-	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to have stopped")
+	assert.Equal(t, timeout, ringpop.suspicion.period, "expected suspicion timeout of 1337s")
 }
-
-func TestStopWhileStopped(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3001", 0)
-	defer ringpop.Destroy()
-
-	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
-
-	ringpop.gossip.stop()
-	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to still be stopped")
-}
-
-func TestCanRestartGossip(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3001", 0)
-	defer ringpop.Destroy()
-
-	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
-
-	ringpop.gossip.start()
-	assert.False(t, ringpop.gossip.Stopped(), "expected gossip to have started")
-
-	ringpop.gossip.stop()
-	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
-
-	ringpop.gossip.start()
-	assert.False(t, ringpop.gossip.Stopped(), "expected gossip to have started")
-}
-
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
-//	SUSPICION TESTS
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func TestReenableWhileEnabled(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.suspicion.stopAll()
@@ -74,7 +34,7 @@ func TestReenableWhileEnabled(t *testing.T) {
 }
 
 func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()))
@@ -95,7 +55,7 @@ func TestCannotStartSuspectPeriodWhileDisabled(t *testing.T) {
 }
 
 func TestSuspectMember(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()))
@@ -106,7 +66,7 @@ func TestSuspectMember(t *testing.T) {
 }
 
 func TestSuspectLocalMember(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	member := ringpop.membership.localMember
@@ -115,24 +75,35 @@ func TestSuspectLocalMember(t *testing.T) {
 }
 
 func TestSuspectBecomesFaulty(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.suspicion.period = time.Duration(1 * time.Millisecond)
 
 	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()))
+	ringpop.membership.makeAlive("127.0.0.1:3002", unixMilliseconds(time.Now()))
 
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
-	time.Sleep(1 * time.Millisecond)
 	ringpop.suspicion.start(*member)
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(time.Millisecond)
+
+	assert.Equal(t, FAULTY, member.Status, "expected suspicion to make member faulty")
+
+	member, _ = ringpop.membership.getMemberByAddress("127.0.0.1:3002")
+	change := Change{
+		Address:     member.Address,
+		Incarnation: member.Incarnation,
+	}
+
+	ringpop.suspicion.start(change)
+	time.Sleep(time.Millisecond)
 
 	assert.Equal(t, FAULTY, member.Status, "expected suspicion to make member faulty")
 }
 
 func TestSuspectTimerStoppedOnDuplicateSuspicion(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
@@ -153,7 +124,7 @@ func TestSuspectTimerStoppedOnDuplicateSuspicion(t *testing.T) {
 }
 
 func TestStopTimer(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)
@@ -170,7 +141,7 @@ func TestStopTimer(t *testing.T) {
 }
 
 func TestStopAllStopsAllTimers(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.suspicion.period = time.Duration(math.MaxInt64)

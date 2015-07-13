@@ -7,7 +7,7 @@ import (
 )
 
 func TestStartStopGossip(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3000", 0)
+	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
 	ringpop.gossip.start()
@@ -18,7 +18,7 @@ func TestStartStopGossip(t *testing.T) {
 }
 
 func TestStopWhileStopped(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3001", 0)
+	ringpop := testPop("127.0.0.1:3001", 0, nil)
 	defer ringpop.Destroy()
 
 	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
@@ -28,7 +28,7 @@ func TestStopWhileStopped(t *testing.T) {
 }
 
 func TestCanRestartGossip(t *testing.T) {
-	ringpop := testPop("127.0.0.1:3001", 0)
+	ringpop := testPop("127.0.0.1:3001", 0, nil)
 	defer ringpop.Destroy()
 
 	assert.True(t, ringpop.gossip.Stopped(), "expected gossip to be stopped")
