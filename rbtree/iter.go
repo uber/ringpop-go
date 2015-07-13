@@ -1,0 +1,163 @@
+package rbtree
+
+//Iter returns an iterator starting at the leftmost node in the tree
+func (t *RBTree) Iter() *RBIter {
+	return NewRBIter(t)
+}
+
+// IterAt returns an iter set at, or immediately after, val
+func (t *RBTree) IterAt(val int) *RBIter {
+	return NewRBIterAt(t, val)
+}
+
+// An RBIter iterates over nodes in an RBTree
+type RBIter struct {
+	tree      *RBTree
+	current   *RingNode
+	ancestors []*RingNode
+}
+
+// NewRBIter returns an RBIter for the given tree, or nil if the given tree is nil
+func NewRBIter(tree *RBTree) *RBIter {
+	if tree == nil {
+		return nil
+	}
+
+	iter := &RBIter{
+		tree:      tree,
+		current:   nil,
+		ancestors: make([]*RingNode, 0),
+	}
+	iter.minNode(tree.root)
+
+	return iter
+}
+
+// NewRBIterAt returns an RBIter for the given tree at or immediately after the given
+// val, or nil if the tree, or the tree's root, is nil
+func NewRBIterAt(tree *RBTree, val int) *RBIter {
+	if tree == nil {
+		return nil
+	}
+
+	iter := &RBIter{
+		tree:      tree,
+		current:   nil,
+		ancestors: make([]*RingNode, 0),
+	}
+
+	if tree.size == 0 {
+		return iter
+	}
+
+	iter.current = tree.root
+	for iter.current != nil {
+		if iter.current.val == val {
+			return iter
+		}
+
+		iter.pushA(iter.current) // add ancestor
+		iter.current = iter.current.Child(val > iter.current.val)
+	}
+
+	// iter current is nil, thus we did not find an equal value, so go back up
+	// ancestors and find the next greatest
+	for iter.current != tree.root {
+		iter.current = iter.popA()
+		if iter.current.val > val {
+			return iter
+		}
+	}
+
+	// val is greater than max in tree, go to min node
+	iter.minNode(tree.root)
+
+	return iter
+}
+
+// Val returns the val contained at the current node
+func (i *RBIter) Val() int {
+	return i.current.val
+}
+
+// Str returns the str contained at the current node
+func (i *RBIter) Str() string {
+	return i.current.str
+}
+
+// Next2 returns the next node in the tree
+func (i *RBIter) Next2() *RingNode {
+	if i.current == nil {
+		i.minNode(i.tree.root) // set current to min node
+	} else {
+		if i.current.right == nil {
+			for {
+				save := i.current
+				i.current = i.popA()
+				if i.current == nil || i.current.right == save {
+					break
+				}
+			}
+		} else {
+			i.pushA(i.current)
+			i.minNode(i.current.right)
+		}
+	}
+	return i.current
+}
+
+// Next returns the next node in the tree
+func (i *RBIter) Next() *RingNode {
+	if i.current == nil {
+		i.minNode(i.tree.root)
+	} else {
+		if i.current.right == nil {
+			for {
+				save := i.current
+				i.current = i.popA()
+				if i.current == nil {
+					i.minNode(i.tree.root)
+					break
+				}
+
+				if i.current.right != save {
+					break
+				}
+			}
+
+		} else {
+			i.pushA(i.current)
+			i.minNode(i.current.right)
+		}
+
+	}
+
+	return i.current
+}
+
+// sets current to left most node in subtree of root
+func (i *RBIter) minNode(root *RingNode) {
+	if root == nil {
+		i.current = root
+		return
+	}
+	for root.left != nil {
+		i.pushA(root)
+		root = root.left
+	}
+	i.current = root
+}
+
+func (i *RBIter) pushA(node *RingNode) {
+	i.ancestors = append(i.ancestors, node)
+}
+
+func (i *RBIter) popA() *RingNode {
+	ind := len(i.ancestors) - 1
+	if ind < 0 {
+		return nil
+	}
+	a := i.ancestors[ind]
+	i.ancestors = i.ancestors[:ind]
+	return a
+}
