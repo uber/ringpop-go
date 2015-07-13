@@ -63,18 +63,15 @@ func (mr *membershipUpdateRollup) addUpdates(changes []Change) {
 	}
 }
 
-func (mr *membershipUpdateRollup) trackUpdates(changes []Change) {
+func (mr *membershipUpdateRollup) trackUpdates(changes []Change) (flushed bool) {
 	if len(changes) == 0 {
 		return
 	}
 
-	mr.lock.Lock()
-	defer mr.lock.Unlock()
-
-	sinceLastUpdate := time.Duration(mr.lastUpdateTime.UnixNano() - time.Now().UnixNano())
+	sinceLastUpdate := time.Now().Sub(mr.lastUpdateTime)
 	if sinceLastUpdate >= mr.flushInterval {
 		mr.flushBuffer()
-		// <-mr.eventC // block until flush completes
+		flushed = true
 	}
 
 	if mr.firstUpdateTime.IsZero() {
@@ -84,6 +81,8 @@ func (mr *membershipUpdateRollup) trackUpdates(changes []Change) {
 	mr.renewFlushTimer()
 	mr.addUpdates(changes)
 	mr.lastUpdateTime = time.Now()
+
+	return
 }
 
 // numUpdates returns the total number of changes contained in the buffer
@@ -98,6 +97,9 @@ func (mr *membershipUpdateRollup) numUpdates() int {
 
 // renewFlushTimer starts or restarts the flush timer
 func (mr *membershipUpdateRollup) renewFlushTimer() {
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
 	if mr.flushTimer != nil {
 		mr.flushTimer.Stop()
 	}
