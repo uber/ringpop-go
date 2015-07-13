@@ -6,6 +6,7 @@ type RBTree struct {
 	size int
 }
 
+// A RingNode is a node in the RBTree
 type RingNode struct {
 	val   int
 	str   string
@@ -14,18 +15,20 @@ type RingNode struct {
 	red   bool
 }
 
+// Size returns the number of nodes in the RBTree
 func (t *RBTree) Size() int {
 	return t.size
 }
 
+// Child returns the left or right node of the RBTree
 func (n *RingNode) Child(right bool) *RingNode {
 	if right {
 		return n.right
-	} else {
-		return n.left
 	}
+	return n.left
 }
 
+// Str returns the str contained in the node
 func (n *RingNode) Str() string {
 	return n.str
 }
@@ -229,19 +232,16 @@ func (n *RingNode) search(val int) (string, bool) {
 	return "", false
 }
 
-// Search searches for a value in the RBTree
-// Returns the string and true if found, empty string and false if val is not
-// in the tree
+// Search searches for a value in the RBTree, returns the string and true if found,
+// or the empty string and false if val is not in the tree
 func (t *RBTree) Search(val int) (string, bool) {
 	if t.root == nil {
 		return "", false
-	} else {
-		return t.root.search(val)
 	}
+	return t.root.search(val)
 }
 
-// Min returns the node in the tree with the smallest value, or nil if the tree
-// is empty
+// Min returns the node in the tree with the smallest value, or nil if the tree is empty
 func (t *RBTree) Min() *RingNode {
 	node := t.root
 
@@ -269,6 +269,7 @@ func (n *RingNode) genIter(val int, ch chan<- *RingNode) {
 	}
 }
 
+// MinIter provides an iterator to iterate over RBTree Nodes
 func (t *RBTree) MinIter() <-chan *RingNode {
 	ch := make(chan *RingNode)
 	if t.root != nil {
