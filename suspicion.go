@@ -11,9 +11,8 @@ const defaultSuspicionTimeout = time.Millisecond * 5000
 
 // interface so that both changes and members can be passed to Suspicion methods
 type suspect interface {
-	suspectAddress() string
-	suspectStatus() string
-	suspectIncarnation() int64
+	address() string
+	incarnation() int64
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -63,10 +62,10 @@ func (s *suspicion) start(suspect suspect) {
 		return
 	}
 
-	if suspect.suspectAddress() == s.ringpop.WhoAmI() {
+	if suspect.address() == s.ringpop.WhoAmI() {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local":   s.ringpop.WhoAmI(),
-			"suspect": suspect.suspectAddress(),
+			"suspect": suspect.address(),
 		}).Debug("[ringpop] cannot start a suspect period for the local member")
 
 		return
@@ -75,28 +74,23 @@ func (s *suspicion) start(suspect suspect) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if timer, ok := s.timers[suspect.suspectAddress()]; ok {
+	if timer, ok := s.timers[suspect.address()]; ok {
 		timer.Stop()
-		// s.ringpop.logger.WithFields(log.Fields{
-		// 	"local":   s.ringpop.WhoAmI(),
-		// 	"suspect": suspect.suspectAddress(),
-		// }).Warn("[ringpop] member is already suspect")
-		// return
 	}
 
 	// declare member faulty when timer runs out
-	s.timers[suspect.suspectAddress()] = time.AfterFunc(s.period, func() {
+	s.timers[suspect.address()] = time.AfterFunc(s.period, func() {
 		s.ringpop.logger.WithFields(log.Fields{
 			"local":  s.ringpop.WhoAmI(),
-			"faulty": suspect.suspectAddress(),
+			"faulty": suspect.address(),
 		}).Info("[ringpop] member declared faulty")
 
-		s.ringpop.membership.makeFaulty(suspect.suspectAddress(), suspect.suspectIncarnation())
+		s.ringpop.membership.makeFaulty(suspect.address(), suspect.incarnation())
 	})
 
 	s.ringpop.logger.WithFields(log.Fields{
 		"local":     s.ringpop.WhoAmI(),
-		"suspect":   suspect.suspectAddress(),
+		"suspect":   suspect.address(),
 		"timestamp": time.Now(),
 	}).Debug("[ringpop] started suspect period")
 }
@@ -106,13 +100,13 @@ func (s *suspicion) stop(suspect suspect) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	if timer, ok := s.timers[suspect.suspectAddress()]; ok {
+	if timer, ok := s.timers[suspect.address()]; ok {
 		timer.Stop()
-		delete(s.timers, suspect.suspectAddress())
+		delete(s.timers, suspect.address())
 
 		s.ringpop.logger.WithFields(log.Fields{
 			"local":   s.ringpop.WhoAmI(),
-			"suspect": suspect.suspectAddress(),
+			"suspect": suspect.address(),
 		}).Debug("[ringpop] stopped members suspect timer")
 	}
 }
