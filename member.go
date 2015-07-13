@@ -14,33 +14,17 @@ const (
 	SUSPECT = "suspect"
 )
 
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
-// MEMBER
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-// Member is a node in the membership list
+// A Member is a node in the ring
 type Member struct {
 	Address     string
 	Status      string
 	Incarnation int64
 }
 
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
-// METHODS
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-func (m Member) suspectAddress() string {
+func (m Member) address() string {
 	return m.Address
 }
 
-func (m Member) suspectStatus() string {
-	return m.Status
-}
-
-func (m Member) suspectIncarnation() int64 {
+func (m Member) incarnation() int64 {
 	return m.Incarnation
 }

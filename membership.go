@@ -24,15 +24,11 @@ type Change struct {
 }
 
 // methods to satisfy `suspect` interface
-func (c Change) suspectAddress() string {
+func (c Change) address() string {
 	return c.Address
 }
 
-func (c Change) suspectStatus() string {
-	return c.Status
-}
-
-func (c Change) suspectIncarnation() int64 {
+func (c Change) incarnation() int64 {
 	return c.Incarnation
 }
 
@@ -140,11 +136,6 @@ func (m *membership) randomPingablemembers(n int, excluding []string) []*Member 
 	return pingableMembers[:n]
 }
 
-func (m *membership) hasMember(member *Member) bool {
-	_, ok := m.members[member.Address]
-	return ok
-}
-
 func (m *membership) isPingable(member *Member) bool {
 	return member.Address != m.ringpop.WhoAmI() &&
 		(member.Status == ALIVE || member.Status == SUSPECT)
@@ -182,7 +173,7 @@ func (m *membership) makeFaulty(address string, incarnation int64) []Change {
 
 func (m *membership) makeLeave(address string, incarnation int64) []Change {
 	if m.localMember == nil {
-		m.localMember = &Member{Address: m.ringpop.WhoAmI()}
+		m.localMember = &Member{Address: m.ringpop.WhoAmI(), Incarnation: unixMilliseconds(time.Now())}
 	}
 
 	return m.update([]Change{Change{
@@ -238,7 +229,7 @@ func (m *membership) update(changes []Change) []Change {
 	var updates []Change
 
 	if len(changes) == 0 {
-		return updates
+		return nil
 	}
 
 	if m.ringpop.Destroyed() {
