@@ -1,13 +1,7 @@
 package ringpop
 
-func validStatus(status string) bool {
-	return status == ALIVE || status == FAULTY || status == LEAVE || status == SUSPECT
-}
-
 func isAliveOverride(member *Member, change Change) bool {
-	return change.Status == ALIVE &&
-		validStatus(member.Status) && // this line is maybe not necessary?
-		change.Incarnation > member.Incarnation
+	return change.Status == ALIVE && change.Incarnation > member.Incarnation
 }
 
 func isFaultyOverride(member *Member, change Change) bool {
