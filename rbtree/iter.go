@@ -75,6 +75,11 @@ func NewRBIterAt(tree *RBTree, val int) *RBIter {
 	return iter
 }
 
+// Nil returns true if the current node is nil
+func (i *RBIter) Nil() bool {
+	return i.current == nil
+}
+
 // Val returns the val contained at the current node
 func (i *RBIter) Val() int {
 	return i.current.Val()

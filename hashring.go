@@ -20,9 +20,14 @@ func farmhash32(address string, off int) uint32 {
 	return farm.Hash32([]byte(hashstr))
 }
 
+func offsetFarmHash32(b []byte, off int) uint32 {
+	b = append(b, byte(off))
+	return farm.Hash32(b)
+}
+
 type hashRing struct {
 	ringpop       *Ringpop
-	rbtree        rbtree.RBTree
+	tree          rbtree.RBTree
 	servers       map[string]bool
 	checksum      uint32
 	replicaPoints int
@@ -32,7 +37,7 @@ type hashRing struct {
 func newHashRing(ringpop *Ringpop) *hashRing {
 	hashring := &hashRing{
 		ringpop:       ringpop,
-		rbtree:        rbtree.RBTree{},
+		tree:          rbtree.RBTree{},
 		servers:       make(map[string]bool),
 		replicaPoints: 3,
 	}
@@ -56,7 +61,7 @@ func (r *hashRing) computeChecksum() {
 		buffer.WriteString(";")
 	}
 
-	r.checksum = farmhash32(buffer.String(), -1)
+	r.checksum = farm.Hash32(buffer.Bytes())
 	r.ringpop.handleRingEvent("checksumComputed")
 }
 
@@ -71,7 +76,7 @@ func (r *hashRing) addServer(address string) {
 	r.servers[address] = true
 	// insert replications into ring
 	for i := 0; i < r.replicaPoints; i++ {
-		r.rbtree.Insert(int(farmhash32(address, i)), address)
+		r.tree.Insert(int(farmhash32(address, i)), address)
 	}
 	r.lock.Unlock()
 
@@ -90,7 +95,7 @@ func (r *hashRing) removeServer(address string) {
 	delete(r.servers, address)
 	// remove replications from ring
 	for i := 0; i < r.replicaPoints; i++ {
-		r.rbtree.Delete(int(farmhash32(address, i)))
+		r.tree.Delete(int(farmhash32(address, i)))
 	}
 	r.lock.Unlock()
 
@@ -114,17 +119,9 @@ func (r *hashRing) serverCount() int {
 }
 
 func (r *hashRing) lookup(key string) (string, bool) {
-	hash := farm.Hash32([]byte(key))
-	iter := make(<-chan *rbtree.RingNode)
-	iter = r.rbtree.Iter(int(hash))
-
-	if node, ok := <-iter; ok {
-		return node.Str(), true
+	iter := r.tree.IterAt(int(farm.Hash32([]byte(key))))
+	if !iter.Nil() {
+		return iter.Str(), true
 	}
-
-	if node := r.rbtree.Min(); node != nil {
-		return node.Str(), true
-	}
-
 	return "", false
 }
