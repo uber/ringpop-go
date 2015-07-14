@@ -28,6 +28,11 @@ func (n *RingNode) Child(right bool) *RingNode {
 	return n.left
 }
 
+// Val returns the val contained in the node
+func (n *RingNode) Val() int {
+	return n.val
+}
+
 // Str returns the str contained in the node
 func (n *RingNode) Str() string {
 	return n.str
@@ -239,19 +244,4 @@ func (t *RBTree) Search(val int) (string, bool) {
 		return "", false
 	}
 	return t.root.search(val)
-}
-
-// Min returns the node in the tree with the smallest value, or nil if the tree is empty
-func (t *RBTree) Min() *RingNode {
-	node := t.root
-
-	if node == nil {
-		return nil
-	}
-
-	for node.left != nil {
-		node = node.left
-	}
-
-	return node
 }

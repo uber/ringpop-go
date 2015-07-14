@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"strconv"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestEmptyTree(t *testing.T) {
 	tree := RBTree{}
 
 	assert.Nil(t, tree.root, "tree root is nil")
-	assert.Equal(t, 0, tree.size, "tree has 0 nodes")
+	assert.Equal(t, 0, tree.Size(), "tree has 0 nodes")
 }
 
 // counts the black height of the tree and validates it along the way
@@ -114,7 +115,7 @@ func TestInsert(t *testing.T) {
 
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
-	assert.Equal(t, 8, tree.size, "expected tree to have 8 nodes")
+	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
 
 	// 4, B
 	node := tree.root
@@ -192,36 +193,36 @@ func TestInsert(t *testing.T) {
 func TestDuplicateInsert(t *testing.T) {
 	tree := makeTree()
 
-	assert.Equal(t, 8, tree.size, "expected tree to have 8 nodes")
+	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
 
 	assert.True(t, tree.Insert(9, "nine"), "failed, expected insertion success")
-	assert.Equal(t, 9, tree.size, "expected tree to have 9 nodes")
+	assert.Equal(t, 9, tree.Size(), "expected tree to have 9 nodes")
 
 	assert.False(t, tree.Insert(1, "one"), "success, expected insertion to fail (duplicate value)")
-	assert.Equal(t, 9, tree.size, "expected tree to have 9 nodes")
+	assert.Equal(t, 9, tree.Size(), "expected tree to have 9 nodes")
 }
 
 func TestRemoveInsert(t *testing.T) {
 	tree := makeTree()
 
-	assert.Equal(t, 8, tree.size, "expected tree to have 8 nodes")
+	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
 
 	assert.True(t, tree.Delete(2), "failed, expected successful deletion")
 	assert.True(t, tree.Delete(4), "failed, expected successful deletion")
 
-	assert.Equal(t, 6, tree.size, "expected tree to have 6 nodes")
+	assert.Equal(t, 6, tree.Size(), "expected tree to have 6 nodes")
 
 	assert.True(t, tree.Insert(2, "two"), "failed, expected insertions success")
 	_, err := validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 
-	assert.Equal(t, 7, tree.size, "expected tree to have 7 nodes")
+	assert.Equal(t, 7, tree.Size(), "expected tree to have 7 nodes")
 
 	assert.True(t, tree.Insert(4, "four"), "failed, expected insertion success")
 	_, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 
-	assert.Equal(t, 8, tree.size, "expected tree to have 8 nodes")
+	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
 }
 
 func TestDelete(t *testing.T) {
@@ -230,7 +231,7 @@ func TestDelete(t *testing.T) {
 	height, err := validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
-	assert.Equal(t, 8, tree.size, "expected tree to have 8 nodes")
+	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
 
 	//               4,B
 	//             /     \
@@ -242,7 +243,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 1
 	assert.True(t, tree.Delete(1), "expected node to be found and removed from tree")
-	assert.Equal(t, 7, tree.size, "expected tree to have 7 nodes")
+	assert.Equal(t, 7, tree.Size(), "expected tree to have 7 nodes")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
@@ -314,7 +315,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 2
 	assert.True(t, tree.Delete(2), "expected node to be found and removed from tree")
-	assert.Equal(t, 6, tree.size, "expected tree to have 6 nodes")
+	assert.Equal(t, 6, tree.Size(), "expected tree to have 6 nodes")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
@@ -376,7 +377,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 3
 	assert.True(t, tree.Delete(3), "expected node to be found and removed from tree")
-	assert.Equal(t, 5, tree.size, "expected tree to have 5 nodes")
+	assert.Equal(t, 5, tree.Size(), "expected tree to have 5 nodes")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
@@ -430,7 +431,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 4
 	assert.True(t, tree.Delete(4), "expected node to be found and removed from tree")
-	assert.Equal(t, 4, tree.size, "expected tree to have 4 nodes")
+	assert.Equal(t, 4, tree.Size(), "expected tree to have 4 nodes")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
@@ -476,7 +477,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 5
 	assert.True(t, tree.Delete(5), "expected node to be found and removed from tree")
-	assert.Equal(t, 3, tree.size, "expected tree to have 3 nodes")
+	assert.Equal(t, 3, tree.Size(), "expected tree to have 3 nodes")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
@@ -512,7 +513,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 5
 	assert.True(t, tree.Delete(6), "expected node to be found and removed from tree")
-	assert.Equal(t, 2, tree.size, "expected tree to have 2 nodes")
+	assert.Equal(t, 2, tree.Size(), "expected tree to have 2 nodes")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 2, height, "expected tree to have black height of 2")
@@ -540,7 +541,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 7
 	assert.True(t, tree.Delete(7), "expected node to be found and removed from tree")
-	assert.Equal(t, 1, tree.size, "expected tree to have 1 node")
+	assert.Equal(t, 1, tree.Size(), "expected tree to have 1 node")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 2, height, "expected tree to have black height of 2")
@@ -558,7 +559,7 @@ func TestDelete(t *testing.T) {
 
 	// REMOVE 7
 	assert.True(t, tree.Delete(8), "expected node to be found and removed from tree")
-	assert.Equal(t, 0, tree.size, "expected tree to be empty")
+	assert.Equal(t, 0, tree.Size(), "expected tree to be empty")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 1, height, "expected tree to have black height of 2")
@@ -567,24 +568,66 @@ func TestDelete(t *testing.T) {
 	assert.Nil(t, tree.root, "tree root is nil")
 
 	assert.False(t, tree.Delete(1), "success, expected deletion to fail with empty tree")
-	assert.Equal(t, 0, tree.size, "expected tree to be empty")
+	assert.Equal(t, 0, tree.Size(), "expected tree to be empty")
 	height, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 1, height, "expected tree to have black height of 1")
 }
 
-func TestBig(t *testing.T) {
+func TestSearchEmpty(t *testing.T) {
 	tree := RBTree{}
 
-	for i := 0; i < 2000; i++ {
-		tree.Insert(i, strconv.Itoa(i))
-	}
+	str, ok := tree.Search(5)
+	assert.False(t, ok, "expected node to not be found")
+	assert.Equal(t, "", str, "expected str to be empty")
+}
 
-	for i := 2; i < 1999; i++ {
-		tree.Delete(i)
+func TestSearch(t *testing.T) {
+	tree := makeTree()
+
+	//               4,B
+	//             /     \
+	//         2,R         6,R
+	//       /     \     /     \
+	//     1,B    3,B   5,B    7,B
+	//                             \
+	//                              8,R
+
+	str, ok := tree.Search(5)
+	assert.True(t, ok, "expected node to be found")
+	assert.Equal(t, "five", str, "expected str to be five")
+
+	str, ok = tree.Search(3)
+	assert.True(t, ok, "expected node to be found")
+	assert.Equal(t, "three", str, "expected str to be three")
+
+	str, ok = tree.Search(8)
+	assert.True(t, ok, "expected node to be found")
+	assert.Equal(t, "eight", str, "expected str to be three")
+
+	str, ok = tree.Search(9)
+	assert.False(t, ok, "expected node to not be found")
+	assert.Equal(t, "", str, "expected str to be empty")
+}
+
+func TestBig(t *testing.T) {
+	tree := RBTree{}
+	random := rand.New(rand.NewSource(1337))
+
+	for i := 0; i < 2000; i++ {
+		n := random.Intn(10000)
+		tree.Insert(n, strconv.Itoa(n))
 	}
 
 	_, err := validateRBTree(tree.root)
+	assert.NoError(t, err, "expected tree to be a valid red black tree")
+
+	for i := 0; i < 1000; i++ {
+		n := random.Intn(10000)
+		tree.Delete(n)
+	}
+
+	_, err = validateRBTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 }
 

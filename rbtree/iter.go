@@ -77,33 +77,12 @@ func NewRBIterAt(tree *RBTree, val int) *RBIter {
 
 // Val returns the val contained at the current node
 func (i *RBIter) Val() int {
-	return i.current.val
+	return i.current.Val()
 }
 
 // Str returns the str contained at the current node
 func (i *RBIter) Str() string {
-	return i.current.str
-}
-
-// Next2 returns the next node in the tree
-func (i *RBIter) Next2() *RingNode {
-	if i.current == nil {
-		i.minNode(i.tree.root) // set current to min node
-	} else {
-		if i.current.right == nil {
-			for {
-				save := i.current
-				i.current = i.popA()
-				if i.current == nil || i.current.right == save {
-					break
-				}
-			}
-		} else {
-			i.pushA(i.current)
-			i.minNode(i.current.right)
-		}
-	}
-	return i.current
+	return i.current.Str()
 }
 
 // Next returns the next node in the tree
