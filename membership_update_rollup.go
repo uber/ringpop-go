@@ -55,6 +55,9 @@ func newMembershipUpdateRollup(ringpop *Ringpop, flushInterval time.Duration, ma
 func (mr *membershipUpdateRollup) addUpdates(changes []Change) {
 	ts := time.Now()
 
+	mr.lock.Lock()
+	defer mr.lock.Unlock()
+
 	for _, change := range changes {
 		// update timestamp
 		change.Timestamp = ts
@@ -65,7 +68,7 @@ func (mr *membershipUpdateRollup) addUpdates(changes []Change) {
 
 func (mr *membershipUpdateRollup) trackUpdates(changes []Change) (flushed bool) {
 	if len(changes) == 0 {
-		return
+		return flushed
 	}
 
 	sinceLastUpdate := time.Now().Sub(mr.lastUpdateTime)
@@ -80,9 +83,12 @@ func (mr *membershipUpdateRollup) trackUpdates(changes []Change) (flushed bool) 
 
 	mr.renewFlushTimer()
 	mr.addUpdates(changes)
-	mr.lastUpdateTime = time.Now()
 
-	return
+	mr.lock.Lock()
+	mr.lastUpdateTime = time.Now()
+	mr.lock.Unlock()
+
+	return flushed
 }
 
 // numUpdates returns the total number of changes contained in the buffer
