@@ -10,44 +10,44 @@ import (
 
 type headers map[string]string
 
-type ringpopServer struct {
+type server struct {
 	ringpop *Ringpop
 	channel *tchannel.Channel
 }
 
-func newRingpopServer(ringpop *Ringpop) (*ringpopServer, error) {
+func newServer(ringpop *Ringpop) (*server, error) {
 	if ringpop.channel == nil {
 		return nil, errors.New("ringpop channel cannot be nil")
 	}
 
-	ringpopServer := &ringpopServer{
+	s := &server{
 		ringpop: ringpop,
 		channel: ringpop.channel,
 	}
 
 	var commands = map[string]tchannel.HandlerFunc{
-		// "/health":            ringpopServer.healthHandler,
-		// "/admin/stats/":      ringpopServer.adminStatsHandler,
-		"/admin/debugSet":   ringpopServer.adminDebugSetHandler,
-		"/admin/debugClear": ringpopServer.adminDebugClearHandler,
-		// "/admin/gossip":      ringpopServer.adminGossipHandler,
-		// "/admin/leave":       ringpopServer.adminLeaveHandler,
-		// "/admin/join":        ringpopServer.adminJoinHandler,
-		// "/admin/reload":      ringpopServer.adminReloadHandler,
-		"/protocol/join":     ringpopServer.protocolJoinHandler,
-		"/protocol/ping":     ringpopServer.protocolPingHandler,
-		"/protocol/ping-req": ringpopServer.protocolPingReqHandler,
+		// "/health":            s.healthHandler,
+		// "/admin/stats/":      s.adminStatsHandler,
+		"/admin/debugSet":   s.adminDebugSetHandler,
+		"/admin/debugClear": s.adminDebugClearHandler,
+		// "/admin/gossip":      s.adminGossipHandler,
+		// "/admin/leave":       s.adminLeaveHandler,
+		// "/admin/join":        s.adminJoinHandler,
+		// "/admin/reload":      s.adminReloadHandler,
+		"/protocol/join":     s.protocolJoinHandler,
+		"/protocol/ping":     s.protocolPingHandler,
+		"/protocol/ping-req": s.protocolPingReqHandler,
 	}
 
 	// Register endpoints with channel
 	for operation, handler := range commands {
-		ringpopServer.channel.Register(handler, operation)
+		s.channel.Register(handler, operation)
 	}
 
-	return ringpopServer, nil
+	return s, nil
 }
 
-func (s *ringpopServer) listenAndServe() error {
+func (s *server) listenAndServe() error {
 	return s.channel.ListenAndServe(s.ringpop.WhoAmI())
 }
 
@@ -57,7 +57,7 @@ func (s *ringpopServer) listenAndServe() error {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (s *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (s *server) protocolJoinHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if s.channel.Closed() {
 		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
@@ -114,7 +114,7 @@ func (s *ringpopServer) protocolJoinHandler(ctx context.Context, call *tchannel.
 	}
 }
 
-func (s *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (s *server) protocolPingHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if s.channel.Closed() {
 		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
@@ -164,7 +164,7 @@ func (s *ringpopServer) protocolPingHandler(ctx context.Context, call *tchannel.
 	}
 }
 
-func (s *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (s *server) protocolPingReqHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if s.channel.Closed() {
 		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
@@ -219,7 +219,7 @@ func (s *ringpopServer) protocolPingReqHandler(ctx context.Context, call *tchann
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func receiveCallNoArgs(s *ringpopServer, call *tchannel.InboundCall, endpoint string, f func()) {
+func receiveCallNoArgs(s *server, call *tchannel.InboundCall, endpoint string, f func()) {
 	var reqHeaders []byte
 	if err := tchannel.NewArgReader(call.Arg2Reader()).ReadJSON(&reqHeaders); err != nil {
 		s.ringpop.logger.WithFields(log.Fields{
@@ -264,7 +264,7 @@ func receiveCallNoArgs(s *ringpopServer, call *tchannel.InboundCall, endpoint st
 	}
 }
 
-func (s *ringpopServer) adminDebugSetHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (s *server) adminDebugSetHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if s.channel.Closed() {
 		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")
@@ -275,7 +275,7 @@ func (s *ringpopServer) adminDebugSetHandler(ctx context.Context, call *tchannel
 	})
 }
 
-func (s *ringpopServer) adminDebugClearHandler(ctx context.Context, call *tchannel.InboundCall) {
+func (s *server) adminDebugClearHandler(ctx context.Context, call *tchannel.InboundCall) {
 	if s.channel.Closed() {
 		s.ringpop.logger.WithField("local", s.ringpop.WhoAmI()).
 			Error("[ringpop] got call while channel closed!")

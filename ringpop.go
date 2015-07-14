@@ -87,14 +87,14 @@ type Ringpop struct {
 
 	// membership
 	ring                   *hashRing
-	dissemination          *dissemination
 	membership             *membership
 	membershipIter         *membershipIter
 	membershipUpdateRollup *membershipUpdateRollup
 
 	// gossip
-	suspicion *suspicion
-	gossip    *gossip
+	suspicion     *suspicion
+	gossip        *gossip
+	dissemination *dissemination
 
 	// statsd
 	statsd       statsd.Statsd
@@ -229,7 +229,7 @@ func (rp *Ringpop) Destroy() {
 // listenAndServe registers ringpop's endpoints with its channel and then sets up
 // the server
 func (rp *Ringpop) listenAndServe() error {
-	s, err := newRingpopServer(rp)
+	s, err := newServer(rp)
 	if err != nil {
 		return err
 	}

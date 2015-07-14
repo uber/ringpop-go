@@ -6,12 +6,10 @@ import (
 	"math"
 	"sync"
 
-	"golang.org/x/net/context"
-
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel/golang/json"
 )
 
 // A joiner joins a ringpop to a (existing?) cluster
@@ -323,10 +321,9 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 	for _, node := range group {
 		wg.Add(1)
 		go func(n string) {
-			ctx, cancel := tchannel.NewContext(j.timeout)
+			ctx, cancel := json.NewContext(j.timeout)
 			defer cancel()
 			errC := make(chan error)
-			defer close(errC)
 
 			// attemp a join
 			go j.joinNode(ctx, n, errC)
@@ -374,31 +371,9 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 	return nodesJoined, nodesFailed
 }
 
-func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
-	// begin call
-	call, err := j.ringpop.channel.BeginCall(ctx, node, "ringpop", "/protocol/join", nil)
-	if err != nil {
-		j.ringpop.logger.WithFields(log.Fields{
-			"local":   j.ringpop.WhoAmI(),
-			"remote":  node,
-			"service": "join-send",
-			"error":   err,
-		}).Debug("[ringpop] could not begin call to remote member")
-		errC <- err
-		return
-	}
-
-	// send request
-	var reqHeaders headers
-	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-		j.ringpop.logger.WithFields(log.Fields{
-			"local":   j.ringpop.WhoAmI(),
-			"service": "join-send",
-			"error":   err,
-		}).Debug("[ringpop] could not write request headers")
-		errC <- err
-		return
-	}
+func (j *joiner) joinNode(ctx json.Context, node string, errC chan error) {
+	defer close(errC)
+	peer := j.ringpop.channel.Peers().GetOrAdd(node)
 
 	reqBody := joinBody{
 		App:         j.ringpop.app,
@@ -406,37 +381,16 @@ func (j *joiner) joinNode(ctx context.Context, node string, errC chan error) {
 		Incarnation: j.ringpop.membership.localMember.Incarnation,
 		Timeout:     j.timeout,
 	}
-	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
-		j.ringpop.logger.WithFields(log.Fields{
-			"local":   j.ringpop.WhoAmI(),
-			"service": "join-send",
-			"error":   err,
-		}).Debug("[ringpop] could not write request body")
-		errC <- err
-		return
-	}
-
-	// get response
-	var resHeaders headers
-	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
-		j.ringpop.logger.WithFields(log.Fields{
-			"local":   j.ringpop.WhoAmI(),
-			"service": "join-send",
-			"error":   err,
-		}).Debug("[ringpop] could not read response headers")
-		errC <- err
-		return
-	}
 
 	var resBody joinResBody
-	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
+	err := json.CallPeer(ctx, peer, "ringpop", "/protocol/join", reqBody, &resBody)
+	if err != nil {
 		j.ringpop.logger.WithFields(log.Fields{
 			"local":   j.ringpop.WhoAmI(),
 			"service": "join-send",
 			"error":   err,
-		}).Debug("[ringpop] could not read response body")
+		}).Debug("[ringpop] could not complete join")
 		errC <- err
-		return
 	}
 
 	// update membership if call was successful

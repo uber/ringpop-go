@@ -4,10 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"golang.org/x/net/context"
-
 	log "github.com/Sirupsen/logrus"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel/golang/json"
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -52,7 +50,10 @@ func newPingSender(ringpop *Ringpop, address string, timeout time.Duration) *pin
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (p *pingSender) sendPing() (*pingBody, error) {
-	ctx, cancel := tchannel.NewContext(p.timeout)
+	// ctx, cancel := tchannel.NewContext(p.timeout)
+	// defer cancel()
+
+	ctx, cancel := json.NewContext(p.timeout)
 	defer cancel()
 
 	errC := make(chan error)
@@ -74,33 +75,9 @@ func (p *pingSender) sendPing() (*pingBody, error) {
 	}
 }
 
-func (p *pingSender) send(ctx context.Context, resBody *pingBody, errC chan error) {
+func (p *pingSender) send(ctx json.Context, resBody *pingBody, errC chan<- error) {
 	defer close(errC)
-
-	// begin call
-	call, err := p.ringpop.channel.BeginCall(ctx, p.address, "ringpop", "/protocol/ping", nil)
-	if err != nil {
-		p.ringpop.logger.WithFields(log.Fields{
-			"local":   p.ringpop.WhoAmI(),
-			"remote":  p.address,
-			"service": "ping-send",
-			"error":   err,
-		}).Debug("[ringpop] could not begin call")
-		errC <- err
-		return
-	}
-
-	// send request
-	var reqHeaders headers
-	if err := tchannel.NewArgWriter(call.Arg2Writer()).WriteJSON(reqHeaders); err != nil {
-		p.ringpop.logger.WithFields(log.Fields{
-			"local":   p.ringpop.WhoAmI(),
-			"error":   err,
-			"service": "ping-send",
-		}).Debug("[ringpop] could not write request headers")
-		errC <- err
-		return
-	}
+	peer := p.ringpop.channel.Peers().GetOrAdd(p.address)
 
 	reqBody := pingBody{
 		Checksum:          p.ringpop.membership.checksum,
@@ -108,34 +85,15 @@ func (p *pingSender) send(ctx context.Context, resBody *pingBody, errC chan erro
 		Source:            p.ringpop.WhoAmI(),
 		SourceIncarnation: p.ringpop.membership.localMember.Incarnation,
 	}
-	if err := tchannel.NewArgWriter(call.Arg3Writer()).WriteJSON(reqBody); err != nil {
-		p.ringpop.logger.WithFields(log.Fields{
-			"local":   p.ringpop.WhoAmI(),
-			"error":   err,
-			"service": "ping-send",
-		}).Debug("[ringpop] could not write request body")
-		errC <- err
-		return
-	}
 
-	// get response
-	var resHeaders headers
-	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&resHeaders); err != nil {
+	err := json.CallPeer(ctx, peer, "ringpop", "/protocol/ping", reqBody, resBody)
+	if err != nil {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local":   p.ringpop.WhoAmI(),
-			"error":   err,
+			"remote":  p.address,
 			"service": "ping-send",
-		}).Debug("[ringpop] could not read response body")
-		errC <- err
-		return
-	}
-
-	if err := tchannel.NewArgReader(call.Response().Arg3Reader()).ReadJSON(&resBody); err != nil {
-		p.ringpop.logger.WithFields(log.Fields{
-			"local":   p.ringpop.WhoAmI(),
 			"error":   err,
-			"service": "ping-send",
-		}).Debug("[ringpop] could not read response body")
+		}).Debug("[ringpop] ping failed")
 		errC <- err
 		return
 	}
