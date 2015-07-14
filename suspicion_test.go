@@ -86,7 +86,7 @@ func TestSuspectBecomesFaulty(t *testing.T) {
 	member, _ := ringpop.membership.getMemberByAddress("127.0.0.1:3001")
 
 	ringpop.suspicion.start(*member)
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 
 	assert.Equal(t, FAULTY, member.Status, "expected suspicion to make member faulty")
 
@@ -97,7 +97,7 @@ func TestSuspectBecomesFaulty(t *testing.T) {
 	}
 
 	ringpop.suspicion.start(change)
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 
 	assert.Equal(t, FAULTY, member.Status, "expected suspicion to make member faulty")
 }
