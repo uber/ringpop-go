@@ -14,7 +14,7 @@ import (
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func TestChecksumChanges(t *testing.T) {
+func TestMembershipChecksumChanges(t *testing.T) {
 	// testPop makes the local member alive
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()

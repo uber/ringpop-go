@@ -2,23 +2,12 @@ package ringpop
 
 import (
 	"bytes"
-	"fmt"
 	"ringpop/rbtree"
 	"sort"
 	"sync"
 
 	"github.com/dgryski/go-farm"
 )
-
-// Wrapper for farm.Hash32
-// if off is < 0, do not append off to the end
-func farmhash32(address string, off int) uint32 {
-	hashstr := address
-	if off >= 0 {
-		hashstr = fmt.Sprintf("%s%v", address, off)
-	}
-	return farm.Hash32([]byte(hashstr))
-}
 
 func offsetFarmHash32(b []byte, off int) uint32 {
 	b = append(b, byte(off))
@@ -76,7 +65,7 @@ func (r *hashRing) addServer(address string) {
 	r.servers[address] = true
 	// insert replications into ring
 	for i := 0; i < r.replicaPoints; i++ {
-		r.tree.Insert(int(farmhash32(address, i)), address)
+		r.tree.Insert(int(offsetFarmHash32([]byte(address), i)), address)
 	}
 	r.lock.Unlock()
 
@@ -95,7 +84,7 @@ func (r *hashRing) removeServer(address string) {
 	delete(r.servers, address)
 	// remove replications from ring
 	for i := 0; i < r.replicaPoints; i++ {
-		r.tree.Delete(int(farmhash32(address, i)))
+		r.tree.Delete(int(offsetFarmHash32([]byte(address), i)))
 	}
 	r.lock.Unlock()
 
