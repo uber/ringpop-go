@@ -27,7 +27,7 @@ func TestMembershipChecksumChanges(t *testing.T) {
 		"expected checksum to have changed on membership change")
 }
 
-func TestChecksumEqual(t *testing.T) {
+func TestMembershipChecksumEqual(t *testing.T) {
 	incarnation := unixMilliseconds(time.Now())
 
 	ringpop := testPop("127.0.0.1:3000", incarnation, nil)
@@ -48,7 +48,7 @@ func TestChecksumEqual(t *testing.T) {
 }
 
 // Higher incarnation should result in a leave override
-func TestLeaveOverrideHigher(t *testing.T) {
+func TestMembershipLeaveOverrideHigher(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -65,7 +65,7 @@ func TestLeaveOverrideHigher(t *testing.T) {
 	assert.Equal(t, LEAVE, member.Status, "expected member status to be leave")
 }
 
-func TestLeaveOverrideEqual(t *testing.T) {
+func TestMembershipLeaveOverrideEqual(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -83,7 +83,7 @@ func TestLeaveOverrideEqual(t *testing.T) {
 }
 
 // Lower incarnation should not result in a leave override
-func TestLeaveOverrideLower(t *testing.T) {
+func TestMembershipLeaveOverrideLower(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -101,7 +101,7 @@ func TestLeaveOverrideLower(t *testing.T) {
 }
 
 // Attempting to make the local member faulty should not change local member status
-func TestLocalFaultyOverride(t *testing.T) {
+func TestMembershipLocalFaultyOverride(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -119,7 +119,7 @@ func TestLocalFaultyOverride(t *testing.T) {
 }
 
 // Attempting to make the local member faulty should not change local member status
-func TestLocalSuspectOverride(t *testing.T) {
+func TestMembershipLocalSuspectOverride(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -138,7 +138,7 @@ func TestLocalSuspectOverride(t *testing.T) {
 
 // Update method properly handles multiple updates in input
 // Also tests that an update for a never before seen member works for all statuses
-func TestHandleMultipleUpdates(t *testing.T) {
+func TestMembershipHandleMultipleUpdates(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -190,7 +190,7 @@ func TestHandleMultipleUpdates(t *testing.T) {
 }
 
 // A member should be able to go from alive -> faulty immediately without having to be suspect inbetween
-func TestAliveToFaulty(t *testing.T) {
+func TestMembershipAliveToFaulty(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -222,7 +222,7 @@ func TestAliveToFaulty(t *testing.T) {
 	assert.Equal(t, FAULTY, newMember.Status, "expected override with same incarnation number")
 }
 
-func TestString(t *testing.T) {
+func TestMembershipString(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
@@ -233,7 +233,7 @@ func TestString(t *testing.T) {
 	assert.NoError(t, err, "membership should successfully be marshalled into JSON")
 }
 
-func TestLeaveEnds(t *testing.T) {
+func TestMembershipLeaveEnds(t *testing.T) {
 	ringpop := testPop("127.0.0.1:3000", 0, nil)
 	defer ringpop.Destroy()
 
