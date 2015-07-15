@@ -19,10 +19,12 @@ import (
 const (
 	defaultMembershipUpdateFlushInterval = 5000 * time.Millisecond
 	defaultProxyReqTimeout               = 30000 * time.Millisecond
+	defaultProxyMaxRetries               = 3
 )
 
 var (
-	proxyReqProps = []string{"keys", "dest", "req", "res"}
+	proxyReqProps             = []string{"keys", "dest", "req", "res"}
+	defaultProxyRetrySchedule = []time.Duration{3 * time.Millisecond, 6 * time.Millisecond, 12 * time.Millisecond}
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -49,7 +51,7 @@ type Options struct {
 	MembershipUpdateFlushInterval time.Duration
 
 	RequestProxyMaxRetries    int
-	RequestProxyRetrySchedule time.Duration // revist
+	RequestProxyRetrySchedule []time.Duration // revist
 
 	MinProtocolPeriod time.Duration
 	SuspicionTimeout  time.Duration
@@ -82,6 +84,8 @@ type Ringpop struct {
 	pingReqTimeout                time.Duration
 	pingTimeout                   time.Duration
 	proxyReqTimeout               time.Duration
+	proxyRetrySchedule            []time.Duration
+	proxyMaxRetries               int
 	maxJoinDuration               time.Duration
 	membershipUpdateFlushInterval time.Duration
 
@@ -95,6 +99,9 @@ type Ringpop struct {
 	suspicion     *suspicion
 	gossip        *gossip
 	dissemination *dissemination
+
+	// proxy
+	proxy *proxy
 
 	// statsd
 	statsd       statsd.Statsd
@@ -161,11 +168,15 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.pingReqTimeout = time.Millisecond * 5000 // 5000
 
 	// set proxyReqTimeout to option or default value
+	// set proxyReqTimeout to option or default value
 	ringpop.proxyReqTimeout = selectDurationOrDefault(opts.ProxyReqTimeout, defaultProxyReqTimeout)
 
 	ringpop.membershipUpdateFlushInterval = selectDurationOrDefault(
 		opts.MembershipUpdateFlushInterval,
 		defaultMembershipUpdateFlushInterval)
+	ringpop.proxyRetrySchedule = make([]time.Duration, len(defaultProxyRetrySchedule))
+	copy(ringpop.proxyRetrySchedule, defaultProxyRetrySchedule)
+	ringpop.proxyMaxRetries = defaultProxyMaxRetries
 
 	// membership and gossip
 	ringpop.ring = newHashRing(ringpop)
@@ -175,6 +186,8 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 		ringpop.membershipUpdateFlushInterval, 0)
 	ringpop.suspicion = newSuspicion(ringpop, opts.SuspicionTimeout)
 	ringpop.gossip = newGossip(ringpop, 0)
+	ringpop.proxy = newProxy(ringpop, ringpop.proxyRetrySchedule, ringpop.proxyMaxRetries)
+
 	// statsd
 	// changes 0.0.0.0:0000 -> 0_0_0_0_0000
 	ringpop.statKeys = make(map[string]string)
@@ -709,6 +722,63 @@ func (rp *Ringpop) PingMemberNow() error {
 // PingReqNow is for testing
 func (rp *Ringpop) PingReqNow(peer, target string) {
 	sendPingReq(rp, peer, target)
+}
+
+func (rp *Ringpop) validateProps(opts map[string]interface{}, props []string) error {
+	for _, val := range props {
+		if opts[val] == "" {
+			rp.logger.Warn("[ringpop] invalid options for: %s", val)
+			return errors.New("invalid options for proxy")
+		}
+	}
+	return nil
+}
+
+func (rp *Ringpop) proxyReq(opts map[string]interface{}) error {
+	var err error
+
+	if opts != nil {
+		if rp.validateProps(opts, proxyReqProps) != nil {
+			log.Fatal("invalid options for proxy request")
+		}
+		err = rp.proxy.proxyRequest(opts)
+	} else {
+		log.Fatal("specify valid options to proxy the request")
+	}
+	return err
+}
+
+func (rp *Ringpop) handleOrProxy(key string, req *proxyReq, res *proxyReqRes, opts map[string]interface{}) bool {
+	rp.logger.WithFields(log.Fields{
+		"local": rp.WhoAmI(),
+		"url":   req.Header.URL,
+		"key":   key,
+	}).Debug("[ringpop] handleOrProxy for a key received")
+
+	dest, _ := rp.ring.lookup(key)
+
+	if rp.WhoAmI() == dest {
+		rp.logger.WithFields(log.Fields{
+			"key":  key,
+			"dest": dest,
+		}).Debug("[ringpop] handleOrProxy was handled")
+		return true
+	}
+
+	// Proxy
+	rp.logger.WithFields(log.Fields{
+		"key":  key,
+		"dest": dest,
+	}).Debug("[ringpop] handleOrProxy was proxied")
+	opts = map[string]interface{}{
+		"dest": dest,
+		"keys": []string{key},
+		"req":  req,
+		"res":  res,
+	}
+
+	rp.proxyReq(opts)
+	return false
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
