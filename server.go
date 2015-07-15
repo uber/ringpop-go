@@ -11,7 +11,7 @@ import (
 
 type headers map[string]string
 
-type blankArg struct{}
+type arg struct{}
 
 type server struct {
 	ringpop *Ringpop
@@ -87,12 +87,12 @@ func (s *server) pingReqHandler(ctx json.Context, reqBody *pingReqBody) (*pingRe
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (s *server) debugSetHandler(ctx json.Context, arg *blankArg) (res *blankArg, err error) {
+func (s *server) debugSetHandler(ctx json.Context, arg *arg) (res *arg, err error) {
 	s.ringpop.logger.Level = log.DebugLevel
 	return
 }
 
-func (s *server) debugClearHandler(ctx json.Context, arg *blankArg) (res *blankArg, err error) {
+func (s *server) debugClearHandler(ctx json.Context, arg *arg) (res *arg, err error) {
 	s.ringpop.logger.Level = log.InfoLevel
 	return
 }

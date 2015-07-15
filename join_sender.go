@@ -42,12 +42,6 @@ func isSingleNodeCluster(ringpop *Ringpop) bool {
 	return ok && numHosts == 1
 }
 
-func sendJoin(ringpop *Ringpop) ([]string, error) {
-	joiner := newJoiner(ringpop, joinerOptions{})
-	joiner.collectPotentialNodes(nil)
-	return joiner.join()
-}
-
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //	JOINER
@@ -107,9 +101,16 @@ type joiner struct {
 	roundNonPreferredNodes []string
 }
 
-func newJoiner(ringpop *Ringpop, opts joinerOptions) *joiner {
+func newJoiner(ringpop *Ringpop, opts *joinerOptions) (*joiner, error) {
 	if ringpop == nil {
-		return nil
+		return nil, errors.New("ringpop cannot be nil")
+	}
+	if len(ringpop.bootstrapHosts) == 0 {
+		return nil, errors.New("bootstrap hosts cannot be empty")
+	}
+
+	if opts == nil {
+		opts = &joinerOptions{}
 	}
 
 	joiner := &joiner{
@@ -130,7 +131,7 @@ func newJoiner(ringpop *Ringpop, opts joinerOptions) *joiner {
 	joinSize := selectNumOrDefault(opts.joinSize, defaultJoinSize)
 	joiner.joinSize = int(math.Min(float64(joinSize), float64(len(joiner.potentialNodes))))
 
-	return joiner
+	return joiner, nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -290,9 +291,9 @@ func (j *joiner) join() ([]string, error) {
 				"startTime":       startTime,
 			}).Warn("[ringpop] max join duration exceeded")
 
-			message := fmt.Sprintf("Join duration of %v exceeded max %v.",
+			err := fmt.Errorf("join duration of %v exceeded max %v",
 				joinDuration, j.maxJoinDuration)
-			return nodesJoined, errors.New(message)
+			return nodesJoined, err
 		}
 
 		j.ringpop.logger.WithFields(log.Fields{
@@ -396,4 +397,19 @@ func (j *joiner) joinNode(ctx json.Context, node string, errC chan error) {
 	// update membership if call was successful
 	j.ringpop.membership.update(resBody.Membership)
 	errC <- nil
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	METHODS
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func sendJoin(ringpop *Ringpop, opts *joinerOptions) ([]string, error) {
+	joiner, err := newJoiner(ringpop, opts)
+	if err != nil {
+		return nil, err
+	}
+	joiner.collectPotentialNodes(nil)
+	return joiner.join()
 }

@@ -1,13 +1,16 @@
 package ringpop
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"regexp"
 	"strings"
+	"testing"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 	"github.com/uber/tchannel/golang"
 )
 
@@ -75,6 +78,55 @@ func selectDurationOrDefault(opt, def time.Duration) time.Duration {
 		return def
 	}
 	return opt
+}
+
+func genNodes(from, to int) []string {
+	var hosts []string
+	for i := from; i <= to; i++ {
+		hosts = append(hosts, fmt.Sprintf("127.0.0.1:%v", 3000+i))
+	}
+
+	return hosts
+}
+
+func genNodesDiffHosts(from, to int) []string {
+	var hosts []string
+	for i := from; i <= to; i++ {
+		hosts = append(hosts, fmt.Sprintf("127.0.0.%v:3001", i))
+	}
+
+	return hosts
+}
+
+func genRingpops(t *testing.T, hostports []string) []*Ringpop {
+	var ringpops []*Ringpop
+
+	for _, hostport := range hostports {
+		ringpop := newServerRingpop(t, hostport)
+		ringpops = append(ringpops, ringpop)
+	}
+
+	return ringpops
+}
+
+func destroyRingpops(ringpops []*Ringpop) {
+	for _, ringpop := range ringpops {
+		ringpop.Destroy()
+	}
+}
+
+func newServerRingpop(t *testing.T, hostport string) *Ringpop {
+	channel, err := tchannel.NewChannel("ringpop", nil)
+	require.NoError(t, err, "error must be nil")
+
+	logger := log.New()
+	logger.Out = ioutil.Discard
+
+	ringpop := NewRingpop("test", hostport, channel, &Options{
+		Logger: logger,
+	})
+
+	return ringpop
 }
 
 func testPop(hostport string, incarnation int64, opts *Options) *Ringpop {

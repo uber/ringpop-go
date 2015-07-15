@@ -240,8 +240,26 @@ func (rp *Ringpop) listenAndServe() error {
 // BootstrapOptions provieds options to bootstrap ringpop with. The bootstrapper
 // will prioritize a slice of given hosts over a file if both are provided.
 type BootstrapOptions struct {
+	// Hosts to bootstrap with
 	Hosts []string
-	File  string
+
+	// File containg json array of hosts
+	File string
+
+	// Whether or not gossip stopped
+	Stopped bool
+
+	// Join timeout
+	Timeout time.Duration
+
+	// Maximum time to attempt joins
+	MaxJoinDuration time.Duration
+
+	// number of nodes to attempt to join
+	ParallelismFactor int
+
+	// number of nodes to join
+	JoinSize int
 }
 
 // Bootstrap seeds the hash ring, joins nodes in the seed list, and then starts
@@ -249,9 +267,8 @@ type BootstrapOptions struct {
 // the nodes joined to the ringpop and a nil error, or a nil slice and an error
 // if the bootstrap failed.
 func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
-	var o *BootstrapOptions
-	if o = opts; opts == nil {
-		o = &BootstrapOptions{}
+	if opts == nil {
+		opts = &BootstrapOptions{}
 	}
 
 	// set up channel
@@ -260,7 +277,7 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		return nil, err
 	}
 
-	if err := rp.seedBootstrapHosts(o); err != nil {
+	if err := rp.seedBootstrapHosts(opts); err != nil {
 		return nil, fmt.Errorf("could not seed bootstrap hosts: %v", err)
 	}
 
@@ -277,7 +294,14 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	// make self alive
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()))
 
-	nodesJoined, err := sendJoin(rp)
+	joinOpts := &joinerOptions{
+		timeout:           opts.Timeout,
+		joinSize:          opts.JoinSize,
+		maxJoinDuration:   opts.MaxJoinDuration,
+		parallelismFactor: opts.ParallelismFactor,
+	}
+
+	nodesJoined, err := sendJoin(rp, joinOpts)
 	if err != nil {
 		rp.logger.WithFields(log.Fields{
 			"err":     err.Error(),
@@ -292,7 +316,9 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		return nil, errors.New(message)
 	}
 
-	rp.gossip.start()
+	if !opts.Stopped {
+		rp.gossip.start()
+	}
 	rp.ready = true
 	rp.emit("ready")
 
@@ -599,7 +625,7 @@ func (rp *Ringpop) handleChanges(changes []Change) {
 	}
 
 	if membershipChanged {
-
+		rp.emit("membershipChanged")
 	}
 
 	if ringChanged {
