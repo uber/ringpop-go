@@ -2,6 +2,7 @@ package ringpop
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -20,6 +21,14 @@ type pingReqErr struct {
 	err     error
 }
 
+func (p pingReqErr) Error() string {
+	msg := "could not ping-req"
+	if p.badPing {
+		msg = "remote ping failed"
+	}
+	return fmt.Sprintf("%s, %s", p.err.Error(), msg)
+}
+
 type pingReqBody struct {
 	Source            string   `json:"source"`
 	SourceIncarnation int64    `json:"sourceIncarnation"`
@@ -34,10 +43,6 @@ type pingReqRes struct {
 	Target     string   `json:"target"`
 	Changes    []Change `json:"changes"`
 	PingStatus bool     `json:"pingStatus"`
-}
-
-func (p *pingReqErr) Error() string {
-	return p.err.Error()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
