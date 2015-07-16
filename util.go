@@ -123,7 +123,7 @@ func newServerRingpop(t *testing.T, hostport string) *Ringpop {
 	logger.Out = ioutil.Discard
 
 	ringpop := NewRingpop("test", hostport, channel, &Options{
-		Logger: logger,
+	// Logger: logger,
 	})
 
 	return ringpop

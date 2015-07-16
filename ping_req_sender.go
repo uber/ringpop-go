@@ -175,7 +175,7 @@ func sendPingReqs(ringpop *Ringpop, target Member, size int) {
 	}
 
 	if len(pingReqMembers) == 0 {
-		return //errors.New("no selectable ping-req members")
+		return
 	}
 
 	var wg sync.WaitGroup

@@ -697,7 +697,6 @@ func (rp *Ringpop) PingMemberNow() error {
 
 	rp.pinging = false
 	rp.membership.update(res.Changes)
-	// TODO
 
 	rp.logger.WithFields(log.Fields{
 		"local":  rp.WhoAmI(),

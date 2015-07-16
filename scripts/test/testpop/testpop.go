@@ -33,7 +33,10 @@ func main() {
 		Logger: logger,
 	})
 
-	nodesJoined, err := rp.Bootstrap(&ringpop.BootstrapOptions{File: "./testpop/hosts.json"}, true)
+	nodesJoined, err := rp.Bootstrap(&ringpop.BootstrapOptions{
+		File:    "./testpop/hosts.json",
+		Stopped: false,
+	})
 	if err != nil {
 		return
 	}
