@@ -26,3 +26,9 @@ TChannel is the transport of choice for ringpop's gossip and proxying capabiliti
 
 ## Developer's Guide
 Coming soon™.
+
+## Installation
+```
+go get github.com/uber/ringpop-go
+godep go test
+```

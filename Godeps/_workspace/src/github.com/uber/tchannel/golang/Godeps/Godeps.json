@@ -1,0 +1,45 @@
+{
+	"ImportPath": "github.com/uber/tchannel/golang",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/apache/thrift/lib/go/thrift",
+			"Rev": "211b82de11c3c5bb83f669a95373b3ea6601d666"
+		},
+		{
+			"ImportPath": "github.com/cactus/go-statsd-client/statsd",
+			"Comment": "v2.0.1",
+			"Rev": "e2d8818d10f59a279d5a97778c1c4ecdbcd5c9df"
+		},
+		{
+			"ImportPath": "github.com/samuel/go-thrift/parser",
+			"Rev": "cc9ca8d18368623fde7aaf35a8a6a32feafd7f51"
+		},
+		{
+			"ImportPath": "github.com/stretchr/objx",
+			"Rev": "cbeaeb16a013161a98496fad62933b1d21786672"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.0-12-g7e4a149",
+			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/mock",
+			"Comment": "v1.0-12-g7e4a149",
+			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Comment": "v1.0-12-g7e4a149",
+			"Rev": "7e4a149930b09fe4c2b134c50ce637457ba6e966"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "b6fdb7d8a4ccefede406f8fe0f017fb58265054c"
+		}
+	]
+}
