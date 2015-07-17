@@ -6,7 +6,7 @@ func isAliveOverride(member *Member, change Change) bool {
 
 func isFaultyOverride(member *Member, change Change) bool {
 	return change.Status == FAULTY &&
-		((member.Status == SUSPECT && change.Incarnation >= member.Incarnation) ||
+		((member.Status == SUSPECT && change.Incarnation > member.Incarnation) ||
 			(member.Status == FAULTY && change.Incarnation > member.Incarnation) ||
 			(member.Status == ALIVE && change.Incarnation >= member.Incarnation))
 }
