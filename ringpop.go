@@ -168,7 +168,6 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.pingReqTimeout = time.Millisecond * 5000 // 5000
 
 	// set proxyReqTimeout to option or default value
-	// set proxyReqTimeout to option or default value
 	ringpop.proxyReqTimeout = selectDurationOrDefault(opts.ProxyReqTimeout, defaultProxyReqTimeout)
 
 	ringpop.membershipUpdateFlushInterval = selectDurationOrDefault(
