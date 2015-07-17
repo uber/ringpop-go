@@ -1,8 +1,8 @@
 # TEST USAGE
 
-First `go build` both `go_go_gadget_ringpops.go` and `testpop.go`.
+First `go build ./...`
 
-Do `./test -n x` where x is the number of ringpop instances to start on execution of the program.
+Then `./test -n x` where x is the number of ringpop instances to start on execution of the program.
 
 During execution the following commands are available to you:
 
