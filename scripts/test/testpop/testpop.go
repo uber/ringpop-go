@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
+	ringpop "github.com/uber/ringpop-go"
 	"regexp"
-	"ringpop"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel/golang"

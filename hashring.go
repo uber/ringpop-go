@@ -2,7 +2,7 @@ package ringpop
 
 import (
 	"bytes"
-	"ringpop/rbtree"
+	"github.com/uber/ringpop-go/rbtree"
 	"sort"
 	"sync"
 
