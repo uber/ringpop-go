@@ -34,7 +34,7 @@ func newServer(ringpop *Ringpop) (*server, error) {
 		"/protocol/join":     s.joinHandler,
 		"/protocol/ping":     s.pingHandler,
 		"/protocol/ping-req": s.pingReqHandler,
-		"/proxy/req":         s.proxyReqHandler,
+		"/forward/req":       s.forwardReqHandler,
 	}
 
 	// register handlers
@@ -82,8 +82,8 @@ func (s *server) pingReqHandler(ctx json.Context, reqBody *pingReqBody) (*pingRe
 	return &resBody, nil
 }
 
-func (s *server) proxyReqHandler(ctx json.Context, req *proxyReq) (*proxyReqRes, error) {
-	resBody := handleProxyRequest(s.ringpop, ctx.Headers().(*proxyReqHeader), req)
+func (s *server) forwardReqHandler(ctx json.Context, req *forwardReq) (*forwardReqRes, error) {
+	resBody := handleForwardRequest(s.ringpop, ctx.Headers().(*forwardReqHeader), req)
 	return &resBody, nil
 }
 

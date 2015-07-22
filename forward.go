@@ -12,11 +12,11 @@ import (
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	REQUEST PROXY
+//	REQUEST FORWARD
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type proxy struct {
+type forwarder struct {
 	ringpop       *Ringpop
 	retrySchedule []time.Duration
 	maxRetries    int
@@ -24,8 +24,8 @@ type proxy struct {
 	endpoint      string
 }
 
-func newProxy(ringpop *Ringpop, retrySchedule []time.Duration, maxRetries int) *proxy {
-	p := &proxy{
+func newForwarder(ringpop *Ringpop, retrySchedule []time.Duration, maxRetries int) *forwarder {
+	p := &forwarder{
 		ringpop:       ringpop,
 		retrySchedule: retrySchedule,
 		maxRetries:    maxRetries,
@@ -40,17 +40,17 @@ func newProxy(ringpop *Ringpop, retrySchedule []time.Duration, maxRetries int) *
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (p *proxy) proxyRequest(opts map[string]interface{}) error {
+func (p *forwarder) forwardRequest(opts map[string]interface{}) error {
 	var ringpop = p.ringpop
 	var dest = opts["dest"].(string)
-	var req = opts["req"].(*proxyReq)
+	var req = opts["req"].(*forwardReq)
 	var keys = opts["keys"].([]string)
 
 	var endpoint string
 	if opts["endpoint"] != nil {
 		endpoint = opts["endpoint"].(string)
 	} else {
-		endpoint = "/proxy/req"
+		endpoint = "/forward/req"
 	}
 
 	var timeout time.Duration
@@ -58,7 +58,7 @@ func (p *proxy) proxyRequest(opts map[string]interface{}) error {
 		temp, _ := strconv.Atoi(opts["timeout"].(string))
 		timeout = time.Duration(temp)
 	} else {
-		timeout = ringpop.proxyReqTimeout
+		timeout = ringpop.forwardReqTimeout
 	}
 
 	cOpts := newChannelOpts(dest, keys, endpoint, timeout)
@@ -66,23 +66,23 @@ func (p *proxy) proxyRequest(opts map[string]interface{}) error {
 	ringpop.logger.WithFields(log.Fields{
 		"local":  ringpop.WhoAmI(),
 		"target": cOpts.host,
-	}).Debug("[ringpop] proxy-req recieve")
+	}).Debug("[ringpop] forward-req recieve")
 
-	_, err := sendProxyRequest(ringpop, cOpts, req)
+	_, err := forwardRequest(ringpop, cOpts, req)
 
 	ringpop.logger.WithFields(log.Fields{
 		"local": ringpop.WhoAmI(),
 		"isOK":  err == nil,
-	}).Debug("[ringpop] proxy-req complete")
+	}).Debug("[ringpop] forward-req complete")
 
 	return err
 }
 
 // TODO: Revisit and Fix this once we have some tests
-func handleProxyRequest(ringpop *Ringpop, headers *proxyReqHeader, pReq *proxyReq) proxyReqRes {
-	ringpop.stat("increment", "proxy-req", 1)
+func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *forwardReq) forwardReqRes {
+	ringpop.stat("increment", "forward-req", 1)
 
-	var res proxyReqRes
+	var res forwardReqRes
 	var err error
 	var resp *http.Response
 
@@ -91,7 +91,7 @@ func handleProxyRequest(ringpop *Ringpop, headers *proxyReqHeader, pReq *proxyRe
 	if checksum != ringpop.membership.checksum {
 		ringpop.logger.WithFields(log.Fields{
 			"local": ringpop.WhoAmI(),
-		}).Debug("[ringpop] proxy-req checksums differ")
+		}).Debug("[ringpop] forward-req checksums differ")
 		return res
 	}
 
@@ -121,10 +121,10 @@ func handleProxyRequest(ringpop *Ringpop, headers *proxyReqHeader, pReq *proxyRe
 	ringpop.logger.WithFields(log.Fields{
 		"local": ringpop.WhoAmI(),
 		"isOK":  err == nil,
-	}).Debug("[ringpop] proxy-req complete")
+	}).Debug("[ringpop] forward-req complete")
 
 	jHeaders, _ := json.Marshal(headers)
-	resBody := proxyReqRes{
+	resBody := forwardReqRes{
 		StatusCode: resp.StatusCode,
 		Headers:    string(jHeaders),
 	}

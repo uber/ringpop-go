@@ -14,38 +14,38 @@ import (
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type proxyReqErr struct {
-	badProxy bool
-	err      error
+type forwardReqErr struct {
+	badForward bool
+	err        error
 }
 
-type proxyReqHeader struct {
+type forwardReqHeader struct {
 	URL      string   `json:"url"`
 	Checksum uint32   `json:"checksum"`
 	Keys     []string `json:"keys"`
 }
 
-type proxyReqBody struct {
+type forwardReqBody struct {
 	body []byte
 }
 
-type proxyReq struct {
-	Header proxyReqHeader
-	Body   proxyReqBody
+type forwardReq struct {
+	Header forwardReqHeader
+	Body   forwardReqBody
 }
 
-type proxyReqRes struct {
+type forwardReqRes struct {
 	StatusCode int    `json:"statusCode"`
 	Headers    string `json:"headers"`
 }
 
-func (p *proxyReqErr) Error() string {
+func (p *forwardReqErr) Error() string {
 	return p.err.Error()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-// PROXY REQ SENDER
+// FORWARD REQ SENDER
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 type channelOpts struct {
@@ -55,24 +55,18 @@ type channelOpts struct {
 	endpoint string
 }
 
-type proxyOpts struct {
-	channelOpts *channelOpts
-	req         *proxyReq
-	res         *proxyReqRes
-}
-
-type proxyReqSender struct {
+type forwardReqSender struct {
 	ringpop        *Ringpop
 	cOpts          *channelOpts
-	req            *proxyReq
+	req            *forwardReq
 	numRetries     int
 	reqStartTime   time.Duration
 	retryStartTime time.Time
 	timeout        time.Duration
 }
 
-func newProxyReqSender(ringpop *Ringpop, opts *channelOpts, timeout time.Duration, req *proxyReq) *proxyReqSender {
-	p := &proxyReqSender{
+func newForwardReqSender(ringpop *Ringpop, opts *channelOpts, timeout time.Duration, req *forwardReq) *forwardReqSender {
+	p := &forwardReqSender{
 		ringpop: ringpop,
 		cOpts:   opts,
 		req:     req,
@@ -93,8 +87,8 @@ func newChannelOpts(host string, keys []string, endpoint string, timeout time.Du
 	return p
 }
 
-func newProxyReqHeader(host string, keys []string, checksum uint32) *proxyReqHeader {
-	p := &proxyReqHeader{
+func newForwardReqHeader(host string, keys []string, checksum uint32) *forwardReqHeader {
+	p := &forwardReqHeader{
 		URL:      host,
 		Checksum: checksum,
 	}
@@ -106,34 +100,34 @@ func newProxyReqHeader(host string, keys []string, checksum uint32) *proxyReqHea
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-// PROXY REQ SENDER METHODS
+// FORWARD REQ SENDER METHODS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func (p *proxyReqSender) rerouteRetry(dest string) (proxyReqRes, error) {
+func (p *forwardReqSender) rerouteRetry(dest string) (forwardReqRes, error) {
 	p.ringpop.logger.WithFields(log.Fields{
 		"local":  p.ringpop.WhoAmI(),
 		"remote": dest,
-	}).Debug("[ringpop] request proxy rerouted")
+	}).Debug("[ringpop] request forward rerouted")
 
-	p.ringpop.emit("requestProxy.retryRerouted")
+	p.ringpop.emit("requestForward.retryRerouted")
 
 	if dest == p.ringpop.WhoAmI() {
-		p.ringpop.stat("increment", "requestProxy.retry.reroute.local", 1)
-		return handleProxyRequest(
+		p.ringpop.stat("increment", "requestForward.retry.reroute.local", 1)
+		return handleForwardRequest(
 			p.ringpop,
-			newProxyReqHeader(p.cOpts.host, p.cOpts.keys, p.ringpop.membership.checksum),
+			newForwardReqHeader(p.cOpts.host, p.cOpts.keys, p.ringpop.membership.checksum),
 			p.req), nil
 	}
 
-	p.ringpop.stat("increment", "requestProxy.retry.reroute.remote", 1)
+	p.ringpop.stat("increment", "requestForward.retry.reroute.remote", 1)
 
 	pnew := newChannelOpts(dest, p.cOpts.keys, p.cOpts.endpoint, p.cOpts.timeout)
 
-	return sendProxyRequest(p.ringpop, pnew, p.req)
+	return forwardRequest(p.ringpop, pnew, p.req)
 }
 
-func (p *proxyReqSender) lookupKeys(keys []string) []string {
+func (p *forwardReqSender) lookupKeys(keys []string) []string {
 	var dests []string
 
 	for _, key := range keys {
@@ -143,7 +137,7 @@ func (p *proxyReqSender) lookupKeys(keys []string) []string {
 	return dests
 }
 
-func (p *proxyReqSender) attemptRetry(errC chan<- error) {
+func (p *forwardReqSender) attemptRetry(errC chan<- error) {
 	p.numRetries++
 
 	var err error
@@ -152,20 +146,20 @@ func (p *proxyReqSender) attemptRetry(errC chan<- error) {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local": p.ringpop.WhoAmI(),
 			"host":  p.cOpts.host,
-		}).Debug("[ringpop] request proxy retry aborted")
-		p.ringpop.emit("requestProxy.retryAborted")
+		}).Debug("[ringpop] request forward retry aborted")
+		p.ringpop.emit("requestForward.retryAborted")
 		err = errors.New("retry aborted")
 		errC <- err
 		return
 	}
-	p.ringpop.stat("increment", "requestProxy.retry.attempted", 1)
-	p.ringpop.emit("requestProxy.retryAttempted")
+	p.ringpop.stat("increment", "requestForward.retry.attempted", 1)
+	p.ringpop.emit("requestForward.retryAttempted")
 
 	newDest := dests[0]
 
 	// If nothing rebalanced, just try sending once again
 	if newDest == p.cOpts.host {
-		_, err = p.sendProxyReq()
+		_, err = p.forwardReq()
 		errC <- err
 		return
 	}
@@ -176,46 +170,46 @@ func (p *proxyReqSender) attemptRetry(errC chan<- error) {
 	return
 }
 
-func (p *proxyReqSender) scheduleRetry(errC chan<- error) {
+func (p *forwardReqSender) scheduleRetry(errC chan<- error) {
 	if p.numRetries == 0 {
 		p.retryStartTime = time.Now()
 	}
 	attemptErrC := make(chan error)
 
 	// sleep for the specified delay time
-	delay := p.ringpop.proxyRetrySchedule[p.numRetries]
+	delay := p.ringpop.forwardRetrySchedule[p.numRetries]
 
 	time.Sleep(delay)
 
 	go p.attemptRetry(attemptErrC)
-	p.ringpop.emit("requestProxy.retryScheduled")
+	p.ringpop.emit("requestForward.retryScheduled")
 
 	select {
-	case err := <-attemptErrC: // proxy-req succeeded or failed
+	case err := <-attemptErrC: // forward-req succeeded or failed
 		errC <- err
 		return
 	}
 }
 
-func (p *proxyReqSender) sendProxyReq() (proxyReqRes, error) {
+func (p *forwardReqSender) forwardReq() (forwardReqRes, error) {
 	ctx, cancel := json.NewContext(p.timeout)
 	defer cancel()
 
-	headers := newProxyReqHeader(p.cOpts.host, p.cOpts.keys, p.ringpop.membership.checksum)
+	headers := newForwardReqHeader(p.cOpts.host, p.cOpts.keys, p.ringpop.membership.checksum)
 	ctx = json.WithHeaders(ctx, headers)
 
 	var err error
 	errC := make(chan error)
 
-	var resBody proxyReqRes
+	var resBody forwardReqRes
 
-	// send proxy-req
+	// send forward-req
 	go p.send(ctx, &resBody, errC)
 	// wait for response
 	select {
-	case err = <-errC: // proxy-req succeeded or failed
+	case err = <-errC: // forward-req succeeded or failed
 		if err != nil {
-			if p.numRetries < p.ringpop.proxyMaxRetries {
+			if p.numRetries < p.ringpop.forwardMaxRetries {
 				retryErr := make(chan error)
 				go p.scheduleRetry(retryErr)
 
@@ -232,23 +226,23 @@ func (p *proxyReqSender) sendProxyReq() (proxyReqRes, error) {
 		}
 		return resBody, err
 
-	case <-ctx.Done(): // proxy-req timed out
-		return resBody, errors.New("proxy-req timed out")
+	case <-time.After(p.timeout): // forward-req timed out
+		return resBody, errors.New("forward-req timed out")
 	}
 }
 
-func (p *proxyReqSender) send(ctx json.Context, resBody *proxyReqRes, errC chan<- error) {
+func (p *forwardReqSender) send(ctx json.Context, resBody *forwardReqRes, errC chan<- error) {
 	defer close(errC)
 	peer := p.ringpop.channel.Peers().GetOrAdd(p.cOpts.host)
 
-	err := json.CallPeer(ctx, peer, "ringpop", "/proxy/req", p.req, resBody)
+	err := json.CallPeer(ctx, peer, "ringpop", "/forward/req", p.req, resBody)
 	if err != nil {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local":   p.ringpop.WhoAmI(),
 			"host":    p.cOpts.host,
-			"service": "proxy-req",
+			"service": "forward-req",
 			"error":   err,
-		}).Debug("[ringpop] proxy-req failed")
+		}).Debug("[ringpop] forward-req failed")
 
 		errC <- err
 		return
@@ -263,25 +257,25 @@ func (p *proxyReqSender) send(ctx json.Context, resBody *proxyReqRes, errC chan<
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func sendProxyRequest(ringpop *Ringpop, opts *channelOpts, reqBody *proxyReq) (proxyReqRes, error) {
+func forwardRequest(ringpop *Ringpop, opts *channelOpts, reqBody *forwardReq) (forwardReqRes, error) {
 	var err error
-	var res proxyReqRes
+	var res forwardReqRes
 
 	go func() {
-		p := newProxyReqSender(ringpop, opts, ringpop.proxyReqTimeout, reqBody)
+		p := newForwardReqSender(ringpop, opts, ringpop.forwardReqTimeout, reqBody)
 
 		p.ringpop.logger.WithFields(log.Fields{
 			"local": p.ringpop.WhoAmI(),
 			"opts":  p.cOpts,
-		}).Debug("[ringpop] proxy-req send")
+		}).Debug("[ringpop] forward-req send")
 
-		res, err = p.sendProxyReq()
+		res, err = p.forwardReq()
 	}()
 	if err != nil {
 		ringpop.logger.WithFields(log.Fields{
 			"statusCode": res.StatusCode,
 			"err":        err,
-		}).Warn("[ringpop] proxy-req response received")
+		}).Warn("[ringpop] forward-req response received")
 	}
 
 	return res, err
