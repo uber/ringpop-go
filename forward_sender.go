@@ -14,11 +14,6 @@ import (
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-type forwardReqErr struct {
-	badForward bool
-	err        error
-}
-
 type forwardReqHeader struct {
 	URL      string   `json:"url"`
 	Checksum uint32   `json:"checksum"`
@@ -37,10 +32,6 @@ type forwardReq struct {
 type forwardReqRes struct {
 	StatusCode int    `json:"statusCode"`
 	Headers    string `json:"headers"`
-}
-
-func (p *forwardReqErr) Error() string {
-	return p.err.Error()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

@@ -20,8 +20,6 @@ type forwarder struct {
 	ringpop       *Ringpop
 	retrySchedule []time.Duration
 	maxRetries    int
-	keys          []string
-	endpoint      string
 }
 
 func newForwarder(ringpop *Ringpop, retrySchedule []time.Duration, maxRetries int) *forwarder {
