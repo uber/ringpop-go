@@ -46,6 +46,19 @@ func newReplicator(ringpop *Ringpop, nReplicas int, rValue int, wValue int) *rep
 	return r
 }
 
+func newReplicaOpts(keys []string, req *forwardReq, rValue int, wValue int, nReplicas int, timeout time.Duration) *replicaOpts {
+	r := &replicaOpts{
+		req:       req,
+		rValue:    rValue,
+		wValue:    wValue,
+		nReplicas: nReplicas,
+		timeout:   timeout,
+	}
+
+	r.keys = make([]string, len(keys))
+	copy(r.keys, keys)
+	return r
+}
 func groupReplicas(ringpop *Ringpop, nValue int, keys []string) map[string]string {
 	var replicas = make(map[string]string)
 
@@ -61,7 +74,7 @@ func groupReplicas(ringpop *Ringpop, nValue int, keys []string) map[string]strin
 	return replicas
 }
 
-func (r *replicator) handleOp(dest string, key string, req *forwardReq, res *forwardReqRes, errC chan<- error, sC chan<- int) {
+func (r *replicator) handleOp(dest string, key string, req *forwardReq, res *forwardReqRes, doneC chan<- bool, errC chan<- error, sC chan<- int) {
 	if r.ringpop.WhoAmI() == dest {
 		r.ringpop.logger.WithFields(log.Fields{
 			"key":  key,
@@ -80,13 +93,16 @@ func (r *replicator) handleOp(dest string, key string, req *forwardReq, res *for
 	}
 
 	err := r.ringpop.forwardReq(opts)
-	errC <- err
+	doneC <- true
 	sC <- res.StatusCode
+	errC <- err
 }
 
 func (r *replicator) readWrite(rwValue int, rOpts *replicaOpts) (*replicaResp, error) {
 	if rOpts == nil {
-		// log error here..
+		r.ringpop.logger.WithFields(log.Fields{
+			"local": r.ringpop.WhoAmI(),
+		}).Debug("[ringpop] nil replica options")
 		return nil, errors.New("nil options")
 	}
 	nValue := rOpts.nReplicas
@@ -96,7 +112,11 @@ func (r *replicator) readWrite(rwValue int, rOpts *replicaOpts) (*replicaResp, e
 	}
 
 	if rwValue > nValue {
-		// log error here
+		r.ringpop.logger.WithFields(log.Fields{
+			"local":   r.ringpop.WhoAmI(),
+			"nValue":  nValue,
+			"rwValue": rwValue,
+		}).Debug("[ringpop] invalid rwValue")
 		return nil, errors.New("invalid rwValue")
 	}
 
@@ -104,43 +124,54 @@ func (r *replicator) readWrite(rwValue int, rOpts *replicaOpts) (*replicaResp, e
 	replicas := groupReplicas(r.ringpop, nValue, keys)
 
 	if len(replicas) < nValue {
-		//log error here
+		r.ringpop.logger.WithFields(log.Fields{
+			"local":         r.ringpop.WhoAmI(),
+			"nValue":        nValue,
+			"len(replicas)": len(replicas),
+		}).Debug("[ringpop] not enough replicas")
 		return nil, errors.New("not enough replicas")
 	}
 
 	var numErrors int
 	var numResponses int
-	var err error
 	var l sync.Mutex
 	var wg sync.WaitGroup
+	var err error
 
 	resp := &replicaResp{}
 	resp.destRespMap = make(map[string]int)
 	for key, dest := range replicas {
 		wg.Add(1)
 		go func(n string, k string) {
+			doneC := make(chan bool)
+
 			var res forwardReqRes
+			var lErr error
 			errC := make(chan error)
 			sC := make(chan int, 1)
 
 			// attemp to handle this
-			go r.handleOp(n, k, rOpts.req, &res, errC, sC)
+			go r.handleOp(n, k, rOpts.req, &res, doneC, errC, sC)
 
-			select {
-			// call either succeeded or failed
-			case err = <-errC:
-				l.Lock()
-				defer l.Unlock()
-				resp.destRespMap[n] = <-sC
-				if err != nil {
+			done := <-doneC
+			if done {
+				select {
+				// call either succeeded or failed
+				case lErr = <-errC:
+					l.Lock()
+					defer l.Unlock()
+					resp.destRespMap[n] = <-sC
+					resp.keys = append(resp.keys, k)
+					if lErr != nil {
+						numErrors++
+					}
+					numResponses++
+				case <-time.After(rOpts.timeout): // timed out
 					numErrors++
 				}
-				numResponses++
-			case <-time.After(rOpts.timeout): // timed out
-				numErrors++
+				wg.Done()
 			}
 
-			wg.Done()
 		}(dest, key)
 	}
 	// wait for all replicas to respond/timeout
@@ -153,12 +184,12 @@ func (r *replicator) readWrite(rwValue int, rOpts *replicaOpts) (*replicaResp, e
 	return resp, err
 }
 
-func (r *replicator) read(rOpts *replicaOpts) *replicaResp {
-	resp, _ := r.readWrite(rOpts.rValue, rOpts)
-	return resp
+func (r *replicator) read(rOpts *replicaOpts) (*replicaResp, error) {
+	resp, err := r.readWrite(rOpts.rValue, rOpts)
+	return resp, err
 }
 
-func (r *replicator) write(rOpts *replicaOpts) *replicaResp {
-	resp, _ := r.readWrite(rOpts.wValue, rOpts)
-	return resp
+func (r *replicator) write(rOpts *replicaOpts) (*replicaResp, error) {
+	resp, err := r.readWrite(rOpts.wValue, rOpts)
+	return resp, err
 }
