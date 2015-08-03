@@ -15,18 +15,14 @@ import (
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 type forwardReqHeader struct {
-	URL      string   `json:"url"`
-	Checksum uint32   `json:"checksum"`
-	Keys     []string `json:"keys"`
-}
-
-type forwardReqBody struct {
-	body []byte
+	URL      string   `json:"URL"`
+	Checksum uint32   `json:"Checksum"`
+	Keys     []string `json:"Keys"`
 }
 
 type forwardReq struct {
-	Header forwardReqHeader
-	Body   forwardReqBody
+	Header forwardReqHeader `json:Header`
+	Body   []byte           `json:Body`
 }
 
 type forwardReqRes struct {
@@ -105,17 +101,28 @@ func (p *forwardReqSender) rerouteRetry(dest string) (forwardReqRes, error) {
 
 	if dest == p.ringpop.WhoAmI() {
 		p.ringpop.stat("increment", "requestForward.retry.reroute.local", 1)
-		return handleForwardRequest(
+		resp, err := handleForwardRequest(
 			p.ringpop,
 			newForwardReqHeader(p.cOpts.host, p.cOpts.keys, p.ringpop.membership.checksum),
-			p.req), nil
+			p.req)
+		return resp, err
 	}
 
 	p.ringpop.stat("increment", "requestForward.retry.reroute.remote", 1)
 
-	pnew := newChannelOpts(dest, p.cOpts.keys, p.cOpts.endpoint, p.cOpts.timeout)
+	// The channel options should be updated
+	newCopts := newChannelOpts(dest, p.cOpts.keys, p.cOpts.endpoint, p.cOpts.timeout)
 
-	return forwardRequest(p.ringpop, pnew, p.req)
+	var res forwardReqRes
+	var err error
+	p.cOpts = newCopts
+	doneC := make(chan bool)
+	go func() {
+		res, err = p.forwardReq(doneC)
+	}()
+
+	<-doneC
+	return res, err
 }
 
 func (p *forwardReqSender) lookupKeys(keys []string) []string {
@@ -147,10 +154,14 @@ func (p *forwardReqSender) attemptRetry(errC chan<- error) {
 	p.ringpop.emit("requestForward.retryAttempted")
 
 	newDest := dests[0]
-
 	// If nothing rebalanced, just try sending once again
 	if newDest == p.cOpts.host {
-		_, err = p.forwardReq()
+		done := make(chan bool)
+		go func() {
+			_, err = p.forwardReq(done)
+		}()
+
+		<-done
 		errC <- err
 		return
 	}
@@ -182,7 +193,7 @@ func (p *forwardReqSender) scheduleRetry(errC chan<- error) {
 	}
 }
 
-func (p *forwardReqSender) forwardReq() (forwardReqRes, error) {
+func (p *forwardReqSender) forwardReq(doneC chan<- bool) (forwardReqRes, error) {
 	ctx, cancel := json.NewContext(p.timeout)
 	defer cancel()
 
@@ -196,6 +207,7 @@ func (p *forwardReqSender) forwardReq() (forwardReqRes, error) {
 
 	// send forward-req
 	go p.send(ctx, &resBody, errC)
+
 	// wait for response
 	select {
 	case err = <-errC: // forward-req succeeded or failed
@@ -215,9 +227,11 @@ func (p *forwardReqSender) forwardReq() (forwardReqRes, error) {
 				}).Warn("[ringpop] Max retries exceeded")
 			}
 		}
+		doneC <- true
 		return resBody, err
 
 	case <-time.After(p.timeout): // forward-req timed out
+		doneC <- true
 		return resBody, errors.New("forward-req timed out")
 	}
 }
@@ -226,7 +240,7 @@ func (p *forwardReqSender) send(ctx json.Context, resBody *forwardReqRes, errC c
 	defer close(errC)
 	peer := p.ringpop.channel.Peers().GetOrAdd(p.cOpts.host)
 
-	err := json.CallPeer(ctx, peer, "ringpop", "/forward/req", p.req, resBody)
+	err := json.CallPeer(ctx, peer, "ringpop", p.cOpts.endpoint, p.req, resBody)
 	if err != nil {
 		p.ringpop.logger.WithFields(log.Fields{
 			"local":   p.ringpop.WhoAmI(),
@@ -235,6 +249,7 @@ func (p *forwardReqSender) send(ctx json.Context, resBody *forwardReqRes, errC c
 			"error":   err,
 		}).Debug("[ringpop] forward-req failed")
 
+		resBody.StatusCode = 500
 		errC <- err
 		return
 	}
@@ -251,6 +266,7 @@ func (p *forwardReqSender) send(ctx json.Context, resBody *forwardReqRes, errC c
 func forwardRequest(ringpop *Ringpop, opts *channelOpts, reqBody *forwardReq) (forwardReqRes, error) {
 	var err error
 	var res forwardReqRes
+	doneC := make(chan bool)
 
 	go func() {
 		p := newForwardReqSender(ringpop, opts, ringpop.forwardReqTimeout, reqBody)
@@ -260,8 +276,11 @@ func forwardRequest(ringpop *Ringpop, opts *channelOpts, reqBody *forwardReq) (f
 			"opts":  p.cOpts,
 		}).Debug("[ringpop] forward-req send")
 
-		res, err = p.forwardReq()
+		res, err = p.forwardReq(doneC)
 	}()
+
+	// Wait for the forward request to complete
+	<-doneC
 	if err != nil {
 		ringpop.logger.WithFields(log.Fields{
 			"statusCode": res.StatusCode,

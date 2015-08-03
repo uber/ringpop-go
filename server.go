@@ -83,8 +83,8 @@ func (s *server) pingReqHandler(ctx json.Context, reqBody *pingReqBody) (*pingRe
 }
 
 func (s *server) forwardReqHandler(ctx json.Context, req *forwardReq) (*forwardReqRes, error) {
-	resBody := handleForwardRequest(s.ringpop, ctx.Headers().(*forwardReqHeader), req)
-	return &resBody, nil
+	resBody, err := handleForwardRequest(s.ringpop, &req.Header, req)
+	return &resBody, err
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

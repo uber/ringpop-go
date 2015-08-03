@@ -1,8 +1,8 @@
 package ringpop
 
 import (
-	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -43,7 +43,8 @@ func (p *forwarder) forwardRequest(opts map[string]interface{}) error {
 	var dest = opts["dest"].(string)
 	var req = opts["req"].(*forwardReq)
 	var keys = opts["keys"].([]string)
-
+	var res = opts["res"].(*forwardReqRes)
+	var err error
 	var endpoint string
 	if opts["endpoint"] != nil {
 		endpoint = opts["endpoint"].(string)
@@ -66,7 +67,7 @@ func (p *forwarder) forwardRequest(opts map[string]interface{}) error {
 		"target": cOpts.host,
 	}).Debug("[ringpop] forward-req recieve")
 
-	_, err := forwardRequest(ringpop, cOpts, req)
+	*res, err = forwardRequest(ringpop, cOpts, req)
 
 	ringpop.logger.WithFields(log.Fields{
 		"local": ringpop.WhoAmI(),
@@ -76,8 +77,7 @@ func (p *forwarder) forwardRequest(opts map[string]interface{}) error {
 	return err
 }
 
-// TODO: Revisit and Fix this once we have some tests
-func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *forwardReq) forwardReqRes {
+func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *forwardReq) (forwardReqRes, error) {
 	ringpop.stat("increment", "forward-req", 1)
 
 	var res forwardReqRes
@@ -88,9 +88,15 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 
 	if checksum != ringpop.membership.checksum {
 		ringpop.logger.WithFields(log.Fields{
-			"local": ringpop.WhoAmI(),
+			"local":             ringpop.WhoAmI(),
+			"expected checksum": ringpop.membership.checksum,
+			"actual":            checksum,
 		}).Debug("[ringpop] forward-req checksums differ")
-		return res
+
+		ringpop.emit("forwardRequest.checksumsDiffer")
+		res.StatusCode = 500
+		err = errors.New("checksums differ")
+		return res, err
 	}
 
 	// send the http request
@@ -98,21 +104,9 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 
 	resp, err = hclient.Get(pReq.Header.URL)
 	if err != nil {
-		return res
+		res.StatusCode = 500
+		return res, err
 	}
-
-	bodyReader := bytes.NewBuffer(pReq.Body.body)
-	req, err := http.NewRequest("GET", pReq.Header.URL, bodyReader)
-
-	if err != nil {
-		return res
-	}
-
-	resp, err = hclient.Do(req)
-	if err != nil {
-		return res
-	}
-
 	// Make sure the conneciton is closed
 	defer resp.Body.Close()
 
@@ -127,5 +121,5 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 		Headers:    string(jHeaders),
 	}
 
-	return resBody
+	return resBody, err
 }
