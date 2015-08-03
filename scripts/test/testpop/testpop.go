@@ -2,14 +2,16 @@ package main
 
 import (
 	"flag"
-	ringpop "github.com/uber/ringpop-go"
 	"regexp"
+
+	ringpop "github.com/uber/ringpop-go"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel/golang"
 )
 
-var hostport = flag.String("p", "127.0.0.1:3000", "hostport to start ringpop on")
+var hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
+var hostsPath = flag.String("hosts", "./hosts.json", "Seed file of list of hosts to join")
 
 var hostPortPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 
@@ -34,7 +36,7 @@ func main() {
 	})
 
 	nodesJoined, err := rp.Bootstrap(&ringpop.BootstrapOptions{
-		File:    "./testpop/hosts.json",
+		File:    *hostsPath,
 		Stopped: false,
 	})
 	if err != nil {

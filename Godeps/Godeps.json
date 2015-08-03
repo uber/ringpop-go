@@ -30,7 +30,7 @@
 		{
 			"ImportPath": "github.com/uber/tchannel/golang",
 			"Comment": "py-0.10.0-198-g6358285",
-			"Rev": "6358285ae9c4602c199fbdcfad778a126906a0fc"
+			"Rev": "ebb8d56ed1f16f1cc00094ee073b41792297381c"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

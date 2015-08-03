@@ -19,7 +19,7 @@ type Change struct {
 	SourceIncarnation int64     `json:"sourceIncarnation"`
 	Address           string    `json:"address"`
 	Status            string    `json:"status"`
-	Incarnation       int64     `json:"incarnation"`
+	Incarnation       int64     `json:"incarnationNumber"`
 	Timestamp         time.Time `json:"timestamp"`
 }
 
@@ -277,7 +277,7 @@ func (m *membership) update(changes []Change) []Change {
 	if len(updates) > 0 {
 		m.computeChecksum()
 		m.ringpop.emit("updated")
-		m.ringpop.handleChanges(changes)
+		m.ringpop.handleChanges(updates)
 	}
 
 	return updates

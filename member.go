@@ -16,9 +16,9 @@ const (
 
 // A Member is a node in the ring
 type Member struct {
-	Address     string
-	Status      string
-	Incarnation int64
+	Address     string `json:"address"`
+	Status      string `json:"status"`
+	Incarnation int64  `json:"incarnationNumber"`
 }
 
 func (m Member) address() string {

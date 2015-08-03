@@ -51,7 +51,7 @@ func isSingleNodeCluster(ringpop *Ringpop) bool {
 type joinBody struct {
 	App         string        `json:"app"`
 	Source      string        `json:"source"`
-	Incarnation int64         `json:"incarnation"`
+	Incarnation int64         `json:"incarnationNumber"`
 	Timeout     time.Duration `json:"timeout"`
 }
 
