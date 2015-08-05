@@ -113,6 +113,8 @@ type Ringpop struct {
 
 	// testing
 	isDenyingJoins bool
+
+	startTime time.Time
 }
 
 // NewRingpop creates a new ringpop on the specified hostport.
@@ -183,6 +185,12 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.statPrefix = fmt.Sprintf("ringpop.%s", ringpop.statHostPort)
 
 	ringpop.setDestroyed(false)
+
+	// ringpop.clientRate = metrics.NewMeter()
+	// ringpop.serverRate = metrics.NewMeter()
+	// ringpop.totalRate = metrics.NewMeter()
+
+	ringpop.startTime = time.Now()
 
 	return ringpop
 }

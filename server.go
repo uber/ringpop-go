@@ -31,6 +31,7 @@ func newServer(ringpop *Ringpop) (*server, error) {
 	var handlers = map[string]interface{}{
 		"/admin/debugSet":    s.debugSetHandler,
 		"/admin/debugClear":  s.debugClearHandler,
+		"/admin/stats":       s.statsHandler,
 		"/protocol/join":     s.joinHandler,
 		"/protocol/ping":     s.pingHandler,
 		"/protocol/ping-req": s.pingReqHandler,
@@ -86,6 +87,11 @@ func (s *server) pingReqHandler(ctx json.Context, reqBody *pingReqBody) (*pingRe
 // ADMIN HANDLERS
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+func (s *server) statsHandler(ctx json.Context, arg *arg) (map[string]interface{}, error) {
+	resBody := handleStats(s.ringpop)
+	return resBody, nil
+}
 
 func (s *server) debugSetHandler(ctx json.Context, arg *arg) (res *arg, err error) {
 	s.ringpop.logger.Level = log.DebugLevel
