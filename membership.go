@@ -277,7 +277,7 @@ func (m *membership) update(changes []Change) []Change {
 	if len(updates) > 0 {
 		m.computeChecksum()
 		m.ringpop.emit("updated")
-		m.ringpop.handleChanges(changes)
+		m.ringpop.handleChanges(updates)
 	}
 
 	return updates
