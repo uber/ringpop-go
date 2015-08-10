@@ -1,13 +1,12 @@
 package ringpop
 
 import (
-	"encoding/json"
 	"errors"
-	"net/http"
 	"strconv"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/uber/tchannel/golang/json"
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -46,10 +45,20 @@ func (p *forwarder) forwardRequest(opts map[string]interface{}) error {
 	var res = opts["res"].(*forwardReqRes)
 	var err error
 	var endpoint string
+	var destService string
+
+	// If the destination endpoint and the service are given, use them to relay
+	// over tchannel directly
 	if opts["endpoint"] != nil {
 		endpoint = opts["endpoint"].(string)
 	} else {
 		endpoint = "/forward/req"
+	}
+
+	if opts["service"] != nil {
+		destService = opts["service"].(string)
+	} else {
+		destService = "ringpop"
 	}
 
 	var timeout time.Duration
@@ -60,7 +69,7 @@ func (p *forwarder) forwardRequest(opts map[string]interface{}) error {
 		timeout = ringpop.forwardReqTimeout
 	}
 
-	cOpts := newChannelOpts(dest, keys, endpoint, timeout)
+	cOpts := newChannelOpts(dest, destService, keys, endpoint, timeout)
 
 	ringpop.logger.WithFields(log.Fields{
 		"local":  ringpop.WhoAmI(),
@@ -82,7 +91,6 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 
 	var res forwardReqRes
 	var err error
-	var resp *http.Response
 
 	checksum := headers.Checksum
 
@@ -99,27 +107,22 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 		return res, err
 	}
 
-	// send the http request
-	hclient := &http.Client{}
+	// Relay the request over tchanne to a local handlerl
+	ctx, cancel := json.NewContext(ringpop.forwardReqTimeout)
+	defer cancel()
 
-	resp, err = hclient.Get(pReq.Header.URL)
-	if err != nil {
-		res.StatusCode = 500
-		return res, err
+	// Relay this directly via tchannel to the appropriate end point
+	peer := ringpop.channel.Peers().GetOrAdd(pReq.Header.HostPort)
+
+	if err := json.CallPeer(ctx, peer, pReq.Header.Service, pReq.Header.Operation, pReq,
+		&res); err != nil {
+		log.Fatalf("json.Call failed: %v", err)
 	}
-	// Make sure the conneciton is closed
-	defer resp.Body.Close()
 
 	ringpop.logger.WithFields(log.Fields{
 		"local": ringpop.WhoAmI(),
 		"isOK":  err == nil,
 	}).Debug("[ringpop] forward-req complete")
 
-	jHeaders, _ := json.Marshal(headers)
-	resBody := forwardReqRes{
-		StatusCode: resp.StatusCode,
-		Headers:    string(jHeaders),
-	}
-
-	return resBody, err
+	return res, err
 }

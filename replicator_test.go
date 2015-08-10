@@ -1,14 +1,16 @@
 package ringpop
 
 import (
-	"strings"
 	"testing"
 	"time"
 
-	"code.uber.internal/go-common.git/x/net/xhttp"
-	"code.uber.internal/go-common.git/x/net/xhttp/xhttptest"
+	log "github.com/Sirupsen/logrus"
+	"golang.org/x/net/context"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel/golang/json"
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -19,26 +21,60 @@ import (
 // ReplicateTestSuite has a recording server used by all the tests
 type ReplicateTestSuite struct {
 	suite.Suite
-	ringpop    *Ringpop
-	testServer *xhttptest.RecordingServer
+	ringpop *Ringpop
+	ch      *tchannel.Channel
+}
+
+func testReplicateHandler(ctx json.Context, req *forwardReq) (*forwardReqRes, error) {
+	// Make sure you received the expected value
+	if string(req.Body) != "hello" {
+		log.Fatalf("Expected \"hello\" but receieved: %v", string(req.Body))
+	}
+
+	return &forwardReqRes{
+		Body:       []byte("replicateTestResp"),
+		StatusCode: 200,
+	}, nil
+}
+
+func onReplicateError(ctx context.Context, err error) {
+	log.Fatalf("onError: %v", err)
+}
+
+func replicaListenAndHandle(s *tchannel.Channel, hostPort string) {
+	log.Infof("Service %s", hostPort)
+
+	// If no error is returned, the listen was successful. Serving happens in the background.
+	if err := s.ListenAndServe(hostPort); err != nil {
+		log.Fatalf("Could not listen on %s: %v", hostPort, err)
+	}
 }
 
 /*
- * SetupSuite instantiates a test server with a valid route to /test/myReplicate
- * This also sets up a testPop to be used by the tests
+* SetupSuite creates a new Tchannel for handling incoming requests sent to "replicatorService"
+* and registers a handler for an endpoint called "test"
  */
 func (suite *ReplicateTestSuite) SetupSuite() {
-	suite.testServer = xhttptest.NewRecordingServer()
-	suite.testServer.Router.AddPatternRoute("/test/myReplicate",
-		xhttp.ServeContentHandler("", time.Time{}, strings.NewReader("My Text")))
-	suite.testServer.Router.AddPatternRoute("/error", xhttp.ErrorHandler("no such topic", 420))
 	suite.ringpop = testPop("127.0.0.1:3000", unixMilliseconds(time.Now()), nil)
+	var err error
+	suite.ch, err = tchannel.NewChannel("replicatorService", &tchannel.ChannelOptions{Logger: tchannel.SimpleLogger})
+	if err != nil {
+		log.Fatalf("Could not create new channel: %v", err)
+	}
+
+	// Register a handler for the test message on the ForwardService
+	json.Register(suite.ch, json.Handlers{
+		"/test": testReplicateHandler,
+	}, onReplicateError)
+
+	// Listen for incoming requests
+	replicaListenAndHandle(suite.ch, "127.0.0.1:10501")
 }
 
-// TearDownSuite is expected to close the test server
+// TearDownSuite is expected to cleanup after test
 func (suite *ReplicateTestSuite) TearDownSuite() {
 	suite.ringpop.Destroy()
-	suite.testServer.Close()
+	suite.ch.Close()
 }
 
 func (suite *ReplicateTestSuite) TestBasicReplicate() {
@@ -58,9 +94,11 @@ func (suite *ReplicateTestSuite) TestBasicReplicate() {
 
 	// Setup the replica options
 	header := forwardReqHeader{
-		URL:      "127.0.0.1:3001",
-		Checksum: ringpop.membership.checksum,
-		Keys:     []string{"key"},
+		HostPort:  "127.0.0.1:10501",
+		Service:   "replicatorService",
+		Operation: "/test",
+		Checksum:  ringpop.membership.checksum,
+		Keys:      []string{"key"},
 	}
 
 	req := forwardReq{
@@ -87,9 +125,11 @@ func (suite *ReplicateTestSuite) TestReplicateInvalid() {
 
 	// Setup the invalid replica options
 	header := forwardReqHeader{
-		URL:      "127.0.0.1:3001",
-		Checksum: ringpop.membership.checksum,
-		Keys:     []string{"key"},
+		HostPort:  "127.0.0.1:3001",
+		Service:   "replicatorService",
+		Operation: "/test",
+		Checksum:  ringpop.membership.checksum,
+		Keys:      []string{"key"},
 	}
 
 	req := forwardReq{

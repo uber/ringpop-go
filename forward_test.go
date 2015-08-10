@@ -1,14 +1,16 @@
 package ringpop
 
 import (
-	"strings"
 	"testing"
 	"time"
 
-	"code.uber.internal/go-common.git/x/net/xhttp"
-	"code.uber.internal/go-common.git/x/net/xhttp/xhttptest"
+	log "github.com/Sirupsen/logrus"
+	"golang.org/x/net/context"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel/golang/json"
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -19,23 +21,57 @@ import (
 // ForwardTestSuite has a recording server used by all the tests
 type ForwardTestSuite struct {
 	suite.Suite
-	testServer *xhttptest.RecordingServer
+	testCh *tchannel.Channel
+}
+
+func testHandler(ctx json.Context, req *forwardReq) (*forwardReqRes, error) {
+	// Make sure you received the expected value
+	if string(req.Body) != "hello" {
+		log.Fatalf("Expected \"hello\" but receieved: %v", string(req.Body))
+	}
+
+	return &forwardReqRes{
+		Body:       []byte("forwardTestResp"),
+		StatusCode: 200,
+	}, nil
+}
+
+func onError(ctx context.Context, err error) {
+	log.Fatalf("onError: %v", err)
+}
+
+func listenAndHandle(s *tchannel.Channel, hostPort string) {
+	log.Infof("Service %s", hostPort)
+
+	// If no error is returned, the listen was successful. Serving happens in the background.
+	if err := s.ListenAndServe(hostPort); err != nil {
+		log.Fatalf("Could not listen on %s: %v", hostPort, err)
+	}
 }
 
 /*
- * SetupSuite instantiates a test server with a valid route to /topics/mytopic
-  * and instantiates a ForwardClient object as well
-*/
+* SetupSuite creates a new Tchannel for handling incoming requests sent to "forwardService"
+* and registers a handler for an endpoint called "test"
+ */
 func (suite *ForwardTestSuite) SetupSuite() {
-	suite.testServer = xhttptest.NewRecordingServer()
-	suite.testServer.Router.AddPatternRoute("/test/myforward",
-		xhttp.ServeContentHandler("", time.Time{}, strings.NewReader("My Text")))
-	suite.testServer.Router.AddPatternRoute("/error", xhttp.ErrorHandler("no such topic", 420))
+	var err error
+	suite.testCh, err = tchannel.NewChannel("forwardService", &tchannel.ChannelOptions{Logger: tchannel.SimpleLogger})
+	if err != nil {
+		log.Fatalf("Could not create new channel: %v", err)
+	}
+
+	// Register a handler for the test message on the ForwardService
+	json.Register(suite.testCh, json.Handlers{
+		"/test": testHandler,
+	}, onError)
+
+	// Listen for incoming requests
+	listenAndHandle(suite.testCh, "127.0.0.1:10500")
 }
 
-// TearDownSuite is expected to close the test server
 func (suite *ForwardTestSuite) TearDownSuite() {
-	suite.testServer.Close()
+	// Close the channel
+	suite.testCh.Close()
 }
 
 func (suite *ForwardTestSuite) TestForwardBasic() {
@@ -51,9 +87,11 @@ func (suite *ForwardTestSuite) TestForwardBasic() {
 	var forwardOpts map[string]interface{}
 
 	header := forwardReqHeader{
-		URL:      "127.0.0.1:3000",
-		Checksum: ringpop.ring.checksum,
-		Keys:     []string{"key"},
+		HostPort:  "127.0.0.1:10500",
+		Service:   "forwardService",
+		Operation: "/test",
+		Checksum:  ringpop.ring.checksum,
+		Keys:      []string{"key"},
 	}
 
 	req := forwardReq{
@@ -64,7 +102,7 @@ func (suite *ForwardTestSuite) TestForwardBasic() {
 	var res forwardReqRes
 	test := ringpop.handleOrForward("key", &req, &res, forwardOpts)
 
-	assert.True(t, test, "Expected to be handled and not proxied")
+	assert.True(t, test, "Expected to be handled and not forwarded")
 }
 
 func (suite *ForwardTestSuite) TestForwardMaxRetries() {
@@ -85,9 +123,10 @@ func (suite *ForwardTestSuite) TestForwardMaxRetries() {
 	ringpop.ring.addServer("server3")
 
 	header := forwardReqHeader{
-		URL:      "127.0.0.1:3000",
-		Checksum: ringpop.ring.checksum,
-		Keys:     []string{"key"},
+		Service:   "forwardService",
+		Operation: "/test",
+		Checksum:  ringpop.ring.checksum,
+		Keys:      []string{"key"},
 	}
 
 	req := forwardReq{
@@ -98,7 +137,7 @@ func (suite *ForwardTestSuite) TestForwardMaxRetries() {
 	var res forwardReqRes
 	test := ringpop.handleOrForward("key", &req, &res, forwardOpts)
 
-	assert.False(t, test, "Expected to be proxied")
+	assert.False(t, test, "Expected to be forwarded")
 }
 
 func (suite *ForwardTestSuite) TestForwardInvalid() {
@@ -127,9 +166,10 @@ func (suite *ForwardTestSuite) TestForwardInvalid() {
 	ringpop3.ring.addServer("server3")
 
 	header := forwardReqHeader{
-		URL:      "127.0.0.1:3000",
-		Checksum: ringpop1.ring.checksum,
-		Keys:     []string{"key", "key2"},
+		Service:   "forwardService",
+		Operation: "/test",
+		Checksum:  ringpop1.ring.checksum,
+		Keys:      []string{"key", "key2"},
 	}
 
 	req := forwardReq{
@@ -148,7 +188,6 @@ func (suite *ForwardTestSuite) TestForwardInvalid() {
 	}
 	err := ringpop1.forwardReq(forwardOpts)
 	assert.NotNil(t, err)
-	//assert.False(t, test, "Expected to be proxied")
 }
 
 func (suite *ForwardTestSuite) TestForwardSuccess() {
@@ -189,9 +228,11 @@ func (suite *ForwardTestSuite) TestForwardSuccess() {
 	var forwardOpts map[string]interface{}
 
 	header := forwardReqHeader{
-		URL:      suite.testServer.HTTPServer.URL + "/test/myforward",
-		Checksum: ringpop2.membership.checksum,
-		Keys:     []string{"key"},
+		HostPort:  "127.0.0.1:10500",
+		Service:   "forwardService",
+		Operation: "/test",
+		Checksum:  ringpop2.membership.checksum,
+		Keys:      []string{"key"},
 	}
 
 	req := forwardReq{
@@ -212,6 +253,7 @@ func (suite *ForwardTestSuite) TestForwardSuccess() {
 	err = ringpop2.forwardReq(forwardOpts)
 	assert.Nil(t, err)
 	assert.Equal(t, res.StatusCode, 200)
+	assert.Equal(t, string(res.Body), "forwardTestResp")
 }
 
 func (suite *ForwardTestSuite) TestForwardFailure() {
@@ -252,9 +294,11 @@ func (suite *ForwardTestSuite) TestForwardFailure() {
 	var forwardOpts map[string]interface{}
 
 	header := forwardReqHeader{
-		URL:      "127.0.0.1:3001",
-		Checksum: ringpop2.membership.checksum,
-		Keys:     []string{"key"},
+		HostPort:  "127.0.0.1:10500",
+		Service:   "forwardService",
+		Operation: "/test",
+		Checksum:  ringpop2.membership.checksum,
+		Keys:      []string{"key"},
 	}
 
 	req := forwardReq{
@@ -266,10 +310,12 @@ func (suite *ForwardTestSuite) TestForwardFailure() {
 
 	var res forwardReqRes
 	forwardOpts = map[string]interface{}{
-		"dest": dest,
-		"keys": []string{"key"},
-		"req":  &req,
-		"res":  &res,
+		"dest":     dest,
+		"keys":     []string{"key"},
+		"req":      &req,
+		"res":      &res,
+		"service":  "dead",
+		"endpoint": "beef",
 	}
 
 	err = ringpop2.forwardReq(forwardOpts)

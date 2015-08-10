@@ -749,9 +749,10 @@ func (rp *Ringpop) forwardReq(opts map[string]interface{}) error {
 
 func (rp *Ringpop) handleOrForward(key string, req *forwardReq, res *forwardReqRes, opts map[string]interface{}) bool {
 	rp.logger.WithFields(log.Fields{
-		"local": rp.WhoAmI(),
-		"url":   req.Header.URL,
-		"key":   key,
+		"local":        rp.WhoAmI(),
+		"destHostPort": req.Header.HostPort,
+		"destService":  req.Header.Service,
+		"key":          key,
 	}).Debug("[ringpop] handleOrForward for a key received")
 
 	dest, _ := rp.ring.lookup(key)
