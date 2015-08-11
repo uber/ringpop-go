@@ -18,11 +18,13 @@ import (
 
 const (
 	defaultMembershipUpdateFlushInterval = 5000 * time.Millisecond
-	defaultProxyReqTimeout               = 30000 * time.Millisecond
+	defaultForwardReqTimeout             = 30000 * time.Millisecond
+	defaultForwardMaxRetries             = 3
 )
 
 var (
-	proxyReqProps = []string{"keys", "dest", "req", "res"}
+	forwardReqProps             = []string{"keys", "dest", "req", "res"}
+	defaultForwardRetrySchedule = []time.Duration{3 * time.Millisecond, 6 * time.Millisecond, 12 * time.Millisecond}
 )
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -44,12 +46,12 @@ type Options struct {
 
 	JoinSize                      int
 	SetTimeout                    time.Duration
-	ProxyReqTimeout               time.Duration
+	ForwardReqTimeout             time.Duration
 	MaxJoinDuration               time.Duration
 	MembershipUpdateFlushInterval time.Duration
 
-	RequestProxyMaxRetries    int
-	RequestProxyRetrySchedule time.Duration // revist
+	RequestForwardMaxRetries    int
+	RequestForwardRetrySchedule []time.Duration // revist
 
 	MinProtocolPeriod time.Duration
 	SuspicionTimeout  time.Duration
@@ -81,7 +83,9 @@ type Ringpop struct {
 
 	pingReqTimeout                time.Duration
 	pingTimeout                   time.Duration
-	proxyReqTimeout               time.Duration
+	forwardReqTimeout             time.Duration
+	forwardRetrySchedule          []time.Duration
+	forwardMaxRetries             int
 	maxJoinDuration               time.Duration
 	membershipUpdateFlushInterval time.Duration
 
@@ -95,6 +99,9 @@ type Ringpop struct {
 	suspicion     *suspicion
 	gossip        *gossip
 	dissemination *dissemination
+
+	// forwarder
+	forwarder *forwarder
 
 	// statsd
 	statsd       statsd.Statsd
@@ -162,12 +169,15 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.pingReqSize = 3
 	ringpop.pingReqTimeout = time.Millisecond * 5000 // 5000
 
-	// set proxyReqTimeout to option or default value
-	ringpop.proxyReqTimeout = selectDurationOrDefault(opts.ProxyReqTimeout, defaultProxyReqTimeout)
+	// set forwardReqTimeout to option or default value
+	ringpop.forwardReqTimeout = selectDurationOrDefault(opts.ForwardReqTimeout, defaultForwardReqTimeout)
 
 	ringpop.membershipUpdateFlushInterval = selectDurationOrDefault(
 		opts.MembershipUpdateFlushInterval,
 		defaultMembershipUpdateFlushInterval)
+	ringpop.forwardRetrySchedule = make([]time.Duration, len(defaultForwardRetrySchedule))
+	copy(ringpop.forwardRetrySchedule, defaultForwardRetrySchedule)
+	ringpop.forwardMaxRetries = defaultForwardMaxRetries
 
 	// membership and gossip
 	ringpop.ring = newHashRing(ringpop)
@@ -177,6 +187,8 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 		ringpop.membershipUpdateFlushInterval, 0)
 	ringpop.suspicion = newSuspicion(ringpop, opts.SuspicionTimeout)
 	ringpop.gossip = newGossip(ringpop, 0)
+	ringpop.forwarder = newForwarder(ringpop, ringpop.forwardRetrySchedule, ringpop.forwardMaxRetries)
+
 	// statsd
 	// changes 0.0.0.0:0000 -> 0_0_0_0_0000
 	ringpop.statKeys = make(map[string]string)
@@ -717,6 +729,64 @@ func (rp *Ringpop) PingMemberNow() error {
 // PingReqNow is for testing
 func (rp *Ringpop) PingReqNow(peer, target string) {
 	sendPingReq(rp, peer, target)
+}
+
+func (rp *Ringpop) validateProps(opts map[string]interface{}, props []string) error {
+	for _, val := range props {
+		if opts[val] == "" {
+			rp.logger.Warn("[ringpop] invalid options for: %s", val)
+			return errors.New("invalid options for forward")
+		}
+	}
+	return nil
+}
+
+func (rp *Ringpop) forwardReq(opts map[string]interface{}) error {
+	var err error
+
+	if opts != nil {
+		if rp.validateProps(opts, forwardReqProps) != nil {
+			log.Fatal("invalid options for forward request")
+		}
+		err = rp.forwarder.forwardRequest(opts)
+	} else {
+		log.Fatal("specify valid options to forward the request")
+	}
+	return err
+}
+
+func (rp *Ringpop) handleOrForward(key string, req *forwardReq, res *forwardReqRes, opts map[string]interface{}) bool {
+	rp.logger.WithFields(log.Fields{
+		"local":        rp.WhoAmI(),
+		"destHostPort": req.Header.HostPort,
+		"destService":  req.Header.Service,
+		"key":          key,
+	}).Debug("[ringpop] handleOrForward for a key received")
+
+	dest, _ := rp.ring.lookup(key)
+
+	if rp.WhoAmI() == dest {
+		rp.logger.WithFields(log.Fields{
+			"key":  key,
+			"dest": dest,
+		}).Debug("[ringpop] handleOrForward was handled")
+		return true
+	}
+
+	// Forward
+	rp.logger.WithFields(log.Fields{
+		"key":  key,
+		"dest": dest,
+	}).Debug("[ringpop] handleOrForward was proxied")
+	opts = map[string]interface{}{
+		"dest": dest,
+		"keys": []string{key},
+		"req":  req,
+		"res":  res,
+	}
+
+	rp.forwardReq(opts)
+	return false
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
