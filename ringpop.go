@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/uber/bark"
+	"github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel/golang"
 
-	"github.com/quipo/statsd"
+	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -36,10 +37,10 @@ var (
 // Options provides opts for creation of a ringpop
 type Options struct {
 	// Logger to send logs to, defaults to StandardLogger
-	Logger *log.Logger
+	Logger bark.Logger
 
 	// Statsd client to send stats to, if none provided no stats are sent
-	Statsd statsd.Statsd
+	StatsReporter bark.StatsReporter
 
 	// File to bootstrap from
 	BootstrapFile string
@@ -104,7 +105,7 @@ type Ringpop struct {
 	forwarder *forwarder
 
 	// statsd
-	statsd       statsd.Statsd
+	statsd       bark.StatsReporter
 	statHostPort string
 	statPrefix   string
 	statKeys     map[string]string
@@ -116,7 +117,7 @@ type Ringpop struct {
 	totalRate  metrics.Meter
 
 	// logging
-	logger *log.Logger
+	logger bark.Logger
 
 	// testing
 	isDenyingJoins bool
@@ -131,13 +132,18 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 		opts = &Options{}
 	}
 
+	logger := opts.Logger
+	if logger == nil {
+		logger = bark.NewLoggerFromLogrus(logrus.StandardLogger())
+	}
+
 	// verify valid hostport
 	if match := hostPortPattern.Match([]byte(hostport)); !match {
-		log.Fatal("Invalid host port ", hostport)
+		logger.Fatal("Invalid host port ", hostport)
 	}
 
 	if channel == nil {
-		log.Fatal("Ringpop requires non-nil channel to be created")
+		logger.Fatal("Ringpop requires non-nil channel to be created")
 	}
 
 	ringpop := &Ringpop{
@@ -152,12 +158,10 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.pinging = false
 
 	// set logger to option or default value
-	if ringpop.logger = log.StandardLogger(); opts.Logger != nil {
-		ringpop.logger = opts.Logger
-	}
+	ringpop.logger = logger
 	// set statsd client to option or default value
-	if ringpop.statsd = (&statsd.NoopClient{}); opts.Statsd != nil {
-		ringpop.statsd = opts.Statsd
+	if ringpop.statsd = bark.NewStatsReporterFromCactus(&statsd.NoopClient{}); opts.StatsReporter != nil {
+		ringpop.statsd = opts.StatsReporter
 	}
 
 	ringpop.bootstrapFile = opts.BootstrapFile
@@ -232,7 +236,7 @@ func (rp *Ringpop) Destroy() {
 	// clientRate/serverRate/totalRate stuff
 
 	rp.channel.Close()
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":     rp.WhoAmI(),
 		"timestamp": time.Now(),
 	}).Debug("[ringpop] closed channel")
@@ -293,7 +297,7 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	// set up channel
 	if err := rp.listenAndServe(); err != nil {
-		rp.logger.WithFields(log.Fields{}).Fatalf("[ringpop] could not setup channel: %v", err)
+		rp.logger.WithFields(bark.Fields{}).Fatalf("[ringpop] could not setup channel: %v", err)
 		return nil, err
 	}
 
@@ -323,7 +327,7 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	nodesJoined, err := sendJoin(rp, joinOpts)
 	if err != nil {
-		rp.logger.WithFields(log.Fields{
+		rp.logger.WithFields(bark.Fields{
 			"err":     err.Error(),
 			"address": rp.hostPort,
 		}).Error("[ringpop] bootstrap failed")
@@ -370,7 +374,7 @@ func (rp *Ringpop) checkForHostnameIPMismatch() bool {
 		}
 
 		if len(mismatched) > 0 {
-			rp.logger.WithFields(log.Fields{
+			rp.logger.WithFields(bark.Fields{
 				"address":                  rp.hostPort,
 				"mismatchedBootstrapHosts": mismatched,
 			}).Warn(message)
@@ -571,7 +575,7 @@ func (rp *Ringpop) handleRingEvent(event string) {
 
 func (rp *Ringpop) onMemberAlive(change Change) {
 	rp.stat("increment", "membership-update.alive", 1)
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":       rp.WhoAmI(),
 		"alive":       change.Address,
 		"incarnation": change.Incarnation,
@@ -585,7 +589,7 @@ func (rp *Ringpop) onMemberAlive(change Change) {
 
 func (rp *Ringpop) onMemberFaulty(change Change) {
 	rp.stat("increment", "membership-update.faulty", 1)
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":       rp.WhoAmI(),
 		"faulty":      change.Address,
 		"incarnation": change.Incarnation,
@@ -599,7 +603,7 @@ func (rp *Ringpop) onMemberFaulty(change Change) {
 
 func (rp *Ringpop) onMemberSuspect(change Change) {
 	rp.stat("increment", "membership-update.suspect", 1)
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":       rp.WhoAmI(),
 		"suspect":     change.Address,
 		"incarnation": change.Incarnation,
@@ -612,7 +616,7 @@ func (rp *Ringpop) onMemberSuspect(change Change) {
 
 func (rp *Ringpop) onMemberLeave(change Change) {
 	rp.stat("increment", "membership-update.leave", 1)
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":       rp.WhoAmI(),
 		"leave":       change.Address,
 		"incarnation": change.Incarnation,
@@ -663,7 +667,7 @@ func (rp *Ringpop) handleChanges(changes []Change) {
 func (rp *Ringpop) PingMember(target Member) error {
 	_, err := sendPing(rp, target.Address, rp.pingTimeout)
 	if err != nil {
-		rp.logger.WithFields(log.Fields{
+		rp.logger.WithFields(bark.Fields{
 			"local":  rp.WhoAmI(),
 			"remote": target.Address,
 		}).Infof("ping failed: %v", err)
@@ -699,7 +703,7 @@ func (rp *Ringpop) PingMemberNow() error {
 
 	res, err := sendPing(rp, member.Address, rp.pingTimeout)
 	if err != nil {
-		rp.logger.WithFields(log.Fields{
+		rp.logger.WithFields(bark.Fields{
 			"local":  rp.WhoAmI(),
 			"remote": member.Address,
 			"error":  err,
@@ -718,7 +722,7 @@ func (rp *Ringpop) PingMemberNow() error {
 	rp.pinging = false
 	rp.membership.update(res.Changes)
 
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":  rp.WhoAmI(),
 		"remote": member.Address,
 	}).Debug("[ringpop] ping success")
@@ -746,17 +750,17 @@ func (rp *Ringpop) forwardReq(opts map[string]interface{}) error {
 
 	if opts != nil {
 		if rp.validateProps(opts, forwardReqProps) != nil {
-			log.Fatal("invalid options for forward request")
+			rp.logger.Fatal("invalid options for forward request")
 		}
 		err = rp.forwarder.forwardRequest(opts)
 	} else {
-		log.Fatal("specify valid options to forward the request")
+		rp.logger.Fatal("specify valid options to forward the request")
 	}
 	return err
 }
 
 func (rp *Ringpop) handleOrForward(key string, req *forwardReq, res *forwardReqRes, opts map[string]interface{}) bool {
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"local":        rp.WhoAmI(),
 		"destHostPort": req.Header.HostPort,
 		"destService":  req.Header.Service,
@@ -766,7 +770,7 @@ func (rp *Ringpop) handleOrForward(key string, req *forwardReq, res *forwardReqR
 	dest, _ := rp.ring.lookup(key)
 
 	if rp.WhoAmI() == dest {
-		rp.logger.WithFields(log.Fields{
+		rp.logger.WithFields(bark.Fields{
 			"key":  key,
 			"dest": dest,
 		}).Debug("[ringpop] handleOrForward was handled")
@@ -774,7 +778,7 @@ func (rp *Ringpop) handleOrForward(key string, req *forwardReq, res *forwardReqR
 	}
 
 	// Forward
-	rp.logger.WithFields(log.Fields{
+	rp.logger.WithFields(bark.Fields{
 		"key":  key,
 		"dest": dest,
 	}).Debug("[ringpop] handleOrForward was proxied")
@@ -806,11 +810,11 @@ func (rp *Ringpop) stat(statType, key string, val int64) {
 
 	switch statType {
 	case "increment":
-		rp.statsd.Incr(fqkey, val)
+		rp.statsd.IncCounter(fqkey, nil, val)
 	case "gauge":
-		rp.statsd.Gauge(fqkey, val)
+		rp.statsd.UpdateGauge(fqkey, nil, val)
 	case "timing":
-		rp.statsd.Timing(fqkey, val)
+		rp.statsd.RecordTimer(fqkey, nil, time.Duration(val))
 	}
 }
 
@@ -831,13 +835,4 @@ func (rp *Ringpop) denyJoins() {
 func (rp *Ringpop) testBootstrapper() {
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()))
 	rp.ready = true
-}
-
-// SetDebug enables or disables the logging debug flag
-func (rp *Ringpop) SetDebug(debug bool) {
-	if debug {
-		log.SetLevel(log.DebugLevel)
-	} else {
-		log.SetLevel(log.InfoLevel)
-	}
 }

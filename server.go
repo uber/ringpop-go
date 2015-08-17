@@ -3,7 +3,7 @@ package ringpop
 import (
 	"errors"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/tchannel/golang"
 	"github.com/uber/tchannel/golang/json"
 	"golang.org/x/net/context"
@@ -100,11 +100,9 @@ func (s *server) statsHandler(ctx json.Context, arg *arg) (map[string]interface{
 }
 
 func (s *server) debugSetHandler(ctx json.Context, arg *arg) (res *arg, err error) {
-	s.ringpop.logger.Level = log.DebugLevel
-	return
+	return nil, errors.New("Debug set not supported")
 }
 
 func (s *server) debugClearHandler(ctx json.Context, arg *arg) (res *arg, err error) {
-	s.ringpop.logger.Level = log.InfoLevel
-	return
+	return nil, errors.New("Debug clear not supported")
 }

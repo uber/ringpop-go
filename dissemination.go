@@ -3,8 +3,7 @@ package ringpop
 import (
 	"math"
 	"sync"
-
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 )
 
 var log10 = math.Log(10)

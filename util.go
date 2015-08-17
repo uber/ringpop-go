@@ -9,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	bark "github.com/uber/bark"
+	logrus "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/uber/tchannel/golang"
 )
@@ -119,7 +120,7 @@ func newServerRingpop(t *testing.T, hostport string) *Ringpop {
 	channel, err := tchannel.NewChannel("ringpop", nil)
 	require.NoError(t, err, "error must be nil")
 
-	logger := log.New()
+	logger := logrus.New()
 	logger.Out = ioutil.Discard
 
 	ringpop := NewRingpop("test", hostport, channel, &Options{
@@ -130,13 +131,13 @@ func newServerRingpop(t *testing.T, hostport string) *Ringpop {
 }
 
 func testPop(hostport string, incarnation int64, opts *Options) *Ringpop {
-	logger := log.New()
+	logger := logrus.New()
 	logger.Out = ioutil.Discard
 
 	if opts == nil {
 		opts = &Options{}
 	}
-	opts.Logger = logger
+	opts.Logger = bark.NewLoggerFromLogrus(logger)
 
 	testCh, _ := tchannel.NewChannel("test-service", nil)
 	ringpop := NewRingpop("test", hostport, testCh, opts)
