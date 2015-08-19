@@ -245,7 +245,7 @@ func (p *forwardReqSender) forwardReq(doneC chan<- bool) (forwardReqRes, error) 
 func (p *forwardReqSender) send(ctx json.Context, resBody *forwardReqRes, errC chan<- error) {
 	defer close(errC)
 
-	peer := p.ringpop.GetOrAddPeer(p.cOpts.host)
+	peer := p.ringpop.channel.Peers().GetOrAdd(p.cOpts.host)
 
 	// send over tchannel to the appropriate service and endpoint
 	err := json.CallPeer(ctx, peer, p.cOpts.destService, p.cOpts.endpoint, p.req, resBody)

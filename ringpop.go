@@ -64,7 +64,7 @@ type Ringpop struct {
 	app      string
 	hostPort string
 
-	channel interface{}
+	channel tchannel.Registrar
 
 	eventC   chan string
 	emitting bool
@@ -125,7 +125,7 @@ type Ringpop struct {
 }
 
 // NewRingpop creates a new ringpop on the specified hostport.
-func NewRingpop(app, hostport string, channel interface{}, opts *Options) *Ringpop {
+func NewRingpop(app, hostport string, channel tchannel.Registrar, opts *Options) *Ringpop {
 	if opts == nil {
 		// opts should contain zero values for each option
 		opts = &Options{}
@@ -218,17 +218,6 @@ func (rp *Ringpop) setDestroyed(destroyed bool) {
 	rp.destroyedLock.Lock()
 	defer rp.destroyedLock.Unlock()
 	rp.destroyed = destroyed
-}
-
-// GetOrAddPeer adds a tchannel peer based on the type of the channel
-func (rp *Ringpop) GetOrAddPeer(hostport string) *tchannel.Peer {
-	switch rp.channel.(type) {
-	case *tchannel.Channel:
-		return rp.channel.(*tchannel.Channel).Peers().GetOrAdd(hostport)
-	case *tchannel.SubChannel:
-		return rp.channel.(*tchannel.SubChannel).Peers().GetOrAdd(hostport)
-	}
-	return nil
 }
 
 // CloseCh closes the tchannel

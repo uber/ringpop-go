@@ -15,7 +15,7 @@ type arg struct{}
 
 type server struct {
 	ringpop *Ringpop
-	channel interface{}
+	channel tchannel.Registrar
 }
 
 func newServer(ringpop *Ringpop) (*server, error) {
@@ -39,7 +39,7 @@ func newServer(ringpop *Ringpop) (*server, error) {
 	}
 
 	// register handlers
-	err := json.Register(s.channel.(tchannel.Registrar), handlers, func(ctx context.Context, err error) {
+	err := json.Register(s.channel, handlers, func(ctx context.Context, err error) {
 		s.ringpop.logger.WithField("error", err).Info("[ringpop] error occured")
 	})
 	if err != nil {
