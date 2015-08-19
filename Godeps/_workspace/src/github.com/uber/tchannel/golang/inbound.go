@@ -29,17 +29,26 @@ import (
 	"golang.org/x/net/context"
 )
 
-var (
-	// ErrHandlerNotFound is returned when no registered handler can be found for a given service and operation
-	ErrHandlerNotFound = NewSystemError(ErrCodeBadRequest, "no handler for service and operation")
-
-	errInboundRequestAlreadyActive = errors.New("inbound request is already active; possible duplicate client id")
-)
+var errInboundRequestAlreadyActive = errors.New("inbound request is already active; possible duplicate client id")
 
 // handleCallReq handles an incoming call request, registering a message
 // exchange to receive further fragments for that call, and dispatching it in
 // another goroutine
 func (c *Connection) handleCallReq(frame *Frame) bool {
+	// TODO(prashant): Parse out the span from
+	switch state := c.readState(); state {
+	case connectionActive:
+		break
+	case connectionStartClose, connectionInboundClosed, connectionClosed:
+		c.SendSystemError(frame.Header.ID, nil, ErrChannelClosed)
+		return true
+	case connectionWaitingToRecvInitReq, connectionWaitingToSendInitReq, connectionWaitingToRecvInitRes:
+		c.SendSystemError(frame.Header.ID, nil, NewSystemError(ErrCodeDeclined, "connection not ready"))
+		return true
+	default:
+		panic(fmt.Errorf("unknown connection state for call req: %v", state))
+	}
+
 	callReq := new(callReq)
 	initialFragment, err := parseInboundFragment(c.framePool, frame, callReq)
 	if err != nil {
@@ -58,16 +67,23 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 		return true
 	}
 
+	call.AddBinaryAnnotation(BinaryAnnotation{Key: "cn", Value: callReq.Headers[CallerName]})
+	call.AddBinaryAnnotation(BinaryAnnotation{Key: "as", Value: callReq.Headers[ArgScheme]})
+	call.AddAnnotation(AnnotationKeyServerReceive)
+
 	response := new(InboundCallResponse)
 	response.mex = mex
 	response.conn = c
 	response.contents = newFragmentingWriter(response, initialFragment.checksumType.New())
 	response.cancel = cancel
 	response.span = callReq.Tracing
-	response.log = PrefixedLogger(fmt.Sprintf("In%v-Response ", callReq.ID()), c.log)
-	response.headers = callHeaders{}
+	response.log = c.log.WithFields(LogField{"In-Response", callReq.ID()})
+	response.headers = transportHeaders{}
 	response.messageForFragment = func(initial bool) message {
 		if initial {
+			call.AddAnnotation(AnnotationKeyServerSend)
+			call.Report(callReq.Tracing, c.traceReporter)
+
 			callRes := new(callRes)
 			callRes.Headers = response.headers
 			callRes.ResponseCode = responseOK
@@ -86,7 +102,7 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	call.headers = callReq.Headers
 	call.span = callReq.Tracing
 	call.response = response
-	call.log = PrefixedLogger(fmt.Sprintf("In%v-Call ", callReq.ID()), c.log)
+	call.log = c.log.WithFields(LogField{"In-Call", callReq.ID()})
 	call.messageForFragment = func(initial bool) message { return new(callReqContinue) }
 	call.contents = newFragmentingReader(call)
 	call.statsReporter = c.statsReporter
@@ -140,11 +156,26 @@ func (c *Connection) dispatchInbound(call *InboundCall) {
 	// https://github.com/golang/go/issues/3512
 	h := c.handlers.find(call.ServiceName(), call.Operation())
 	if h == nil {
+		// CHeck the subchannel map to see if we find one there
+		c.log.Debugf("Checking the subchannel's handlers for %s:%s", call.ServiceName(), call.Operation())
+		h = c.subchannels.find(call.ServiceName(), call.Operation())
+	}
+	if h == nil {
 		c.log.Errorf("Could not find handler for %s:%s", call.ServiceName(), call.Operation())
 		call.mex.shutdown()
-		call.Response().SendSystemError(ErrHandlerNotFound)
+		call.Response().SendSystemError(
+			NewSystemError(ErrCodeBadRequest, "no handler for service %q and operation %q", call.ServiceName(), call.Operation()))
 		return
 	}
+
+	// TODO(prashant): This is an expensive way to check for cancellation, and is not thread-safe.
+	// We need to figure out a better solution to avoid leaking calls that timeout.
+	go func() {
+		<-call.mex.ctx.Done()
+		if call.mex.ctx.Err() != nil {
+			call.failed(call.mex.ctx.Err())
+		}
+	}()
 
 	c.log.Debugf("Dispatching %s:%s from %s", call.ServiceName(), call.Operation(), c.remotePeerInfo)
 	h.Handle(call.mex.ctx, call)
@@ -152,12 +183,13 @@ func (c *Connection) dispatchInbound(call *InboundCall) {
 
 // An InboundCall is an incoming call from a peer
 type InboundCall struct {
+	Annotations
 	reqResReader
 
 	response        *InboundCallResponse
 	serviceName     string
 	operation       []byte
-	headers         callHeaders
+	headers         transportHeaders
 	span            Span
 	statsReporter   StatsReporter
 	commonStatsTags map[string]string
@@ -222,7 +254,7 @@ type InboundCallResponse struct {
 	// calledAt is the time the inbound call was routed to the application.
 	calledAt         time.Time
 	applicationError bool
-	headers          callHeaders
+	headers          transportHeaders
 	span             Span
 	statsReporter    StatsReporter
 	commonStatsTags  map[string]string
@@ -235,27 +267,7 @@ func (response *InboundCallResponse) SendSystemError(err error) error {
 	response.cancel()
 	response.state = reqResWriterComplete
 
-	// Send the error frame
-	frame := response.conn.framePool.Get()
-	if err := frame.write(&errorMessage{
-		id:      response.mex.msgID,
-		tracing: response.span,
-		errCode: GetSystemErrorCode(err),
-		message: err.Error()}); err != nil {
-		// Nothing we can do here
-		response.conn.log.Warnf("Could not create outbound frame to %s for %d: %v",
-			response.conn.remotePeerInfo, response.mex.msgID, err)
-		return nil
-	}
-
-	select {
-	case response.conn.sendCh <- frame: // Good to go
-	default: // Nothing we can do here anyway
-		response.conn.log.Warnf("Could not send error frame to %s for %d : %v",
-			response.conn.remotePeerInfo, response.mex.msgID, err)
-	}
-
-	return nil
+	return response.conn.SendSystemError(response.mex.msgID, CurrentSpan(response.mex.ctx), err)
 }
 
 // SetApplicationError marks the response as being an application error.  This method can
@@ -273,7 +285,7 @@ func (response *InboundCallResponse) SetApplicationError() error {
 
 // Arg2Writer returns a WriteCloser that can be used to write the second argument.
 // The returned writer must be closed once the write is complete.
-func (response *InboundCallResponse) Arg2Writer() (io.WriteCloser, error) {
+func (response *InboundCallResponse) Arg2Writer() (ArgWriter, error) {
 	if err := NewArgWriter(response.arg1Writer()).Write(nil); err != nil {
 		return nil, err
 	}
@@ -282,7 +294,7 @@ func (response *InboundCallResponse) Arg2Writer() (io.WriteCloser, error) {
 
 // Arg3Writer returns a WriteCloser that can be used to write the last argument.
 // The returned writer must be closed once the write is complete.
-func (response *InboundCallResponse) Arg3Writer() (io.WriteCloser, error) {
+func (response *InboundCallResponse) Arg3Writer() (ArgWriter, error) {
 	return response.arg3Writer()
 }
 
@@ -297,5 +309,10 @@ func (response *InboundCallResponse) doneSending() {
 	latency := timeNow().Sub(response.calledAt)
 	response.statsReporter.RecordTimer("inbound.calls.latency", response.commonStatsTags, latency)
 
+	response.mex.shutdown()
+}
+
+// errorSending shuts down the message exhcnage for this call, and records counters.
+func (response *InboundCallResponse) errorSending() {
 	response.mex.shutdown()
 }

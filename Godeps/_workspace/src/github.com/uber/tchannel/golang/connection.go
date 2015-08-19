@@ -74,6 +74,9 @@ var (
 	// request through a connection which has not yet been initialized
 	ErrConnectionNotReady = errors.New("connection is not yet ready")
 
+	// errConnectionInvalidState is returned when the connection is in an unknown state.
+	errConnectionUnknownState = errors.New("connection is in an invalid state")
+
 	// ErrSendBufferFull is returned when a message cannot be sent to the
 	// peer because the frame sending buffer has become full.  Typically
 	// this indicates that the connection is stuck and writes have become
@@ -100,13 +103,21 @@ type ConnectionOptions struct {
 	ChecksumType ChecksumType
 }
 
-// OnActiveHandler is the event handler for when a connection becomes active.
-type OnActiveHandler func(c *Connection)
+// connectionEvents are the events that can be triggered by a connection.
+type connectionEvents struct {
+	// OnActive is called when a connection becomes active.
+	OnActive func(c *Connection)
+
+	// OnCloseStateChange is called when a connection that is closing changes state.
+	OnCloseStateChange func(c *Connection)
+}
 
 // Connection represents a connection to a remote peer.
 type Connection struct {
+	connID          uint32
 	log             Logger
 	statsReporter   StatsReporter
+	traceReporter   TraceReporter
 	checksumType    ChecksumType
 	framePool       FramePool
 	conn            net.Conn
@@ -118,8 +129,9 @@ type Connection struct {
 	inbound         messageExchangeSet
 	outbound        messageExchangeSet
 	handlers        *handlerMap
+	subchannels     *subChannelMap
 	nextMessageID   uint32
-	onActive        OnActiveHandler
+	events          connectionEvents
 	commonStatsTags map[string]string
 }
 
@@ -130,7 +142,7 @@ type connectionState int
 
 const (
 	// Connection initiated by peer is waiting to recv init-req from peer
-	connectionWaitingToRecvInitReq connectionState = iota
+	connectionWaitingToRecvInitReq connectionState = iota + 1
 
 	// Connection initated by current process is waiting to send init-req to peer
 	connectionWaitingToSendInitReq
@@ -154,23 +166,25 @@ const (
 	connectionClosed
 )
 
+//go:generate stringer -type=connectionState
+
 // Creates a new Connection around an outbound connection initiated to a peer
-func (ch *Channel) newOutboundConnection(hostPort string, opts *ConnectionOptions) (*Connection, error) {
+func (ch *Channel) newOutboundConnection(hostPort string, events connectionEvents, opts *ConnectionOptions) (*Connection, error) {
 	conn, err := net.Dial("tcp", hostPort)
 	if err != nil {
 		return nil, err
 	}
 
-	return ch.newConnection(conn, connectionWaitingToSendInitReq, nil, opts), nil
+	return ch.newConnection(conn, connectionWaitingToSendInitReq, events, opts), nil
 }
 
 // Creates a new Connection based on an incoming connection from a peer
-func (ch *Channel) newInboundConnection(conn net.Conn, onActive OnActiveHandler, opts *ConnectionOptions) (*Connection, error) {
-	return ch.newConnection(conn, connectionWaitingToRecvInitReq, onActive, opts), nil
+func (ch *Channel) newInboundConnection(conn net.Conn, events connectionEvents, opts *ConnectionOptions) (*Connection, error) {
+	return ch.newConnection(conn, connectionWaitingToRecvInitReq, events, opts), nil
 }
 
 // Creates a new connection in a given initial state
-func (ch *Channel) newConnection(conn net.Conn, initialState connectionState, onActive OnActiveHandler, opts *ConnectionOptions) *Connection {
+func (ch *Channel) newConnection(conn net.Conn, initialState connectionState, events connectionEvents, opts *ConnectionOptions) *Connection {
 	if opts == nil {
 		opts = &ConnectionOptions{}
 	}
@@ -196,13 +210,19 @@ func (ch *Channel) newConnection(conn net.Conn, initialState connectionState, on
 	}
 
 	connID := atomic.AddUint32(&nextConnID, 1)
-	log := PrefixedLogger(fmt.Sprintf("C%v ", connID), ch.log)
+	log := ch.log.WithFields(LogFields{
+		{"connID", connID},
+		{"localPeer", conn.LocalAddr()},
+		{"remotePeer", conn.RemoteAddr()},
+	}...)
 	peerInfo := ch.PeerInfo()
 	log.Debugf("created for %v (%v) local: %v remote: %v",
 		peerInfo.ServiceName, peerInfo.ProcessName, conn.LocalAddr(), conn.RemoteAddr())
 	c := &Connection{
+		connID:        connID,
 		log:           log,
 		statsReporter: ch.statsReporter,
+		traceReporter: ch.traceReporter,
 		conn:          conn,
 		framePool:     framePool,
 		state:         initialState,
@@ -220,27 +240,31 @@ func (ch *Channel) newConnection(conn net.Conn, initialState connectionState, on
 			exchanges: make(map[uint32]*messageExchange),
 		},
 		handlers:        ch.handlers,
-		onActive:        onActive,
+		events:          events,
 		commonStatsTags: ch.commonStatsTags,
+		subchannels:     ch.subChannels,
 	}
+	c.inbound.onRemoved = c.checkExchanges
+	c.outbound.onRemoved = c.checkExchanges
 
-	go c.readFrames()
-	go c.writeFrames()
+	go c.readFrames(connID)
+	go c.writeFrames(connID)
 	return c
 }
 
 // IsActive returns whether this connection is in an active state.
 func (c *Connection) IsActive() bool {
-	var isActive bool
-	c.withStateRLock(func() error {
-		isActive = (c.state == connectionActive)
-		return nil
-	})
-	return isActive
+	return c.readState() == connectionActive
 }
 
 func (c *Connection) callOnActive() {
-	if f := c.onActive; f != nil {
+	if f := c.events.OnActive; f != nil {
+		f(c)
+	}
+}
+
+func (c *Connection) callOnCloseStateChange() {
+	if f := c.events.OnCloseStateChange; f != nil {
 		f(c)
 	}
 }
@@ -259,7 +283,7 @@ func (c *Connection) sendInit(ctx context.Context) error {
 		case connectionActive, connectionWaitingToRecvInitRes:
 			return errConnectionAlreadyActive
 		default:
-			return fmt.Errorf("connection in unknown state %d", c.state)
+			return errConnectionUnknownState
 		}
 	})
 	if err != nil {
@@ -285,30 +309,12 @@ func (c *Connection) sendInit(ctx context.Context) error {
 		return c.connectionError(err)
 	}
 
-	res := initRes{initMessage{id: initMsgID}}
+	res := initRes{}
 	err = c.recvMessage(ctx, &res, mex.recvCh)
 	if err != nil {
 		return c.connectionError(err)
 	}
 
-	if res.Version != CurrentProtocolVersion {
-		return c.connectionError(fmt.Errorf("Unsupported protocol version %d from peer", res.Version))
-	}
-
-	c.remotePeerInfo.HostPort = res.initParams[InitParamHostPort]
-	if c.remotePeerInfo.IsEphemeral() {
-		c.remotePeerInfo.HostPort = c.conn.RemoteAddr().String()
-	}
-	c.remotePeerInfo.ProcessName = res.initParams[InitParamProcessName]
-
-	c.withStateLock(func() error {
-		if c.state == connectionWaitingToRecvInitRes {
-			c.state = connectionActive
-		}
-		return nil
-	})
-
-	c.callOnActive()
 	return nil
 }
 
@@ -316,13 +322,7 @@ func (c *Connection) sendInit(ctx context.Context) error {
 // InitReq, and the InitReq is valid, send a corresponding InitRes and mark
 // ourselves as active
 func (c *Connection) handleInitReq(frame *Frame) {
-	if err := c.withStateRLock(func() error {
-		return nil
-	}); err != nil {
-		c.connectionError(err)
-		return
-	}
-
+	id := frame.Header.ID
 	var req initReq
 	rbuf := typed.NewReadBuffer(frame.SizedPayload())
 	if err := req.read(rbuf); err != nil {
@@ -332,14 +332,21 @@ func (c *Connection) handleInitReq(frame *Frame) {
 	}
 
 	if req.Version != CurrentProtocolVersion {
-		// TODO(mmihic): Send protocol error
-		c.connectionError(fmt.Errorf("Unsupported protocol version %d from peer", req.Version))
+		c.protocolError(id, fmt.Errorf("Unsupported protocol version %d from peer", req.Version))
 		return
 	}
 
-	c.remotePeerInfo.HostPort = req.initParams[InitParamHostPort]
-	c.remotePeerInfo.ProcessName = req.initParams[InitParamProcessName]
+	var ok bool
+	if c.remotePeerInfo.HostPort, ok = req.initParams[InitParamHostPort]; !ok {
+		c.protocolError(id, fmt.Errorf("Header %v is required", InitParamHostPort))
+		return
+	}
+	if c.remotePeerInfo.ProcessName, ok = req.initParams[InitParamProcessName]; !ok {
+		c.protocolError(id, fmt.Errorf("Header %v is required", InitParamProcessName))
+		return
+	}
 	if c.remotePeerInfo.IsEphemeral() {
+		// TODO(prashant): Add an IsEphemeral bool to the peer info.
 		c.remotePeerInfo.HostPort = c.conn.RemoteAddr().String()
 	}
 
@@ -400,6 +407,11 @@ func (c *Connection) handlePingRes(frame *Frame) bool {
 
 // handlePingReq responds to the pingReq message with a pingRes.
 func (c *Connection) handlePingReq(frame *Frame) {
+	if c.readState() != connectionActive {
+		c.protocolError(frame.Header.ID, fmt.Errorf("connection state is not active"))
+		return
+	}
+
 	pingRes := &pingRes{id: frame.Header.ID}
 	if err := c.sendMessage(pingRes); err != nil {
 		c.connectionError(err)
@@ -408,37 +420,54 @@ func (c *Connection) handlePingReq(frame *Frame) {
 
 // Handles an incoming InitRes.  If we are waiting for the peer to send us an
 // InitRes, forward the InitRes to the waiting goroutine
-
-// TODO(mmihic): There is a race condition here, in that the peer might start
-// sending us requests before the goroutine doing initialization has a chance
-// to process the InitRes.  We probably want to move the InitRes checking to
-// here (where it will run in the receiver goroutine and thus block new
-// incoming messages), and simply signal the init goroutine that we are done
 func (c *Connection) handleInitRes(frame *Frame) bool {
-	if err := c.withStateRLock(func() error {
-		switch c.state {
-		case connectionWaitingToRecvInitRes:
-			return nil
-		case connectionClosed, connectionStartClose, connectionInboundClosed:
-			return ErrConnectionClosed
-
-		case connectionActive:
-			return errConnectionAlreadyActive
-
-		case connectionWaitingToSendInitReq:
-			return ErrConnectionNotReady
-
-		case connectionWaitingToRecvInitReq:
-			return errConnectionWaitingOnPeerInit
-
-		default:
-			return fmt.Errorf("Connection in unknown state %d", c.state)
-		}
-	}); err != nil {
+	var err error
+	switch c.readState() {
+	case connectionWaitingToRecvInitRes:
+		err = nil
+	case connectionClosed, connectionStartClose, connectionInboundClosed:
+		err = ErrConnectionClosed
+	case connectionActive:
+		err = errConnectionAlreadyActive
+	case connectionWaitingToSendInitReq:
+		err = ErrConnectionNotReady
+	case connectionWaitingToRecvInitReq:
+		err = errConnectionWaitingOnPeerInit
+	default:
+		err = errConnectionUnknownState
+	}
+	if err != nil {
 		c.connectionError(err)
 		return true
 	}
 
+	res := initRes{initMessage{id: frame.Header.ID}}
+	if err := frame.read(&res); err != nil {
+		c.connectionError(fmt.Errorf("failed to read initRes from frame"))
+		return true
+	}
+
+	if res.Version != CurrentProtocolVersion {
+		c.protocolError(frame.Header.ID, fmt.Errorf("unsupported protocol version %d from peer", res.Version))
+		return true
+	}
+
+	c.remotePeerInfo.HostPort = res.initParams[InitParamHostPort]
+	if c.remotePeerInfo.IsEphemeral() {
+		c.remotePeerInfo.HostPort = c.conn.RemoteAddr().String()
+	}
+	c.remotePeerInfo.ProcessName = res.initParams[InitParamProcessName]
+
+	c.withStateLock(func() error {
+		if c.state == connectionWaitingToRecvInitRes {
+			c.state = connectionActive
+		}
+		return nil
+	})
+	c.callOnActive()
+
+	// We forward the peer frame, as the other side is blocked waiting on this frame.
+	// Rather than add another mechanism, we use the mex to block the sender till we get initRes.
 	if err := c.outbound.forwardPeerFrame(frame); err != nil {
 		c.connectionError(errCannotHandleInitRes)
 		return true
@@ -483,22 +512,52 @@ func (c *Connection) NextMessageID() uint32 {
 	return atomic.AddUint32(&c.nextMessageID, 1)
 }
 
-// connectionError handles a connection level error
-func (c *Connection) connectionError(err error) error {
-	doClose := false
-	c.withStateLock(func() error {
-		if c.state != connectionClosed {
-			c.state = connectionClosed
-			doClose = true
-		}
-		return nil
-	})
+// SendSystemError sends an error frame for the given system error.
+func (c *Connection) SendSystemError(id uint32, span *Span, err error) error {
+	frame := c.framePool.Get()
 
-	if doClose {
-		c.closeNetwork()
+	errorSpan := Span{}
+	if span != nil {
+		errorSpan = *span
 	}
 
+	if err := frame.write(&errorMessage{
+		id:      id,
+		errCode: GetSystemErrorCode(err),
+		tracing: errorSpan,
+		message: err.Error()}); err != nil {
+
+		// This shouldn't happen - it means writing the errorMessage is broken.
+		c.log.Warnf("Could not create outbound frame to %s for %d: %v",
+			c.remotePeerInfo, id, err)
+		return fmt.Errorf("failed to create outbound error frame")
+	}
+
+	select {
+	case c.sendCh <- frame: // Good to go
+	default: // Nothing we can do here anyway
+		c.log.Warnf("Could not send error frame to %s for %d : %v",
+			c.remotePeerInfo, id, err)
+		return fmt.Errorf("failed to send error frame")
+	}
+
+	return nil
+}
+
+// connectionError handles a connection level error
+func (c *Connection) connectionError(err error) error {
+	c.log.Warnf("Connection error: %v", err)
+	c.Close()
 	return NewWrappedSystemError(ErrCodeNetwork, err)
+}
+
+func (c *Connection) protocolError(id uint32, err error) error {
+	c.log.Warnf("Protocol error: %v", err)
+	sysErr := NewWrappedSystemError(ErrCodeProtocol, err)
+	c.SendSystemError(id, nil, sysErr)
+	// Don't close the connection until the error has been sent.
+	c.Close()
+	return sysErr
 }
 
 // withStateLock performs an action with the connection state mutex locked
@@ -509,12 +568,11 @@ func (c *Connection) withStateLock(f func() error) error {
 	return f()
 }
 
-// withStateRLock an action with the connection state mutex held in a read lock
-func (c *Connection) withStateRLock(f func() error) error {
+func (c *Connection) readState() connectionState {
 	c.stateMut.RLock()
-	defer c.stateMut.RUnlock()
-
-	return f()
+	state := c.state
+	c.stateMut.RUnlock()
+	return state
 }
 
 // readFrames is the loop that reads frames from the network connection and
@@ -522,10 +580,10 @@ func (c *Connection) withStateRLock(f func() error) error {
 // prevent overlapping reads on the socket.  Most handlers simply send the
 // incoming frame to a channel; the init handlers are a notable exception,
 // since we cannot process new frames until the initialization is complete.
-func (c *Connection) readFrames() {
+func (c *Connection) readFrames(_ uint32) {
 	for {
 		frame := c.framePool.Get()
-		if err := frame.ReadFrom(c.conn); err != nil {
+		if err := frame.ReadIn(c.conn); err != nil {
 			c.framePool.Release(frame)
 			c.connectionError(err)
 			return
@@ -565,11 +623,15 @@ func (c *Connection) readFrames() {
 
 // writeFrames is the main loop that pulls frames from the send channel and
 // writes them to the connection.
-func (c *Connection) writeFrames() {
+func (c *Connection) writeFrames(_ uint32) {
 	for f := range c.sendCh {
-		c.log.Debugf("Writing frame %s", f.Header)
+		if f == nil {
+			close(c.sendCh)
+			break
+		}
 
-		err := f.WriteTo(c.conn)
+		c.log.Debugf("Writing frame %s", f.Header)
+		err := f.WriteOut(c.conn)
 		c.framePool.Release(f)
 		if err != nil {
 			c.connectionError(err)
@@ -579,6 +641,81 @@ func (c *Connection) writeFrames() {
 
 	// Close the network after we have sent the last frame
 	c.closeNetwork()
+}
+
+// checkExchanges is called whenever an exchange is removed, and when Close is called.
+func (c *Connection) checkExchanges() {
+	moveState := func(fromState, toState connectionState) bool {
+		err := c.withStateLock(func() error {
+			if c.state != fromState {
+				return errors.New("")
+			}
+			c.state = toState
+			return nil
+		})
+		return err == nil
+	}
+
+	var updated bool
+	if c.readState() == connectionStartClose {
+		if c.inbound.count() == 0 && moveState(connectionStartClose, connectionInboundClosed) {
+			updated = true
+		}
+		// If there was no update to the state, there's no more processing to do.
+		if !updated {
+			return
+		}
+	}
+
+	if c.readState() == connectionInboundClosed {
+		if c.outbound.count() == 0 && moveState(connectionInboundClosed, connectionClosed) {
+			updated = true
+		}
+	}
+
+	if updated {
+		curState := c.readState()
+		// If the connection is closed, we can safely close the channel.
+		if curState == connectionClosed {
+			close(c.sendCh)
+		}
+
+		c.log.Debugf("checkExchanges updated connection state to %v", curState)
+		c.callOnCloseStateChange()
+	}
+}
+
+// Close starts a graceful Close which will first reject incoming calls, reject outgoing calls
+// before finally marking the connection state as closed.
+func (c *Connection) Close() error {
+	c.log.Debugf("Connection Close")
+
+	var closeSendCh bool
+	// Update the state which will start blocking incoming calls.
+	if err := c.withStateLock(func() error {
+		switch c.state {
+		case connectionActive:
+			c.state = connectionStartClose
+		case connectionWaitingToRecvInitReq, connectionWaitingToRecvInitRes:
+			// If the connection isn't active yet, it can be closed after messages in sendCh.
+			c.state = connectionClosed
+			closeSendCh = true
+		default:
+			return fmt.Errorf("connection must be Active to Close")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if closeSendCh {
+		close(c.sendCh)
+	}
+
+	// Check all in-flight requests to see whether we can transition the Close state.
+	c.checkExchanges()
+
+	return nil
 }
 
 // closeNetwork closes the network connection and all network-related channels.

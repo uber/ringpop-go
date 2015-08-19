@@ -21,7 +21,6 @@ package tchannel
 // THE SOFTWARE.
 
 import (
-	"fmt"
 	"io"
 	"time"
 
@@ -29,21 +28,20 @@ import (
 	"golang.org/x/net/context"
 )
 
+// maxOperationSize is the maximum size of arg1.
+const maxOperationSize = 16 * 1024
+
 // beginCall begins an outbound call on the connection
 func (c *Connection) beginCall(ctx context.Context, serviceName string, callOptions *CallOptions) (*OutboundCall, error) {
-	if err := c.withStateRLock(func() error {
-		switch c.state {
-		case connectionActive, connectionStartClose, connectionInboundClosed:
-			return nil
-		case connectionClosed:
-			return ErrConnectionClosed
-		case connectionWaitingToRecvInitReq, connectionWaitingToSendInitReq, connectionWaitingToRecvInitRes:
-			return ErrConnectionNotReady
-		}
-
-		return nil
-	}); err != nil {
-		return nil, err
+	switch c.readState() {
+	case connectionActive, connectionStartClose:
+		break
+	case connectionInboundClosed, connectionClosed:
+		return nil, ErrConnectionClosed
+	case connectionWaitingToRecvInitReq, connectionWaitingToSendInitReq, connectionWaitingToRecvInitRes:
+		return nil, ErrConnectionNotReady
+	default:
+		return nil, errConnectionUnknownState
 	}
 
 	deadline, ok := ctx.Deadline()
@@ -62,7 +60,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 		return nil, err
 	}
 
-	headers := callHeaders{
+	headers := transportHeaders{
 		CallerName: c.localPeerInfo.ServiceName,
 	}
 	callOptions.setHeaders(headers)
@@ -78,7 +76,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 	}
 	call.statsReporter = c.statsReporter
 	call.createStatsTags(c.commonStatsTags)
-	call.log = PrefixedLogger(fmt.Sprintf("Out%v-Call ", requestID), c.log)
+	call.log = c.log.WithFields(LogField{"Out-Call", requestID})
 
 	// TODO(mmihic): It'd be nice to do this without an fptr
 	call.messageForFragment = func(initial bool) message {
@@ -98,12 +96,18 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 		call.callReq.Tracing.EnableTracing(false)
 	}
 
+	call.AddBinaryAnnotation(BinaryAnnotation{Key: "cn", Value: call.callReq.Headers[CallerName]})
+	call.AddBinaryAnnotation(BinaryAnnotation{Key: "as", Value: call.callReq.Headers[ArgScheme]})
+	call.AddAnnotation(AnnotationKeyClientSend)
+
 	response := new(OutboundCallResponse)
 	response.startedAt = timeNow()
 	response.mex = mex
-	response.log = PrefixedLogger(fmt.Sprintf("Out%v-Response ", requestID), c.log)
+	response.log = c.log.WithFields(LogField{"Out-Response", requestID})
 	response.messageForFragment = func(initial bool) message {
 		if initial {
+			call.AddAnnotation(AnnotationKeyClientReceive)
+			call.Report(call.callReq.Tracing, c.traceReporter)
 			return &response.callRes
 		}
 
@@ -142,6 +146,7 @@ func (c *Connection) handleCallResContinue(frame *Frame) bool {
 // ArgReader2() and ArgReader3() methods on the Response() object.
 type OutboundCall struct {
 	reqResWriter
+	Annotations
 
 	callReq         callReq
 	response        *OutboundCallResponse
@@ -167,6 +172,10 @@ func (call *OutboundCall) createStatsTags(connectionTags map[string]string) {
 
 // writeOperation writes the operation (arg1) to the call
 func (call *OutboundCall) writeOperation(operation []byte) error {
+	if len(operation) > maxOperationSize {
+		return call.failed(ErrOperationTooLarge)
+	}
+
 	// TODO(prashant): Should operation become part of BeginCall so this can use Format directly.
 	if call.callReq.Headers[ArgScheme] != HTTP.String() {
 		call.commonStatsTags["target-endpoint"] = string(operation)
@@ -178,13 +187,13 @@ func (call *OutboundCall) writeOperation(operation []byte) error {
 
 // Arg2Writer returns a WriteCloser that can be used to write the second argument.
 // The returned writer must be closed once the write is complete.
-func (call *OutboundCall) Arg2Writer() (io.WriteCloser, error) {
+func (call *OutboundCall) Arg2Writer() (ArgWriter, error) {
 	return call.arg2Writer()
 }
 
 // Arg3Writer returns a WriteCloser that can be used to write the last argument.
 // The returned writer must be closed once the write is complete.
-func (call *OutboundCall) Arg3Writer() (io.WriteCloser, error) {
+func (call *OutboundCall) Arg3Writer() (ArgWriter, error) {
 	return call.arg3Writer()
 }
 
@@ -239,17 +248,19 @@ func (response *OutboundCallResponse) Arg3Reader() (io.ReadCloser, error) {
 // channel and converted into a SystemError returned from the next reader or
 // access call.
 func (c *Connection) handleError(frame *Frame) {
-	var errorMessage errorMessage
+	errMsg := errorMessage{
+		id: frame.Header.ID,
+	}
 	rbuf := typed.NewReadBuffer(frame.SizedPayload())
-	if err := errorMessage.read(rbuf); err != nil {
+	if err := errMsg.read(rbuf); err != nil {
 		c.log.Warnf("Unable to read Error frame from %s: %v", c.remotePeerInfo, err)
 		c.connectionError(err)
 		return
 	}
 
-	if errorMessage.errCode == ErrCodeProtocol {
-		c.log.Warnf("Peer %s reported protocol error: %s", c.remotePeerInfo, errorMessage.message)
-		c.connectionError(errorMessage.AsSystemError())
+	if errMsg.errCode == ErrCodeProtocol {
+		c.log.Warnf("Peer %s reported protocol error: %s", c.remotePeerInfo, errMsg.message)
+		c.connectionError(errMsg.AsSystemError())
 		return
 	}
 

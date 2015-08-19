@@ -87,7 +87,10 @@ var (
 	ErrTimeoutRequired = NewSystemError(ErrCodeBadRequest, "timeout required")
 
 	// ErrChannelClosed is a SystemError indicating that the channel has been closed.
-	ErrChannelClosed = NewSystemError(ErrCodeDeclined, "closed channel cannot make calls")
+	ErrChannelClosed = NewSystemError(ErrCodeDeclined, "closed channel")
+
+	// ErrOperationTooLarge is a SystemError indicating that the operation is too large.
+	ErrOperationTooLarge = NewSystemError(ErrCodeProtocol, "operation too large")
 )
 
 // A SystemError is a system-level error, containing an error code and message
@@ -100,8 +103,8 @@ type SystemError struct {
 }
 
 // NewSystemError defines a new SystemError with a code and message
-func NewSystemError(code SystemErrCode, msg string) error {
-	return SystemError{code: code, msg: msg}
+func NewSystemError(code SystemErrCode, msg string, args ...interface{}) error {
+	return SystemError{code: code, msg: fmt.Sprintf(msg, args...)}
 }
 
 // NewWrappedSystemError defines a new SystemError wrapping an existing error

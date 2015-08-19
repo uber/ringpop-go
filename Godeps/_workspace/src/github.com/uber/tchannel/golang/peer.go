@@ -74,6 +74,18 @@ func (l *PeerList) GetOrAdd(hostPort string) *Peer {
 	return l.Add(hostPort)
 }
 
+// Copy returns a copy of the peer list. This method should only be used for testing.
+func (l *PeerList) Copy() map[string]*Peer {
+	l.mut.RLock()
+	defer l.mut.RUnlock()
+
+	listCopy := make(map[string]*Peer)
+	for k, v := range l.peersByHostPort {
+		listCopy[k] = v
+	}
+	return listCopy
+}
+
 // Close closes connections for all peers.
 func (l *PeerList) Close() {
 	l.mut.RLock()
@@ -127,10 +139,6 @@ func randConn(conns []*Connection) *Connection {
 // GetConnection returns an active connection to this peer. If no active connections
 // are found, it will create a new outbound connection and return it.
 func (p *Peer) GetConnection(ctx context.Context) (*Connection, error) {
-	if p.channel.Closed() {
-		return nil, ErrChannelClosed
-	}
-
 	// TODO(prashant): Use some sort of scoring to pick a connection.
 	if activeConns := p.getActive(); len(activeConns) > 0 {
 		return randConn(activeConns), nil
@@ -147,7 +155,10 @@ func (p *Peer) GetConnection(ctx context.Context) (*Connection, error) {
 // AddConnection adds an active connection to the peer's connection list.
 // If a connection is not active, ErrInvalidConnectionState will be returned.
 func (p *Peer) AddConnection(c *Connection) error {
-	if !c.IsActive() {
+	switch c.readState() {
+	case connectionActive, connectionStartClose:
+		break
+	default:
 		return ErrInvalidConnectionState
 	}
 
@@ -160,13 +171,8 @@ func (p *Peer) AddConnection(c *Connection) error {
 
 // Connect adds a new outbound connection to the peer.
 func (p *Peer) Connect(ctx context.Context) (*Connection, error) {
-	ch := p.channel
-	c, err := ch.newOutboundConnection(p.hostPort, &ch.connectionOptions)
+	c, err := p.channel.Connect(ctx, p.hostPort, &p.channel.connectionOptions)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := c.sendInit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -203,6 +209,6 @@ func (p *Peer) Close() {
 	defer p.mut.RUnlock()
 
 	for _, c := range p.connections {
-		c.closeNetwork()
+		c.Close()
 	}
 }

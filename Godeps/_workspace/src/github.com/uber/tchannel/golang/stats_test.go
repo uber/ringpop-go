@@ -67,16 +67,16 @@ func TestStatsCalls(t *testing.T) {
 	// sender records call latency
 	// so expected inbound latency = incrementor, outbound = 3 * incrementor
 
+	clientStats := newRecordingStatsReporter()
 	serverStats := newRecordingStatsReporter()
 	serverOpts := &testutils.ChannelOpts{
 		StatsReporter: serverStats,
 	}
-	require.NoError(t, testutils.WithServer(serverOpts, func(serverCh *Channel, hostPort string) {
+	WithVerifiedServer(t, serverOpts, func(serverCh *Channel, hostPort string) {
 		handler := raw.Wrap(newTestHandler(t))
 		serverCh.Register(handler, "echo")
 		serverCh.Register(handler, "app-error")
 
-		clientStats := newRecordingStatsReporter()
 		ch, err := testutils.NewClient(&testutils.ChannelOpts{StatsReporter: clientStats})
 		require.NoError(t, err)
 
@@ -111,8 +111,8 @@ func TestStatsCalls(t *testing.T) {
 		serverStats.Expected.IncCounter("inbound.calls.recvd", inboundTags, 1)
 		serverStats.Expected.IncCounter("inbound.calls.app-errors", inboundTags, 1)
 		serverStats.Expected.RecordTimer("inbound.calls.latency", inboundTags, 70*time.Millisecond)
+	})
 
-		clientStats.Validate(t)
-		serverStats.Validate(t)
-	}))
+	clientStats.Validate(t)
+	serverStats.Validate(t)
 }
