@@ -2,11 +2,11 @@ package ringpop
 
 import (
 	"bytes"
-	"github.com/uber/ringpop-go/rbtree"
 	"sort"
 	"sync"
 
 	"github.com/dgryski/go-farm"
+	"github.com/uber/ringpop-go/rbtree"
 )
 
 func offsetFarmHash32(b []byte, off int) uint32 {
@@ -108,6 +108,8 @@ func (r *hashRing) serverCount() int {
 }
 
 func (r *hashRing) lookup(key string) (string, bool) {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
 	iter := r.tree.IterAt(int(farm.Hash32([]byte(key))))
 	if !iter.Nil() {
 		return iter.Str(), true

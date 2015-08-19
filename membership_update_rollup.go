@@ -71,15 +71,20 @@ func (mr *membershipUpdateRollup) trackUpdates(changes []Change) (flushed bool) 
 		return flushed
 	}
 
+	mr.lock.RLock()
+	flushInterval := mr.flushInterval
 	sinceLastUpdate := time.Now().Sub(mr.lastUpdateTime)
-	if sinceLastUpdate >= mr.flushInterval {
+	mr.lock.RUnlock()
+	if sinceLastUpdate >= flushInterval {
 		mr.flushBuffer()
 		flushed = true
 	}
 
+	mr.lock.Lock()
 	if mr.firstUpdateTime.IsZero() {
 		mr.firstUpdateTime = time.Now()
 	}
+	mr.lock.Unlock()
 
 	mr.renewFlushTimer()
 	mr.addUpdates(changes)
