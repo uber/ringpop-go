@@ -101,7 +101,7 @@ func (p *pingReqSender) sendPingReq() (pingReqRes, error) {
 
 func (p *pingReqSender) send(ctx json.Context, resBody *pingReqRes, errC chan<- error) {
 	defer close(errC)
-	peer := p.ringpop.channel.Peers().GetOrAdd(p.address)
+	peer := p.ringpop.GetOrAddPeer(p.address)
 
 	reqBody := pingReqBody{
 		Checksum:          p.ringpop.membership.checksum,

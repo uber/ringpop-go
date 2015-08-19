@@ -112,7 +112,7 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 	defer cancel()
 
 	// Relay this directly via tchannel to the appropriate end point
-	peer := ringpop.channel.Peers().GetOrAdd(pReq.Header.HostPort)
+	peer := ringpop.GetOrAddPeer(pReq.Header.HostPort)
 
 	if err := json.CallPeer(ctx, peer, pReq.Header.Service, pReq.Header.Operation, pReq,
 		&res); err != nil {

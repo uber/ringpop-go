@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/uber/tchannel/golang"
 )
 
 func TestServerJoin(t *testing.T) {
@@ -166,4 +167,52 @@ func TestServerGossipPingTimesOut(t *testing.T) {
 	res, err := sendPing(ringpop, remote, time.Millisecond)
 	assert.Error(t, err, "expected ping to have timed out")
 	assert.Nil(t, res, "expected res to be nil")
+}
+
+func TestServerSubchannel(t *testing.T) {
+	// First create a top level tchannel
+	ch, err := tchannel.NewChannel("testServer", nil)
+	require.NoError(t, err, "expected channel to be created successfully")
+
+	// Listen on this channel
+	err = ch.ListenAndServe("127.0.0.1:3001")
+	require.NoError(t, err, "expected channel to listen on 127.0.0.1:3001")
+	defer ch.Close()
+
+	// Now create a ringpop with a subchannel
+	ringpop1 := newServerRingpopSub(t, "127.0.0.1:3001", ch)
+	defer ringpop1.Destroy()
+
+	nodesJoined, err := ringpop1.Bootstrap(&BootstrapOptions{
+		Hosts:   []string{"127.0.0.1:3001"},
+		Stopped: true,
+	})
+
+	require.NoError(t, err, "ringpop must bootstrap successfully")
+	require.Empty(t, nodesJoined, "ringpop must only join self")
+
+	// create a new instance of ringpop as usual with a top level channel
+	ringpop2 := newServerRingpop(t, "127.0.0.1:3002")
+	defer ringpop2.Destroy()
+
+	nodesJoined, err = ringpop2.Bootstrap(&BootstrapOptions{
+		Hosts:   []string{"127.0.0.1:3001", "127.0.0.1:3002"},
+		Stopped: true,
+	})
+
+	// we should join and gossip properly
+	require.NoError(t, err, "ringpop must bootstrap successfully")
+	require.Len(t, nodesJoined, 1, "ringpop must only join one other ringpop")
+	require.Equal(t, "127.0.0.1:3001", nodesJoined[0], "ringpop must join correct ringpop")
+
+	ringpop1.dissemination.clearChanges()
+	ringpop2.dissemination.clearChanges()
+
+	ringpop2.membership.makeAlive("127.0.0.1:3003", unixMilliseconds(time.Now()))
+	assert.NotEqual(t, ringpop1.membership.checksum, ringpop2.membership.checksum,
+		"expected ringpop checksums to be different")
+
+	ringpop1.gossip.gossip()
+	assert.Equal(t, ringpop1.membership.checksum, ringpop1.membership.checksum,
+		"expected ringpop checksums to converge on gossip ping")
 }

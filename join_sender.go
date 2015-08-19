@@ -374,7 +374,7 @@ func (j *joiner) joinGroup(totalNodesJoined []string) ([]string, []string) {
 
 func (j *joiner) joinNode(ctx json.Context, node string, errC chan error) {
 	defer close(errC)
-	peer := j.ringpop.channel.Peers().GetOrAdd(node)
+	peer := j.ringpop.GetOrAddPeer(node)
 
 	reqBody := joinBody{
 		App:         j.ringpop.app,

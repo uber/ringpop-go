@@ -15,7 +15,7 @@ type arg struct{}
 
 type server struct {
 	ringpop *Ringpop
-	channel *tchannel.Channel
+	channel interface{}
 }
 
 func newServer(ringpop *Ringpop) (*server, error) {
@@ -39,7 +39,7 @@ func newServer(ringpop *Ringpop) (*server, error) {
 	}
 
 	// register handlers
-	err := json.Register(s.channel, handlers, func(ctx context.Context, err error) {
+	err := json.Register(s.channel.(tchannel.Registrar), handlers, func(ctx context.Context, err error) {
 		s.ringpop.logger.WithField("error", err).Info("[ringpop] error occured")
 	})
 	if err != nil {
@@ -50,7 +50,13 @@ func newServer(ringpop *Ringpop) (*server, error) {
 }
 
 func (s *server) listenAndServe() error {
-	return s.channel.ListenAndServe(s.ringpop.WhoAmI())
+	// listen on the socket for the top-level tchannel
+	// subchannel is expected to have a top channel which is listening
+	switch s.ringpop.channel.(type) {
+	case *tchannel.Channel:
+		return s.ringpop.channel.(*tchannel.Channel).ListenAndServe(s.ringpop.WhoAmI())
+	}
+	return nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

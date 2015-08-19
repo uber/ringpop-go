@@ -129,6 +129,19 @@ func newServerRingpop(t *testing.T, hostport string) *Ringpop {
 	return ringpop
 }
 
+func newServerRingpopSub(t *testing.T, hostport string, ch *tchannel.Channel) *Ringpop {
+	subCh := ch.GetSubChannel("ringpop")
+
+	logger := log.New()
+	logger.Out = ioutil.Discard
+
+	ringpop := NewRingpop("test", hostport, subCh, &Options{
+	// Logger: logger,
+	})
+
+	return ringpop
+}
+
 func testPop(hostport string, incarnation int64, opts *Options) *Ringpop {
 	logger := log.New()
 	logger.Out = ioutil.Discard
