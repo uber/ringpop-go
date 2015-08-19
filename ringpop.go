@@ -78,6 +78,7 @@ type Ringpop struct {
 	pinging       bool
 	destroyed     bool
 	destroyedLock sync.Mutex
+	stateLock     sync.Mutex
 
 	pingReqSize int
 
@@ -148,8 +149,10 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 
 	ringpop.eventC = make(chan string, 25)
 
+	ringpop.stateLock.Lock()
 	ringpop.ready = false
 	ringpop.pinging = false
+	ringpop.stateLock.Unlock()
 
 	// set logger to option or default value
 	if ringpop.logger = log.StandardLogger(); opts.Logger != nil {
@@ -661,6 +664,9 @@ func (rp *Ringpop) handleChanges(changes []Change) {
 
 // PingMember is temporary testing func
 func (rp *Ringpop) PingMember(target Member) error {
+	rp.stateLock.Lock()
+	defer rp.stateLock.Unlock()
+
 	_, err := sendPing(rp, target.Address, rp.pingTimeout)
 	if err != nil {
 		rp.logger.WithFields(log.Fields{
@@ -678,6 +684,9 @@ func (rp *Ringpop) PingMember(target Member) error {
 
 // PingMemberNow temporarily exported for testing purposes
 func (rp *Ringpop) PingMemberNow() error {
+	rp.stateLock.Lock()
+	defer rp.stateLock.Unlock()
+
 	if rp.pinging {
 		rp.logger.Warn("[ringpop] aborting ping because one is already in progress")
 		return errors.New("ping aborted because a ping already in progress")

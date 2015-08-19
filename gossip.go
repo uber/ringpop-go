@@ -70,6 +70,9 @@ func (g *gossip) SetStopped(stopped bool) {
 }
 
 func (g *gossip) computeProtocolDelay() time.Duration {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
 	if g.numProtocolPeriods != 0 {
 		target := g.lastProtocolPeriod.Add(g.lastProtocolRate)
 		return time.Duration(math.Max(float64(target.UnixNano()-time.Now().UnixNano()), float64(g.minProtocolPeriod)))
@@ -79,12 +82,18 @@ func (g *gossip) computeProtocolDelay() time.Duration {
 }
 
 func (g *gossip) computeProtocolRate() time.Duration {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
 	observed := g.protocolTiming.Percentile(0.5) * 2.0
 	return time.Duration(math.Max(observed, float64(g.minProtocolPeriod)))
 }
 
 // runs a single gossip protocol period
 func (g *gossip) gossip() {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
 	pingStartTime := time.Now()
 
 	g.ringpop.PingMemberNow()
