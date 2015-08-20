@@ -35,7 +35,6 @@ var errInboundRequestAlreadyActive = errors.New("inbound request is already acti
 // exchange to receive further fragments for that call, and dispatching it in
 // another goroutine
 func (c *Connection) handleCallReq(frame *Frame) bool {
-	// TODO(prashant): Parse out the span from
 	switch state := c.readState(); state {
 	case connectionActive:
 		break
@@ -63,7 +62,17 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 
 	mex, err := c.inbound.newExchange(ctx, c.framePool, callReq.messageType(), frame.Header.ID, 512)
 	if err != nil {
+		if err == errDuplicateMex {
+			err = errInboundRequestAlreadyActive
+		}
 		c.log.Errorf("could not register exchange for %s", frame.Header)
+		c.SendSystemError(frame.Header.ID, nil, err)
+		return true
+	}
+
+	// Close may have been called between the time we checked the state and us creating the exchange.
+	if c.readState() != connectionActive {
+		mex.shutdown()
 		return true
 	}
 
@@ -112,7 +121,7 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	response.commonStatsTags = call.commonStatsTags
 
 	setResponseHeaders(call.headers, response.headers)
-	go c.dispatchInbound(call)
+	go c.dispatchInbound(c.connID, callReq.ID(), call)
 	return false
 }
 
@@ -138,7 +147,7 @@ func (call *InboundCall) createStatsTags(connectionTags map[string]string) {
 }
 
 // dispatchInbound ispatches an inbound call to the appropriate handler
-func (c *Connection) dispatchInbound(call *InboundCall) {
+func (c *Connection) dispatchInbound(_ uint32, _ uint32, call *InboundCall) {
 	c.log.Debugf("Received incoming call for %s from %s", call.ServiceName(), c.remotePeerInfo)
 
 	if err := call.readOperation(); err != nil {

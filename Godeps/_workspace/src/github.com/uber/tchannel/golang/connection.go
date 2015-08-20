@@ -533,15 +533,21 @@ func (c *Connection) SendSystemError(id uint32, span *Span, err error) error {
 		return fmt.Errorf("failed to create outbound error frame")
 	}
 
-	select {
-	case c.sendCh <- frame: // Good to go
-	default: // Nothing we can do here anyway
+	// When sending errors, we hold the state rlock to ensure that sendCh is not closed
+	// as we are sending the frame.
+	return c.withStateRLock(func() error {
+		// Errors cannot be sent if the connection has been closed.
+		if c.state != connectionClosed {
+			select {
+			case c.sendCh <- frame: // Good to go
+				return nil
+			default: // If the send buffer is full, log and return an error.
+			}
+		}
 		c.log.Warnf("Could not send error frame to %s for %d : %v",
 			c.remotePeerInfo, id, err)
 		return fmt.Errorf("failed to send error frame")
-	}
-
-	return nil
+	})
 }
 
 // connectionError handles a connection level error
@@ -563,9 +569,19 @@ func (c *Connection) protocolError(id uint32, err error) error {
 // withStateLock performs an action with the connection state mutex locked
 func (c *Connection) withStateLock(f func() error) error {
 	c.stateMut.Lock()
-	defer c.stateMut.Unlock()
+	err := f()
+	c.stateMut.Unlock()
 
-	return f()
+	return err
+}
+
+// withStateRLock performs an action with the connection state mutex rlocked.
+func (c *Connection) withStateRLock(f func() error) error {
+	c.stateMut.RLock()
+	err := f()
+	c.stateMut.RUnlock()
+
+	return err
 }
 
 func (c *Connection) readState() connectionState {
@@ -625,11 +641,6 @@ func (c *Connection) readFrames(_ uint32) {
 // writes them to the connection.
 func (c *Connection) writeFrames(_ uint32) {
 	for f := range c.sendCh {
-		if f == nil {
-			close(c.sendCh)
-			break
-		}
-
 		c.log.Debugf("Writing frame %s", f.Header)
 		err := f.WriteOut(c.conn)
 		c.framePool.Release(f)
@@ -656,31 +667,30 @@ func (c *Connection) checkExchanges() {
 		return err == nil
 	}
 
-	var updated bool
+	var updated connectionState
 	if c.readState() == connectionStartClose {
 		if c.inbound.count() == 0 && moveState(connectionStartClose, connectionInboundClosed) {
-			updated = true
+			updated = connectionInboundClosed
 		}
 		// If there was no update to the state, there's no more processing to do.
-		if !updated {
+		if updated == 0 {
 			return
 		}
 	}
 
 	if c.readState() == connectionInboundClosed {
 		if c.outbound.count() == 0 && moveState(connectionInboundClosed, connectionClosed) {
-			updated = true
+			updated = connectionClosed
 		}
 	}
 
-	if updated {
-		curState := c.readState()
+	if updated != 0 {
 		// If the connection is closed, we can safely close the channel.
-		if curState == connectionClosed {
+		if updated == connectionClosed {
 			close(c.sendCh)
 		}
 
-		c.log.Debugf("checkExchanges updated connection state to %v", curState)
+		c.log.Debugf("checkExchanges updated connection state to %v", updated)
 		c.callOnCloseStateChange()
 	}
 }

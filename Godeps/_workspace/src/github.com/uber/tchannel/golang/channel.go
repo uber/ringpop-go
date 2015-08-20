@@ -207,7 +207,17 @@ func (ch *Channel) ListenAndServe(hostPort string) error {
 // Registrar is the base interface for registering handlers on either the base
 // Channel or the SubChannel
 type Registrar interface {
+	// ServiceName returns the service name that this Registrar is for.
+	ServiceName() string
+
+	// Register registers a handler for ServiceName and the given operation.
 	Register(h Handler, operationName string)
+
+	// Logger returns the logger for this Registrar.
+	Logger() Logger
+
+	// Peers returns the peer list for this Registrar.
+	Peers() *PeerList
 }
 
 // Register registers a handler for a service+operation pair
@@ -316,6 +326,11 @@ func (ch *Channel) Ping(ctx context.Context, hostPort string) error {
 // Logger returns the logger for this channel.
 func (ch *Channel) Logger() Logger {
 	return ch.log
+}
+
+// ServiceName returns the serviceName that this channel was created for.
+func (ch *Channel) ServiceName() string {
+	return ch.PeerInfo().ServiceName
 }
 
 // Connect connects the channel.
