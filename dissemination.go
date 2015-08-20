@@ -46,6 +46,9 @@ func newDissemination(ringpop *Ringpop) *dissemination {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (d *dissemination) adjustPiggybackCount() {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	serverCount := d.ringpop.ring.serverCount()
 	prevPiggybackCount := d.maxPiggybackCount
 

@@ -137,9 +137,15 @@ func (m *membership) getMemberListLength() int {
 }
 
 func (m *membership) getMembers() map[string]*Member {
+	localMembers := make(map[string]*Member)
 	m.lock.RLock()
 	defer m.lock.RUnlock()
-	return m.members
+
+	// copy the map rather than returning the reference
+	for k, v := range m.members {
+		localMembers[k] = v
+	}
+	return localMembers
 }
 
 func (m *membership) randomPingablemembers(n int, excluding []string) []*Member {
