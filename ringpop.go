@@ -64,7 +64,7 @@ type Ringpop struct {
 	app      string
 	hostPort string
 
-	channel *tchannel.Channel
+	channel tchannel.Registrar
 
 	eventC   chan string
 	emitting bool
@@ -125,7 +125,7 @@ type Ringpop struct {
 }
 
 // NewRingpop creates a new ringpop on the specified hostport.
-func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) *Ringpop {
+func NewRingpop(app, hostport string, channel tchannel.Registrar, opts *Options) *Ringpop {
 	if opts == nil {
 		// opts should contain zero values for each option
 		opts = &Options{}
@@ -220,6 +220,16 @@ func (rp *Ringpop) setDestroyed(destroyed bool) {
 	rp.destroyed = destroyed
 }
 
+// CloseCh closes the tchannel
+func (rp *Ringpop) CloseCh() {
+	switch rp.channel.(type) {
+	case *tchannel.Channel:
+		rp.channel.(*tchannel.Channel).Close()
+	case *tchannel.SubChannel:
+		// TODO: Do Something....
+	}
+}
+
 // Destroy kills the ringpop
 func (rp *Ringpop) Destroy() {
 	rp.setDestroyed(true)
@@ -230,8 +240,7 @@ func (rp *Ringpop) Destroy() {
 	close(rp.eventC)
 
 	// clientRate/serverRate/totalRate stuff
-
-	rp.channel.Close()
+	rp.CloseCh()
 	rp.logger.WithFields(log.Fields{
 		"local":     rp.WhoAmI(),
 		"timestamp": time.Now(),

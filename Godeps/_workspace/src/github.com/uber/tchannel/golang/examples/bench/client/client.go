@@ -42,7 +42,7 @@ func main() {
 		go worker(ch)
 	}
 
-	log.Printf("Config: %v workers on %v threads, setBlockSize %v, getToSetRatio %v",
+	log.Printf("client config: %v workers on %v threads, setBlockSize %v, getToSetRatio %v",
 		*numGoroutines, *numOSThreads, *setBlockSize, *getToSetRatio)
 	requestCountReporter()
 }
@@ -76,12 +76,12 @@ func worker(ch *tchannel.Channel) {
 
 func setRequest(ch *tchannel.Channel, key, value string) error {
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-	_, _, _, err := raw.Call(ctx, ch, *hostPort, "bench-server", "set", []byte(key), []byte(value))
+	_, _, _, err := raw.Call(ctx, ch, *hostPort, "benchmark", "set", []byte(key), []byte(value))
 	return err
 }
 
 func getRequest(ch *tchannel.Channel, key string) (string, error) {
 	ctx, _ := context.WithTimeout(context.Background(), time.Second)
-	_, arg3, _, err := raw.Call(ctx, ch, *hostPort, "bench-server", "get", []byte(key), nil)
+	_, arg3, _, err := raw.Call(ctx, ch, *hostPort, "benchmark", "get", []byte(key), nil)
 	return string(arg3), err
 }

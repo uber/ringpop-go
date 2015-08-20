@@ -29,8 +29,8 @@
 		},
 		{
 			"ImportPath": "github.com/uber/tchannel/golang",
-			"Comment": "py-0.10.0-198-g6358285",
-			"Rev": "ebb8d56ed1f16f1cc00094ee073b41792297381c"
+			"Comment": "py-0.10.0-878-ged78a26",
+			"Rev": "ed78a269a539ecd2d69f693788b0ce1b4de910b4"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
