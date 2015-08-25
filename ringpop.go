@@ -38,8 +38,8 @@ import (
 
 // Options to create a Ringpop with
 type Options struct {
-	Logger log.Logger
-	Stats  log.StatsReporter
+	Logger  log.Logger
+	Statter log.StatsReporter
 }
 
 func defaultOptions() *Options {
@@ -48,7 +48,8 @@ func defaultOptions() *Options {
 	})
 
 	opts := &Options{
-		Logger: logger,
+		Logger:  logger,
+		Statter: new(noopStatsReporter),
 	}
 
 	return opts
@@ -65,8 +66,8 @@ func mergeDefault(opts *Options) *Options {
 		opts.Logger = def.Logger
 	}
 
-	if opts.Stats == nil {
-		opts.Stats = def.Stats
+	if opts.Statter == nil {
+		opts.Statter = def.Statter
 	}
 
 	return opts
@@ -89,7 +90,7 @@ type Ringpop struct {
 
 	listeners []EventListener
 
-	stats        log.StatsReporter
+	statter      log.StatsReporter
 	statHostport string
 	statPrefix   string
 	statKeys     map[string]string
@@ -109,7 +110,7 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 		app:      app,
 		address:  address,
 		logger:   opts.Logger,
-		stats:    opts.Stats,
+		statter:  opts.Statter,
 		statKeys: make(map[string]string),
 	}
 
@@ -349,11 +350,11 @@ func (rp *Ringpop) stat(sType, sKey string, val int64) {
 
 	switch sType {
 	case "increment":
-		rp.stats.Incr(psKey, val)
+		rp.statter.IncCounter(psKey, nil, val)
 	case "gauge":
-		rp.stats.Gauge(psKey, val)
+		rp.statter.UpdateGauge(psKey, nil, val)
 	case "timing":
-		rp.stats.Timing(psKey, val)
+		rp.statter.RecordTimer(psKey, nil, time.Duration(val))
 	}
 }
 
