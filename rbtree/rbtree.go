@@ -1,17 +1,39 @@
+// Copyright (c) 2015 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package rbtree
+
+// TODO: change RBNode.val from int to int64?
 
 // An RBTree is an automatically balancing tree of KVP pairs (presumably)
 type RBTree struct {
-	root *RingNode
+	root *RBNode
 	size int
 }
 
-// A RingNode is a node in the RBTree
-type RingNode struct {
+// An RBNode is a node in the RBTree
+type RBNode struct {
 	val   int
 	str   string
-	left  *RingNode
-	right *RingNode
+	left  *RBNode
+	right *RBNode
 	red   bool
 }
 
@@ -21,7 +43,7 @@ func (t *RBTree) Size() int {
 }
 
 // Child returns the left or right node of the RBTree
-func (n *RingNode) Child(right bool) *RingNode {
+func (n *RBNode) Child(right bool) *RBNode {
 	if right {
 		return n.right
 	}
@@ -29,16 +51,16 @@ func (n *RingNode) Child(right bool) *RingNode {
 }
 
 // Val returns the val contained in the node
-func (n *RingNode) Val() int {
+func (n *RBNode) Val() int {
 	return n.val
 }
 
 // Str returns the str contained in the node
-func (n *RingNode) Str() string {
+func (n *RBNode) Str() string {
 	return n.str
 }
 
-func (n *RingNode) setChild(right bool, node *RingNode) {
+func (n *RBNode) setChild(right bool, node *RBNode) {
 	if right {
 		n.right = node
 	} else {
@@ -47,11 +69,11 @@ func (n *RingNode) setChild(right bool, node *RingNode) {
 }
 
 // returns true if RingNode is red
-func isRed(node *RingNode) bool {
+func isRed(node *RBNode) bool {
 	return node != nil && node.red
 }
 
-func singleRotate(oldroot *RingNode, dir bool) *RingNode {
+func singleRotate(oldroot *RBNode, dir bool) *RBNode {
 	newroot := oldroot.Child(!dir)
 
 	oldroot.setChild(!dir, newroot.Child(dir))
@@ -63,7 +85,7 @@ func singleRotate(oldroot *RingNode, dir bool) *RingNode {
 	return newroot
 }
 
-func doubleRotate(root *RingNode, dir bool) *RingNode {
+func doubleRotate(root *RBNode, dir bool) *RBNode {
 	root.setChild(!dir, singleRotate(root.Child(!dir), !dir))
 	return singleRotate(root, dir)
 }
@@ -72,17 +94,17 @@ func doubleRotate(root *RingNode, dir bool) *RingNode {
 // Returns true on succesful insertion, false if duplicate exists
 func (t *RBTree) Insert(val int, str string) (ret bool) {
 	if t.root == nil {
-		t.root = &RingNode{val: val, str: str}
+		t.root = &RBNode{val: val, str: str}
 		ret = true
 	} else {
-		var head = &RingNode{}
+		var head = &RBNode{}
 
 		var dir = true
 		var last = true
 
-		var parent *RingNode  // parent
-		var gparent *RingNode // grandparent
-		var ggparent = head   // great grandparent
+		var parent *RBNode  // parent
+		var gparent *RBNode // grandparent
+		var ggparent = head // great grandparent
 		var node = t.root
 
 		ggparent.right = t.root
@@ -90,7 +112,7 @@ func (t *RBTree) Insert(val int, str string) (ret bool) {
 		for {
 			if node == nil {
 				// insert new node at bottom
-				node = &RingNode{val: val, str: str, red: true}
+				node = &RBNode{val: val, str: str, red: true}
 				parent.setChild(dir, node)
 				ret = true
 			} else if isRed(node.left) && isRed(node.right) {
@@ -149,11 +171,11 @@ func (t *RBTree) Delete(val int) bool {
 		return false
 	}
 
-	var head = &RingNode{red: true} // fake red node to push down
+	var head = &RBNode{red: true} // fake red node to push down
 	var node = head
-	var parent *RingNode  //parent
-	var gparent *RingNode //grandparent
-	var found *RingNode
+	var parent *RBNode  //parent
+	var gparent *RBNode //grandparent
+	var found *RBNode
 
 	var dir = true
 
@@ -224,7 +246,7 @@ func (t *RBTree) Delete(val int) bool {
 	return found != nil
 }
 
-func (n *RingNode) search(val int) (string, bool) {
+func (n *RBNode) search(val int) (string, bool) {
 	if n.val == val {
 		return n.str, true
 	} else if val < n.val {

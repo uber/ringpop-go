@@ -1,3 +1,23 @@
+// Copyright (c) 2015 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package rbtree
 
 //Iter returns an iterator starting at the leftmost node in the tree
@@ -13,8 +33,8 @@ func (t *RBTree) IterAt(val int) *RBIter {
 // An RBIter iterates over nodes in an RBTree
 type RBIter struct {
 	tree      *RBTree
-	current   *RingNode
-	ancestors []*RingNode
+	current   *RBNode
+	ancestors []*RBNode
 }
 
 // NewRBIter returns an RBIter for the given tree, or nil if the given tree is nil
@@ -26,7 +46,7 @@ func NewRBIter(tree *RBTree) *RBIter {
 	iter := &RBIter{
 		tree:      tree,
 		current:   nil,
-		ancestors: make([]*RingNode, 0),
+		ancestors: make([]*RBNode, 0),
 	}
 	iter.minNode(tree.root)
 
@@ -43,7 +63,7 @@ func NewRBIterAt(tree *RBTree, val int) *RBIter {
 	iter := &RBIter{
 		tree:      tree,
 		current:   nil,
-		ancestors: make([]*RingNode, 0),
+		ancestors: make([]*RBNode, 0),
 	}
 
 	if tree.size == 0 {
@@ -91,7 +111,7 @@ func (i *RBIter) Str() string {
 }
 
 // Next returns the next node in the tree
-func (i *RBIter) Next() *RingNode {
+func (i *RBIter) Next() *RBNode {
 	if i.current == nil {
 		i.minNode(i.tree.root)
 	} else {
@@ -120,7 +140,7 @@ func (i *RBIter) Next() *RingNode {
 }
 
 // sets current to left most node in subtree of root
-func (i *RBIter) minNode(root *RingNode) {
+func (i *RBIter) minNode(root *RBNode) {
 	if root == nil {
 		i.current = root
 		return
@@ -132,11 +152,11 @@ func (i *RBIter) minNode(root *RingNode) {
 	i.current = root
 }
 
-func (i *RBIter) pushA(node *RingNode) {
+func (i *RBIter) pushA(node *RBNode) {
 	i.ancestors = append(i.ancestors, node)
 }
 
-func (i *RBIter) popA() *RingNode {
+func (i *RBIter) popA() *RBNode {
 	ind := len(i.ancestors) - 1
 	if ind < 0 {
 		return nil
