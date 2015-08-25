@@ -21,7 +21,7 @@
 package swim
 
 import (
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/tchannel/golang/json"
 	"golang.org/x/net/context"
 )
@@ -70,12 +70,12 @@ func (n *Node) pingRequestHandler(ctx json.Context, req *pingRequest) (*pingResp
 }
 
 func (n *Node) debugSetHandler(ctx json.Context, req *Arg) (*Arg, error) {
-	n.logger.Level = log.DebugLevel
+	// n.logger.Level = log.DebugLevel
 	return &Arg{}, nil
 }
 
 func (n *Node) debugClearHandler(ctx json.Context, req *Arg) (*Arg, error) {
-	n.logger.Level = log.InfoLevel
+	// n.logger.Level = log.InfoLevel
 	return &Arg{}, nil
 }
 

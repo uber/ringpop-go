@@ -26,13 +26,16 @@ import (
 	"golang.org/x/net/context"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/uber/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/tchannel/golang"
 	"github.com/uber/tchannel/golang/json"
 )
 
-var hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
-var hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
+var (
+	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
+	hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
+)
 
 type worker struct {
 	ringpop *ringpop.Ringpop
@@ -80,10 +83,11 @@ func main() {
 	}
 
 	logger := log.StandardLogger()
+
 	worker := &worker{
 		channel: ch,
 		ringpop: ringpop.NewRingpop("ping-app", *hostport, ch, &ringpop.Options{
-			Logger: logger,
+			Logger: bark.NewLoggerFromLogrus(logger),
 		}),
 		logger: logger,
 	}

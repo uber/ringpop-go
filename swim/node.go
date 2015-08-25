@@ -26,8 +26,9 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
+	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel/golang"
 )
@@ -47,7 +48,7 @@ type Options struct {
 	BootstrapFile  string
 	BootstrapHosts []string
 
-	Logger *log.Logger
+	Logger log.Logger
 }
 
 func defaultOptions() *Options {
@@ -66,9 +67,9 @@ func defaultOptions() *Options {
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
 
-		Logger: &log.Logger{
+		Logger: log.NewLoggerFromLogrus(&logrus.Logger{
 			Out: ioutil.Discard,
-		},
+		}),
 	}
 
 	return opts
@@ -140,7 +141,7 @@ type Node struct {
 
 	startTime time.Time
 
-	logger *log.Logger
+	logger log.Logger
 }
 
 // NewNode returns a new SWIM node

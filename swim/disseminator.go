@@ -24,7 +24,7 @@ import (
 	"math"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 )
 
 var log10 = math.Log(10)
@@ -44,8 +44,6 @@ type disseminator struct {
 	pFactor int
 
 	l sync.RWMutex
-
-	logger *log.Logger
 }
 
 // NewDisseminator returns a new Disseminator instance
@@ -55,7 +53,6 @@ func newDisseminator(n *Node) *disseminator {
 		changes: make(map[string]*pChange),
 		maxP:    1,
 		pFactor: 15,
-		logger:  n.logger,
 	}
 
 	return d
@@ -79,7 +76,7 @@ func (d *disseminator) AdjustMaxPropogations() {
 
 		d.node.emit(MaxPAdjustedEvent{prevMaxP, newMaxP})
 
-		d.logger.WithFields(log.Fields{
+		d.node.logger.WithFields(log.Fields{
 			"local":             d.node.Address(),
 			"newMax":            newMaxP,
 			"prevMax":           prevMaxP,
@@ -127,7 +124,7 @@ func (d *disseminator) IssueAsReceiver(senderAddress string,
 	} else if d.node.memberlist.Checksum() != senderChecksum {
 		d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
 
-		d.logger.WithFields(log.Fields{
+		d.node.logger.WithFields(log.Fields{
 			"local":          d.node.Address(),
 			"localChecksum":  d.node.memberlist.Checksum(),
 			"remote":         senderAddress,

@@ -24,7 +24,7 @@ import (
 	"errors"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/tchannel/golang"
 	"github.com/uber/tchannel/golang/json"
 )
@@ -49,7 +49,7 @@ type requestSender struct {
 
 	startTime, retryStartTime time.Time
 
-	logger *log.Logger
+	logger log.Logger
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination

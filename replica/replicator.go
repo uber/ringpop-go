@@ -26,7 +26,8 @@ import (
 	"reflect"
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/replica/util"
 	"github.com/uber/tchannel/golang"
@@ -89,7 +90,7 @@ type Replicator struct {
 	sender    Sender
 	channel   *tchannel.SubChannel
 	forwarder *forward.Forwarder
-	logger    *log.Logger
+	logger    log.Logger
 	defaults  *Options
 }
 
@@ -118,13 +119,13 @@ func mergeDefaultOptions(opts *Options, def *Options) *Options {
 // NewReplicator returns a new Replicator instance that makes calls with the given
 // SubChannel to the service defined by SubChannel.GetServiceName(). The given n/w/r
 // values will be used as defaults for the replicator when none are provided
-func NewReplicator(s Sender, channel *tchannel.SubChannel, logger *log.Logger,
+func NewReplicator(s Sender, channel *tchannel.SubChannel, logger log.Logger,
 	opts *Options) *Replicator {
 
 	if logger == nil {
-		logger = &log.Logger{
+		logger = log.NewLoggerFromLogrus(&logrus.Logger{
 			Out: ioutil.Discard,
-		}
+		})
 	}
 
 	f := forward.NewForwarder(s, channel, logger)

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 )
 
 type suspect interface {
@@ -42,8 +42,6 @@ type suspicion struct {
 
 	// protects suspicion timers
 	l sync.Mutex
-
-	logger *log.Logger
 }
 
 // NewSuspicion returns a new suspicion SWIM sub-protocol with the given timeout
@@ -52,7 +50,6 @@ func newSuspicion(n *Node, timeout time.Duration) *suspicion {
 		node:    n,
 		timeout: timeout,
 		timers:  make(map[string]*time.Timer),
-		logger:  n.logger,
 		enabled: true,
 	}
 
@@ -61,13 +58,13 @@ func newSuspicion(n *Node, timeout time.Duration) *suspicion {
 
 func (s *suspicion) Start(suspect suspect) {
 	if !s.enabled {
-		s.logger.WithField("local", s.node.Address()).
+		s.node.logger.WithField("local", s.node.Address()).
 			Warn("cannot start suspect period while disabled")
 		return
 	}
 
 	if s.node.Address() == suspect.address() {
-		s.logger.WithField("local", s.node.Address()).
+		s.node.logger.WithField("local", s.node.Address()).
 			Warn("cannot start suspect period for local member")
 		return
 	}
@@ -78,7 +75,7 @@ func (s *suspicion) Start(suspect suspect) {
 	defer s.l.Unlock()
 
 	s.timers[suspect.address()] = time.AfterFunc(s.timeout, func() {
-		s.logger.WithFields(log.Fields{
+		s.node.logger.WithFields(log.Fields{
 			"local":  s.node.Address(),
 			"faulty": suspect.address(),
 		}).Info("member declared faulty")
@@ -86,7 +83,7 @@ func (s *suspicion) Start(suspect suspect) {
 		s.node.memberlist.MakeFaulty(suspect.address(), suspect.incarnation())
 	})
 
-	s.logger.WithFields(log.Fields{
+	s.node.logger.WithFields(log.Fields{
 		"local":   s.node.Address(),
 		"suspect": suspect.address(),
 	}).Debug("started suspect period")
@@ -100,7 +97,7 @@ func (s *suspicion) Stop(suspect suspect) {
 		timer.Stop()
 		delete(s.timers, suspect.address())
 
-		s.logger.WithFields(log.Fields{
+		s.node.logger.WithFields(log.Fields{
 			"local":   s.node.Address(),
 			"suspect": suspect.address(),
 		}).Debug("stopped member suspect timer")
@@ -113,13 +110,13 @@ func (s *suspicion) Reenable() {
 	defer s.l.Unlock()
 
 	if s.enabled {
-		s.logger.WithField("local", s.node.Address()).Warn("suspicion already enabled")
+		s.node.logger.WithField("local", s.node.Address()).Warn("suspicion already enabled")
 		return
 	}
 
 	s.enabled = true
 
-	s.logger.WithField("local", s.node.Address()).Info("reenabled suspicion protocol")
+	s.node.logger.WithField("local", s.node.Address()).Info("reenabled suspicion protocol")
 }
 
 // stop all suspicion timers and disables suspicion protocol
@@ -128,7 +125,7 @@ func (s *suspicion) Disable() {
 	defer s.l.Unlock()
 
 	if !s.enabled {
-		s.logger.WithField("local", s.node.Address()).Warn("suspicion already disabled")
+		s.node.logger.WithField("local", s.node.Address()).Warn("suspicion already disabled")
 		return
 	}
 
@@ -141,7 +138,7 @@ func (s *suspicion) Disable() {
 		delete(s.timers, address)
 	}
 
-	s.logger.WithFields(log.Fields{
+	s.node.logger.WithFields(log.Fields{
 		"local":         s.node.Address(),
 		"timersStopped": numTimers,
 	}).Info("disabled suspicion protocol")

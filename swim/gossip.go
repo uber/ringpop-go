@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
+	log "github.com/uber/bark"
 )
 
 const defaultMinProtocolPeriod = 200 * time.Millisecond

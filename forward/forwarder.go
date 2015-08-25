@@ -24,7 +24,8 @@ import (
 	"io/ioutil"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel/golang"
 )
@@ -45,7 +46,7 @@ type Options struct {
 	RerouteRetries bool
 	RetrySchedule  []time.Duration
 	Timeout        time.Duration
-	Logger         *log.Logger
+	Logger         log.Logger
 }
 
 func (f *Forwarder) defaultOptions() *Options {
@@ -82,13 +83,15 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 type Forwarder struct {
 	sender  Sender
 	channel *tchannel.SubChannel
-	logger  *log.Logger
+	logger  log.Logger
 }
 
 // NewForwarder returns a new forwarder
-func NewForwarder(s Sender, ch *tchannel.SubChannel, logger *log.Logger) *Forwarder {
+func NewForwarder(s Sender, ch *tchannel.SubChannel, logger log.Logger) *Forwarder {
 	if logger == nil {
-		logger = &log.Logger{Out: ioutil.Discard}
+		logger = log.NewLoggerFromLogrus(&logrus.Logger{
+			Out: ioutil.Discard,
+		})
 	}
 
 	f := &Forwarder{

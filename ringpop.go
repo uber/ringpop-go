@@ -27,9 +27,9 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/dgryski/go-farm"
-	"github.com/quipo/statsd"
+	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/swim/util"
@@ -38,16 +38,17 @@ import (
 
 // Options to create a Ringpop with
 type Options struct {
-	Logger *log.Logger
-	Stats  Stats
+	Logger log.Logger
+	Stats  log.StatsReporter
 }
 
 func defaultOptions() *Options {
+	logger := log.NewLoggerFromLogrus(&logrus.Logger{
+		Out: ioutil.Discard,
+	})
+
 	opts := &Options{
-		Logger: &log.Logger{
-			Out: ioutil.Discard,
-		},
-		Stats: statsd.NoopClient{},
+		Logger: logger,
 	}
 
 	return opts
@@ -81,21 +82,21 @@ type Ringpop struct {
 	// protects ready, destroyed
 	l sync.RWMutex
 
-	channel *tchannel.SubChannel
-	node    *swim.Node
-	ring    *hashRing
+	channel   *tchannel.SubChannel
+	node      *swim.Node
+	ring      *hashRing
+	forwarder *forward.Forwarder
 
 	listeners []EventListener
 
-	logger       *log.Logger
-	stats        Stats
+	stats        log.StatsReporter
 	statHostport string
 	statPrefix   string
 	statKeys     map[string]string
 	statHooks    []string   // type ?
 	sl           sync.Mutex // protects stat keys
 
-	forwarder *forward.Forwarder
+	logger log.Logger
 
 	startTime time.Time
 }

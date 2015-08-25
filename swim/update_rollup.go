@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim/util"
 )
 
