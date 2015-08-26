@@ -77,15 +77,12 @@ func (s *requestSender) Send() (err error) {
 	ctx, cancel := json.NewContext(s.timeout)
 	defer cancel()
 
-	resC := make(chan bool)
-	errC := make(chan error)
-
-	go s.MakeCall(ctx, resC, errC)
 	select {
-	case <-resC: // response written to s.response
-		return nil
+	case err := <-s.MakeCall(ctx):
+		if err == nil {
+			return nil // response written to s.response
+		}
 
-	case <-errC: // error occured
 		if s.retries < s.maxRetries {
 			return s.ScheduleRetry()
 		}
@@ -112,18 +109,22 @@ func (s *requestSender) Send() (err error) {
 }
 
 // calls remote service and writes response to s.response
-func (s *requestSender) MakeCall(ctx json.Context, resC chan<- bool, errC chan<- error) {
-	defer close(resC)
-	defer close(errC)
+func (s *requestSender) MakeCall(ctx json.Context) <-chan error {
+	errC := make(chan error)
+	go func() {
+		defer close(errC)
 
-	peer := s.channel.Peers().GetOrAdd(s.destination)
+		peer := s.channel.Peers().GetOrAdd(s.destination)
 
-	if err := json.CallPeer(ctx, peer, s.service, s.endpoint, s.request, s.response); err != nil {
-		errC <- err
-		return
-	}
+		if err := json.CallPeer(ctx, peer, s.service, s.endpoint, s.request, s.response); err != nil {
+			errC <- err
+			return
+		}
 
-	resC <- true
+		errC <- nil
+	}()
+
+	return errC
 }
 
 func (s *requestSender) ScheduleRetry() error {

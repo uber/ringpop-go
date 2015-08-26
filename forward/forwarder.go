@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package forward provides a mechanism to forward TChannel requests.
 package forward
 
 import (
@@ -94,13 +95,11 @@ func NewForwarder(s Sender, ch *tchannel.SubChannel, logger log.Logger) *Forward
 		})
 	}
 
-	f := &Forwarder{
+	return &Forwarder{
 		sender:  s,
 		channel: ch,
 		logger:  logger,
 	}
-
-	return f
 }
 
 // ForwardRequest forwards a request to the given service and endpoint and writes the response
