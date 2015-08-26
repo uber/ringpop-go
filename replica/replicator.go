@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package replica extends Ringpop functionality by providing a mechanism to replicate
+// a request to multiple nodes in the ring.
 package replica
 
 import (
@@ -33,21 +35,26 @@ import (
 	"github.com/uber/tchannel/golang"
 )
 
+// FanoutMode defines how a replicator should fanout it's requests
+type FanoutMode int
+
 const (
 	// Parallel fanout mode for replicator read write requests. Sends out requests
 	// in parallel.
-	Parallel = "parallel"
+	Parallel FanoutMode = iota
 
 	// SerialSequential fanout mode for replicator read write requests. Sends out
 	// requests one at a time going through the preference list sequentially
-	SerialSequential = "serial"
+	SerialSequential
 
 	// SerialBalanced fanout mode for replicator read write requests. Sends out
 	// requests one at a time, going through the preference list in a random order
-	SerialBalanced = "balanced"
+	SerialBalanced
+)
 
-	read  = "read"
-	write = "write"
+const (
+	read int = iota
+	write
 )
 
 // A Sender is used to lookup the destinations for requests given a key.
@@ -72,7 +79,7 @@ type Response struct {
 // Options for sending a read/write replicator request
 type Options struct {
 	NValue, RValue, WValue int
-	FanoutMode             string
+	FanoutMode             FanoutMode
 }
 
 type callOptions struct {
@@ -94,7 +101,7 @@ type Replicator struct {
 	defaults  *Options
 }
 
-func selectFanoutMode(mode string) string {
+func selectFanoutMode(mode FanoutMode) FanoutMode {
 	switch mode {
 	case Parallel, SerialSequential, SerialBalanced:
 		return mode
@@ -193,7 +200,7 @@ func validateResponseType(restype interface{}) error {
 	return nil
 }
 
-func (r *Replicator) readWrite(rw string, keys []string, request, restype interface{},
+func (r *Replicator) readWrite(rw int, keys []string, request, restype interface{},
 	operation string, fopts *forward.Options, opts *Options) ([]Response, error) {
 
 	if err := validateResponseType(restype); err != nil {
@@ -275,17 +282,19 @@ func (r *Replicator) parallel(rwValue int, copts *callOptions, fopts *forward.Op
 	for _, dest := range copts.Dests {
 		wg.Add(1)
 		go func(dest string) {
-			defer wg.Done()
-
 			res, err := r.forwardRequest(dest, copts, fopts)
 
 			l.Lock()
-			defer l.Unlock()
 
 			if err != nil {
 				errors = append(errors, err)
+				wg.Done()
+				l.Unlock()
 				return
 			}
+
+			wg.Done()
+			l.Unlock()
 			responses = append(responses, res)
 		}(dest)
 	}

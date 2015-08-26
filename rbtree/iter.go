@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package rbtree provides an implementation of a Red Black Tree.
 package rbtree
 
 //Iter returns an iterator starting at the leftmost node in the tree
@@ -44,9 +45,8 @@ func NewRBIter(tree *RBTree) *RBIter {
 	}
 
 	iter := &RBIter{
-		tree:      tree,
-		current:   nil,
-		ancestors: make([]*RBNode, 0),
+		tree:    tree,
+		current: nil,
 	}
 	iter.minNode(tree.root)
 

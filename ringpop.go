@@ -18,12 +18,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package ringpop brings cooperation and coordination to applications that would
+// otherwise run as a set of independent worker processes.
+//
+// Ringpop implements a membership protocol that allows those workers to discover
+// one another and use the communication channels established between them as a
+// means of disseminating information, detecting failure, and ultimately converging
+// on a consistent membership list. Consistent hashing is then applied on top of
+// that list and gives an application the ability to define predictable behavior
+// and data storage facilities within a custom keyspace. The keyspace is partitioned
+// and evenly assigned to the individual instances of an application. Clients of
+// the application remain simple and need not know of the underlying cooperation
+// between workers nor chosen partitioning scheme. A request can be sent to any
+// instance, and Ringpop intelligently forwards the request to the “correct” instance
+// as defined by a hash ring lookup.
+//
+// Ringpop makes it possible to build extremely scalable and fault-tolerant distributed
+// systems with 3 main capabilities: membership protocol, consistent hashing, and forwarding.
 package ringpop
 
 import (
 	"fmt"
 	"io/ioutil"
-	"strings"
 	"sync"
 	"time"
 
@@ -79,9 +95,10 @@ type Ringpop struct {
 	app     string
 	address string
 
-	ready, destroyed bool
-	// protects ready, destroyed
-	l sync.RWMutex
+	state struct {
+		read, destroyed bool
+		sync.RWMutex
+	}
 
 	channel   *tchannel.SubChannel
 	node      *swim.Node
@@ -90,12 +107,14 @@ type Ringpop struct {
 
 	listeners []EventListener
 
-	statter      log.StatsReporter
-	statHostport string
-	statPrefix   string
-	statKeys     map[string]string
-	statHooks    []string   // type ?
-	sl           sync.Mutex // protects stat keys
+	statter log.StatsReporter
+	stats   struct {
+		hostport string
+		prefix   string
+		keys     map[string]string
+		hooks    []string
+		sync.RWMutex
+	}
 
 	logger log.Logger
 
@@ -107,11 +126,10 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 	opts = mergeDefault(opts)
 
 	ringpop := &Ringpop{
-		app:      app,
-		address:  address,
-		logger:   opts.Logger,
-		statter:  opts.Statter,
-		statKeys: make(map[string]string),
+		app:     app,
+		address: address,
+		logger:  opts.Logger,
+		statter: opts.Statter,
 	}
 
 	if channel != nil {
@@ -126,9 +144,9 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 
 	ringpop.ring = newHashRing(ringpop, farm.Hash32)
 
-	ringpop.statHostport = strings.Replace(ringpop.address, ".", "_", -1)
-	ringpop.statHostport = strings.Replace(ringpop.statHostport, ":", "_", -1)
-	ringpop.statPrefix = fmt.Sprintf("ringpop.%s", ringpop.statHostport)
+	ringpop.stats.hostport = genStatsHostport(ringpop.address)
+	ringpop.stats.prefix = fmt.Sprintf("ringpop.%s", ringpop.stats.hostport)
+	ringpop.stats.keys = make(map[string]string)
 
 	ringpop.forwarder = forward.NewForwarder(ringpop, ringpop.channel, ringpop.logger)
 
@@ -137,20 +155,19 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 
 // Destroy Ringpop
 func (rp *Ringpop) Destroy() {
-	rp.l.Lock()
-	defer rp.l.Unlock()
-
+	rp.state.Lock()
 	rp.node.Destroy()
-
-	rp.destroyed = true
+	rp.state.destroyed = true
+	rp.state.Unlock()
 }
 
 // Destroyed returns
 func (rp *Ringpop) Destroyed() bool {
-	rp.l.Lock()
-	defer rp.l.Unlock()
+	rp.state.Lock()
+	destroyed := rp.state.destroyed
+	rp.state.Unlock()
 
-	return rp.destroyed
+	return destroyed
 }
 
 // App returns the app the ringpop belongs to
@@ -339,14 +356,15 @@ type Stats interface {
 }
 
 func (rp *Ringpop) stat(sType, sKey string, val int64) {
-	rp.sl.Lock()
-	defer rp.sl.Unlock()
+	rp.stats.Lock()
 
-	psKey, ok := rp.statKeys[sKey]
+	psKey, ok := rp.stats.keys[sKey]
 	if !ok {
-		psKey = fmt.Sprintf("%s.%s", rp.statPrefix, sKey)
-		rp.statKeys[sKey] = psKey
+		psKey = fmt.Sprintf("%s.%s", rp.stats.prefix, sKey)
+		rp.stats.keys[sKey] = psKey
 	}
+
+	rp.stats.Unlock()
 
 	switch sType {
 	case "increment":

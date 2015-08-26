@@ -24,21 +24,23 @@ import (
 	"flag"
 	"regexp"
 
+	"github.com/uber/bark"
 	"github.com/uber/ringpop-go"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel/golang"
 )
 
-var hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
-var hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
-
-var hostPortPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
+var (
+	hostport        = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
+	hostfile        = flag.String("hosts", "./hosts.json", "path to hosts file")
+	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
+)
 
 func main() {
 	flag.Parse()
 
-	if !hostPortPattern.MatchString(*hostport) {
+	if !hostportPattern.MatchString(*hostport) {
 		log.Fatalf("bad hostport: %s", *hostport)
 	}
 
@@ -48,9 +50,8 @@ func main() {
 	}
 
 	logger := log.StandardLogger()
-
 	rp := ringpop.NewRingpop("testpop", *hostport, ch, &ringpop.Options{
-		Logger: logger,
+		Logger: bark.NewLoggerFromLogrus(logger),
 	})
 
 	if err := ch.ListenAndServe(rp.WhoAmI()); err != nil {

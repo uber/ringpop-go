@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel/golang"
 )
@@ -39,22 +41,16 @@ func newDummyStats() *dummmyStats {
 	return &dummmyStats{make(map[string]int64)}
 }
 
-func (d *dummmyStats) Incr(key string, val int64) error {
-	d.vals[key] += val
-
-	return nil
+func (s *dummmyStats) IncCounter(key string, tags bark.Tags, val int64) {
+	s.vals[key] += val
 }
 
-func (d *dummmyStats) Gauge(key string, val int64) error {
-	d.vals[key] += val
-
-	return nil
+func (s *dummmyStats) UpdateGauge(key string, tags bark.Tags, val int64) {
+	s.vals[key] += val
 }
 
-func (d *dummmyStats) Timing(key string, val int64) error {
-	d.vals[key] += val
-
-	return nil
+func (s *dummmyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
+	s.vals[key] += int64(d)
 }
 
 // fake event listener

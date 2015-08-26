@@ -52,7 +52,7 @@ func (s *RingpopTestSuite) TestMergeDefault() {
 	def := defaultOptions()
 
 	s.EqualValues(s.ringpop.logger, def.Logger, "expected default logger to be used")
-	s.EqualValues(s.ringpop.stats, def.Stats, "expected default stats to be used")
+	s.EqualValues(s.ringpop.statter, def.Statter, "expected default stats to be used")
 }
 
 func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
@@ -89,7 +89,7 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 
 func (s *RingpopTestSuite) TestHandleEvents() {
 	stats := newDummyStats()
-	s.ringpop.stats = stats
+	s.ringpop.statter = stats
 
 	listener := &dummyListener{}
 	s.ringpop.RegisterListener(listener)

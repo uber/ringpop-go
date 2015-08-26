@@ -38,7 +38,7 @@ type hashRing struct {
 	hashfunc      func([]byte) uint32
 	checksum      uint32
 	replicaPoints int
-	l             sync.RWMutex
+	sync.RWMutex
 }
 
 func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32) *hashRing {
@@ -52,10 +52,11 @@ func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32) *hashRing {
 }
 
 func (r *hashRing) Checksum() uint32 {
-	r.l.RLock()
-	defer r.l.RUnlock()
+	r.RLock()
+	checksum := r.checksum
+	r.RUnlock()
 
-	return r.checksum
+	return checksum
 }
 
 // computeChecksum computes checksum of all servers in the ring
@@ -63,8 +64,7 @@ func (r *hashRing) ComputeChecksum() {
 	var addresses sort.StringSlice
 	var buffer bytes.Buffer
 
-	r.l.Lock()
-	defer r.l.Unlock()
+	r.Lock()
 
 	for address := range r.servers {
 		addresses = append(addresses, address)
@@ -83,6 +83,8 @@ func (r *hashRing) ComputeChecksum() {
 		OldChecksum: old,
 		NewChecksum: r.checksum,
 	})
+
+	r.Unlock()
 }
 
 func (r *hashRing) AddServer(address string) {
@@ -97,8 +99,7 @@ func (r *hashRing) AddServer(address string) {
 
 // inserts server replicas into ring
 func (r *hashRing) AddReplicas(server string) {
-	r.l.Lock()
-	defer r.l.Unlock()
+	r.Lock()
 
 	r.servers[server] = true
 
@@ -106,6 +107,8 @@ func (r *hashRing) AddReplicas(server string) {
 		address := fmt.Sprintf("%s%v", server, i)
 		r.tree.Insert(int(r.hashfunc([]byte(address))), server)
 	}
+
+	r.Unlock()
 }
 
 func (r *hashRing) RemoveServer(address string) {
@@ -119,8 +122,7 @@ func (r *hashRing) RemoveServer(address string) {
 }
 
 func (r *hashRing) RemoveReplicas(server string) {
-	r.l.Lock()
-	defer r.l.Unlock()
+	r.Lock()
 
 	delete(r.servers, server)
 
@@ -128,6 +130,8 @@ func (r *hashRing) RemoveReplicas(server string) {
 		address := fmt.Sprintf("%s%v", server, i)
 		r.tree.Delete(int(r.hashfunc([]byte(address))))
 	}
+
+	r.Unlock()
 }
 
 // adds and removes servers in a batch with a single checksum computation at the end
@@ -160,45 +164,51 @@ func (r *hashRing) AddRemoveServers(add []string, remove []string) bool {
 
 // hasServer returns true if the server exists in the ring, false otherwise
 func (r *hashRing) HasServer(address string) bool {
-	r.l.RLock()
-	defer r.l.RUnlock()
+	r.RLock()
+	server := r.servers[address]
+	r.RUnlock()
 
-	return r.servers[address]
+	return server
 }
 
 // ServerCount returns the number of servers in the ring
 func (r *hashRing) ServerCount() int {
-	r.l.RLock()
-	defer r.l.RUnlock()
+	r.RLock()
+	count := len(r.servers)
+	r.RUnlock()
 
-	return len(r.servers)
+	return count
 }
 
 func (r *hashRing) Lookup(key string) (string, bool) {
-	r.l.RLock()
-	defer r.l.RUnlock()
+	r.RLock()
 
 	iter := r.tree.IterAt(int(r.hashfunc([]byte(key))))
 	if iter.Nil() {
+		r.RUnlock()
 		return "", false
 	}
-	return iter.Str(), true
+
+	server := iter.Str()
+
+	r.RUnlock()
+
+	return server, true
 }
 
 func (r *hashRing) LookupN(key string, n int) []string {
-	r.l.RLock()
-	defer r.l.RUnlock()
-
 	serverCount := r.ServerCount()
 	if n > serverCount {
 		n = serverCount
 	}
 
+	r.RLock()
 	var servers []string
 	var unique = make(map[string]bool)
 
 	iter := r.tree.IterAt(int(r.hashfunc([]byte(key))))
 	if iter.Nil() {
+		r.RUnlock()
 		return servers
 	}
 
@@ -215,6 +225,8 @@ func (r *hashRing) LookupN(key string, n int) []string {
 			break
 		}
 	}
+
+	r.RUnlock()
 
 	return servers
 }
