@@ -66,18 +66,22 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 		return def
 	}
 
-	opts.MaxRetries = util.SelectInt(opts.MaxRetries, def.MaxRetries)
-	opts.Timeout = util.SelectDuration(opts.Timeout, def.Timeout)
+	var merged Options
 
+	merged.MaxRetries = util.SelectInt(opts.MaxRetries, def.MaxRetries)
+	merged.Timeout = util.SelectDuration(opts.Timeout, def.Timeout)
+
+	merged.RetrySchedule = opts.RetrySchedule
 	if opts.RetrySchedule == nil {
-		opts.RetrySchedule = def.RetrySchedule
+		merged.RetrySchedule = def.RetrySchedule
 	}
 
+	merged.Logger = opts.Logger
 	if opts.Logger == nil {
-		opts.Logger = def.Logger
+		merged.Logger = def.Logger
 	}
 
-	return opts
+	return &merged
 }
 
 // A Forwarder is used to forward requests to their destinations
@@ -103,12 +107,12 @@ func NewForwarder(s Sender, ch *tchannel.SubChannel, logger log.Logger) *Forward
 }
 
 // ForwardRequest forwards a request to the given service and endpoint and writes the response
-// to Response
+// to Response. Keys are used by the sender to lookup the destination on retry. If you have mutliple
+// keys and their destinations diverge on a retry then the call is aborted.
 func (f *Forwarder) ForwardRequest(request, response interface{}, destination, service, endpoint string,
 	keys []string, opts *Options) error {
 
 	opts = f.mergeDefaultOptions(opts)
-
 	rs := newRequestSender(f.sender, f.channel, request, response, keys,
 		destination, service, endpoint, opts)
 	return rs.Send()
