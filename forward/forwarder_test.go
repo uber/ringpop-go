@@ -45,7 +45,7 @@ type ForwarderTestSuite struct {
 	sender    *DummySender
 	forwarder *Forwarder
 	channel   *tchannel.Channel
-	peers     map[string]*tchannel.Channel
+	peer      *tchannel.Channel
 }
 
 type Ping struct {
@@ -67,41 +67,30 @@ func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Chan
 		func(ctx context.Context, err error) {}))
 }
 
-func (s *ForwarderTestSuite) AddPeer(address string) {
-	channel, err := tchannel.NewChannel("test", nil)
-	s.Require().NoError(err, "channel must be created successfully")
-
-	s.registerPong(address, channel)
-
-	s.Require().NoError(channel.ListenAndServe(address), "channel must listen")
-
-	s.peers[address] = channel
-}
-
-func (s *ForwarderTestSuite) SetupTest() {
-	s.peers = make(map[string]*tchannel.Channel)
-
+func (s *ForwarderTestSuite) SetupSuite() {
 	s.sender = &DummySender{"127.0.0.1:3001", "127.0.0.1:3001"}
 
 	channel, err := tchannel.NewChannel("test", nil)
 	s.Require().NoError(err, "channel must be created successfully")
 	s.channel = channel
 
+	peer, err := tchannel.NewChannel("test", nil)
+	s.Require().NoError(err, "channel must be created successfully")
+	s.registerPong("127.0.0.1:3002", peer)
+	s.Require().NoError(peer.ListenAndServe("127.0.0.1:3002"), "channel must listen")
+	s.peer = peer
+
 	s.forwarder = NewForwarder(s.sender, s.channel.GetSubChannel("forwarder"), nil)
 }
 
-func (s *ForwarderTestSuite) TearDownTest() {
+func (s *ForwarderTestSuite) TearDownSuite() {
 	s.channel.Close()
-	for _, peer := range s.peers {
-		peer.Close()
-	}
+	s.peer.Close()
 }
 
 func (s *ForwarderTestSuite) TestForward() {
 	var ping Ping
 	var pong Pong
-
-	s.AddPeer("127.0.0.1:3002")
 
 	s.sender.lookup = "127.0.0.1:3002"
 	dest := s.sender.Lookup("some key")
@@ -117,7 +106,7 @@ func (s *ForwarderTestSuite) TestMaxRetries() {
 	var ping Ping
 	var pong Pong
 
-	s.sender.lookup = "127.0.0.1:3002"
+	s.sender.lookup = "127.0.0.1:3003"
 	dest := s.sender.Lookup("some key")
 
 	err := s.forwarder.ForwardRequest(ping, &pong, dest, "test", "/ping", []string{"some key"},
@@ -130,7 +119,7 @@ func (s *ForwarderTestSuite) TestKeysDiverged() {
 	var ping Ping
 	var pong Pong
 
-	s.sender.lookup = "127.0.0.1:3002"
+	s.sender.lookup = "127.0.0.1:3003"
 	dest := s.sender.Lookup("some key")
 
 	// no keys should result in destinations length of 0 during retry, causing abortion of request
@@ -157,7 +146,6 @@ func (s *ForwarderTestSuite) TestRequestRerouted() {
 	var ping Ping
 	var pong Pong
 
-	s.AddPeer("127.0.0.1:3002")
 	s.sender.lookup = "127.0.0.1:3002"
 
 	err := s.forwarder.ForwardRequest(ping, &pong, "127.0.0.1:3003", "test", "/ping", []string{"some key"},
@@ -172,7 +160,6 @@ func (s *ForwarderTestSuite) TestRequestNoReroutes() {
 	var ping Ping
 	var pong Pong
 
-	s.AddPeer("127.0.0.1:3002")
 	s.sender.lookup = "127.0.0.1:3002"
 
 	err := s.forwarder.ForwardRequest(ping, &pong, "127.0.0.1:3003", "test", "/ping", []string{"some key"},

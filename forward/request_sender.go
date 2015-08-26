@@ -45,7 +45,7 @@ type requestSender struct {
 	timeout             time.Duration
 	retries, maxRetries int
 	retrySchedule       []time.Duration
-	rerouteReties       bool
+	rerouteRetries      bool
 
 	startTime, retryStartTime time.Time
 
@@ -57,19 +57,19 @@ func newRequestSender(sender Sender, channel *tchannel.SubChannel, request, resp
 	keys []string, destination, service, endpoint string, opts *Options) *requestSender {
 
 	return &requestSender{
-		sender:        sender,
-		channel:       channel,
-		request:       request,
-		response:      response,
-		keys:          keys,
-		destination:   destination,
-		service:       service,
-		endpoint:      endpoint,
-		timeout:       opts.Timeout,
-		maxRetries:    opts.MaxRetries,
-		retrySchedule: opts.RetrySchedule,
-		rerouteReties: opts.RerouteRetries,
-		logger:        opts.Logger,
+		sender:         sender,
+		channel:        channel,
+		request:        request,
+		response:       response,
+		keys:           keys,
+		destination:    destination,
+		service:        service,
+		endpoint:       endpoint,
+		timeout:        opts.Timeout,
+		maxRetries:     opts.MaxRetries,
+		retrySchedule:  opts.RetrySchedule,
+		rerouteRetries: opts.RerouteRetries,
+		logger:         opts.Logger,
 	}
 }
 
@@ -115,7 +115,6 @@ func (s *requestSender) MakeCall(ctx json.Context) <-chan error {
 		defer close(errC)
 
 		peer := s.channel.Peers().GetOrAdd(s.destination)
-
 		if err := json.CallPeer(ctx, peer, s.service, s.endpoint, s.request, s.response); err != nil {
 			errC <- err
 			return
@@ -145,7 +144,7 @@ func (s *requestSender) AttemptRetry() error {
 		return errors.New("key destinations have diverged")
 	}
 
-	if s.rerouteReties {
+	if s.rerouteRetries {
 		newDest := dests[0]
 		// nothing rebalanced so send again
 		if newDest != s.destination {

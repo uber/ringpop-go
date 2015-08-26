@@ -70,6 +70,7 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 
 	merged.MaxRetries = util.SelectInt(opts.MaxRetries, def.MaxRetries)
 	merged.Timeout = util.SelectDuration(opts.Timeout, def.Timeout)
+	merged.RerouteRetries = opts.RerouteRetries
 
 	merged.RetrySchedule = opts.RetrySchedule
 	if opts.RetrySchedule == nil {
