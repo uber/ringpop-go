@@ -20,7 +20,10 @@
 
 package swim
 
-import "math/rand"
+import (
+	"math/rand"
+	"time"
+)
 
 const (
 	// Alive is the member "Alive" state
@@ -61,4 +64,64 @@ func shuffle(members []*Member) []*Member {
 	}
 
 	return newMembers
+}
+
+func (m *Member) nonLocalOverride(change Change) bool {
+	return m.aliveOverride(change) ||
+		m.suspectOverride(change) ||
+		m.faultyOverride(change) ||
+		m.leaveOverride(change)
+}
+
+func (m *Member) aliveOverride(change Change) bool {
+	return change.Status == Alive && change.Incarnation > m.Incarnation
+}
+
+func (m *Member) faultyOverride(change Change) bool {
+	return change.Status == Faulty &&
+		((m.Status == Suspect && change.Incarnation >= m.Incarnation) ||
+			(m.Status == Faulty && change.Incarnation > m.Incarnation) ||
+			(m.Status == Alive && change.Incarnation >= m.Incarnation))
+}
+
+func (m *Member) leaveOverride(change Change) bool {
+	return change.Status == Leave &&
+		m.Status != Leave && change.Incarnation >= m.Incarnation
+}
+
+func (m *Member) suspectOverride(change Change) bool {
+	return change.Status == Suspect &&
+		((m.Status == Suspect && change.Incarnation > m.Incarnation) ||
+			(m.Status == Faulty && change.Incarnation > m.Incarnation) ||
+			(m.Status == Alive && change.Incarnation >= m.Incarnation))
+}
+
+func (m *Member) localOverride(local string, change Change) bool {
+	return m.localSuspectOverride(local, change) || m.localFaultyOverride(local, change)
+}
+
+func (m *Member) localFaultyOverride(local string, change Change) bool {
+	return m.Address == local && change.Status == Faulty
+}
+
+func (m *Member) localSuspectOverride(local string, change Change) bool {
+	return m.Address == local && change.Status == Suspect
+}
+
+// A Change is a change a member to be applied
+type Change struct {
+	Source            string    `json:"source"`
+	SourceIncarnation int64     `json:"sourceIncarnation"`
+	Address           string    `json:"address"`
+	Incarnation       int64     `json:"incarnation"`
+	Status            string    `json:"status"`
+	Timestamp         time.Time `json:"timestamp"`
+}
+
+func (c Change) address() string {
+	return c.Address
+}
+
+func (c Change) incarnation() int64 {
+	return c.Incarnation
 }

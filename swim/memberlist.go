@@ -226,7 +226,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		}
 
 		// if change is local override, reassert member is alive
-		if localOverride(m.node.Address(), member, change) {
+		if member.localOverride(m.node.Address(), change) {
 			overrideChange := Change{
 				Source:            change.Source,
 				SourceIncarnation: change.SourceIncarnation,
@@ -242,7 +242,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		}
 
 		// if non-local override, apply change wholesale
-		if nonLocalOverride(member, change) {
+		if member.nonLocalOverride(change) {
 			m.Apply(change)
 			applied = append(applied, change)
 		}
