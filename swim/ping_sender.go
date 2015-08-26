@@ -59,62 +59,58 @@ func (p *pingSender) SendPing() (*ping, error) {
 	ctx, cancel := json.NewContext(p.timeout)
 	defer cancel()
 
-	resC := make(chan *ping)
-	errC := make(chan error)
-
-	go p.MakeCall(ctx, resC, errC)
-	// wait for response
+	var res ping
 	select {
-	case res := <-resC: // ping succeeded
-		return res, nil
-
-	case err := <-errC: // ping failed
-		return nil, err
+	case err := <-p.MakeCall(ctx, &res):
+		return &res, err
 
 	case <-ctx.Done(): // ping timed out
 		return nil, errors.New("ping timed out")
 	}
 }
 
-func (p *pingSender) MakeCall(ctx json.Context, resC chan<- *ping, errC chan<- error) {
-	var res ping
+func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
+	errC := make(chan error)
 
-	defer close(resC)
-	defer close(errC)
+	go func() {
+		defer close(errC)
 
-	peer := p.node.channel.Peers().GetOrAdd(p.target)
+		peer := p.node.channel.Peers().GetOrAdd(p.target)
 
-	req := ping{
-		Checksum:          p.node.memberlist.Checksum(),
-		Changes:           p.node.disseminator.IssueAsSender(),
-		Source:            p.node.Address(),
-		SourceIncarnation: p.node.Incarnation(),
-	}
+		req := ping{
+			Checksum:          p.node.memberlist.Checksum(),
+			Changes:           p.node.disseminator.IssueAsSender(),
+			Source:            p.node.Address(),
+			SourceIncarnation: p.node.Incarnation(),
+		}
 
-	p.node.emit(PingSendEvent{
-		Local:   p.node.Address(),
-		Remote:  p.target,
-		Changes: req.Changes,
-	})
+		p.node.emit(PingSendEvent{
+			Local:   p.node.Address(),
+			Remote:  p.target,
+			Changes: req.Changes,
+		})
 
-	p.node.logger.WithFields(log.Fields{
-		"local":   p.node.Address(),
-		"remote":  p.target,
-		"changes": req.Changes,
-	}).Debug("ping send")
-
-	err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, &res)
-	if err != nil {
 		p.node.logger.WithFields(log.Fields{
-			"local":  p.node.Address(),
-			"remote": p.target,
-			"error":  err,
-		}).Debug("ping failed")
-		errC <- err
-		return
-	}
+			"local":   p.node.Address(),
+			"remote":  p.target,
+			"changes": req.Changes,
+		}).Debug("ping send")
 
-	resC <- &res
+		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, res)
+		if err != nil {
+			p.node.logger.WithFields(log.Fields{
+				"local":  p.node.Address(),
+				"remote": p.target,
+				"error":  err,
+			}).Debug("ping failed")
+			errC <- err
+			return
+		}
+
+		errC <- nil
+	}()
+
+	return errC
 }
 
 // SendPing sends a ping to target node that times out after timeout

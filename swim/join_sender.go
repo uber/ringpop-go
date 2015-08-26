@@ -289,14 +289,12 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	group := j.SelectGroup(nodesJoined)
 
-	var successes struct {
-		addresses []string
+	var responses struct {
+		successes []string
+		failures  []string
 		sync.Mutex
 	}
-	var failures struct {
-		addresses []string
-		sync.Mutex
-	}
+
 	var numNodesLeft = j.size - len(nodesJoined)
 	var startTime = time.Now()
 
@@ -308,20 +306,23 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			ctx, cancel := json.NewContext(j.timeout)
 			defer cancel()
 
-			resC := make(chan *joinResponse)
-			errC := make(chan error)
-
-			go j.MakeCall(ctx, n, resC, errC)
-
+			var res joinResponse
 			var failed bool
+
 			select {
-			case res := <-resC:
+			case err := <-j.MakeCall(ctx, n, &res):
+				if err != nil {
+					j.node.logger.WithFields(log.Fields{
+						"local":   j.node.address,
+						"remote":  n,
+						"timeout": j.timeout,
+					}).Debug("attempt to join node failed")
+					failed = true
+					break
+				}
 				j.node.memberlist.Update(res.Changes)
 
-			case <-errC: // call failed
-				failed = true
-
-			case <-ctx.Done(): // call timed out
+			case <-ctx.Done():
 				j.node.logger.WithFields(log.Fields{
 					"local":   j.node.address,
 					"remote":  n,
@@ -331,13 +332,13 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			}
 
 			if !failed {
-				successes.Lock()
-				successes.addresses = append(successes.addresses, n)
-				successes.Unlock()
+				responses.Lock()
+				responses.successes = append(responses.successes, n)
+				responses.Unlock()
 			} else {
-				failures.Lock()
-				failures.addresses = append(failures.addresses, n)
-				failures.Unlock()
+				responses.Lock()
+				responses.failures = append(responses.failures, n)
+				responses.Unlock()
 			}
 
 			wg.Done()
@@ -353,41 +354,45 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 		"joinSize":     j.size,
 		"joinTime":     time.Now().Sub(startTime),
 		"numNodesLeft": numNodesLeft,
-		"numFailures":  len(failures.addresses),
-		"failures":     failures.addresses,
-		"numSuccesses": len(successes.addresses),
-		"successes":    successes.addresses,
+		"numFailures":  len(responses.failures),
+		"failures":     responses.failures,
+		"numSuccesses": len(responses.successes),
+		"successes":    responses.successes,
 	}).Debug("join group complete")
 
-	return successes.addresses, failures.addresses
+	return responses.successes, responses.failures
 }
 
-func (j *joinSender) MakeCall(ctx json.Context, node string,
-	resC chan *joinResponse, errC chan error) {
+func (j *joinSender) MakeCall(ctx json.Context, node string, res *joinResponse) <-chan error {
+	errC := make(chan error)
 
-	defer close(resC)
-	defer close(errC)
-	peer := j.node.channel.Peers().GetOrAdd(node)
+	go func() {
+		defer close(errC)
 
-	req := joinRequest{
-		App:         j.node.app,
-		Source:      j.node.address,
-		Incarnation: j.node.Incarnation(),
-		Timeout:     j.timeout,
-	}
+		peer := j.node.channel.Peers().GetOrAdd(node)
 
-	var res joinResponse
-	err := json.CallPeer(ctx, peer, j.node.service, "/protocol/join", req, &res)
-	if err != nil {
-		j.node.logger.WithFields(log.Fields{
-			"local": j.node.address,
-			"call":  "join-send",
-			"error": err,
-		}).Debug("could not complete join")
-		errC <- err
-	}
+		req := joinRequest{
+			App:         j.node.app,
+			Source:      j.node.address,
+			Incarnation: j.node.Incarnation(),
+			Timeout:     j.timeout,
+		}
 
-	resC <- &res
+		err := json.CallPeer(ctx, peer, j.node.service, "/protocol/join", req, res)
+		if err != nil {
+			j.node.logger.WithFields(log.Fields{
+				"local": j.node.address,
+				"call":  "join-send",
+				"error": err,
+			}).Debug("could not complete join")
+			errC <- err
+			return
+		}
+
+		errC <- nil
+	}()
+
+	return errC
 }
 
 // SendJoin creates a new JoinSender and attempts to join the cluster defined by

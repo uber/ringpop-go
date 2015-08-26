@@ -68,18 +68,10 @@ func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
 	ctx, cancel := json.NewContext(p.timeout)
 	defer cancel()
 
-	errC := make(chan error)
-	resC := make(chan *pingResponse)
-
-	go p.MakeCall(ctx, resC, errC)
-
-	// wait for response
+	var res pingResponse
 	select {
-	case err := <-errC: // call failed
-		return nil, err
-
-	case res := <-resC: // call succeeded
-		return res, nil
+	case err := <-p.MakeCall(ctx, &res):
+		return &res, err
 
 	case <-ctx.Done(): // call timed out
 		return nil, errors.New("ping request timed out")
@@ -87,30 +79,32 @@ func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
 
 }
 
-func (p *pingRequestSender) MakeCall(ctx json.Context, resC chan<- *pingResponse, errC chan<- error) {
-	var res pingResponse
+func (p *pingRequestSender) MakeCall(ctx json.Context, res *pingResponse) <-chan error {
+	errC := make(chan error)
 
-	defer close(errC)
-	defer close(resC)
+	go func() {
+		defer close(errC)
 
-	peer := p.node.channel.Peers().GetOrAdd(p.peer)
+		peer := p.node.channel.Peers().GetOrAdd(p.peer)
 
-	req := &pingRequest{
-		Source:            p.node.Address(),
-		SourceIncarnation: p.node.Incarnation(),
-		Checksum:          p.node.memberlist.Checksum(),
-		Changes:           p.node.disseminator.IssueAsSender(),
-		Target:            p.target,
-	}
+		req := &pingRequest{
+			Source:            p.node.Address(),
+			SourceIncarnation: p.node.Incarnation(),
+			Checksum:          p.node.memberlist.Checksum(),
+			Changes:           p.node.disseminator.IssueAsSender(),
+			Target:            p.target,
+		}
 
-	err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping-req", req, &res)
-	if err != nil {
-		// TODO: logging?
-		errC <- err
-		return
-	}
+		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping-req", req, &res)
+		if err != nil {
+			errC <- err
+			return
+		}
 
-	resC <- &res
+		errC <- nil
+	}()
+
+	return errC
 }
 
 // sendPingRequests sends ping requests to the target address and returns a channel

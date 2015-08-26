@@ -138,7 +138,7 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 	}
 
 	ringpop.node = swim.NewNode(app, address, ringpop.channel, &swim.Options{
-		Logger: opts.Logger,
+		Logger: ringpop.logger,
 	})
 	ringpop.node.RegisterListener(ringpop)
 
@@ -155,8 +155,9 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 
 // Destroy Ringpop
 func (rp *Ringpop) Destroy() {
-	rp.state.Lock()
 	rp.node.Destroy()
+
+	rp.state.Lock()
 	rp.state.destroyed = true
 	rp.state.Unlock()
 }
@@ -191,7 +192,8 @@ func (rp *Ringpop) emit(event interface{}) {
 	}
 }
 
-// RegisterListener adds a listener to the ringpop
+// RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
+// should be thread safe
 func (rp *Ringpop) RegisterListener(l EventListener) {
 	rp.listeners = append(rp.listeners, l)
 }
@@ -202,7 +204,7 @@ func (rp *Ringpop) RegisterListener(l EventListener) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// BootstrapOptions used to bootstrap the ringpop with
+// BootstrapOptions are used to bootstrap the ringpop
 type BootstrapOptions struct {
 	swim.BootstrapOptions
 }

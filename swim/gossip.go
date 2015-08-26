@@ -30,8 +30,6 @@ import (
 	log "github.com/uber/bark"
 )
 
-const defaultMinProtocolPeriod = 200 * time.Millisecond
-
 // Gossip handles the protocol period of the SWIM protocol
 type gossip struct {
 	node *Node
