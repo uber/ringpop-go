@@ -115,12 +115,14 @@ func mergeDefaultOptions(opts *Options, def *Options) *Options {
 		return def
 	}
 
-	opts.NValue = util.SelectInt(opts.NValue, def.NValue)
-	opts.RValue = util.SelectInt(opts.RValue, def.RValue)
-	opts.WValue = util.SelectInt(opts.WValue, def.WValue)
-	opts.FanoutMode = selectFanoutMode(opts.FanoutMode)
+	var merged Options
 
-	return opts
+	merged.NValue = util.SelectInt(opts.NValue, def.NValue)
+	merged.RValue = util.SelectInt(opts.RValue, def.RValue)
+	merged.WValue = util.SelectInt(opts.WValue, def.WValue)
+	merged.FanoutMode = selectFanoutMode(opts.FanoutMode)
+
+	return &merged
 }
 
 // NewReplicator returns a new Replicator instance that makes calls with the given
@@ -274,34 +276,37 @@ func (r *Replicator) readWrite(rw int, keys []string, request, restype interface
 func (r *Replicator) parallel(rwValue int, copts *callOptions, fopts *forward.Options,
 	opts *Options) ([]Response, []error) {
 
-	var responses []Response
-	var errors []error
+	var responses struct {
+		successes []Response
+		errors    []error
+		sync.Mutex
+	}
+
 	var wg sync.WaitGroup
-	var l sync.Mutex
 
 	for _, dest := range copts.Dests {
 		wg.Add(1)
 		go func(dest string) {
 			res, err := r.forwardRequest(dest, copts, fopts)
 
-			l.Lock()
-
 			if err != nil {
-				errors = append(errors, err)
+				responses.Lock()
+				responses.errors = append(responses.errors, err)
+				responses.Unlock()
 				wg.Done()
-				l.Unlock()
 				return
 			}
 
+			responses.Lock()
+			responses.successes = append(responses.successes, res)
+			responses.Unlock()
 			wg.Done()
-			l.Unlock()
-			responses = append(responses, res)
 		}(dest)
 	}
 
 	wg.Wait()
 
-	return responses, nil
+	return responses.successes, responses.errors
 }
 
 func (r *Replicator) serial(rwValue int, copts *callOptions,
@@ -323,7 +328,7 @@ func (r *Replicator) serial(rwValue int, copts *callOptions,
 		responses = append(responses, res)
 	}
 
-	return responses, nil
+	return responses, errors
 }
 
 func (r *Replicator) forwardRequest(dest string, copts *callOptions,
