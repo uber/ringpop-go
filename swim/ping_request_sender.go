@@ -114,7 +114,7 @@ func (p *pingRequestSender) MakeCall(ctx json.Context, resC chan<- *pingResponse
 }
 
 // sendPingRequests sends ping requests to the target address and returns a channel
-//containing the responses. Responses can be on of type:
+//containing the responses. Responses can be one of type:
 //  (1) error:          if the call to peer failed
 //  (2) PingResponse:   if the peer performed the ping request
 func sendPingRequests(node *Node, target string, size int, timeout time.Duration) <-chan interface{} {

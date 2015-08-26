@@ -25,11 +25,11 @@ import (
 	"time"
 )
 
-type memberSorter []Member
+type members []Member
 
-func (s *memberSorter) Len() int           { return len(*s) }
-func (s *memberSorter) Swap(i, j int)      { (*s)[i], (*s)[j] = (*s)[j], (*s)[i] }
-func (s *memberSorter) Less(i, j int) bool { return (*s)[i].Address < (*s)[j].Address }
+func (s *members) Len() int           { return len(*s) }
+func (s *members) Swap(i, j int)      { (*s)[i], (*s)[j] = (*s)[j], (*s)[i] }
+func (s *members) Less(i, j int) bool { return (*s)[i].Address < (*s)[j].Address }
 
 // MemberStats contains members in a memberlist and the checksum of those members
 type MemberStats struct {
@@ -40,7 +40,7 @@ type MemberStats struct {
 // MemberStats returns the current checksum of the node's memberlist and a slice
 // of the members in the memberlist in lexographically sorted order by address
 func (n *Node) MemberStats() MemberStats {
-	members := memberSorter(n.memberlist.GetMembers())
+	members := members(n.memberlist.GetMembers())
 	sort.Sort(&members)
 	return MemberStats{n.memberlist.Checksum(), members}
 }
@@ -73,7 +73,7 @@ type Timing struct {
 
 // ProtocolStats returns stats about the node's SWIM protocol.
 func (n *Node) ProtocolStats() ProtocolStats {
-	timing := n.gossip.protocolTiming
+	timing := n.gossip.ProtocolTiming()
 	return ProtocolStats{
 		Timing{
 			Type:     "histogram",

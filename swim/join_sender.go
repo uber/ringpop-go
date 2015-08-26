@@ -221,12 +221,6 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 	var numFailed = 0
 	var startTime = time.Now()
 
-	defer j.node.emit(JoinCompleteEvent{
-		Duration:  time.Now().Sub(startTime),
-		NumJoined: numJoined,
-		Joined:    nodesJoined,
-	})
-
 	if util.SingleNodeCluster(j.node.address, j.node.bootstrapHosts) {
 		j.node.logger.WithField("local", j.node.address).Info("got single node cluster to join")
 		return nodesJoined, nil
@@ -283,18 +277,29 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		}).Debug("join not yet complete")
 	}
 
+	j.node.emit(JoinCompleteEvent{
+		Duration:  time.Now().Sub(startTime),
+		NumJoined: numJoined,
+		Joined:    nodesJoined,
+	})
+
 	return nodesJoined, nil
 }
 
 func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	group := j.SelectGroup(nodesJoined)
 
-	var successes []string
-	var failures []string
+	var successes struct {
+		addresses []string
+		sync.Mutex
+	}
+	var failures struct {
+		addresses []string
+		sync.Mutex
+	}
 	var numNodesLeft = j.size - len(nodesJoined)
 	var startTime = time.Now()
 
-	var l sync.Mutex
 	var wg sync.WaitGroup
 
 	for _, node := range group {
@@ -325,13 +330,14 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 				failed = true
 			}
 
-			l.Lock()
-			defer l.Unlock()
-
 			if !failed {
-				successes = append(successes, n)
+				successes.Lock()
+				successes.addresses = append(successes.addresses, n)
+				successes.Unlock()
 			} else {
-				failures = append(failures, n)
+				failures.Lock()
+				failures.addresses = append(failures.addresses, n)
+				failures.Unlock()
 			}
 
 			wg.Done()
@@ -340,19 +346,20 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	// wait for joins to complete
 	wg.Wait()
 
+	// don't need to lock successes/failures since we're finished writing to them
 	j.node.logger.WithFields(log.Fields{
 		"local":        j.node.address,
 		"groupSize":    len(group),
 		"joinSize":     j.size,
 		"joinTime":     time.Now().Sub(startTime),
 		"numNodesLeft": numNodesLeft,
-		"numFailures":  len(failures),
-		"failures":     failures,
-		"numSuccesses": len(successes),
-		"successes":    successes,
+		"numFailures":  len(failures.addresses),
+		"failures":     failures.addresses,
+		"numSuccesses": len(successes.addresses),
+		"successes":    successes.addresses,
 	}).Debug("join group complete")
 
-	return successes, failures
+	return successes.addresses, failures.addresses
 }
 
 func (j *joinSender) MakeCall(ctx json.Context, node string,

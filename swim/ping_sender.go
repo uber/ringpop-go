@@ -120,5 +120,6 @@ func (p *pingSender) MakeCall(ctx json.Context, resC chan<- *ping, errC chan<- e
 // SendPing sends a ping to target node that times out after timeout
 func sendPing(node *Node, target string, timeout time.Duration) (*ping, error) {
 	ps := newPingSender(node, target, timeout)
-	return ps.SendPing()
+	res, err := ps.SendPing()
+	return res, err
 }

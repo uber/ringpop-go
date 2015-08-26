@@ -114,9 +114,10 @@ type Node struct {
 	service string
 	address string
 
-	stopped, destroyed, pinging, ready bool
-
-	l sync.RWMutex // protects stopping/destroying SWIM
+	state struct {
+		stopped, destroyed, pinging, ready bool
+		sync.RWMutex
+	}
 
 	bootstrapFile  string
 	bootstrapHosts map[string][]string
@@ -216,10 +217,9 @@ func (n *Node) Start() {
 	n.gossip.Start()
 	n.suspicion.Reenable()
 
-	n.l.Lock()
-	defer n.l.Unlock()
-
-	n.stopped = false
+	n.state.Lock()
+	n.state.stopped = false
+	n.state.Unlock()
 }
 
 // Stop stops the SWIM protocol and all sub-protocols
@@ -227,18 +227,18 @@ func (n *Node) Stop() {
 	n.gossip.Stop()
 	n.suspicion.Disable()
 
-	n.l.Lock()
-	defer n.l.Unlock()
-
-	n.stopped = true
+	n.state.Lock()
+	n.state.stopped = true
+	n.state.Unlock()
 }
 
 // Stopped returns whether or not the SWIM protocol is currently running
 func (n *Node) Stopped() bool {
-	n.l.RLock()
-	defer n.l.RUnlock()
+	n.state.RLock()
+	stopped := n.state.stopped
+	n.state.RUnlock()
 
-	return n.stopped
+	return stopped
 }
 
 // Destroy stops the SWIM protocol and all sub-protocols
@@ -246,18 +246,27 @@ func (n *Node) Destroy() {
 	n.Stop()
 	n.rollup.Destroy()
 
-	n.l.Lock()
-	defer n.l.Unlock()
-
-	n.destroyed = true
+	n.state.Lock()
+	n.state.destroyed = true
+	n.state.Unlock()
 }
 
 // Destroyed returns whether or not the node has been destroyed or node
 func (n *Node) Destroyed() bool {
-	n.l.RLock()
-	defer n.l.RUnlock()
+	n.state.RLock()
+	destroyed := n.state.destroyed
+	n.state.RUnlock()
 
-	return n.destroyed
+	return destroyed
+}
+
+// Ready returns whether or not the node has bootstrapped fully and is ready for use
+func (n *Node) Ready() bool {
+	n.state.RLock()
+	ready := n.state.ready
+	n.state.RUnlock()
+
+	return ready
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -346,7 +355,10 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		n.gossip.Start()
 	}
 
-	n.ready = true
+	n.state.Lock()
+	n.state.ready = true
+	n.state.Unlock()
+
 	n.startTime = time.Now()
 
 	return joined, nil
@@ -434,6 +446,20 @@ func (n *Node) handleChanges(changes []Change) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
+func (n *Node) pinging() bool {
+	n.state.RLock()
+	pinging := n.state.pinging
+	n.state.RUnlock()
+
+	return pinging
+}
+
+func (n *Node) setPinging(pinging bool) {
+	n.state.Lock()
+	n.state.pinging = pinging
+	n.state.Unlock()
+}
+
 // pingNextMember pings the next member in the memberlist
 func (n *Node) pingNextMember() {
 	member, ok := n.memberiter.Next()
@@ -442,13 +468,13 @@ func (n *Node) pingNextMember() {
 		return
 	}
 
-	if n.pinging {
+	if n.pinging() {
 		n.logger.WithField("local", n.Address()).Warn("node already pinging")
 		return
 	}
 
-	n.pinging = true
-	defer func() { n.pinging = false }()
+	n.setPinging(true)
+	defer n.setPinging(false)
 
 	// send ping
 	res, err := sendPing(n, member.Address, n.pingTimeout)

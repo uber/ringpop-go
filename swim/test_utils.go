@@ -57,21 +57,20 @@ func (dummyIter) Next() (*Member, bool) {
 
 type lError struct {
 	err error
-	l   sync.Mutex
+	sync.Mutex
 }
 
 func (e *lError) Set(err error) {
-	e.l.Lock()
-	defer e.l.Unlock()
-
+	e.Lock()
 	e.err = err
+	e.Unlock()
 }
 
 func (e *lError) Err() error {
-	e.l.Lock()
-	defer e.l.Unlock()
-
-	return e.err
+	e.Lock()
+	err := e.err
+	e.Unlock()
+	return err
 }
 
 type testNode struct {
@@ -135,7 +134,6 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) {
 func destroyNodes(tnodes ...*testNode) {
 	for _, tnode := range tnodes {
 		tnode.Destroy()
-		println("destroyed", tnode.node.Address())
 	}
 }
 

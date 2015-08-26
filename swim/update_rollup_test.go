@@ -76,12 +76,14 @@ func (s *RollupTestSuite) TestFlushBuffer() {
 }
 
 func (s *RollupTestSuite) TestTrackUpdatesFlushes() {
-	s.r.buffer["one"] = []Change{}
-	s.r.buffer["two"] = []Change{}
+	s.r.buffer.Lock()
+	s.r.buffer.updates["one"] = []Change{}
+	s.r.buffer.updates["two"] = []Change{}
+	s.r.buffer.Unlock()
 
-	s.Len(s.r.buffer, 2, "expected two updates to be in buffer")
+	s.Len(s.r.Buffer(), 2, "expected two updates to be in buffer")
 
-	s.r.lastUpdateTime = util.TimeZero() // simulate time passing
+	s.r.timings.lastUpdate = util.TimeZero() // simulate time passing
 
 	s.r.TrackUpdates([]Change{Change{Address: "new"}})
 

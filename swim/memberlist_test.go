@@ -70,9 +70,9 @@ func (s *MemberlistTestSuite) TearDownTest() {
 }
 
 func (s *MemberlistTestSuite) TestChecksumChanges() {
-	old := s.m.checksum
+	old := s.m.Checksum()
 	s.m.MakeAlive("127.0.0.1:3002", s.incarnation)
-	s.NotEqual(old, s.m.checksum, "expected checksum to change")
+	s.NotEqual(old, s.m.Checksum(), "expected checksum to change")
 }
 
 func (s *MemberlistTestSuite) TestChecksumsEqual() {

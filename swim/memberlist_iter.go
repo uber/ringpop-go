@@ -27,7 +27,7 @@ type memberIter interface {
 // A memberlistIter iterates on a memberlist. Whenever the iterator runs out of
 // members, it shuffles the Memberlist and starts from the beginning.
 type memberlistIter struct {
-	memberlist   *memberlist
+	m            *memberlist
 	currentIndex int
 	currentRound int
 }
@@ -35,12 +35,12 @@ type memberlistIter struct {
 // NewMemberlistIter returns a new MemberlistIter
 func newMemberlistIter(m *memberlist) *memberlistIter {
 	iter := &memberlistIter{
-		memberlist:   m,
+		m:            m,
 		currentIndex: -1,
 		currentRound: 0,
 	}
 
-	iter.memberlist.Shuffle()
+	iter.m.Shuffle()
 
 	return iter
 }
@@ -48,22 +48,22 @@ func newMemberlistIter(m *memberlist) *memberlistIter {
 // Next returns the next pingable member in the member list, if it
 // visits all members but none are pingable returns nil, false
 func (i *memberlistIter) Next() (*Member, bool) {
-	maxToVisit := len(i.memberlist.mlist)
+	maxToVisit := i.m.NumMembers()
 	visited := make(map[string]bool)
 
 	for len(visited) < maxToVisit {
 		i.currentIndex++
 
-		if i.currentIndex >= len(i.memberlist.mlist) {
+		if i.currentIndex >= i.m.NumMembers() {
 			i.currentIndex = 0
 			i.currentRound++
-			i.memberlist.Shuffle()
+			i.m.Shuffle()
 		}
 
-		member := i.memberlist.MemberAt(i.currentIndex)
+		member := i.m.MemberAt(i.currentIndex)
 		visited[member.Address] = true
 
-		if i.memberlist.Pingable(*member) {
+		if i.m.Pingable(*member) {
 			return member, true
 		}
 	}

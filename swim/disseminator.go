@@ -43,7 +43,7 @@ type disseminator struct {
 	maxP    int
 	pFactor int
 
-	l sync.RWMutex
+	sync.RWMutex
 }
 
 // NewDisseminator returns a new Disseminator instance
@@ -59,12 +59,11 @@ func newDisseminator(n *Node) *disseminator {
 }
 
 func (d *disseminator) AdjustMaxPropogations() {
-	if !d.node.ready {
+	if !d.node.Ready() {
 		return
 	}
 
-	d.l.Lock()
-	defer d.l.Unlock()
+	d.Lock()
 
 	numPingable := d.node.memberlist.NumPingableMembers()
 	prevMaxP := d.maxP
@@ -84,13 +83,12 @@ func (d *disseminator) AdjustMaxPropogations() {
 			"numPingable":       numPingable,
 		}).Debug("adjusted max propogation count")
 	}
+
+	d.Unlock()
 }
 
-func (d *disseminator) FullSync() []Change {
-	var changes []Change
-
-	d.l.Lock()
-	defer d.l.Unlock()
+func (d *disseminator) FullSync() (changes []Change) {
+	d.Lock()
 
 	for _, member := range d.node.memberlist.GetMembers() {
 		changes = append(changes, Change{
@@ -101,6 +99,8 @@ func (d *disseminator) FullSync() []Change {
 			Status:            member.Status,
 		})
 	}
+
+	d.Unlock()
 
 	return changes
 }
@@ -137,11 +137,8 @@ func (d *disseminator) IssueAsReceiver(senderAddress string,
 	return []Change{}, false
 }
 
-func (d *disseminator) issueChanges(filter func(*pChange) bool) []Change {
-	var changes []Change
-
-	d.l.Lock()
-	defer d.l.Unlock()
+func (d *disseminator) issueChanges(filter func(*pChange) bool) (changes []Change) {
+	d.Lock()
 
 	for _, change := range d.changes {
 		if filter != nil && filter(change) {
@@ -159,19 +156,19 @@ func (d *disseminator) issueChanges(filter func(*pChange) bool) []Change {
 		changes = append(changes, change.Change)
 	}
 
+	d.Unlock()
+
 	return changes
 }
 
 func (d *disseminator) ClearChanges() {
-	d.l.Lock()
-	defer d.l.Unlock()
-
+	d.Lock()
 	d.changes = make(map[string]*pChange)
+	d.Unlock()
 }
 
 func (d *disseminator) RecordChange(change Change) {
-	d.l.Lock()
-	defer d.l.Unlock()
-
+	d.Lock()
 	d.changes[change.Address] = &pChange{change, 0}
+	d.Unlock()
 }

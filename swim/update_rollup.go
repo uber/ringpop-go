@@ -31,48 +31,60 @@ import (
 var timeZero = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type updateRollup struct {
-	node            *Node
-	maxUpdates      int
-	buffer          map[string][]Change
-	firstUpdateTime time.Time
-	lastFlushTime   time.Time
-	lastUpdateTime  time.Time
-	flushTimer      *time.Timer
-	flushInterval   time.Duration
+	node          *Node
+	maxUpdates    int
+	flushInterval time.Duration
 
-	bl sync.RWMutex // protects buffer
-	tl sync.RWMutex // protects flush timer
+	buffer struct {
+		updates map[string][]Change
+		sync.RWMutex
+	}
+
+	flushTimer struct {
+		t *time.Timer
+		sync.Mutex
+	}
+
+	timings struct {
+		firstUpdate time.Time
+		lastFlush   time.Time
+		lastUpdate  time.Time
+		sync.RWMutex
+	}
 }
 
 func newUpdateRollup(node *Node, flushInterval time.Duration, maxUpdates int) *updateRollup {
 	rollup := &updateRollup{
 		node:          node,
-		buffer:        make(map[string][]Change),
 		maxUpdates:    maxUpdates,
 		flushInterval: flushInterval,
 	}
+
+	rollup.buffer.updates = make(map[string][]Change)
 
 	return rollup
 }
 
 func (r *updateRollup) Destroy() {
-	r.tl.Lock()
-	defer r.tl.Unlock()
+	r.flushTimer.Lock()
 
-	if r.flushTimer != nil {
-		r.flushTimer.Stop()
+	if r.flushTimer.t != nil {
+		r.flushTimer.t.Stop()
 	}
+
+	r.flushTimer.Unlock()
 }
 
 func (r *updateRollup) AddUpdates(changes []Change) {
-	r.bl.Lock()
-	defer r.bl.Unlock()
+	r.buffer.Lock()
 
 	timestamp := time.Now()
 	for _, change := range changes {
 		change.Timestamp = timestamp
-		r.buffer[change.Address] = append(r.buffer[change.Address], change)
+		r.buffer.updates[change.Address] = append(r.buffer.updates[change.Address], change)
 	}
+
+	r.buffer.Unlock()
 }
 
 func (r *updateRollup) TrackUpdates(changes []Change) (flushed bool) {
@@ -82,68 +94,73 @@ func (r *updateRollup) TrackUpdates(changes []Change) (flushed bool) {
 
 	now := time.Now()
 
-	sinceLastUpdate := now.Sub(r.lastUpdateTime)
+	r.timings.Lock()
+	sinceLastUpdate := now.Sub(r.timings.lastUpdate)
+	r.timings.Unlock()
+
 	if sinceLastUpdate >= r.flushInterval {
-		r.FlushBuffer()
+		r.FlushBuffer() // locks buffer and timings
 		flushed = true
 	}
 
-	if r.firstUpdateTime.IsZero() {
-		r.firstUpdateTime = now
+	r.timings.Lock()
+	if r.timings.firstUpdate.IsZero() {
+		r.timings.firstUpdate = now
 	}
 
-	r.RenewFlushTimer()
-	r.AddUpdates(changes)
+	r.RenewFlushTimer()   // locks flushTimer
+	r.AddUpdates(changes) // locks buffer
 
-	r.bl.Lock()
-	defer r.bl.Unlock()
-
-	r.lastUpdateTime = now
+	r.timings.lastUpdate = now
+	r.timings.Unlock()
 
 	return flushed
 }
 
-func (r *updateRollup) NumUpdates() (n int) {
-	for _, updates := range r.buffer {
+func (r *updateRollup) RenewFlushTimer() {
+	r.flushTimer.Lock()
+
+	if r.flushTimer.t != nil {
+		r.flushTimer.t.Stop()
+	}
+
+	r.flushTimer.t = time.AfterFunc(r.flushInterval, func() {
+		r.FlushBuffer()
+		r.RenewFlushTimer()
+	})
+
+	r.flushTimer.Unlock()
+}
+
+func (r *updateRollup) numUpdates() (n int) {
+	for _, updates := range r.buffer.updates {
 		n += len(updates)
 	}
 
 	return
 }
 
-func (r *updateRollup) RenewFlushTimer() {
-	r.tl.Lock()
-	defer r.tl.Unlock()
-
-	if r.flushTimer != nil {
-		r.flushTimer.Stop()
-	}
-
-	r.flushTimer = time.AfterFunc(r.flushInterval, func() {
-		r.FlushBuffer()
-		r.RenewFlushTimer()
-	})
-}
-
 func (r *updateRollup) FlushBuffer() {
-	r.bl.Lock()
-	defer r.bl.Unlock()
+	r.buffer.Lock()
 
-	if len(r.buffer) == 0 {
+	if len(r.buffer.updates) == 0 {
 		r.node.logger.WithField("local", r.node.Address()).Debug("no updates flushed")
+		r.buffer.Unlock()
 		return
 	}
 
 	now := time.Now()
 
+	r.timings.Lock()
+
 	sinceFirstUpdate := time.Duration(0)
-	if !r.lastUpdateTime.IsZero() {
-		sinceFirstUpdate = r.lastUpdateTime.Sub(r.firstUpdateTime)
+	if !r.timings.lastUpdate.IsZero() {
+		sinceFirstUpdate = r.timings.lastUpdate.Sub(r.timings.firstUpdate)
 	}
 
 	sinceLastFlush := time.Duration(0)
-	if !r.lastFlushTime.IsZero() {
-		sinceLastFlush = now.Sub(r.lastFlushTime)
+	if !r.timings.lastFlush.IsZero() {
+		sinceLastFlush = now.Sub(r.timings.lastFlush)
 	}
 
 	r.node.logger.WithFields(log.Fields{
@@ -151,28 +168,33 @@ func (r *updateRollup) FlushBuffer() {
 		"checksum":         r.node.memberlist.Checksum(),
 		"sinceFirstUpdate": sinceFirstUpdate,
 		"sinceLastFlush":   sinceLastFlush,
-		"numUpdates":       r.NumUpdates(),
+		"numUpdates":       r.numUpdates(),
 		// "updates":          r.buffer,
 	}).Debug("rollup flushed update buffer")
 
-	r.buffer = make(map[string][]Change)
-	r.lastFlushTime = now
-	r.firstUpdateTime = util.TimeZero()
-	r.lastUpdateTime = util.TimeZero()
+	r.buffer.updates = make(map[string][]Change)
+	r.timings.lastFlush = now
+	r.timings.firstUpdate = util.TimeZero()
+	r.timings.lastUpdate = util.TimeZero()
+
+	r.buffer.Unlock()
+	r.timings.Unlock()
 }
 
 // testing func to avoid data races
 func (r *updateRollup) FlushTimer() *time.Timer {
-	r.tl.RLock()
-	defer r.tl.RUnlock()
+	r.flushTimer.Lock()
+	timer := r.flushTimer.t
+	r.flushTimer.Unlock()
 
-	return r.flushTimer
+	return timer
 }
 
 // testing func to avoid data races
 func (r *updateRollup) Buffer() map[string][]Change {
-	r.bl.RLock()
-	defer r.bl.RUnlock()
+	r.buffer.RLock()
+	buffer := r.buffer.updates
+	r.buffer.RUnlock()
 
-	return r.buffer
+	return buffer
 }

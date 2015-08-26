@@ -87,21 +87,21 @@ func (s *DisseminatorTestSuite) TestIssueChangesAsReceiver() {
 	s.m.MakeSuspect("127.0.0.1:3003", s.incarnation)
 	s.m.MakeFaulty("127.0.0.1:3004", s.incarnation)
 
-	changes, fs := s.d.IssueAsReceiver(s.node.Address(), s.node.Incarnation(), s.m.checksum)
+	changes, fs := s.d.IssueAsReceiver(s.node.Address(), s.node.Incarnation(), s.m.Checksum())
 	s.Len(changes, 0, "expected no changes to be issued for same sender/receiver")
 	s.False(fs, "expected changes to not be a full sync")
 
-	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.checksum)
+	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.Checksum())
 	s.Len(changes, 3, "expected three changes to be issued")
 	s.False(fs, "expected changes to not be a full sync")
 
 	s.d.ClearChanges()
 
-	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.checksum)
+	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.Checksum())
 	s.Len(changes, 0, "expected to get no changes")
 	s.False(fs, "expected changes to not be a full sync")
 
-	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.checksum+1)
+	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.Checksum()+1)
 	s.Len(changes, 4, "expected change to be issued for each memeber in membership")
 	s.True(fs, "expected changes to be a full sync")
 }

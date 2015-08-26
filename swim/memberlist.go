@@ -35,46 +35,48 @@ import (
 
 // A memberlist contains the membership for a node
 type memberlist struct {
-	node     *Node
-	mmap     map[string]*Member
-	mlist    []*Member
-	local    *Member
-	checksum uint32
+	node  *Node
+	local *Member
 
-	// protects I/O operations on the member list
-	l sync.RWMutex
+	members struct {
+		list      []*Member
+		byAddress map[string]*Member
+		checksum  uint32
+		sync.RWMutex
+	}
 }
 
 // newMemberlist returns a new member list
 func newMemberlist(n *Node) *memberlist {
-	memberlist := &memberlist{
+	m := &memberlist{
 		node: n,
-		mmap: make(map[string]*Member),
 	}
 
-	return memberlist
+	m.members.byAddress = make(map[string]*Member)
+
+	return m
 }
 
 func (m *memberlist) Checksum() uint32 {
-	m.l.RLock()
-	defer m.l.RUnlock()
+	m.members.Lock()
+	checksum := m.members.checksum
+	m.members.Unlock()
 
-	return m.checksum
+	return checksum
 }
 
 // computes membership checksum
 func (m *memberlist) ComputeChecksum() {
-	m.l.Lock()
-	defer m.l.Unlock()
-
-	m.checksum = farm.Hash32([]byte(m.GenChecksumString()))
+	m.members.Lock()
+	m.members.checksum = farm.Hash32([]byte(m.GenChecksumString()))
+	m.members.Unlock()
 }
 
 // generates string to use when computing checksum
 func (m *memberlist) GenChecksumString() string {
 	var strings sort.StringSlice
 
-	for _, member := range m.mmap {
+	for _, member := range m.members.list {
 		s := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
 		strings = append(strings, s)
 	}
@@ -92,18 +94,27 @@ func (m *memberlist) GenChecksumString() string {
 
 // returns the member at a specific address
 func (m *memberlist) Member(address string) (*Member, bool) {
-	m.l.RLock()
-	defer m.l.RUnlock()
+	m.members.RLock()
+	member, ok := m.members.byAddress[address]
+	m.members.RUnlock()
 
-	member, ok := m.mmap[address]
 	return member, ok
 }
 
 func (m *memberlist) MemberAt(i int) *Member {
-	m.l.RLock()
-	defer m.l.RUnlock()
+	m.members.RLock()
+	member := m.members.list[i]
+	m.members.RUnlock()
 
-	return m.mlist[i]
+	return member
+}
+
+func (m *memberlist) NumMembers() int {
+	m.members.RLock()
+	n := len(m.members.list)
+	m.members.RUnlock()
+
+	return n
 }
 
 // returns whether or not a member is pingable
@@ -115,29 +126,28 @@ func (m *memberlist) Pingable(member Member) bool {
 
 // returns the number of pingable members in the memberlist
 func (m *memberlist) NumPingableMembers() (n int) {
-	m.l.RLock()
-	defer m.l.RUnlock()
-
-	for _, member := range m.mlist {
+	m.members.Lock()
+	for _, member := range m.members.list {
 		if m.Pingable(*member) {
 			n++
 		}
 	}
-	return
+	m.members.Unlock()
+
+	return n
 }
 
 // returns n pingable members in the member list
 func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*Member {
 	var members []*Member
 
-	m.l.RLock()
-	defer m.l.RUnlock()
-
-	for _, member := range m.mlist {
+	m.members.RLock()
+	for _, member := range m.members.list {
 		if m.Pingable(*member) && !excluding[member.Address] {
 			members = append(members, member)
 		}
 	}
+	m.members.RUnlock()
 
 	// shuffle members and take first n
 	members = shuffle(members)
@@ -150,12 +160,11 @@ func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*
 
 // returns an immutable slice of members representing the current state of the membership
 func (m *memberlist) GetMembers() (members []Member) {
-	m.l.Lock()
-	defer m.l.Unlock()
-
-	for _, member := range m.mlist {
+	m.members.RLock()
+	for _, member := range m.members.list {
 		members = append(members, *member)
 	}
+	m.members.RUnlock()
 
 	return
 }
@@ -204,10 +213,10 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
-	m.l.Lock()
+	m.members.Lock()
 
 	for _, change := range changes {
-		member, ok := m.mmap[change.Address]
+		member, ok := m.members.byAddress[change.Address]
 
 		// first time member has been seen, take change wholesale
 		if !ok {
@@ -239,7 +248,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		}
 	}
 
-	m.l.Unlock()
+	m.members.Unlock()
 
 	if len(applied) > 0 {
 		oldChecksum := m.Checksum()
@@ -248,7 +257,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			Changes:     applied,
 			OldChecksum: oldChecksum,
 			NewChecksum: m.Checksum(),
-			NumMembers:  len(m.mlist),
+			NumMembers:  m.NumMembers(),
 		})
 		m.node.handleChanges(applied)
 		m.node.rollup.TrackUpdates(applied)
@@ -259,16 +268,16 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 // gets a random position in [0, length of member list)
 func (m *memberlist) getJoinPosition() int {
-	l := len(m.mlist)
+	l := len(m.members.list)
 	if l == 0 {
 		return l
 	}
-	return rand.Intn(len(m.mlist))
+	return rand.Intn(l)
 }
 
 // applies a change directly to the member list
 func (m *memberlist) Apply(change Change) {
-	member, ok := m.mmap[change.Address]
+	member, ok := m.members.byAddress[change.Address]
 
 	if !ok {
 		member = &Member{
@@ -281,9 +290,9 @@ func (m *memberlist) Apply(change Change) {
 			m.local = member
 		}
 
-		m.mmap[change.Address] = member
+		m.members.byAddress[change.Address] = member
 		i := m.getJoinPosition()
-		m.mlist = append(m.mlist[:i], append([]*Member{member}, m.mlist[i:]...)...)
+		m.members.list = append(m.members.list[:i], append([]*Member{member}, m.members.list[i:]...)...)
 	}
 
 	member.Status = change.Status
@@ -292,18 +301,16 @@ func (m *memberlist) Apply(change Change) {
 
 // shuffles the member list
 func (m *memberlist) Shuffle() {
-	m.l.Lock()
-	defer m.l.Unlock()
-
-	m.mlist = shuffle(m.mlist)
+	m.members.Lock()
+	m.members.list = shuffle(m.members.list)
+	m.members.Unlock()
 }
 
 // String returns a JSON string
 func (m *memberlist) String() string {
-	m.l.RLock()
-	defer m.l.RUnlock()
-
-	str, _ := json.Marshal(m.mlist) // will never return error (presumably)
+	m.members.RLock()
+	str, _ := json.Marshal(m.members.list) // will never return error (presumably)
+	m.members.RUnlock()
 	return string(str)
 }
 

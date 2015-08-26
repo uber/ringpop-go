@@ -40,8 +40,7 @@ type suspicion struct {
 	timers  map[string]*time.Timer
 	enabled bool
 
-	// protects suspicion timers
-	l sync.Mutex
+	sync.Mutex
 }
 
 // NewSuspicion returns a new suspicion SWIM sub-protocol with the given timeout
@@ -71,8 +70,7 @@ func (s *suspicion) Start(suspect suspect) {
 
 	s.Stop(suspect)
 
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.Lock()
 
 	s.timers[suspect.address()] = time.AfterFunc(s.timeout, func() {
 		s.node.logger.WithFields(log.Fields{
@@ -83,6 +81,8 @@ func (s *suspicion) Start(suspect suspect) {
 		s.node.memberlist.MakeFaulty(suspect.address(), suspect.incarnation())
 	})
 
+	s.Unlock()
+
 	s.node.logger.WithFields(log.Fields{
 		"local":   s.node.Address(),
 		"suspect": suspect.address(),
@@ -90,8 +90,7 @@ func (s *suspicion) Start(suspect suspect) {
 }
 
 func (s *suspicion) Stop(suspect suspect) {
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.Lock()
 
 	if timer, ok := s.timers[suspect.address()]; ok {
 		timer.Stop()
@@ -102,30 +101,33 @@ func (s *suspicion) Stop(suspect suspect) {
 			"suspect": suspect.address(),
 		}).Debug("stopped member suspect timer")
 	}
+
+	s.Unlock()
 }
 
 // reenable suspicion protocol
 func (s *suspicion) Reenable() {
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.Lock()
 
 	if s.enabled {
 		s.node.logger.WithField("local", s.node.Address()).Warn("suspicion already enabled")
+		s.Unlock()
 		return
 	}
 
 	s.enabled = true
+	s.Unlock()
 
 	s.node.logger.WithField("local", s.node.Address()).Info("reenabled suspicion protocol")
 }
 
 // stop all suspicion timers and disables suspicion protocol
 func (s *suspicion) Disable() {
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.Lock()
 
 	if !s.enabled {
 		s.node.logger.WithField("local", s.node.Address()).Warn("suspicion already disabled")
+		s.Unlock()
 		return
 	}
 
@@ -138,6 +140,8 @@ func (s *suspicion) Disable() {
 		delete(s.timers, address)
 	}
 
+	s.Unlock()
+
 	s.node.logger.WithFields(log.Fields{
 		"local":         s.node.Address(),
 		"timersStopped": numTimers,
@@ -146,8 +150,8 @@ func (s *suspicion) Disable() {
 
 // testing func to avoid data races
 func (s *suspicion) Timer(address string) *time.Timer {
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	return s.timers[address]
 }
