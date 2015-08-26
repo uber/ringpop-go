@@ -33,7 +33,7 @@ type PingTestSuite struct {
 	node, peer   *Node
 }
 
-func (s *PingTestSuite) SetupTest() {
+func (s *PingTestSuite) SetupSuite() {
 	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
 	s.node = s.tnode.node
 	s.tpeer = newChannelNode(s.T(), "127.0.0.1:3002")
@@ -42,7 +42,7 @@ func (s *PingTestSuite) SetupTest() {
 	bootstrapNodes(s.T(), s.tnode, s.tpeer)
 }
 
-func (s *PingTestSuite) TearDownTest() {
+func (s *PingTestSuite) TearDownSuite() {
 	destroyNodes(s.tnode, s.tpeer)
 }
 

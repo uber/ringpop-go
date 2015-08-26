@@ -144,14 +144,10 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 
 	ctx, cancel := json.NewContext(joiner.timeout)
 	defer cancel()
-	errC := make(chan error)
-	resC := make(chan *joinResponse)
 
-	// attemp a join
-	go joiner.MakeCall(ctx, peer.node.Address(), resC, errC)
-
+	var res joinResponse
 	select {
-	case err := <-errC:
+	case err := <-joiner.MakeCall(ctx, peer.node.Address(), &res):
 		s.Error(err, "expected join to fail for different apps")
 	case <-ctx.Done():
 		s.Fail("expected join to not timeout")
@@ -167,14 +163,10 @@ func (s *JoinSenderTestSuite) TestJoinSelf() {
 
 	ctx, cancel := json.NewContext(joiner.timeout)
 	defer cancel()
-	errC := make(chan error)
-	resC := make(chan *joinResponse)
 
-	// attemp a join
-	go joiner.MakeCall(ctx, s.node.Address(), resC, errC)
-
+	var res joinResponse
 	select {
-	case err := <-errC:
+	case err := <-joiner.MakeCall(ctx, s.node.Address(), &res):
 		s.Error(err, "expected join to fail for different apps")
 	case <-ctx.Done():
 		s.Fail("expected join to not timeout")
