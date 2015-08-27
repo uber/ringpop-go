@@ -41,6 +41,7 @@ type requestSender struct {
 	destination       string
 	service, endpoint string
 	keys              []string
+	format            tchannel.Format
 
 	destinations []string // destinations the request has been routed to ?
 
@@ -56,7 +57,7 @@ type requestSender struct {
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
 func newRequestSender(sender Sender, channel *tchannel.SubChannel, request []byte, keys []string,
-	destination, service, endpoint string, opts *Options) *requestSender {
+	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
 	return &requestSender{
 		sender:         sender,
@@ -66,6 +67,7 @@ func newRequestSender(sender Sender, channel *tchannel.SubChannel, request []byt
 		destination:    destination,
 		service:        service,
 		endpoint:       endpoint,
+		format:         format,
 		timeout:        opts.Timeout,
 		maxRetries:     opts.MaxRetries,
 		retrySchedule:  opts.RetrySchedule,
@@ -117,13 +119,15 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error 
 
 		peer := s.channel.Peers().GetOrAdd(s.destination)
 
-		call, err := peer.BeginCall(ctx, s.service, s.endpoint, nil)
+		call, err := peer.BeginCall(ctx, s.service, s.endpoint, &tchannel.CallOptions{
+			Format: s.format,
+		})
 		if err != nil {
 			errC <- err
 			return
 		}
 
-		_, arg3, _, err := raw.WriteArgs(call, nil, s.request)
+		_, arg3, _, err := raw.WriteArgs(call, []byte{0, 0}, s.request)
 		if err != nil {
 			errC <- err
 			return

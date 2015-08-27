@@ -388,16 +388,16 @@ func (rp *Ringpop) stat(sType, sKey string, val int64) {
 // if it should be forwarded to a different node. If false is returned, forwarding
 // is taken care of internally by the method, and, if no error has occured, the
 // response is written in the provided response field.
-func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte,
-	service, endpoint string, opts *forward.Options) (bool, error) {
+func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string,
+	format tchannel.Format, opts *forward.Options) (bool, error) {
 
 	dest := rp.Lookup(key)
 	if dest == rp.WhoAmI() {
 		return true, nil
 	}
 
-	res, err := rp.forwarder.ForwardRequest(request, dest, service, endpoint, []string{key}, opts)
+	res, err := rp.forwarder.ForwardRequest(request, dest, service, endpoint, []string{key}, format, opts)
 	*response = res
-	// else forward request
+
 	return false, err
 }
