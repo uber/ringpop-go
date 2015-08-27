@@ -61,9 +61,8 @@ func NewRBIterAt(tree *RBTree, val int) *RBIter {
 	}
 
 	iter := &RBIter{
-		tree:      tree,
-		current:   nil,
-		ancestors: make([]*RBNode, 0),
+		tree:    tree,
+		current: nil,
 	}
 
 	if tree.size == 0 {
