@@ -1,15 +1,15 @@
 package replica
 
 import (
+	json2 "encoding/json"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/tchannel/golang"
 	"github.com/uber/tchannel/golang/json"
+	"golang.org/x/net/context"
 )
 
 var foptsTimeout = &forward.Options{
@@ -45,6 +45,11 @@ type ReplicatorTestSuite struct {
 
 type Ping struct {
 	From string `json:"from"`
+}
+
+func (p Ping) Bytes() []byte {
+	data, _ := json2.Marshal(p)
+	return data
 }
 
 type Pong struct {
@@ -112,42 +117,39 @@ func (s *ReplicatorTestSuite) TestRead() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var pong Pong
-
 	var dests = s.sender.LookupN("key", 3)
 
 	// parallel
-	responses, err := s.replicator.Read([]string{"key"}, ping, pong, "/ping", foptsTimeout, nil)
+	responses, err := s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, nil)
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
 
 	// serial sequential
-	responses, err = s.replicator.Read([]string{"key"}, ping, pong, "/ping", foptsTimeout, &Options{
+	responses, err = s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, &Options{
 		FanoutMode: SerialSequential,
 	})
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
-
 	// serial balanced
-	responses, err = s.replicator.Read([]string{"key"}, ping, pong, "/ping", foptsTimeout, &Options{
+	responses, err = s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, &Options{
 		FanoutMode: SerialBalanced,
 	})
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
 }
 
@@ -155,18 +157,16 @@ func (s *ReplicatorTestSuite) TestMultipleKeys() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var pong Pong
-
 	var dests = s.sender.LookupN("key", 3)
 
 	// parallel
-	responses, err := s.replicator.Read([]string{"key1", "key2"}, ping, pong, "/ping", foptsTimeout, nil)
+	responses, err := s.replicator.Read([]string{"key1", "key2"}, ping.Bytes(), "/ping", foptsTimeout, nil)
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
 
 }
@@ -177,42 +177,39 @@ func (s *ReplicatorTestSuite) TestWrite() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var pong Pong
-
 	var dests = s.sender.LookupN("key", 3)
 
 	// parallel
-	responses, err := s.replicator.Write([]string{"key"}, ping, pong, "/ping", foptsTimeout, nil)
+	responses, err := s.replicator.Write([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, nil)
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
 
 	// serial sequential
-	responses, err = s.replicator.Write([]string{"key"}, ping, pong, "/ping", foptsTimeout, &Options{
+	responses, err = s.replicator.Write([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, &Options{
 		FanoutMode: SerialSequential,
 	})
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
-
 	// serial balanced
-	responses, err = s.replicator.Write([]string{"key"}, ping, pong, "/ping", foptsTimeout, &Options{
+	responses, err = s.replicator.Write([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, &Options{
 		FanoutMode: SerialBalanced,
 	})
 	s.NoError(err, "calls should be replicated")
 	s.Len(responses, 3, "expected response from each peer")
 	for _, response := range responses {
-		body, ok := response.Body.(*Pong)
-		s.Require().True(ok, "expected pong response")
-		s.Contains(dests, body.From)
+		var pong Pong
+		s.Require().NoError(json2.Unmarshal(response.Body, &pong))
+		s.Contains(dests, pong.From)
 	}
 }
 
@@ -225,16 +222,15 @@ func (s *ReplicatorTestSuite) TestRWValueNotSatisfied() {
 	}
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var pong Pong
 
-	_, err := s.replicator.Read([]string{"key"}, ping, pong, "/ping", foptsTimeout, &Options{
+	_, err := s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, &Options{
 		RValue: 3,
 		NValue: 3,
 	})
 
 	s.EqualError(err, "rw value not satisfied")
 
-	_, err = s.replicator.Read([]string{"key"}, ping, pong, "/ping", foptsTimeout, &Options{
+	_, err = s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, &Options{
 		RValue:     3,
 		NValue:     3,
 		FanoutMode: SerialSequential,
@@ -246,14 +242,14 @@ func (s *ReplicatorTestSuite) TestRWValueNotSatisfied() {
 func (s *ReplicatorTestSuite) TestInvalidRWValue() {
 	s.ResetLookupN()
 
-	_, err := s.replicator.Read([]string{}, Ping{}, Pong{}, "/ping", nil, &Options{
+	_, err := s.replicator.Read([]string{}, Ping{}.Bytes(), "/ping", nil, &Options{
 		RValue: 3,
 		NValue: 1,
 	})
 
 	s.EqualError(err, "rw value cannot exceed n value")
 
-	_, err = s.replicator.Write([]string{}, Ping{}, Pong{}, "/ping", nil, &Options{
+	_, err = s.replicator.Write([]string{}, Ping{}.Bytes(), "/ping", nil, &Options{
 		WValue: 3,
 		NValue: 1,
 	})
@@ -264,51 +260,11 @@ func (s *ReplicatorTestSuite) TestInvalidRWValue() {
 func (s *ReplicatorTestSuite) TestNotEnoughDests() {
 	s.sender.lookupN = []string{}
 
-	_, err := s.replicator.Read([]string{}, Ping{}, Pong{}, "/ping", nil, &Options{
+	_, err := s.replicator.Read([]string{}, Ping{}.Bytes(), "/ping", nil, &Options{
 		RValue: 3,
 	})
 
 	s.EqualError(err, "rw value not satisfied by destination")
-}
-
-func (s *ReplicatorTestSuite) TestInvalidResponseTypes() {
-	s.ResetLookupN()
-
-	var someStruct = struct{}{}
-
-	_, err := s.replicator.Read([]string{"key"}, 0, &someStruct, "nah", nil, nil)
-	s.EqualError(err, "invalid type for response", "pointer to struct is bad")
-
-	var badMap map[int]int
-
-	_, err = s.replicator.Read([]string{"key"}, 0, badMap, "nah", nil, nil)
-	s.EqualError(err, "invalid type for response", "non map[string]... is bad")
-
-	var n int
-
-	_, err = s.replicator.Read([]string{"key"}, 0, n, "nah", nil, nil)
-	s.EqualError(err, "invalid type for response", "numbers are bad")
-
-	var str string
-
-	_, err = s.replicator.Read([]string{"key"}, 0, str, "nah", nil, nil)
-	s.EqualError(err, "invalid type for response", "strings are bad")
-
-	var validMap1 map[string]int
-	var validMap2 map[string]interface{}
-	var validMap3 map[string]struct{ x, y, z int }
-
-	err = validateResponseType(validMap1)
-	s.NoError(err)
-
-	err = validateResponseType(validMap2)
-	s.NoError(err)
-
-	err = validateResponseType(validMap3)
-	s.NoError(err)
-
-	err = validateResponseType(struct{ x, y, z int }{})
-	s.NoError(err)
 }
 
 func TestReplicatorTestSuite(t *testing.T) {

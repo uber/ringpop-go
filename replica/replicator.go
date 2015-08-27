@@ -25,7 +25,6 @@ package replica
 import (
 	"errors"
 	"io/ioutil"
-	"reflect"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
@@ -73,7 +72,7 @@ type Sender interface {
 type Response struct {
 	Destination string
 	Keys        []string
-	Body        interface{}
+	Body        []byte
 }
 
 // Options for sending a read/write replicator request
@@ -85,8 +84,7 @@ type Options struct {
 type callOptions struct {
 	Keys       []string
 	Dests      []string
-	Request    interface{}
-	Restype    interface{}
+	Request    []byte
 	KeysByDest map[string][]string
 	Operation  string
 }
@@ -149,11 +147,11 @@ func NewReplicator(s Sender, channel *tchannel.SubChannel, logger log.Logger,
 // takes a response type, which is the type of struct that will be returned in each
 // responses.Body in response. Response type must be a concrete struct. The body field
 // will contain a pointer to that type of struct.
-func (r *Replicator) Read(keys []string, request, restype interface{}, operation string,
-	fopts *forward.Options, opts *Options) (responses []Response, err error) {
+func (r *Replicator) Read(keys []string, request []byte, operation string, fopts *forward.Options,
+	opts *Options) (responses []Response, err error) {
 
 	opts = mergeDefaultOptions(opts, r.defaults)
-	return r.readWrite(read, keys, request, restype, operation, fopts, opts)
+	return r.readWrite(read, keys, request, operation, fopts, opts)
 }
 
 // Write replicates a write request. It takes key(s) to be used for lookup of the requests
@@ -162,11 +160,11 @@ func (r *Replicator) Read(keys []string, request, restype interface{}, operation
 // takes a response type, which is the type of struct that will be returned in each
 // responses.Body in response. Response type must be a concrete struct. The body field
 // will contain a pointer to that type of struct.
-func (r *Replicator) Write(keys []string, request, response interface{}, operation string,
-	fopts *forward.Options, opts *Options) (responses []Response, err error) {
+func (r *Replicator) Write(keys []string, request []byte, operation string, fopts *forward.Options,
+	opts *Options) (responses []Response, err error) {
 
 	opts = mergeDefaultOptions(opts, r.defaults)
-	return r.readWrite(write, keys, request, response, operation, fopts, opts)
+	return r.readWrite(write, keys, request, operation, fopts, opts)
 }
 
 func (r *Replicator) groupReplicas(keys []string, n int) (map[string][]string,
@@ -192,22 +190,8 @@ func (r *Replicator) groupReplicas(keys []string, n int) (map[string][]string,
 	return destsByKey, keysByDest
 }
 
-func validateResponseType(restype interface{}) error {
-	t := reflect.TypeOf(restype)
-
-	if t.Kind() != reflect.Struct && (t.Kind() != reflect.Map || t.Key().Kind() != reflect.String) {
-		return errors.New("invalid type for response")
-	}
-
-	return nil
-}
-
-func (r *Replicator) readWrite(rw int, keys []string, request, restype interface{},
-	operation string, fopts *forward.Options, opts *Options) ([]Response, error) {
-
-	if err := validateResponseType(restype); err != nil {
-		return []Response{}, err
-	}
+func (r *Replicator) readWrite(rw int, keys []string, request []byte, operation string,
+	fopts *forward.Options, opts *Options) ([]Response, error) {
 
 	var rwValue int
 	switch rw {
@@ -245,7 +229,6 @@ func (r *Replicator) readWrite(rw int, keys []string, request, restype interface
 		Keys:       keys,
 		Dests:      dests,
 		Request:    request,
-		Restype:    restype,
 		KeysByDest: keysByDest,
 		Operation:  operation,
 	}
@@ -331,15 +314,12 @@ func (r *Replicator) serial(rwValue int, copts *callOptions,
 	return responses, errors
 }
 
-func (r *Replicator) forwardRequest(dest string, copts *callOptions,
-	fopts *forward.Options) (Response, error) {
-
+func (r *Replicator) forwardRequest(dest string, copts *callOptions, fopts *forward.Options) (Response, error) {
 	var response Response
-	var res = reflect.New(reflect.TypeOf(copts.Restype))
 	var keys = copts.KeysByDest[dest]
 
-	err := r.forwarder.ForwardRequest(copts.Request, res.Interface(), dest,
-		r.channel.ServiceName(), copts.Operation, keys, fopts)
+	res, err := r.forwarder.ForwardRequest(copts.Request, dest, r.channel.ServiceName(),
+		copts.Operation, keys, fopts)
 
 	if err != nil {
 		r.logger.WithFields(log.Fields{
@@ -351,7 +331,7 @@ func (r *Replicator) forwardRequest(dest string, copts *callOptions,
 
 	response.Destination = dest
 	response.Keys = keys
-	response.Body = res.Interface()
+	response.Body = res
 
 	return response, nil
 }

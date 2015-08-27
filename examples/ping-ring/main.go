@@ -21,6 +21,7 @@
 package main
 
 import (
+	json2 "encoding/json"
 	"flag"
 
 	log "github.com/Sirupsen/logrus"
@@ -47,6 +48,12 @@ type Ping struct {
 	Key string `json:"key"`
 }
 
+// Bytes returns the byets for a ping
+func (p Ping) Bytes() []byte {
+	data, _ := json2.Marshal(p)
+	return data
+}
+
 // Pong is a ping response
 type Pong struct {
 	Message string `json:"message"`
@@ -63,10 +70,15 @@ func (w *worker) RegisterPong() error {
 
 func (w *worker) PingHandler(ctx json.Context, ping *Ping) (*Pong, error) {
 	var pong Pong
+	var res []byte
 
-	handle, err := w.ringpop.HandleOrForward(ping.Key, ping, &pong, "ping", "/ping", nil)
+	handle, err := w.ringpop.HandleOrForward(ping.Key, ping.Bytes(), &res, "ping", "/ping", nil)
 	if handle {
 		return &Pong{"Hello, world!", w.ringpop.WhoAmI()}, nil
+	}
+
+	if err := json2.Unmarshal(res, &pong); err != nil {
+		return nil, err
 	}
 
 	// else request was forwarded

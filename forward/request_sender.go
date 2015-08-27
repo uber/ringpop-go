@@ -24,9 +24,11 @@ import (
 	"errors"
 	"time"
 
+	"golang.org/x/net/context"
+
 	log "github.com/uber/bark"
 	"github.com/uber/tchannel/golang"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel/golang/raw"
 )
 
 // A requestSender is used to send a request to its destination, as defined by the sender's
@@ -35,7 +37,7 @@ type requestSender struct {
 	sender  Sender
 	channel *tchannel.SubChannel
 
-	request, response interface{}
+	request           []byte
 	destination       string
 	service, endpoint string
 	keys              []string
@@ -53,14 +55,13 @@ type requestSender struct {
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
-func newRequestSender(sender Sender, channel *tchannel.SubChannel, request, response interface{},
-	keys []string, destination, service, endpoint string, opts *Options) *requestSender {
+func newRequestSender(sender Sender, channel *tchannel.SubChannel, request []byte, keys []string,
+	destination, service, endpoint string, opts *Options) *requestSender {
 
 	return &requestSender{
 		sender:         sender,
 		channel:        channel,
 		request:        request,
-		response:       response,
 		keys:           keys,
 		destination:    destination,
 		service:        service,
@@ -73,14 +74,14 @@ func newRequestSender(sender Sender, channel *tchannel.SubChannel, request, resp
 	}
 }
 
-func (s *requestSender) Send() (err error) {
-	ctx, cancel := json.NewContext(s.timeout)
+func (s *requestSender) Send() (res []byte, err error) {
+	ctx, cancel := tchannel.NewContext(s.timeout)
 	defer cancel()
 
 	select {
-	case err := <-s.MakeCall(ctx):
+	case err := <-s.MakeCall(ctx, &res):
 		if err == nil {
-			return nil // response written to s.response
+			return res, nil
 		}
 
 		if s.retries < s.maxRetries {
@@ -94,7 +95,7 @@ func (s *requestSender) Send() (err error) {
 			"endpoint":    s.endpoint,
 		}).Warn("max retries exceeded for request")
 
-		return errors.New("max retries exceeded")
+		return nil, errors.New("max retries exceeded")
 
 	case <-ctx.Done(): // request timed out
 		s.logger.WithFields(log.Fields{
@@ -104,29 +105,38 @@ func (s *requestSender) Send() (err error) {
 			"endpoint":    s.endpoint,
 		}).Warn("request timed out")
 
-		return errors.New("request timed out")
+		return nil, errors.New("request timed out")
 	}
 }
 
 // calls remote service and writes response to s.response
-func (s *requestSender) MakeCall(ctx json.Context) <-chan error {
+func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error {
 	errC := make(chan error)
 	go func() {
 		defer close(errC)
 
 		peer := s.channel.Peers().GetOrAdd(s.destination)
-		if err := json.CallPeer(ctx, peer, s.service, s.endpoint, s.request, s.response); err != nil {
+
+		call, err := peer.BeginCall(ctx, s.service, s.endpoint, nil)
+		if err != nil {
 			errC <- err
 			return
 		}
 
+		_, arg3, _, err := raw.WriteArgs(call, nil, s.request)
+		if err != nil {
+			errC <- err
+			return
+		}
+
+		*res = arg3
 		errC <- nil
 	}()
 
 	return errC
 }
 
-func (s *requestSender) ScheduleRetry() error {
+func (s *requestSender) ScheduleRetry() ([]byte, error) {
 	if s.retries == 0 {
 		s.retryStartTime = time.Now()
 	}
@@ -136,12 +146,12 @@ func (s *requestSender) ScheduleRetry() error {
 	return s.AttemptRetry()
 }
 
-func (s *requestSender) AttemptRetry() error {
+func (s *requestSender) AttemptRetry() ([]byte, error) {
 	s.retries++
 
 	dests := s.LookupKeys(s.keys)
 	if len(dests) > 1 || len(dests) == 0 {
-		return errors.New("key destinations have diverged")
+		return nil, errors.New("key destinations have diverged")
 	}
 
 	if s.rerouteRetries {
@@ -156,7 +166,7 @@ func (s *requestSender) AttemptRetry() error {
 	return s.Send()
 }
 
-func (s *requestSender) RerouteRetry(destination string) error {
+func (s *requestSender) RerouteRetry(destination string) ([]byte, error) {
 	s.destination = destination // update request destination
 	return s.Send()
 }
