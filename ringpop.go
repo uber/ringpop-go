@@ -321,7 +321,10 @@ func (rp *Ringpop) Lookup(key string) string {
 	return dest
 }
 
-// TODO: LookupN
+// LookupN hashes a key to N servers in the ring
+func (rp *Ringpop) LookupN(key string, n int) []string {
+	return rp.ring.LookupN(key, n)
+}
 
 func (rp *Ringpop) ringEvent(event interface{}) {
 	rp.emit(event)
