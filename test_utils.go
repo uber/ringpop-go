@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel/golang"
 )
 
@@ -50,7 +51,7 @@ func (s *dummmyStats) UpdateGauge(key string, tags bark.Tags, val int64) {
 }
 
 func (s *dummmyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
-	s.vals[key] += int64(d)
+	s.vals[key] += util.MS(d)
 }
 
 // fake event listener

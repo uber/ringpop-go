@@ -50,7 +50,6 @@ import (
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
-	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel/golang"
 )
 
@@ -242,40 +241,36 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		// TODO: stat
 
 	case swim.MemberlistChangesAppliedEvent:
-		rp.stat("gauge", "changes.apply", int64(len(event.Changes)))
+		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
 		rp.handleChanges(event.Changes)
 
 	case swim.FullSyncEvent:
-		rp.stat("increment", "full-sync", 1)
+		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
 	case swim.MaxPAdjustedEvent:
-		rp.stat("gauge", "max-p", int64(event.NewPCount))
+		rp.statter.UpdateGauge(rp.getStatKey("max-p"), nil, int64(event.NewPCount))
 
 	case swim.JoinReceiveEvent:
-		rp.stat("increment", "join.recv", 1)
+		rp.statter.IncCounter(rp.getStatKey("join.recv"), nil, 1)
 
 	case swim.JoinCompleteEvent:
-		rp.stat("increment", "join.complete", 1)
-		rp.stat("timing", "join", util.MS(event.Duration))
+		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
+		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
 
 	case swim.PingSendEvent:
-		rp.stat("increment", "ping.send", 1)
+		rp.statter.IncCounter(rp.getStatKey("ping.send"), nil, 1)
 
 	case swim.PingReceiveEvent:
-		rp.stat("increment", "ping.recv", 1)
+		rp.statter.IncCounter(rp.getStatKey("ping.recv"), nil, 1)
 
 	case swim.PingRequestsSendEvent:
-		rp.stat("increment", "ping-req.send", int64(len(event.Peers)))
-		rp.stat("increment", "ping-req.other-members", int64(len(event.Peers)))
+		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, int64(len(event.Peers)))
 
 	case swim.PingRequestReceiveEvent:
-		rp.stat("increment", "ping-req.recv", 1)
+		rp.statter.IncCounter(rp.getStatKey("ping-req.recv"), nil, 1)
 
 	case swim.PingRequestPingEvent:
-		rp.stat("timing", "ping-req.ping", util.MS(event.Duration))
-
-	default:
-		// do nothing
+		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
 	}
 }
 
@@ -331,13 +326,14 @@ func (rp *Ringpop) ringEvent(event interface{}) {
 
 	switch event := event.(type) {
 	case RingChecksumEvent:
-		rp.stat("increment", "ring.checksum-computed", 1)
+		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
 
 	case RingChangedEvent:
-		rp.stat("increment", "ring.server-added", int64(len(event.ServersAdded)))
-		rp.stat("increment", "ring.server-added", int64(len(event.ServersAdded)))
+		added := int64(len(event.ServersAdded))
+		removed := int64(len(event.ServersRemoved))
+		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
+		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
 	}
-
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -346,32 +342,16 @@ func (rp *Ringpop) ringEvent(event interface{}) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// Stats is an interface for where ringpop should send statistics
-type Stats interface {
-	Incr(key string, val int64) error
-	Gauge(key string, val int64) error
-	Timing(key string, val int64) error
-}
-
-func (rp *Ringpop) stat(sType, sKey string, val int64) {
+func (rp *Ringpop) getStatKey(key string) string {
 	rp.stats.Lock()
-
-	psKey, ok := rp.stats.keys[sKey]
+	rpKey, ok := rp.stats.keys[key]
 	if !ok {
-		psKey = fmt.Sprintf("%s.%s", rp.stats.prefix, sKey)
-		rp.stats.keys[sKey] = psKey
+		rpKey = fmt.Sprintf("%s.%s", rp.stats.prefix, key)
+		rp.stats.keys[key] = rpKey
 	}
-
 	rp.stats.Unlock()
 
-	switch sType {
-	case "increment":
-		rp.statter.IncCounter(psKey, nil, val)
-	case "gauge":
-		rp.statter.UpdateGauge(psKey, nil, val)
-	case "timing":
-		rp.statter.RecordTimer(psKey, nil, time.Duration(val))
-	}
+	return rpKey
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

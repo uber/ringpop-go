@@ -125,7 +125,6 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 
 	s.ringpop.HandleEvent(swim.PingRequestsSendEvent{Peers: genAddresses(1, 2, 5)})
 	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.ping-req.send"])
-	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.ping-req.other-members"])
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestReceiveEvent{})
@@ -137,7 +136,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(11, listener.EventCount(), "expected 11 events to be recorded")
+	s.Equal(11, listener.EventCount(), "expected 11 total events to be recorded")
 }
 
 func TestRingpopTestSuite(t *testing.T) {
