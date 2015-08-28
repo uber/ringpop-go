@@ -143,6 +143,7 @@ type Node struct {
 	startTime time.Time
 
 	logger log.Logger
+	log    log.Logger // wraps the provided logger with a 'local: address' field
 }
 
 // NewNode returns a new SWIM node
@@ -155,6 +156,7 @@ func NewNode(app, address string, channel *tchannel.SubChannel, opts *Options) *
 		app:     app,
 		channel: channel,
 		logger:  opts.Logger,
+		log:     opts.Logger.WithField("local", address),
 
 		joinTimeout:        opts.JoinTimeout,
 		pingTimeout:        opts.PingTimeout,
@@ -320,12 +322,12 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	err := util.CheckLocalMissing(n.address, n.bootstrapHosts[util.CaptureHost(n.address)])
 	if err != nil {
-		n.logger.Warn(err.Error())
+		n.log.Warn(err.Error())
 	}
 
 	mismatched, err := util.CheckHostnameIPMismatch(n.address, n.bootstrapHosts)
 	if err != nil {
-		n.logger.WithField("mismatched", mismatched).Warn(err.Error())
+		n.log.WithField("mismatched", mismatched).Warn(err.Error())
 	}
 
 	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
@@ -339,15 +341,14 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	joined, err := sendJoin(n, joinOpts)
 	if err != nil {
-		n.logger.WithFields(log.Fields{
-			"err":   err.Error(),
-			"local": n.address,
+		n.log.WithFields(log.Fields{
+			"err": err.Error(),
 		}).Error("bootstrap failed")
 		return nil, err
 	}
 
 	if n.Destroyed() {
-		n.logger.WithField("local", n.address).Error("destroyed during bootstrap process")
+		n.log.Error("destroyed during bootstrap process")
 		return nil, errors.New("destroyed during bootstrap process")
 	}
 
@@ -379,7 +380,7 @@ func (n *Node) seedBootstrapHosts(opts *BootstrapOptions) (err error) {
 				if err == nil {
 					break
 				}
-				n.logger.WithField("file", opts.File).Warnf("could not read host file: %v", err)
+				n.log.WithField("file", opts.File).Warnf("could not read host file: %v", err)
 			}
 			fallthrough
 		case true:
@@ -388,7 +389,7 @@ func (n *Node) seedBootstrapHosts(opts *BootstrapOptions) (err error) {
 				if err == nil {
 					break
 				}
-				n.logger.WithField("file", n.bootstrapFile).Warnf("could not read host file: %v", err)
+				n.log.WithField("file", n.bootstrapFile).Warnf("could not read host file: %v", err)
 			}
 			fallthrough
 		case true:
@@ -396,7 +397,7 @@ func (n *Node) seedBootstrapHosts(opts *BootstrapOptions) (err error) {
 			if err == nil {
 				break
 			}
-			n.logger.WithField("file", "./hosts.json").Warnf("could not read host file: %v", err)
+			n.log.WithField("file", "./hosts.json").Warnf("could not read host file: %v", err)
 			return errors.New("unable to read hosts file")
 		}
 	}
@@ -464,12 +465,12 @@ func (n *Node) setPinging(pinging bool) {
 func (n *Node) pingNextMember() {
 	member, ok := n.memberiter.Next()
 	if !ok {
-		n.logger.WithField("local", n.Address()).Warn("no pingable members")
+		n.log.Warn("no pingable members")
 		return
 	}
 
 	if n.pinging() {
-		n.logger.WithField("local", n.Address()).Warn("node already pinging")
+		n.log.Warn("node already pinging")
 		return
 	}
 
@@ -489,19 +490,12 @@ func (n *Node) pingNextMember() {
 		switch res := response.(type) {
 		case *pingResponse:
 			if res.OK {
-				n.logger.WithFields(log.Fields{
-					"local":  n.Address(),
-					"target": member.Address,
-				}).Info("ping request target reachable")
-
+				n.log.WithField("target", member.Address).Info("ping request target reachable")
 				n.memberlist.Update(res.Changes)
 				return
 			}
 
-			n.logger.WithFields(log.Fields{
-				"local":  n.Address(),
-				"target": member.Address,
-			}).Info("ping request target unreachable")
+			n.log.WithField("target", member.Address).Info("ping request target unreachable")
 			n.memberlist.MakeSuspect(member.Address, member.Incarnation)
 			return
 
@@ -510,8 +504,7 @@ func (n *Node) pingNextMember() {
 		}
 	}
 
-	n.logger.WithFields(log.Fields{
-		"local":     n.Address,
+	n.log.WithFields(log.Fields{
 		"target":    member.Address,
 		"errors":    errs,
 		"numErrors": len(errs),

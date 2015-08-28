@@ -42,7 +42,7 @@ func (n *Node) registerHandlers() error {
 	}
 
 	return json.Register(n.channel, handlers, func(ctx context.Context, err error) {
-		n.logger.WithField("error", err).Info("error occured")
+		n.log.WithField("error", err).Info("error occured")
 	})
 
 }
@@ -50,10 +50,8 @@ func (n *Node) registerHandlers() error {
 func (n *Node) joinHandler(ctx json.Context, req *joinRequest) (*joinResponse, error) {
 	res, err := handleJoin(n, req)
 	if err != nil {
-		n.logger.WithFields(log.Fields{
-			"local":   n.address,
-			"error":   err,
-			"handler": "join",
+		n.log.WithFields(log.Fields{
+			"error": err,
 		}).Debug("failed to receive join")
 		return nil, err
 	}

@@ -75,8 +75,7 @@ func (d *disseminator) AdjustMaxPropogations() {
 
 		d.node.emit(MaxPAdjustedEvent{prevMaxP, newMaxP})
 
-		d.node.logger.WithFields(log.Fields{
-			"local":             d.node.Address(),
+		d.node.log.WithFields(log.Fields{
 			"newMax":            newMaxP,
 			"prevMax":           prevMaxP,
 			"propogationFactor": d.pFactor,
@@ -124,8 +123,7 @@ func (d *disseminator) IssueAsReceiver(senderAddress string,
 	} else if d.node.memberlist.Checksum() != senderChecksum {
 		d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
 
-		d.node.logger.WithFields(log.Fields{
-			"local":          d.node.Address(),
+		d.node.log.WithFields(log.Fields{
 			"localChecksum":  d.node.memberlist.Checksum(),
 			"remote":         senderAddress,
 			"remoteChecksum": senderChecksum,

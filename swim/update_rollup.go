@@ -144,7 +144,7 @@ func (r *updateRollup) FlushBuffer() {
 	r.buffer.Lock()
 
 	if len(r.buffer.updates) == 0 {
-		r.node.logger.WithField("local", r.node.Address()).Debug("no updates flushed")
+		r.node.log.Debug("no updates flushed")
 		r.buffer.Unlock()
 		return
 	}
@@ -163,8 +163,7 @@ func (r *updateRollup) FlushBuffer() {
 		sinceLastFlush = now.Sub(r.timings.lastFlush)
 	}
 
-	r.node.logger.WithFields(log.Fields{
-		"local":            r.node.Address(),
+	r.node.log.WithFields(log.Fields{
 		"checksum":         r.node.memberlist.Checksum(),
 		"sinceFirstUpdate": sinceFirstUpdate,
 		"sinceLastFlush":   sinceLastFlush,

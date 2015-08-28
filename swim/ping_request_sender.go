@@ -59,8 +59,7 @@ func newPingRequestSender(node *Node, peer, target string, timeout time.Duration
 }
 
 func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
-	p.node.logger.WithFields(log.Fields{
-		"local":  p.node.Address(),
+	p.node.log.WithFields(log.Fields{
 		"peer":   p.peer,
 		"target": p.target,
 	}).Debug("ping request send")
@@ -134,8 +133,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 		go func(peer Member) {
 			p := newPingRequestSender(node, peer.Address, target, timeout)
 
-			p.node.logger.WithFields(log.Fields{
-				"local":  p.node.Address(),
+			p.node.log.WithFields(log.Fields{
 				"peer":   peer.Address,
 				"target": p.target,
 			}).Debug("sending ping request")

@@ -121,7 +121,7 @@ func (g *gossip) ProtocolTiming() metrics.Histogram {
 // start the gossip protocol
 func (g *gossip) Start() {
 	if !g.Stopped() {
-		g.node.logger.WithField("local", g.node.Address()).Warn("gossip already started")
+		g.node.log.Warn("gossip already started")
 		return
 	}
 
@@ -129,18 +129,18 @@ func (g *gossip) Start() {
 	g.RunProtocolRateLoop()
 	g.RunProtocolPeriodLoop()
 
-	g.node.logger.WithField("local", g.node.Address()).Debug("started gossip protocol")
+	g.node.log.Debug("started gossip protocol")
 }
 
 // stop the gossip protocol
 func (g *gossip) Stop() {
 	if g.Stopped() {
-		g.node.logger.WithField("local", g.node.Address()).Warn("gossip already stopped")
+		g.node.log.Warn("gossip already stopped")
 		return
 	}
 
 	g.SetStopped(true)
-	g.node.logger.WithField("local", g.node.Address()).Debug("stopped gossip protocol")
+	g.node.log.Debug("stopped gossip protocol")
 }
 
 // run the gossip protocol period loop
@@ -154,8 +154,7 @@ func (g *gossip) RunProtocolPeriodLoop() {
 			g.ProtocolPeriod()
 		}
 
-		g.node.logger.WithFields(log.Fields{
-			"local": g.node.Address(),
+		g.node.log.WithFields(log.Fields{
 			"start": startTime,
 			"end":   time.Now(),
 		}).Debug("stopped protocol period loop")

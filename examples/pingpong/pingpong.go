@@ -41,25 +41,24 @@ func (w *worker) Ping(ctx thrift.Context, request *pingpong.Ping) (*pingpong.Pon
 		return nil, err
 	}
 
-	handle, err := w.ringpop.HandleOrForward(request.Key, req, &res, "pingpong", "PingPong::Ping",
-		tchannel.Thrift, nil)
-	if handle {
-		// handle request locally
-		return &pingpong.Pong{From: w.address}, nil
+	handle, err := w.ringpop.HandleOrForward(request.Key, req, &res, "pingpong",
+		"PingPong::Ping", tchannel.Thrift, nil)
+
+	if !handle {
+		if err != nil {
+			return nil, err
+		}
+
+		var pongResult pingpong.PingResult
+		if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
+			return nil, err
+		}
+
+		return pongResult.GetSuccess(), nil
 	}
 
-	// request was forwarded!
-
-	if err != nil {
-		return nil, err
-	}
-
-	var pongResult pingpong.PingResult
-	if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
-		return nil, err
-	}
-
-	return pongResult.GetSuccess(), nil
+	// handle request locally
+	return &pingpong.Pong{From: w.address}, nil
 }
 
 func main() {

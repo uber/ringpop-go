@@ -119,6 +119,7 @@ type Ringpop struct {
 	}
 
 	logger log.Logger
+	log    log.Logger
 
 	startTime time.Time
 }
@@ -131,6 +132,7 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 		app:     app,
 		address: address,
 		logger:  opts.Logger,
+		log:     opts.Logger.WithField("local", address),
 		statter: opts.Statter,
 	}
 
@@ -217,18 +219,11 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	joined, err := rp.node.Bootstrap(&opts.BootstrapOptions)
 	if err != nil {
-		rp.logger.WithFields(log.Fields{
-			"local": rp.WhoAmI(),
-			"error": err,
-		}).Info("bootstrap failed")
+		rp.log.WithField("error", err).Info("bootstrap failed")
 		return nil, err
 	}
 
-	rp.logger.WithFields(log.Fields{
-		"local":  rp.WhoAmI(),
-		"joined": joined,
-	}).Info("bootstrap complete")
-
+	rp.log.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
 }
 
@@ -319,11 +314,7 @@ func (rp *Ringpop) Lookup(key string) string {
 	rp.emit(LookupEvent{key, time.Now().Sub(startTime)})
 
 	if !ok {
-		rp.logger.WithFields(log.Fields{
-			"local": rp.WhoAmI(),
-			"key":   key,
-		}).Error("could not find destination for key")
-
+		rp.log.WithField("key", key).Warn("could not find destination for key")
 		return rp.WhoAmI()
 	}
 
