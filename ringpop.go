@@ -38,12 +38,14 @@
 package ringpop
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/forward"
@@ -400,4 +402,33 @@ func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte,
 	*response = res
 
 	return false, err
+}
+
+// SerializeThrift takes a thrift struct and returns the serialized bytes
+// of that struct using the thrift binary protocol. This is a temporary
+// measure before frames can forwarded directly past the endpoint to the proper
+// destinaiton.
+func SerializeThrift(s thrift.TStruct) ([]byte, error) {
+	var b []byte
+	var buffer = bytes.NewBuffer(b)
+
+	transport := thrift.NewStreamTransportW(buffer)
+	if err := s.Write(thrift.NewTBinaryProtocolTransport(transport)); err != nil {
+		return nil, err
+	}
+
+	if err := transport.Flush(); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+// DeserializeThrift takes a byte slice and attempts to write it into the
+// given thrift struct using the thrift binary protocol. This is a temporary
+// measure before frames can forwarded directly past the endpoint to the proper
+// destinaiton.
+func DeserializeThrift(b []byte, s thrift.TStruct) error {
+	reader := bytes.NewReader(b)
+	transport := thrift.NewStreamTransportR(reader)
+	return s.Read(thrift.NewTBinaryProtocolTransport(transport))
 }
