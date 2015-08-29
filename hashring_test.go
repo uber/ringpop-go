@@ -77,18 +77,18 @@ func (s *RingTestSuite) TestRemoveServer() {
 }
 
 func (s *RingTestSuite) TestChecksumChanges() {
-	checksum := s.ring.checksum
+	checksum := s.ring.Checksum()
 
 	s.ring.AddServer("server1")
 	s.ring.AddServer("server2")
 
-	s.NotEqual(checksum, s.ring.checksum, "expected checksum to have changed on server add")
+	s.NotEqual(checksum, s.ring.Checksum(), "expected checksum to have changed on server add")
 
-	checksum = s.ring.checksum
+	checksum = s.ring.Checksum()
 
 	s.ring.RemoveServer("server1")
 
-	s.NotEqual(checksum, s.ring.checksum, "expected checksum to have changed on server remove")
+	s.NotEqual(checksum, s.ring.Checksum(), "expected checksum to have changed on server remove")
 }
 
 func (s *RingTestSuite) TestServerCount() {
@@ -168,7 +168,7 @@ func (s *RingTestSuite) TestLookupN() {
 	// bug the ring out by removing server from tree but not the ring itself
 	for i := 0; i < s.ring.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", "127.0.0.1:3001", i)
-		s.ring.tree.Delete(int(s.ring.hashfunc([]byte(address))))
+		s.ring.servers.tree.Delete(int(s.ring.hashfunc([]byte(address))))
 	}
 
 	unique = make(map[string]bool)
