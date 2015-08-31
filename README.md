@@ -1,4 +1,4 @@
-# Ringpop-Go
+# ringpop-go
 Ringpop brings application-layer sharding to your services in a fault tolerant and scalable manner. It is an embeddable server that reliably partitions your data, detects node failures and easily integrates new nodes into your application cluster when they become available. For more information about the techniques applied within ringpop, see the Concepts section below.
 
 # Table of Contents
