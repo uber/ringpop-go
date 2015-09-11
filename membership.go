@@ -81,6 +81,12 @@ func (m *membership) computeChecksum() {
 	m.lock.Unlock()
 }
 
+func (m *membership) getChecksum() uint32 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return m.checksum
+}
+
 func (m *membership) genChecksumString() string {
 	var checksumStrings sort.StringSlice
 
@@ -118,7 +124,34 @@ func (m *membership) memberCount() int {
 	return len(m.members)
 }
 
+func (m *membership) getMemberOnIndex(currentIndex int) *Member {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return m.memberlist[currentIndex]
+}
+
+func (m *membership) getMemberListLength() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return len(m.memberlist)
+}
+
+func (m *membership) getMembers() map[string]*Member {
+	localMembers := make(map[string]*Member)
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	// copy the map rather than returning the reference
+	for k, v := range m.members {
+		localMembers[k] = v
+	}
+	return localMembers
+}
+
 func (m *membership) randomPingablemembers(n int, excluding []string) []*Member {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	var pingableMembers []*Member
 
 	for _, member := range m.memberlist {
@@ -359,19 +392,19 @@ func newMembershipIter(membership *membership) membershipIter {
 // Returns the next pingable member in the membership list, if it
 // visits all members but none are pingable, returns nil, false
 func (it *membershipIter) next() (*Member, bool) {
-	maxToVisit := len(it.membership.memberlist)
+	maxToVisit := it.membership.getMemberListLength()
 	visited := make(map[string]bool)
 
 	for len(visited) < maxToVisit {
 		it.currentIndex++
 
-		if it.currentIndex >= len(it.membership.memberlist) {
+		if it.currentIndex >= it.membership.getMemberListLength() {
 			it.currentIndex = 0
 			it.currentRound++
 			it.membership.shuffle()
 		}
 
-		member := it.membership.memberlist[it.currentIndex]
+		member := it.membership.getMemberOnIndex(it.currentIndex)
 		visited[member.Address] = true
 
 		if it.membership.isPingable(member) {

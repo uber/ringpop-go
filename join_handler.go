@@ -62,7 +62,7 @@ func handleJoin(ringpop *Ringpop, body joinBody) (joinResBody, error) {
 		App:                ringpop.app,
 		Coordinator:        ringpop.WhoAmI(),
 		Membership:         ringpop.dissemination.fullSync(),
-		MembershipChecksum: ringpop.membership.checksum,
+		MembershipChecksum: ringpop.membership.getChecksum(),
 	}
 
 	return res, nil

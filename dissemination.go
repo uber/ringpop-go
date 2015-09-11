@@ -46,6 +46,9 @@ func newDissemination(ringpop *Ringpop) *dissemination {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (d *dissemination) adjustPiggybackCount() {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
 	serverCount := d.ringpop.ring.serverCount()
 	prevPiggybackCount := d.maxPiggybackCount
 
@@ -64,9 +67,10 @@ func (d *dissemination) adjustPiggybackCount() {
 }
 
 func (d *dissemination) fullSync() []Change {
-	changes := make([]Change, 0, len(d.ringpop.membership.members))
+	members := d.ringpop.membership.getMembers()
+	changes := make([]Change, 0, len(members))
 
-	for _, member := range d.ringpop.membership.members {
+	for _, member := range members {
 		changes = append(changes, Change{
 			Source:      d.ringpop.WhoAmI(),
 			Address:     member.Address,
