@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 	"github.com/uber/tchannel/golang/json"
 )
 
@@ -116,7 +116,7 @@ func handleForwardRequest(ringpop *Ringpop, headers *forwardReqHeader, pReq *for
 
 	if err := json.CallPeer(ctx, peer, pReq.Header.Service, pReq.Header.Operation, pReq,
 		&res); err != nil {
-		log.Fatalf("json.Call failed: %v", err)
+		ringpop.logger.Fatalf("json.Call failed: %v", err)
 	}
 
 	ringpop.logger.WithFields(log.Fields{

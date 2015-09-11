@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/uber/bark"
 )
 
 const defaultSuspicionTimeout = time.Millisecond * 5000

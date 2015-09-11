@@ -1,6 +1,6 @@
 package ringpop
 
-import log "github.com/Sirupsen/logrus"
+import log "github.com/uber/bark"
 
 func handlePingReq(ringpop *Ringpop, body pingReqBody) pingReqRes {
 	ringpop.stat("increment", "ping-req.recv", 1)

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 )
-import log "github.com/Sirupsen/logrus"
+import log "github.com/uber/bark"
 
 const defaultMaxNumUpdates = 250
 
