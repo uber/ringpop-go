@@ -167,3 +167,35 @@ func TestServerGossipPingTimesOut(t *testing.T) {
 	assert.Error(t, err, "expected ping to have timed out")
 	assert.Nil(t, res, "expected res to be nil")
 }
+
+func TestServerSkipHosts(t *testing.T) {
+	ringpop := newServerRingpop(t, "127.0.0.1:3001")
+	defer ringpop.Destroy()
+
+	nodesJoined, err := ringpop.Bootstrap(&BootstrapOptions{
+		Hosts:     []string{"127.0.0.1:3001"},
+		SkipHosts: []string{"127.0.0.1:3002"},
+		Stopped:   true,
+	})
+
+	require.NoError(t, err, "ringpop must bootstrap successfully")
+	require.Empty(t, nodesJoined, "ringpop must only join self")
+
+	ringpop.membership.makeAlive("127.0.0.1:3001", unixMilliseconds(time.Now()))
+	ringpop.membership.makeAlive("127.0.0.1:3002", unixMilliseconds(time.Now()))
+
+	ringpop2 := newServerRingpop(t, "127.0.0.1:3002")
+	defer ringpop2.Destroy()
+
+	nodesJoined, err = ringpop2.Bootstrap(&BootstrapOptions{
+		Hosts:     []string{"127.0.0.1:3001", "127.0.0.1:3002"},
+		SkipHosts: []string{"127.0.0.1:3002"},
+	})
+	require.NoError(t, err, "ringpop must bootstrap successfully")
+	require.Len(t, nodesJoined, 1, "ringpop must only join one other ringpop")
+	require.Equal(t, "127.0.0.1:3001", nodesJoined[0], "ringpop must join correct ringpop")
+
+	// The ring server count should just be 1, since we skipped one host
+	assert.Equal(t, 1, ringpop.ring.serverCount())
+	assert.Equal(t, 1, ringpop2.ring.serverCount())
+}

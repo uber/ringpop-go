@@ -44,6 +44,9 @@ type Options struct {
 	// File to bootstrap from
 	BootstrapFile string
 
+	// File to read the list of hosts *not* to be added to the hashring
+	SkipHostsFile string
+
 	JoinSize                      int
 	SetTimeout                    time.Duration
 	ForwardReqTimeout             time.Duration
@@ -77,6 +80,8 @@ type Ringpop struct {
 	ready         bool
 	pinging       bool
 	destroyed     bool
+	skipHostsFile string
+	skipHosts     map[string][]string //Hosts which doesn't have to be added to the hash ring
 	destroyedLock sync.Mutex
 
 	pingReqSize int
@@ -164,6 +169,8 @@ func NewRingpop(app, hostport string, channel *tchannel.Channel, opts *Options) 
 	ringpop.bootstrapHosts = make(map[string][]string)
 	ringpop.joinSize = opts.JoinSize
 	ringpop.maxJoinDuration = selectDurationOrDefault(opts.MaxJoinDuration, defaultMaxJoinDuration)
+	ringpop.skipHosts = make(map[string][]string)
+	ringpop.skipHostsFile = opts.SkipHostsFile
 
 	ringpop.pingTimeout = time.Millisecond * 1500 // 1500
 	ringpop.pingReqSize = 3
@@ -263,6 +270,9 @@ type BootstrapOptions struct {
 	// Hosts to bootstrap with
 	Hosts []string
 
+	// Hosts to be skipped while adding to ring
+	SkipHosts []string
+
 	// File containg json array of hosts
 	File string
 
@@ -310,6 +320,8 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	rp.checkForMissingBootstrapHost()
 	rp.checkForHostnameIPMismatch()
+
+	rp.setupSkipHosts(opts)
 
 	// make self alive
 	rp.membership.makeAlive(rp.WhoAmI(), unixMilliseconds(time.Now()))
@@ -463,6 +475,48 @@ func (rp *Ringpop) seedBootstrapHosts(opts *BootstrapOptions) error {
 	return nil
 }
 
+// return true if the host is on the list to be skipped, else return false to
+// add it to the ring
+func (rp *Ringpop) shouldSkipMember(hostPort string) bool {
+	if indexOf(rp.skipHosts[captureHost(hostPort)], hostPort) == -1 {
+		return false
+	}
+
+	return true
+}
+
+// setup the list of hosts to be skipped while adding to the hashring
+func (rp *Ringpop) setupSkipHosts(opts *BootstrapOptions) error {
+	var hosts []string
+	var err error
+
+	if opts.SkipHosts != nil {
+		hosts = opts.SkipHosts
+	} else {
+		switch true {
+		case true:
+			if rp.skipHostsFile != "" {
+				hosts, err = rp.readHostsFile(rp.skipHostsFile)
+				if err == nil {
+					break
+				}
+				rp.logger.WithField("file", rp.skipHostsFile).Warnf("[ringpop] could not read skip host file: %v", err)
+			}
+			return errors.New("unable to read hosts file")
+		}
+	}
+
+	for _, hostport := range hosts {
+		host := captureHost(hostport)
+		if host == "" {
+			continue
+		}
+		rp.skipHosts[host] = append(rp.skipHosts[host], hostport)
+	}
+
+	return nil
+}
+
 func (rp *Ringpop) readHostsFile(file string) ([]string, error) {
 	var hosts []string
 
@@ -579,8 +633,10 @@ func (rp *Ringpop) onMemberAlive(change Change) {
 	}).Debug("[ringpop] member is alive")
 
 	rp.dissemination.recordChange(change) // Propogate change
-	rp.ring.addServer(change.Address)     // Add node to ring
-	rp.suspicion.stop(change)             // Stop suspicion for node
+	if !rp.shouldSkipMember(change.Address) {
+		rp.ring.addServer(change.Address) // Add node to ring
+	}
+	rp.suspicion.stop(change) // Stop suspicion for node
 }
 
 func (rp *Ringpop) onMemberFaulty(change Change) {
@@ -592,7 +648,9 @@ func (rp *Ringpop) onMemberFaulty(change Change) {
 		"source":      change.Source,
 	}).Debug("[ringpop] member is faulty")
 
-	rp.ring.removeServer(change.Address)  // Remove node from ring
+	if !rp.shouldSkipMember(change.Address) {
+		rp.ring.removeServer(change.Address) // Remove node from ring
+	}
 	rp.suspicion.stop(change)             // Stop suspicion for node
 	rp.dissemination.recordChange(change) // Propogate change
 }
@@ -620,8 +678,10 @@ func (rp *Ringpop) onMemberLeave(change Change) {
 	}).Debug("[ringpop] member has left")
 
 	rp.dissemination.recordChange(change) // Propogate change
-	rp.ring.removeServer(change.Address)  // Remove server from ring
-	rp.suspicion.stop(change)             // Stop suspicion for node
+	if !rp.shouldSkipMember(change.Address) {
+		rp.ring.removeServer(change.Address) // Remove server from ring
+	}
+	rp.suspicion.stop(change) // Stop suspicion for node
 }
 
 func (rp *Ringpop) handleChanges(changes []Change) {
