@@ -1,5 +1,3 @@
-package main
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package main
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package main
 
 import (
 	"bufio"
@@ -145,7 +145,9 @@ type firstHandler struct{}
 
 func (h *firstHandler) Healthcheck(ctx thrift.Context) (*gen.HealthCheckRes, error) {
 	log.Printf("first: HealthCheck()\n")
-	return &gen.HealthCheckRes{true, "OK"}, nil
+	return &gen.HealthCheckRes{
+		Healthy: true,
+		Msg:     "OK"}, nil
 }
 
 func (h *firstHandler) Echo(ctx thrift.Context, msg string) (r string, err error) {

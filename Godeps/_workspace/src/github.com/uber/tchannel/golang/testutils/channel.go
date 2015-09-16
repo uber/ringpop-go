@@ -1,8 +1,3 @@
-package testutils
-
-// This file contains test setup logic, and is named with a _test.go suffix to
-// ensure it's only compiled with tests.
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,13 +18,22 @@ package testutils
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package testutils
+
+// This file contains test setup logic, and is named with a _test.go suffix to
+// ensure it's only compiled with tests.
+
 import (
 	"flag"
 	"fmt"
 	"net"
 	"sync/atomic"
+	"testing"
+
+	"golang.org/x/net/context"
 
 	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel/golang/raw"
 )
 
 var connectionLog = flag.Bool("connectionLog", false, "Enables connection logging in tests")
@@ -54,6 +58,9 @@ type ChannelOpts struct {
 	// StatsReporter specifies the StatsReporter to use.
 	StatsReporter tchannel.StatsReporter
 
+	// TraceReporter specified the TraceReporter to use.
+	TraceReporter tchannel.TraceReporter
+
 	// DefaultConnectionOptions specifies the channel's default connection options.
 	DefaultConnectionOptions tchannel.ConnectionOptions
 }
@@ -76,6 +83,7 @@ func getChannelOptions(opts *ChannelOpts, processName string) *tchannel.ChannelO
 		Logger:      logger,
 		DefaultConnectionOptions: opts.DefaultConnectionOptions,
 		StatsReporter:            opts.StatsReporter,
+		TraceReporter:            opts.TraceReporter,
 	}
 }
 
@@ -131,4 +139,24 @@ func NewClient(opts *ChannelOpts) (*tchannel.Channel, error) {
 	serviceName := defaultString(opts.ServiceName, DefaultClientName)
 	processName := defaultString(opts.ProcessName, serviceName+"-"+fmt.Sprint(clientNum))
 	return tchannel.NewChannel(serviceName, getChannelOptions(opts, processName))
+}
+
+type rawFuncHandler struct {
+	t *testing.T
+	f func(context.Context, *raw.Args) (*raw.Res, error)
+}
+
+func (h rawFuncHandler) OnError(ctx context.Context, err error) {
+	h.t.Errorf("simpleHandler OnError: %v %v", ctx, err)
+}
+
+func (h rawFuncHandler) Handle(ctx context.Context, args *raw.Args) (*raw.Res, error) {
+	return h.f(ctx, args)
+}
+
+// RegisterFunc registers a function as a handler for the given operation name.
+func RegisterFunc(t *testing.T, ch *tchannel.Channel, name string,
+	f func(ctx context.Context, args *raw.Args) (*raw.Res, error)) {
+
+	ch.Register(raw.Wrap(rawFuncHandler{t, f}), name)
 }

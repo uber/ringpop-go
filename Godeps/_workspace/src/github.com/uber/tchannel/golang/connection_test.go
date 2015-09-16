@@ -1,5 +1,3 @@
-package tchannel_test
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel_test
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel_test
 
 import (
 	"errors"
@@ -88,7 +88,7 @@ func (h *testHandler) OnError(ctx context.Context, err error) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		handler := newTestHandler(t)
 		ch.Register(raw.Wrap(handler), "echo")
 
@@ -112,11 +112,11 @@ func TestRoundTrip(t *testing.T) {
 		assert.Equal(t, JSON, handler.format)
 		assert.Equal(t, testServiceName, handler.caller)
 		assert.Equal(t, JSON, call.Response().Format(), "response Format should match request Format")
-	}))
+	})
 }
 
 func TestDefaultFormat(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		handler := newTestHandler(t)
 		ch.Register(raw.Wrap(handler), "echo")
 
@@ -130,7 +130,7 @@ func TestDefaultFormat(t *testing.T) {
 		require.Equal(t, testArg3, arg3)
 		require.Equal(t, Raw, handler.format)
 		assert.Equal(t, Raw, resp.Format(), "response Format should match request Format")
-	}))
+	})
 }
 
 func TestReuseConnection(t *testing.T) {
@@ -138,9 +138,9 @@ func TestReuseConnection(t *testing.T) {
 	defer cancel()
 
 	s1Opts := &testutils.ChannelOpts{ServiceName: "s1"}
-	require.Nil(t, testutils.WithServer(s1Opts, func(ch1 *Channel, hostPort1 string) {
+	WithVerifiedServer(t, s1Opts, func(ch1 *Channel, hostPort1 string) {
 		s2Opts := &testutils.ChannelOpts{ServiceName: "s2"}
-		require.Nil(t, testutils.WithServer(s2Opts, func(ch2 *Channel, hostPort2 string) {
+		WithVerifiedServer(t, s2Opts, func(ch2 *Channel, hostPort2 string) {
 			ch1.Register(raw.Wrap(newTestHandler(t)), "echo")
 			ch2.Register(raw.Wrap(newTestHandler(t)), "echo")
 
@@ -180,45 +180,45 @@ func TestReuseConnection(t *testing.T) {
 				}(call)
 			}
 			wg.Wait()
-		}))
-	}))
+		})
+	})
 }
 
 func TestPing(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		ctx, cancel := NewContext(time.Second * 5)
 		defer cancel()
 
 		clientCh, err := testutils.NewClient(nil)
 		require.NoError(t, err)
 		require.NoError(t, clientCh.Ping(ctx, hostPort))
-	}))
+	})
 }
 
 func TestBadRequest(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		ctx, cancel := NewContext(time.Second * 5)
 		defer cancel()
 
 		_, _, _, err := raw.Call(ctx, ch, hostPort, "Nowhere", "Noone", []byte("Headers"), []byte("Body"))
 		require.NotNil(t, err)
 		assert.Equal(t, ErrCodeBadRequest, GetSystemErrorCode(err))
-	}))
+	})
 }
 
 func TestNoTimeout(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		ch.Register(raw.Wrap(newTestHandler(t)), "Echo")
 
 		ctx := context.Background()
 		_, _, _, err := raw.Call(ctx, ch, hostPort, "svc", "Echo", []byte("Headers"), []byte("Body"))
 		require.NotNil(t, err)
 		assert.Equal(t, ErrTimeoutRequired, err)
-	}))
+	})
 }
 
 func TestServerBusy(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		ch.Register(raw.Wrap(newTestHandler(t)), "busy")
 
 		ctx, cancel := NewContext(time.Second * 5)
@@ -227,11 +227,11 @@ func TestServerBusy(t *testing.T) {
 		_, _, _, err := raw.Call(ctx, ch, hostPort, testServiceName, "busy", []byte("Arg2"), []byte("Arg3"))
 		require.NotNil(t, err)
 		assert.Equal(t, ErrCodeBusy, GetSystemErrorCode(err), "err: %v", err)
-	}))
+	})
 }
 
 func TestTimeout(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		ch.Register(raw.Wrap(newTestHandler(t)), "timeout")
 
 		ctx, cancel := NewContext(time.Millisecond * 100)
@@ -241,11 +241,22 @@ func TestTimeout(t *testing.T) {
 
 		// TODO(mmihic): Maybe translate this into ErrTimeout (or vice versa)?
 		assert.Equal(t, context.DeadlineExceeded, err)
-	}))
+	})
+}
+
+func TestLargeOperation(t *testing.T) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
+		ctx, cancel := NewContext(time.Second)
+		defer cancel()
+
+		largeOperation := testutils.RandBytes(16*1024 + 1)
+		_, _, _, err := raw.Call(ctx, ch, hostPort, testServiceName, string(largeOperation), nil, nil)
+		assert.Equal(t, ErrOperationTooLarge, err)
+	})
 }
 
 func TestFragmentation(t *testing.T) {
-	require.Nil(t, testutils.WithServer(nil, func(ch *Channel, hostPort string) {
+	WithVerifiedServer(t, nil, func(ch *Channel, hostPort string) {
 		ch.Register(raw.Wrap(newTestHandler(t)), "echo")
 
 		arg2 := make([]byte, MaxFramePayloadSize*2)
@@ -265,5 +276,5 @@ func TestFragmentation(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, arg2, respArg2)
 		assert.Equal(t, arg3, respArg3)
-	}))
+	})
 }

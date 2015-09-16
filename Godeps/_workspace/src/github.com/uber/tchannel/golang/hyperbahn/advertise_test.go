@@ -1,5 +1,3 @@
-package hyperbahn
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package hyperbahn
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package hyperbahn
 
 import (
 	"errors"
@@ -61,8 +61,9 @@ func TestAdvertiseFailed(t *testing.T) {
 		require.NoError(t, err)
 		defer clientCh.Close()
 
-		client := NewClient(clientCh, configFor(hostPort), nil)
-		require.Error(t, client.Advertise())
+		client, err := NewClient(clientCh, configFor(hostPort), nil)
+		require.NoError(t, err, "NewClient")
+		assert.Error(t, client.Advertise(), "Advertise without handler should fail")
 	})
 }
 
@@ -76,6 +77,7 @@ type retryTest struct {
 	sleepArgs  <-chan time.Duration
 	sleepBlock chan<- struct{}
 
+	ch     *tchannel.Channel
 	client *Client
 	mock   mock.Mock
 }
@@ -122,10 +124,12 @@ func runRetryTest(t *testing.T, f func(r *retryTest)) {
 		require.NoError(t, err)
 		defer clientCh.Close()
 
-		r.client = NewClient(clientCh, configFor(hostPort), &ClientOptions{
+		r.ch = clientCh
+		r.client, err = NewClient(clientCh, configFor(hostPort), &ClientOptions{
 			Handler:      r,
 			FailStrategy: FailStrategyIgnore,
 		})
+		require.NoError(t, err, "NewClient")
 		f(r)
 		r.mock.AssertExpectations(t)
 	})
@@ -141,6 +145,40 @@ func TestAdvertiseSuccess(t *testing.T) {
 
 		// Verify that the arguments passed to 'ad' are correct.
 		expectedRequest := adRequest{[]service{{Name: "my-client", Cost: 0}}}
+		require.Equal(t, expectedRequest, r.req)
+
+		// Verify readvertise happen after sleeping for ~advertiseInterval.
+		r.mock.On("On", Readvertised).Return().Times(10)
+		for i := 0; i < 10; i++ {
+			s1 := <-r.sleepArgs
+			checkAdvertiseInterval(t, s1)
+			r.sleepBlock <- struct{}{}
+
+			r.setAdvertiseSuccess()
+			require.Equal(t, expectedRequest, r.req)
+		}
+
+		// Block till the last advertise completes.
+		<-r.sleepArgs
+	})
+}
+
+func TestMutlipleAdvertise(t *testing.T) {
+	runRetryTest(t, func(r *retryTest) {
+		r.mock.On("On", SendAdvertise).Return().
+			Times(1 /* initial */ + 10 /* successful retries */)
+		r.mock.On("On", Advertised).Return().Once()
+		r.setAdvertiseSuccess()
+
+		sc2, sc3 := r.ch.GetSubChannel("svc-2"), r.ch.GetSubChannel("svc-3")
+		require.NoError(t, r.client.Advertise(sc2, sc3))
+
+		// Verify that the arguments passed to 'ad' are correct.
+		expectedRequest := adRequest{[]service{
+			{Name: "my-client", Cost: 0},
+			{Name: "svc-2", Cost: 0},
+			{Name: "svc-3", Cost: 0},
+		}}
 		require.Equal(t, expectedRequest, r.req)
 
 		// Verify readvertise happen after sleeping for ~advertiseInterval.

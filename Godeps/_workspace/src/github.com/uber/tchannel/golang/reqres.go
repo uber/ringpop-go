@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel
 
 import (
 	"fmt"
@@ -78,7 +78,7 @@ type reqResWriter struct {
 
 //go:generate stringer -type=reqResReaderState
 
-func (w *reqResWriter) argWriter(last bool, inState reqResWriterState, outState reqResWriterState) (io.WriteCloser, error) {
+func (w *reqResWriter) argWriter(last bool, inState reqResWriterState, outState reqResWriterState) (ArgWriter, error) {
 	if w.err != nil {
 		return nil, w.err
 	}
@@ -89,22 +89,22 @@ func (w *reqResWriter) argWriter(last bool, inState reqResWriterState, outState 
 
 	argWriter, err := w.contents.ArgWriter(last)
 	if err != nil {
-		return nil, err
+		return nil, w.failed(err)
 	}
 
 	w.state = outState
 	return argWriter, nil
 }
 
-func (w *reqResWriter) arg1Writer() (io.WriteCloser, error) {
+func (w *reqResWriter) arg1Writer() (ArgWriter, error) {
 	return w.argWriter(false /* last */, reqResWriterPreArg1, reqResWriterPreArg2)
 }
 
-func (w *reqResWriter) arg2Writer() (io.WriteCloser, error) {
+func (w *reqResWriter) arg2Writer() (ArgWriter, error) {
 	return w.argWriter(false /* last */, reqResWriterPreArg2, reqResWriterPreArg3)
 }
 
-func (w *reqResWriter) arg3Writer() (io.WriteCloser, error) {
+func (w *reqResWriter) arg3Writer() (ArgWriter, error) {
 	return w.argWriter(true /* last */, reqResWriterPreArg3, reqResWriterComplete)
 }
 
@@ -125,7 +125,7 @@ func (w *reqResWriter) newFragment(initial bool, checksum Checksum) (*writableFr
 	if err := message.write(wbuf); err != nil {
 		return nil, err
 	}
-	wbuf.WriteByte(byte(checksum.TypeCode()))
+	wbuf.WriteSingleByte(byte(checksum.TypeCode()))
 	fragment.checksumRef = wbuf.DeferBytes(checksum.Size())
 	fragment.checksum = checksum
 	fragment.contents = wbuf
@@ -145,8 +145,6 @@ func (w *reqResWriter) flushFragment(fragment *writableFragment) error {
 		return w.failed(w.mex.ctx.Err())
 	case w.conn.sendCh <- frame:
 		return nil
-	default:
-		return w.failed(ErrSendBufferFull)
 	}
 }
 
@@ -254,12 +252,12 @@ func (r *reqResReader) failed(err error) error {
 func parseInboundFragment(framePool FramePool, frame *Frame, message message) (*readableFragment, error) {
 	rbuf := typed.NewReadBuffer(frame.SizedPayload())
 	fragment := new(readableFragment)
-	fragment.flags = rbuf.ReadByte()
+	fragment.flags = rbuf.ReadSingleByte()
 	if err := message.read(rbuf); err != nil {
 		return nil, err
 	}
 
-	fragment.checksumType = ChecksumType(rbuf.ReadByte())
+	fragment.checksumType = ChecksumType(rbuf.ReadSingleByte())
 	fragment.checksum = rbuf.ReadBytes(fragment.checksumType.ChecksumSize())
 	fragment.contents = rbuf
 	fragment.done = func() {

@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel
 
 import (
 	"time"
@@ -126,52 +126,55 @@ type initRes struct {
 
 func (m *initRes) messageType() messageType { return messageTypeInitRes }
 
-// CallHeaderName is a type for call header names.
-type CallHeaderName string
+// TransportHeaderName is a type for transport header names.
+type TransportHeaderName string
 
-func (cn CallHeaderName) String() string { return string(cn) }
+func (cn TransportHeaderName) String() string { return string(cn) }
 
 // Known transport header keys for call requests. See protocol docs for more information.
 const (
 	// ArgScheme header specifies the format of the args.
-	ArgScheme CallHeaderName = "as"
+	ArgScheme TransportHeaderName = "as"
 
 	// CallerName header specifies the name of the service making the call.
-	CallerName CallHeaderName = "cn"
+	CallerName TransportHeaderName = "cn"
 
 	// ClaimAtFinish header value is host:port specifying the instance to send a claim message
 	// to when response is being sent.
-	ClaimAtFinish CallHeaderName = "caf"
+	ClaimAtFinish TransportHeaderName = "caf"
 
 	// ClaimAtStart header value is host:port specifying another instance to send a claim message
 	// to when work is started.
-	ClaimAtStart CallHeaderName = "cas"
+	ClaimAtStart TransportHeaderName = "cas"
 
 	// FailureDomain header describes a group of related requests to the same service that are
 	// likely to fail in the same way if they were to fail.
-	FailureDomain CallHeaderName = "fd"
+	FailureDomain TransportHeaderName = "fd"
+
+	// ShardKey header value is used by ringpop to deliver calls to a specific tchannel instance.
+	ShardKey TransportHeaderName = "sk"
 
 	// RetryFlags header specifies whether retry policies.
-	RetryFlags CallHeaderName = "re"
+	RetryFlags TransportHeaderName = "re"
 
 	// SpeculativeExecution header specifies the number of nodes on which to run the request.
-	SpeculativeExecution CallHeaderName = "se"
+	SpeculativeExecution TransportHeaderName = "se"
 )
 
-// callHeaders are passed as part of a CallReq/CallRes
-type callHeaders map[CallHeaderName]string
+// transportHeaders are passed as part of a CallReq/CallRes
+type transportHeaders map[TransportHeaderName]string
 
-func (ch callHeaders) read(r *typed.ReadBuffer) {
-	nh := r.ReadByte()
+func (ch transportHeaders) read(r *typed.ReadBuffer) {
+	nh := r.ReadSingleByte()
 	for i := 0; i < int(nh); i++ {
 		k := r.ReadLen8String()
 		v := r.ReadLen8String()
-		ch[CallHeaderName(k)] = v
+		ch[TransportHeaderName(k)] = v
 	}
 }
 
-func (ch callHeaders) write(w *typed.WriteBuffer) {
-	w.WriteByte(byte(len(ch)))
+func (ch transportHeaders) write(w *typed.WriteBuffer) {
+	w.WriteSingleByte(byte(len(ch)))
 
 	for k, v := range ch {
 		w.WriteLen8String(k.String())
@@ -184,7 +187,7 @@ type callReq struct {
 	id         uint32
 	TimeToLive time.Duration
 	Tracing    Span
-	Headers    callHeaders
+	Headers    transportHeaders
 	Service    string
 }
 
@@ -194,7 +197,7 @@ func (m *callReq) read(r *typed.ReadBuffer) error {
 	m.TimeToLive = time.Duration(r.ReadUint32()) * time.Millisecond
 	m.Tracing.read(r)
 	m.Service = r.ReadLen8String()
-	m.Headers = callHeaders{}
+	m.Headers = transportHeaders{}
 	m.Headers.read(r)
 	return r.Err()
 }
@@ -229,22 +232,22 @@ type callRes struct {
 	id           uint32
 	ResponseCode ResponseCode
 	Tracing      Span
-	Headers      callHeaders
+	Headers      transportHeaders
 }
 
 func (m *callRes) ID() uint32               { return m.id }
 func (m *callRes) messageType() messageType { return messageTypeCallRes }
 
 func (m *callRes) read(r *typed.ReadBuffer) error {
-	m.ResponseCode = ResponseCode(r.ReadByte())
+	m.ResponseCode = ResponseCode(r.ReadSingleByte())
 	m.Tracing.read(r)
-	m.Headers = callHeaders{}
+	m.Headers = transportHeaders{}
 	m.Headers.read(r)
 	return r.Err()
 }
 
 func (m *callRes) write(w *typed.WriteBuffer) error {
-	w.WriteByte(byte(m.ResponseCode))
+	w.WriteSingleByte(byte(m.ResponseCode))
 	m.Tracing.write(w)
 	m.Headers.write(w)
 	return w.Err()
@@ -271,14 +274,14 @@ type errorMessage struct {
 func (m *errorMessage) ID() uint32               { return m.id }
 func (m *errorMessage) messageType() messageType { return messageTypeError }
 func (m *errorMessage) read(r *typed.ReadBuffer) error {
-	m.errCode = SystemErrCode(r.ReadByte())
+	m.errCode = SystemErrCode(r.ReadSingleByte())
 	m.tracing.read(r)
 	m.message = r.ReadLen16String()
 	return r.Err()
 }
 
 func (m *errorMessage) write(w *typed.WriteBuffer) error {
-	w.WriteByte(byte(m.errCode))
+	w.WriteSingleByte(byte(m.errCode))
 	m.tracing.write(w)
 	w.WriteLen16String(m.message)
 	return w.Err()

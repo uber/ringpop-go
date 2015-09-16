@@ -1,5 +1,3 @@
-package thrift
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package thrift
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package thrift
+
 import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/uber/tchannel/golang"
@@ -27,17 +27,22 @@ import (
 
 // client implements TChanClient and makes outgoing Thrift calls.
 type client struct {
-	sc   *tchannel.SubChannel
-	opts ClientOptions
+	sc          *tchannel.SubChannel
+	serviceName string
+	opts        ClientOptions
 }
 
 // ClientOptions are options to customize the client.
-type ClientOptions struct{}
+type ClientOptions struct {
+	// HostPort specifies a specific server to hit.
+	HostPort string
+}
 
 // NewClient returns a Client that makes calls over the given tchannel to the given Hyperbahn service.
 func NewClient(ch *tchannel.Channel, serviceName string, opts *ClientOptions) TChanClient {
 	client := &client{
-		sc: ch.GetSubChannel(serviceName),
+		sc:          ch.GetSubChannel(serviceName),
+		serviceName: serviceName,
 	}
 	if opts != nil {
 		client.opts = *opts
@@ -45,8 +50,14 @@ func NewClient(ch *tchannel.Channel, serviceName string, opts *ClientOptions) TC
 	return client
 }
 
-func (c *client) Call(ctx Context, serviceName, methodName string, req, resp thrift.TStruct) (bool, error) {
-	call, err := c.sc.BeginCall(ctx, serviceName+"::"+methodName, &tchannel.CallOptions{Format: tchannel.Thrift})
+func (c *client) Call(ctx Context, thriftService, methodName string, req, resp thrift.TStruct) (bool, error) {
+	var peer *tchannel.Peer
+	if c.opts.HostPort != "" {
+		peer = c.sc.Peers().GetOrAdd(c.opts.HostPort)
+	} else {
+		peer = c.sc.Peers().Get()
+	}
+	call, err := peer.BeginCall(ctx, c.serviceName, thriftService+"::"+methodName, &tchannel.CallOptions{Format: tchannel.Thrift})
 	if err != nil {
 		return false, err
 	}

@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,12 +18,13 @@ package tchannel
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package tchannel
+
 import (
 	"fmt"
 	"time"
 
 	"github.com/uber/tchannel/golang/typed"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -35,7 +34,14 @@ var (
 	traceRng = NewRand(time.Now().UnixNano())
 )
 
-// Span represents Zipkin-style span
+// TargetEndpoint represents target server endpoint information.
+type TargetEndpoint struct {
+	HostPort    string
+	ServiceName string
+	Operation   string
+}
+
+// Span represents Zipkin-style span.
 type Span struct {
 	traceID  uint64
 	parentID uint64
@@ -51,7 +57,7 @@ func (s *Span) read(r *typed.ReadBuffer) error {
 	s.traceID = r.ReadUint64()
 	s.parentID = r.ReadUint64()
 	s.spanID = r.ReadUint64()
-	s.flags = r.ReadByte()
+	s.flags = r.ReadSingleByte()
 	return r.Err()
 }
 
@@ -59,7 +65,7 @@ func (s *Span) write(w *typed.WriteBuffer) error {
 	w.WriteUint64(s.traceID)
 	w.WriteUint64(s.parentID)
 	w.WriteUint64(s.spanID)
-	w.WriteByte(s.flags)
+	w.WriteSingleByte(s.flags)
 	return w.Err()
 }
 
@@ -105,13 +111,4 @@ func (s Span) NewChildSpan() *Span {
 		childSpan.spanID = uint64(traceRng.Int63())
 	}
 	return childSpan
-}
-
-// CurrentSpan returns the Span value for the provided Context
-func CurrentSpan(ctx context.Context) *Span {
-	if span := ctx.Value(contextKeyTracing); span != nil {
-		return span.(*Span)
-	}
-
-	return nil
 }

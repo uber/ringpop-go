@@ -1,8 +1,3 @@
-package tchannel_test
-
-// This file contains functions for tests to access internal tchannel state.
-// Since it has a _test.go suffix, it is only compiled with tests in this package.
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,10 +18,14 @@ package tchannel_test
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package tchannel_test
+
+// This file contains functions for tests to access internal tchannel state.
+// Since it has a _test.go suffix, it is only compiled with tests in this package.
+
 import (
 	"bytes"
 	"math/rand"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -55,20 +54,8 @@ func (*swapper) Handle(ctx context.Context, args *raw.Args) (*raw.Res, error) {
 	}, nil
 }
 
-func checkEmptyExchangesConns(connections []*Connection) string {
-	var errors []string
-	for _, c := range connections {
-		if v := CheckEmptyExchanges(c); v != "" {
-			errors = append(errors, v)
-		}
-	}
-	return strings.Join(errors, "\n")
-}
-
 func TestFramesReleased(t *testing.T) {
-	if testing.Short() {
-		return
-	}
+	CheckStress(t)
 
 	defer testutils.SetTimeout(t, 10*time.Second)()
 	const (
@@ -77,19 +64,9 @@ func TestFramesReleased(t *testing.T) {
 		maxRandArg           = 512 * 1024
 	)
 
-	// Generate random bytes used to create arguments.
-	randBytes := make([]byte, maxRandArg)
-	for i := 0; i < len(randBytes); i += 8 {
-		n := rand.Int63()
-		for j := 0; j < 8; j++ {
-			randBytes[i+j] = byte(n & 0xff)
-			n = n << 1
-		}
-	}
-
 	var connections []*Connection
 	pool := NewRecordingFramePool()
-	require.NoError(t, testutils.WithServer(&testutils.ChannelOpts{
+	WithVerifiedServer(t, &testutils.ChannelOpts{
 		ServiceName: "swap-server",
 		DefaultConnectionOptions: ConnectionOptions{
 			FramePool: pool,
@@ -106,11 +83,6 @@ func TestFramesReleased(t *testing.T) {
 		defer cancel()
 		require.NoError(t, clientCh.Ping(ctx, hostPort))
 
-		generateArg := func(n int) []byte {
-			from := rand.Intn(maxRandArg - n)
-			return randBytes[from : from+n]
-		}
-
 		var wg sync.WaitGroup
 		worker := func() {
 			for i := 0; i < requestsPerGoroutine; i++ {
@@ -119,9 +91,8 @@ func TestFramesReleased(t *testing.T) {
 
 				require.NoError(t, clientCh.Ping(ctx, hostPort))
 
-				argSize := rand.Intn(maxRandArg)
-				arg2 := generateArg(argSize)
-				arg3 := generateArg(argSize)
+				arg2 := testutils.RandBytes(rand.Intn(maxRandArg))
+				arg3 := testutils.RandBytes(rand.Intn(maxRandArg))
 				resArg2, resArg3, _, err := raw.Call(ctx, clientCh, hostPort, "swap-server", "swap", arg2, arg3)
 				if !assert.NoError(t, err, "error during sendRecv") {
 					continue
@@ -147,7 +118,7 @@ func TestFramesReleased(t *testing.T) {
 
 		connections = append(connections, GetConnections(serverCh)...)
 		connections = append(connections, GetConnections(clientCh)...)
-	}))
+	})
 
 	// Wait a few milliseconds for the closing of channels to take effect.
 	time.Sleep(10 * time.Millisecond)
@@ -157,7 +128,7 @@ func TestFramesReleased(t *testing.T) {
 	}
 
 	// Check the message exchanges and make sure they are all empty.
-	if exchangesLeft := checkEmptyExchangesConns(connections); exchangesLeft != "" {
+	if exchangesLeft := CheckEmptyExchangesConns(connections); exchangesLeft != "" {
 		t.Errorf("Found uncleared message exchanges:\n%v", exchangesLeft)
 	}
 }

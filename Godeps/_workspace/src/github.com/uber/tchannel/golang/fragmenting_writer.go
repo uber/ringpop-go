@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package tchannel
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package tchannel
+
 import (
 	"errors"
 	"fmt"
@@ -38,6 +38,14 @@ const (
 	chunkHeaderSize      = 2    // each chunk is a uint16
 	hasMoreFragmentsFlag = 0x01 // flags indicating there are more fragments coming
 )
+
+// ArgWriter is the interface returned by ArgXWriter.
+type ArgWriter interface {
+	io.WriteCloser
+
+	// Flush flushes the currently written bytes without waiting for the frame to be filled.
+	Flush() error
+}
 
 // A writableFragment is a fragment that can be written to, containing a buffer
 // for contents, a running checksum, and placeholders for the fragment flags
@@ -144,9 +152,9 @@ func newFragmentingWriter(sender fragmentSender, checksum Checksum) *fragmenting
 	}
 }
 
-// ArgWriter returns an io.WriteCloser to write an argument. The WriteCloser will handle
-// fragmentation as needed. Once the argument is written, the WriteCloser must be closed.
-func (w *fragmentingWriter) ArgWriter(last bool) (io.WriteCloser, error) {
+// ArgWriter returns an ArgWriter to write an argument. The ArgWriter will handle
+// fragmentation as needed. Once the argument is written, the ArgWriter must be closed.
+func (w *fragmentingWriter) ArgWriter(last bool) (ArgWriter, error) {
 	if err := w.BeginArgument(last); err != nil {
 		return nil, err
 	}
@@ -215,27 +223,32 @@ func (w *fragmentingWriter) Write(b []byte) (int, error) {
 
 		// There was more data than fit into the fragment, so flush the current fragment,
 		// start a new fragment and chunk, and continue writing
-		w.curChunk.finish()
-		w.curFragment.finish(true)
-		if w.err = w.sender.flushFragment(w.curFragment); w.err != nil {
+		if w.err = w.Flush(); w.err != nil {
 			return totalWritten, w.err
 		}
 
-		if w.curFragment, w.err = w.sender.newFragment(false, w.checksum); w.err != nil {
-			return totalWritten, w.err
-		}
-
-		w.curChunk = newWritableChunk(w.checksum, w.curFragment.contents)
 		b = b[bytesWritten:]
 	}
 }
 
-func (w *fragmentingWriter) Close() error {
-	return w.EndArgument()
+// Flush flushes the current fragment, and starts a new fragment and chunk.
+func (w *fragmentingWriter) Flush() error {
+	w.curChunk.finish()
+	w.curFragment.finish(true)
+	if w.err = w.sender.flushFragment(w.curFragment); w.err != nil {
+		return w.err
+	}
+
+	if w.curFragment, w.err = w.sender.newFragment(false, w.checksum); w.err != nil {
+		return w.err
+	}
+
+	w.curChunk = newWritableChunk(w.checksum, w.curFragment.contents)
+	return nil
 }
 
-// EndArgument ends the current argument.
-func (w *fragmentingWriter) EndArgument() error {
+// Close ends the current argument.
+func (w *fragmentingWriter) Close() error {
 	last := w.state == fragmentingWriteInLastArgument
 	if w.err != nil {
 		return w.err

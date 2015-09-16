@@ -1,3 +1,23 @@
+// Copyright (c) 2015 Uber Technologies, Inc.
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package main
 
 import (
@@ -42,7 +62,7 @@ func main() {
 		go worker(ch)
 	}
 
-	log.Printf("Config: %v workers on %v threads, setBlockSize %v, getToSetRatio %v",
+	log.Printf("client config: %v workers on %v threads, setBlockSize %v, getToSetRatio %v",
 		*numGoroutines, *numOSThreads, *setBlockSize, *getToSetRatio)
 	requestCountReporter()
 }
@@ -76,12 +96,12 @@ func worker(ch *tchannel.Channel) {
 
 func setRequest(ch *tchannel.Channel, key, value string) error {
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
-	_, _, _, err := raw.Call(ctx, ch, *hostPort, "bench-server", "set", []byte(key), []byte(value))
+	_, _, _, err := raw.Call(ctx, ch, *hostPort, "benchmark", "set", []byte(key), []byte(value))
 	return err
 }
 
 func getRequest(ch *tchannel.Channel, key string) (string, error) {
 	ctx, _ := context.WithTimeout(context.Background(), time.Second)
-	_, arg3, _, err := raw.Call(ctx, ch, *hostPort, "bench-server", "get", []byte(key), nil)
+	_, arg3, _, err := raw.Call(ctx, ch, *hostPort, "benchmark", "get", []byte(key), nil)
 	return string(arg3), err
 }

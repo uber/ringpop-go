@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package tchannel
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package tchannel
+
 import (
 	"fmt"
 	"runtime"
@@ -37,18 +37,6 @@ func NewRecordingFramePool() *RecordingFramePool {
 	return &RecordingFramePool{
 		allocations: make(map[*Frame]string),
 	}
-}
-
-func CheckEmptyExchanges(c *Connection) string {
-	c.inbound.mut.RLock()
-	c.outbound.mut.RLock()
-	defer c.inbound.mut.RUnlock()
-	defer c.outbound.mut.RUnlock()
-
-	if exchangesLeft := len(c.outbound.exchanges) + len(c.inbound.exchanges); exchangesLeft > 0 {
-		return fmt.Sprintf("connection %p had %v leftover exchanges", c, exchangesLeft)
-	}
-	return ""
 }
 
 func recordStack() string {

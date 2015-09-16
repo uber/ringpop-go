@@ -1,5 +1,3 @@
-package hyperbahn
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,8 +18,13 @@ package hyperbahn
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package hyperbahn
+
 // Configuration is the initial configuration
 type Configuration struct {
 	// InitialNodes is the list of known Hyperbahn nodes to add initially.
 	InitialNodes []string
+	// InitialNodesFile is a JSON file that contains the list of known Hyperbahn nodes.
+	// If this option is set, it overrides InitialNodes.
+	InitialNodesFile string
 }

@@ -1,5 +1,3 @@
-package thrift
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package thrift
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package thrift
 
 import (
 	"io"
@@ -46,6 +46,13 @@ func (t *readWriterTransport) IsOpen() bool {
 
 func (t *readWriterTransport) Close() error {
 	return nil
+}
+
+// RemainingBytes returns the max number of bytes (same as Thrift's StreamTransport) as we
+// do not know how many bytes we have left.
+func (t *readWriterTransport) RemainingBytes() uint64 {
+	const maxSize = ^uint64(0)
+	return maxSize
 }
 
 var _ thrift.TTransport = &readWriterTransport{}

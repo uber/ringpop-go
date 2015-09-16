@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel
 
 import (
 	"errors"
@@ -88,11 +88,15 @@ func (mex *messageExchange) recvPeerFrameOfType(msgType messageType) (*Frame, er
 		return frame, nil
 
 	case messageTypeError:
-		var err errorMessage
+		errMsg := errorMessage{
+			id: frame.Header.ID,
+		}
 		var rbuf typed.ReadBuffer
 		rbuf.Wrap(frame.SizedPayload())
-		err.read(&rbuf)
-		return nil, err.AsSystemError()
+		if err := errMsg.read(&rbuf); err != nil {
+			return nil, err
+		}
+		return nil, errMsg.AsSystemError()
 
 	default:
 		// TODO(mmihic): Should be treated as a protocol error
@@ -122,6 +126,8 @@ func (mex *messageExchange) shutdown() {
 type messageExchangeSet struct {
 	log       Logger
 	name      string
+	onRemoved func()
+
 	exchanges map[uint32]*messageExchange
 	mut       sync.RWMutex
 }
@@ -167,9 +173,18 @@ func (mexset *messageExchangeSet) removeExchange(msgID uint32) {
 	mexset.log.Debugf("Removing %s message exchange %d", mexset.name, msgID)
 
 	mexset.mut.Lock()
-	defer mexset.mut.Unlock()
-
 	delete(mexset.exchanges, msgID)
+	mexset.mut.Unlock()
+
+	mexset.onRemoved()
+}
+
+func (mexset *messageExchangeSet) count() int {
+	mexset.mut.RLock()
+	count := len(mexset.exchanges)
+	mexset.mut.RUnlock()
+
+	return count
 }
 
 // forwardPeerFrame forwards a frame from the peer to the appropriate message

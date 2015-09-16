@@ -1,12 +1,16 @@
 GODEPS := $(shell pwd)/Godeps/_workspace
 OLDGOPATH := $(GOPATH)
 PATH := $(GODEPS)/bin:$(PATH)
-EXAMPLES=./examples/bench/server ./examples/bench/client ./examples/hello/server ./examples/hello/client ./examples/ping ./examples/thrift ./examples/hyperbahn/echo-server
-PKGS := . ./json ./hyperbahn ./thrift ./typed $(EXAMPLES)
+EXAMPLES=./examples/bench/server ./examples/bench/client ./examples/ping ./examples/thrift ./examples/hyperbahn/echo-server
+PKGS := . ./json ./hyperbahn ./thrift ./typed ./trace $(EXAMPLES)
 TEST_PKGS := $(addprefix github.com/uber/tchannel/golang/,$(PKGS))
 BUILD := ./build
 SRCS := $(foreach pkg,$(PKGS),$(wildcard $(pkg)/*.go))
 export GOPATH = $(GODEPS):$(OLDGOPATH)
+
+# Cross language test args
+TEST_HOST=127.0.0.1
+TEST_PORT=0
 
 all: test examples
 
@@ -60,15 +64,18 @@ vet:
 thrift_example: thrift_gen
 	go build -o $(BUILD)/examples/thrift       ./examples/thrift/main.go
 
+test_server:
+	./build/examples/test_server --host ${TEST_HOST} --port ${TEST_PORT}
+
 examples: clean setup thrift_example
 	echo Building examples...
-	mkdir -p $(BUILD)/examples/hello $(BUILD)/examples/ping $(BUILD)/examples/bench
-	go build -o $(BUILD)/examples/hello/server ./examples/hello/server
-	go build -o $(BUILD)/examples/hello/client ./examples/hello/client
+	mkdir -p $(BUILD)/examples/ping $(BUILD)/examples/bench
 	go build -o $(BUILD)/examples/ping/pong    ./examples/ping/main.go
 	go build -o $(BUILD)/examples/hyperbahn/echo-server    ./examples/hyperbahn/echo-server/main.go
 	go build -o $(BUILD)/examples/bench/server ./examples/bench/server
 	go build -o $(BUILD)/examples/bench/client ./examples/bench/client
+	go build -o $(BUILD)/examples/bench/runner ./examples/bench/runner.go
+	go build -o $(BUILD)/examples/test_server ./examples/test_server
 
 thrift_gen:
 	cd examples/thrift && thrift -r --gen go:thrift_import=github.com/apache/thrift/lib/go/thrift test.thrift

@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel
 
 import (
 	"bytes"
@@ -113,7 +113,7 @@ func (r *fragmentingReader) BeginArgument(last bool) error {
 
 	// We're guaranteed that either this is the first argument (in which
 	// case we need to get the first fragment and chunk) or that we have a
-	// valid curChunk (populated via EndArgument)
+	// valid curChunk (populated via Close)
 	if r.state == fragmentingReadStart {
 		if r.err = r.recvAndParseNextFragment(true); r.err != nil {
 			return r.err
@@ -173,10 +173,6 @@ func (r *fragmentingReader) Read(b []byte) (int, error) {
 }
 
 func (r *fragmentingReader) Close() error {
-	return r.EndArgument()
-}
-
-func (r *fragmentingReader) EndArgument() error {
 	last := r.state == fragmentingReadInLastArgument
 	if r.err != nil {
 		return r.err

@@ -1,3 +1,23 @@
+// Copyright (c) 2015 Uber Technologies, Inc.
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package tchannel
 
 import (
@@ -74,6 +94,18 @@ func (l *PeerList) GetOrAdd(hostPort string) *Peer {
 	return l.Add(hostPort)
 }
 
+// Copy returns a copy of the peer list. This method should only be used for testing.
+func (l *PeerList) Copy() map[string]*Peer {
+	l.mut.RLock()
+	defer l.mut.RUnlock()
+
+	listCopy := make(map[string]*Peer)
+	for k, v := range l.peersByHostPort {
+		listCopy[k] = v
+	}
+	return listCopy
+}
+
 // Close closes connections for all peers.
 func (l *PeerList) Close() {
 	l.mut.RLock()
@@ -127,10 +159,6 @@ func randConn(conns []*Connection) *Connection {
 // GetConnection returns an active connection to this peer. If no active connections
 // are found, it will create a new outbound connection and return it.
 func (p *Peer) GetConnection(ctx context.Context) (*Connection, error) {
-	if p.channel.Closed() {
-		return nil, ErrChannelClosed
-	}
-
 	// TODO(prashant): Use some sort of scoring to pick a connection.
 	if activeConns := p.getActive(); len(activeConns) > 0 {
 		return randConn(activeConns), nil
@@ -147,7 +175,10 @@ func (p *Peer) GetConnection(ctx context.Context) (*Connection, error) {
 // AddConnection adds an active connection to the peer's connection list.
 // If a connection is not active, ErrInvalidConnectionState will be returned.
 func (p *Peer) AddConnection(c *Connection) error {
-	if !c.IsActive() {
+	switch c.readState() {
+	case connectionActive, connectionStartClose:
+		break
+	default:
 		return ErrInvalidConnectionState
 	}
 
@@ -160,13 +191,8 @@ func (p *Peer) AddConnection(c *Connection) error {
 
 // Connect adds a new outbound connection to the peer.
 func (p *Peer) Connect(ctx context.Context) (*Connection, error) {
-	ch := p.channel
-	c, err := ch.newOutboundConnection(p.hostPort, &ch.connectionOptions)
+	c, err := p.channel.Connect(ctx, p.hostPort, &p.channel.connectionOptions)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := c.sendInit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -185,12 +211,11 @@ func (p *Peer) BeginCall(ctx context.Context, serviceName string, operationName 
 		return nil, err
 	}
 
-	call, err := conn.beginCall(ctx, serviceName, callOptions)
-	if err != nil {
-		return nil, err
+	if callOptions == nil {
+		callOptions = defaultCallOptions
 	}
-
-	if err := call.writeOperation([]byte(operationName)); err != nil {
+	call, err := conn.beginCall(ctx, serviceName, callOptions, operationName)
+	if err != nil {
 		return nil, err
 	}
 
@@ -203,6 +228,6 @@ func (p *Peer) Close() {
 	defer p.mut.RUnlock()
 
 	for _, c := range p.connections {
-		c.closeNetwork()
+		c.Close()
 	}
 }

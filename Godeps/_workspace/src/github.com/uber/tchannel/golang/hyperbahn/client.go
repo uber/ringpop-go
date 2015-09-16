@@ -1,5 +1,3 @@
-package hyperbahn
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,7 +18,13 @@ package hyperbahn
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package hyperbahn
+
 import (
+	"encoding/json"
+	"fmt"
+	"net"
+	"os"
 	"time"
 
 	"github.com/uber/tchannel/golang"
@@ -28,8 +32,9 @@ import (
 
 // Client manages Hyperbahn connections and registrations.
 type Client struct {
-	tchan *tchannel.Channel
-	opts  ClientOptions
+	tchan    *tchannel.Channel
+	services []string
+	opts     ClientOptions
 }
 
 // FailStrategy is the strategy to use when registration fails maxRegistrationFailures
@@ -57,7 +62,7 @@ type ClientOptions struct {
 // NewClient creates a new Hyperbahn client using the given channel.
 // config is the environment-specific configuration for Hyperbahn such as the list of initial nodes.
 // opts are optional, and are used to customize the client.
-func NewClient(ch *tchannel.Channel, config Configuration, opts *ClientOptions) *Client {
+func NewClient(ch *tchannel.Channel, config Configuration, opts *ClientOptions) (*Client, error) {
 	client := &Client{tchan: ch}
 	if opts != nil {
 		client.opts = *opts
@@ -69,12 +74,43 @@ func NewClient(ch *tchannel.Channel, config Configuration, opts *ClientOptions) 
 		client.opts.Handler = nullHandler{}
 	}
 
+	if err := parseConfig(&config); err != nil {
+		return nil, err
+	}
+
 	// Add the given initial nodes as peers.
 	for _, node := range config.InitialNodes {
 		addPeer(ch, node)
 	}
 
-	return client
+	return client, nil
+}
+
+// parseConfig parses the configuration options (e.g. InitialNodesFile)
+func parseConfig(config *Configuration) error {
+	if config.InitialNodesFile != "" {
+		f, err := os.Open(config.InitialNodesFile)
+		if err != nil {
+			return err
+		}
+
+		decoder := json.NewDecoder(f)
+		if err := decoder.Decode(&config.InitialNodes); err != nil {
+			return err
+		}
+	}
+
+	if len(config.InitialNodes) == 0 {
+		return fmt.Errorf("hyperbahn Client requires at least one initial node")
+	}
+
+	for _, node := range config.InitialNodes {
+		if _, _, err := net.SplitHostPort(node); err != nil {
+			return fmt.Errorf("hyperbahn Client got invalid node %v: %v", node, err)
+		}
+	}
+
+	return nil
 }
 
 // addPeer adds a peer to the Hyperbahn subchannel.
@@ -84,9 +120,21 @@ func addPeer(ch *tchannel.Channel, hostPort string) {
 	peers.Add(hostPort)
 }
 
+func (c *Client) getServiceNames(otherServices []tchannel.Registrar) {
+	c.services = make([]string, 0, len(otherServices)+1)
+	c.services = append(c.services, c.tchan.PeerInfo().ServiceName)
+
+	for _, s := range otherServices {
+		c.services = append(c.services, s.ServiceName())
+	}
+}
+
 // Advertise advertises the service with Hyperbahn, and returns any errors on initial advertisement.
+// Advertise can register multiple services hosted on the same endpoint.
 // If the advertisement succeeds, a goroutine is started to re-advertise periodically.
-func (c *Client) Advertise() error {
+func (c *Client) Advertise(otherServices ...tchannel.Registrar) error {
+	c.getServiceNames(otherServices)
+
 	if err := c.sendAdvertise(); err != nil {
 		return err
 	}

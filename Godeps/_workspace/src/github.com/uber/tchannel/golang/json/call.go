@@ -1,5 +1,3 @@
-package json
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package json
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package json
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ func makeCall(ctx Context, call *tchannel.OutboundCall, arg interface{}, resp in
 	}
 
 	// Call Arg2Reader before application error.
-	var respHeaders interface{}
+	var respHeaders map[string]string
 	if err := tchannel.NewArgReader(call.Response().Arg2Reader()).ReadJSON(&respHeaders); err != nil {
 		return fmt.Errorf("arg2 read failed: %v", err)
 	}

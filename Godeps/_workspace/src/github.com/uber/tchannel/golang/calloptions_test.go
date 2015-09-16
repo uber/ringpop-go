@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package tchannel
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package tchannel
+
 import (
 	"testing"
 
@@ -29,16 +29,16 @@ import (
 func TestSetHeaders(t *testing.T) {
 	tests := []struct {
 		format          Format
-		expectedHeaders callHeaders
+		expectedHeaders transportHeaders
 	}{
 		{
 			// When no format is specified, Raw should be used by default.
 			format:          "",
-			expectedHeaders: callHeaders{ArgScheme: Raw.String()},
+			expectedHeaders: transportHeaders{ArgScheme: Raw.String()},
 		},
 		{
 			format:          Thrift,
-			expectedHeaders: callHeaders{ArgScheme: Thrift.String()},
+			expectedHeaders: transportHeaders{ArgScheme: Thrift.String()},
 		},
 	}
 
@@ -46,7 +46,7 @@ func TestSetHeaders(t *testing.T) {
 		callOpts := &CallOptions{
 			Format: tt.format,
 		}
-		headers := make(callHeaders)
+		headers := make(transportHeaders)
 		callOpts.setHeaders(headers)
 		assert.Equal(t, tt.expectedHeaders, headers)
 	}

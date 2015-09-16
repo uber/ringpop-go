@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel
 
 // Format is the arg scheme used for a specific call.
 type Format string
@@ -40,24 +40,29 @@ type CallOptions struct {
 	// Format is arg scheme used for this call, sent in the "as" header.
 	// This header is only set if the Format is set.
 	Format Format
+
+	// ShardKey determines where this call request belongs, used with ringpop applications.
+	ShardKey string
 }
 
 var defaultCallOptions = &CallOptions{}
 
-func (c *CallOptions) setHeaders(headers callHeaders) {
-	if c == nil {
-		c = defaultCallOptions
-	}
+func (c *CallOptions) setHeaders(headers transportHeaders) {
+	headers[ArgScheme] = Raw.String()
+	c.overrideHeaders(headers)
+}
 
-	format := Raw
+// overrideHeaders sets headers if the call options contains non-default values.
+func (c *CallOptions) overrideHeaders(headers transportHeaders) {
 	if c.Format != "" {
-		format = c.Format
+		headers[ArgScheme] = c.Format.String()
 	}
-
-	headers[ArgScheme] = format.String()
+	if c.ShardKey != "" {
+		headers[ShardKey] = c.ShardKey
+	}
 }
 
 // setResponseHeaders copies some headers from the incoming call request to the response.
-func setResponseHeaders(reqHeaders, respHeaders callHeaders) {
+func setResponseHeaders(reqHeaders, respHeaders transportHeaders) {
 	respHeaders[ArgScheme] = reqHeaders[ArgScheme]
 }

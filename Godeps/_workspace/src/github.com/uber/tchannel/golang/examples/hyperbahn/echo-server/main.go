@@ -1,5 +1,3 @@
-package main
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package main
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package main
+
 import (
 	"fmt"
 	"log"
@@ -29,6 +29,7 @@ import (
 
 	"github.com/uber/tchannel/golang"
 	"github.com/uber/tchannel/golang/hyperbahn"
+	"github.com/uber/tchannel/golang/raw"
 	"golang.org/x/net/context"
 )
 
@@ -49,7 +50,9 @@ func main() {
 	}
 	log.Printf("Listening on %v", l.Addr())
 
-	tchan.Register(handler{}, "echo")
+	sc := tchan.GetSubChannel("go-echo-2")
+	tchan.Register(raw.Wrap(handler{""}), "echo")
+	sc.Register(raw.Wrap(handler{"subchannel:"}), "echo")
 	tchan.Serve(l)
 
 	if len(os.Args[1:]) == 0 {
@@ -58,11 +61,14 @@ func main() {
 
 	// advertise service with Hyperbahn.
 	config := hyperbahn.Configuration{InitialNodes: os.Args[1:]}
-	client := hyperbahn.NewClient(tchan, config, &hyperbahn.ClientOptions{
+	client, err := hyperbahn.NewClient(tchan, config, &hyperbahn.ClientOptions{
 		Handler: eventHandler{},
 		Timeout: time.Second,
 	})
-	if err := client.Advertise(); err != nil {
+	if err != nil {
+		log.Fatalf("hyperbahn.NewClient failed: %v", err)
+	}
+	if err := client.Advertise(sc); err != nil {
 		log.Fatalf("Advertise failed: %v", err)
 	}
 
@@ -80,26 +86,20 @@ func (eventHandler) OnError(err error) {
 	fmt.Printf("OnError(%v)\n", err)
 }
 
-type handler struct{}
+type handler struct {
+	prefix string
+}
 
-func (handler) Handle(ctx context.Context, call *tchannel.InboundCall) {
-	var arg2 []byte
-	if err := tchannel.NewArgReader(call.Arg2Reader()).Read(&arg2); err != nil {
-		log.Printf("Read arg2 failed: %v\n", err)
-	}
+func (h handler) OnError(ctx context.Context, err error) {
+	log.Fatalf("OnError: %v", err)
+}
 
-	var arg3 []byte
-	if err := tchannel.NewArgReader(call.Arg3Reader()).Read(&arg3); err != nil {
-		log.Printf("Read arg2 failed: %v\n", err)
-	}
+func (h handler) Handle(ctx context.Context, args *raw.Args) (*raw.Res, error) {
+	arg2 := h.prefix + string(args.Arg2)
+	arg3 := h.prefix + string(args.Arg3)
 
-	resp := call.Response()
-	if err := tchannel.NewArgWriter(resp.Arg2Writer()).Write(arg2); err != nil {
-		log.Printf("Write arg2 failed: %v", arg2)
-	}
-
-	if err := tchannel.NewArgWriter(resp.Arg3Writer()).Write(arg3); err != nil {
-		log.Printf("Write arg3 failed: %v", arg3)
-	}
-
+	return &raw.Res{
+		Arg2: []byte(arg2),
+		Arg3: []byte(arg3),
+	}, nil
 }

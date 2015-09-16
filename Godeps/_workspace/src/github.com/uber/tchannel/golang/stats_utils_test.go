@@ -1,8 +1,3 @@
-package tchannel_test
-
-// This file contains test setup logic, and is named with a _test.go suffix to
-// ensure it's only compiled with tests.
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,11 +18,17 @@ package tchannel_test
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package tchannel_test
+
+// This file contains test setup logic, and is named with a _test.go suffix to
+// ensure it's only compiled with tests.
+
 import (
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,6 +44,8 @@ type statsValue struct {
 }
 
 type recordingStatsReporter struct {
+	sync.Mutex
+
 	// Values is a map from the metricName -> map[tagMapAsString]*statsValue
 	Values map[string]map[string]*statsValue
 
@@ -81,6 +84,9 @@ func tagsToString(tags map[string]string) string {
 }
 
 func (r *recordingStatsReporter) getStat(name string, tags map[string]string) *statsValue {
+	r.Lock()
+	defer r.Unlock()
+
 	tagMap, ok := r.Values[name]
 	if !ok {
 		tagMap = make(map[string]*statsValue)
@@ -108,6 +114,9 @@ func (r *recordingStatsReporter) RecordTimer(name string, tags map[string]string
 }
 
 func (r *recordingStatsReporter) Validate(t *testing.T) {
+	r.Lock()
+	defer r.Unlock()
+
 	assert.Equal(t, keysMap(r.Expected.Values), keysMap(r.Values),
 		"Metric keys are different")
 	for counterKey, counter := range r.Values {

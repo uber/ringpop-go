@@ -1,5 +1,3 @@
-package main
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package main
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package main
+
 import (
 	"fmt"
 	"log"
@@ -35,28 +35,38 @@ import (
 )
 
 func main() {
-	// Create a TChannel and listen for inbound connections.
+	// Create a TChannel and register the Thrift handlers.
 	ch, err := tchannel.NewChannel("keyvalue", nil)
 	if err != nil {
 		log.Fatalf("Failed to create tchannel: %v", err)
 	}
-	ip, err := tchannel.ListenIP()
-	if err != nil {
-		log.Fatalf("Failed to find IP to Listen on: %v", err)
-	}
-	ch.ListenAndServe(ip.String() + ":12345")
 
 	// Register both the KeyValue and Admin services.
+	// We can register multiple Thrift services on a single Hyperbahn service.
 	h := newKVHandler()
 	server := thrift.NewServer(ch)
 	server.Register(keyvalue.NewTChanKeyValueServer(h))
 	server.Register(keyvalue.NewTChanAdminServer(h))
 
+	// Listen for connections on the external interface so we can receive connections.
+	ip, err := tchannel.ListenIP()
+	if err != nil {
+		log.Fatalf("Failed to find IP to Listen on: %v", err)
+	}
+	// We use port 0 which asks the OS to assign any available port.
+	// Static port allocations are not necessary for services on Hyperbahn.
+	ch.ListenAndServe(fmt.Sprintf("%v:%v", ip, 0))
+
+	// Advertising registers this service instance with Hyperbahn so
+	// that Hyperbahn can route requests for "keyvalue" to us.
 	config := hyperbahn.Configuration{InitialNodes: os.Args[1:]}
 	if len(config.InitialNodes) == 0 {
 		log.Fatalf("No Autobahn nodes to advertise with")
 	}
-	client := hyperbahn.NewClient(ch, config, nil)
+	client, err := hyperbahn.NewClient(ch, config, nil)
+	if err != nil {
+		log.Fatalf("hyperbahn.NewClient failed: %v", err)
+	}
 	if err := client.Advertise(); err != nil {
 		log.Fatalf("Hyperbahn advertise failed: %v", err)
 	}

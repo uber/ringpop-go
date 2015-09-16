@@ -1,10 +1,3 @@
-package testutils
-
-import "github.com/uber/tchannel/golang"
-
-// This file contains test setup logic, and is named with a _test.go suffix to
-// ensure it's only compiled with tests.
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,15 +18,34 @@ import "github.com/uber/tchannel/golang"
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package testutils
+
+import "github.com/uber/tchannel/golang"
+
+// This file contains test setup logic, and is named with a _test.go suffix to
+// ensure it's only compiled with tests.
+
 // FakeIncomingCall implements IncomingCall interface.
+// Note: the F suffix for the fields is to clash with the method name.
 type FakeIncomingCall struct {
-	callerName string
+	// CallerNameF is the calling service's name.
+	CallerNameF string
+
+	// ShardKeyF is the intended destination for this call.
+	ShardKeyF string
 }
 
+// CallerName returns the caller name as specified in the fake call.
 func (f *FakeIncomingCall) CallerName() string {
-	return f.callerName
+	return f.CallerNameF
 }
 
+// ShardKey returns the shard key as specified in the fake call.
+func (f *FakeIncomingCall) ShardKey() string {
+	return f.ShardKeyF
+}
+
+// NewIncomingCall creates an incoming call for tests.
 func NewIncomingCall(callerName string) tchannel.IncomingCall {
-	return &FakeIncomingCall{callerName: callerName}
+	return &FakeIncomingCall{CallerNameF: callerName}
 }

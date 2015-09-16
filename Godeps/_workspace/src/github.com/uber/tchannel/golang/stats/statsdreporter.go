@@ -1,5 +1,3 @@
-package stats
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,6 +18,8 @@ package stats
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+package stats
+
 import (
 	"regexp"
 	"strings"
@@ -39,8 +39,8 @@ type statsdReporter struct {
 }
 
 // NewStatsdReporter returns a StatsReporter that reports to statsd on the given addr.
-func NewStatsdReporter(addr string) (tchannel.StatsReporter, error) {
-	client, err := statsd.NewBufferedClient(addr, "", time.Second, 0)
+func NewStatsdReporter(addr, prefix string) (tchannel.StatsReporter, error) {
+	client, err := statsd.NewBufferedClient(addr, prefix, time.Second, 0)
 	if err != nil {
 		return nil, err
 	}

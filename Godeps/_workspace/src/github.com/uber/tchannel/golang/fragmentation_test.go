@@ -1,5 +1,3 @@
-package tchannel
-
 // Copyright (c) 2015 Uber Technologies, Inc.
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,6 +17,8 @@ package tchannel
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
+package tchannel
 
 import (
 	"bytes"
@@ -100,7 +100,6 @@ func TestFragmentationMiddleArgNearFragmentBoundary(t *testing.T) {
 			0x0000, 0x0000, // empty chunk indicating the end of arg 1
 			0x0000, 0x0004, 'N', 'O', 'P', 'Q'}}, // all of arg 2
 	))
-
 }
 
 func TestFragmentationMiddleArgOnExactFragmentBoundary(t *testing.T) {
@@ -164,8 +163,8 @@ func TestFragmentationWriterErrors(t *testing.T) {
 	})
 
 	runFragmentationErrorTest(func(w *fragmentingWriter, r *fragmentingReader) {
-		// EndArgument without beginning argument
-		assert.Error(t, w.EndArgument())
+		// Close without beginning argument
+		assert.Error(t, w.Close())
 	})
 }
 
@@ -178,8 +177,8 @@ func TestFragmentationReaderErrors(t *testing.T) {
 	})
 
 	runFragmentationErrorTest(func(w *fragmentingWriter, r *fragmentingReader) {
-		// EndArgument without beginning argument
-		assert.Error(t, r.EndArgument())
+		// Close without beginning argument
+		assert.Error(t, r.Close())
 	})
 
 	runFragmentationErrorTest(func(w *fragmentingWriter, r *fragmentingReader) {
@@ -211,7 +210,7 @@ func TestFragmentationReaderErrors(t *testing.T) {
 	})
 
 	runFragmentationErrorTest(func(w *fragmentingWriter, r *fragmentingReader) {
-		// EndArgument without receiving all data in chunk
+		// Close without receiving all data in chunk
 		writer, err := w.ArgWriter(true /* last */)
 		assert.NoError(t, err)
 		assert.NoError(t, NewArgWriter(writer, nil).Write([]byte("hello")))
@@ -221,11 +220,11 @@ func TestFragmentationReaderErrors(t *testing.T) {
 		_, err = r.Read(b)
 		assert.NoError(t, err)
 		assert.Equal(t, "hel", string(b))
-		assert.Error(t, r.EndArgument())
+		assert.Error(t, r.Close())
 	})
 
 	runFragmentationErrorTest(func(w *fragmentingWriter, r *fragmentingReader) {
-		// EndArgument without receiving all fragments
+		// Close without receiving all fragments
 		writer, err := w.ArgWriter(true /* last */)
 		assert.NoError(t, err)
 		assert.NoError(t, NewArgWriter(writer, nil).Write([]byte("hello world what's up")))
@@ -235,7 +234,7 @@ func TestFragmentationReaderErrors(t *testing.T) {
 		_, err = r.Read(b)
 		assert.NoError(t, err)
 		assert.Equal(t, "hello wo", string(b))
-		assert.Error(t, r.EndArgument())
+		assert.Error(t, r.Close())
 	})
 
 	runFragmentationErrorTest(func(w *fragmentingWriter, r *fragmentingReader) {
@@ -375,7 +374,7 @@ func (ch fragmentChannel) newFragment(initial bool, checksum Checksum) (*writabl
 	wbuf := typed.NewWriteBuffer(make([]byte, testFragmentSize))
 	fragment := new(writableFragment)
 	fragment.flagsRef = wbuf.DeferByte()
-	wbuf.WriteByte(byte(checksum.TypeCode()))
+	wbuf.WriteSingleByte(byte(checksum.TypeCode()))
 	fragment.checksumRef = wbuf.DeferBytes(checksum.Size())
 	fragment.checksum = checksum
 	fragment.contents = wbuf
@@ -393,8 +392,8 @@ func (ch fragmentChannel) recvNextFragment(initial bool) (*readableFragment, err
 	rbuf := typed.NewReadBuffer(<-ch)
 	fragment := new(readableFragment)
 	fragment.done = func() {}
-	fragment.flags = rbuf.ReadByte()
-	fragment.checksumType = ChecksumType(rbuf.ReadByte())
+	fragment.flags = rbuf.ReadSingleByte()
+	fragment.checksumType = ChecksumType(rbuf.ReadSingleByte())
 	fragment.checksum = rbuf.ReadBytes(fragment.checksumType.ChecksumSize())
 	fragment.contents = rbuf
 	return fragment, rbuf.Err()

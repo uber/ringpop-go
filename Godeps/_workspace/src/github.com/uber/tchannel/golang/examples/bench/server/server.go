@@ -1,3 +1,23 @@
+// Copyright (c) 2015 Uber Technologies, Inc.
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package main
 
 import (
@@ -7,6 +27,7 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"runtime"
 	"sync"
 
 	"github.com/uber/tchannel/golang"
@@ -18,14 +39,16 @@ var (
 	flagHost      = flag.String("host", "localhost", "The hostname to listen on")
 	flagPort      = flag.Int("port", 12345, "The base port to listen on")
 	flagInstances = flag.Int("instances", 1, "The number of instances to start")
+	flagOSThreads = flag.Int("numThreads", 1, "The number of OS threads to use (sets GOMAXPROCS)")
 )
 
 func main() {
 	flag.Parse()
+	runtime.GOMAXPROCS(*flagOSThreads)
 
 	// Sets up a listener for pprof.
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		log.Printf("server pprof endpoint failed: %v", http.ListenAndServe("localhost:6060", nil))
 	}()
 
 	for i := 0; i < *flagInstances; i++ {
@@ -33,6 +56,8 @@ func main() {
 			log.Fatalf("setupServer %v failed: %v", i, err)
 		}
 	}
+
+	log.Printf("server config: %v threads listening on %v:%v", *flagOSThreads, *flagHost, *flagPort)
 
 	// Listen indefinitely.
 	select {}
