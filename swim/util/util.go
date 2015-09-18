@@ -56,7 +56,7 @@ func ReadHostsFile(file string) ([]string, error) {
 		return nil, err
 	}
 
-	return hosts, err
+	return hosts, nil
 }
 
 // CheckHostnameIPMismatch checks for a hostname/IP mismatch in a map of hosts to

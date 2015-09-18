@@ -59,8 +59,8 @@ func defaultOptions() *Options {
 		MinProtocolPeriod: 200 * time.Millisecond,
 
 		JoinTimeout:        1000 * time.Millisecond,
-		PingTimeout:        1000 * time.Millisecond,
-		PingRequestTimeout: 1500 * time.Millisecond,
+		PingTimeout:        1500 * time.Millisecond,
+		PingRequestTimeout: 5000 * time.Millisecond,
 
 		PingRequestSize: 3,
 

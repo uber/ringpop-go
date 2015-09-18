@@ -30,81 +30,81 @@ type EventListener interface {
 // A MaxPAdjustedEvent occurs when the disseminator adjusts the max propogation
 // count for changes
 type MaxPAdjustedEvent struct {
-	OldPCount int
-	NewPCount int
+	OldPCount int  `json:"oldPCount"`
+	NewPCount int  `json:"newPCount"`
 }
 
 // A MemberlistChangesReceivedEvent contains changes received by the node's
 // memberlist, pending application
 type MemberlistChangesReceivedEvent struct {
-	Changes []Change
+	Changes []Change        `json:"changes"`
 }
 
 // A MemberlistChangesAppliedEvent contains changes that were applied to the
 // node's memberlist as well as the previous and new checksums and the
 // number of members in the memberlist
 type MemberlistChangesAppliedEvent struct {
-	Changes     []Change
-	OldChecksum uint32
-	NewChecksum uint32
-	NumMembers  int
+	Changes     []Change    `json:"changes"`
+	OldChecksum uint32      `json:"oldChecksum"`
+	NewChecksum uint32      `json:"newChecksum"`
+	NumMembers  int         `json:"numMembers"`
 }
 
 // A FullSyncEvent is sent when the disseminator's node issues changes a
 // full sync of the memberlist
 type FullSyncEvent struct {
-	Remote         string
-	RemoteChecksum uint32
+	Remote         string   `json:"remote"`
+	RemoteChecksum uint32   `json:"remoteChecksum"`
 }
 
 // A JoinReceiveEvent is sent when a join request is received by a node
 type JoinReceiveEvent struct {
-	Local  string
-	Source string
+	Local  string   `json:"local"`
+	Source string   `json:"source"`
 }
 
 // A JoinCompleteEvent is sent when a join request to remote node successfully
 // completes
 type JoinCompleteEvent struct {
-	Duration  time.Duration
-	NumJoined int
-	Joined    []string
+	Duration  time.Duration `json:"duration"`
+	NumJoined int           `json:"numJoined"`
+	Joined    []string      `json:"joined"`
 }
 
 // A PingSendEvent is sent when the node sends a ping to a remote node
 type PingSendEvent struct {
-	Local   string
-	Remote  string
-	Changes []Change
+	Local   string      `json:"local"`
+	Remote  string      `json:"remote"`
+	Changes []Change    `json:"changes"`
 }
 
 // A PingReceiveEvent is sent when the node receives a ping from a remote node
 type PingReceiveEvent struct {
-	Local   string
-	Source  string
-	Changes []Change
+	Local   string    `json:"local"`
+	Source  string    `json:"source"`
+	Changes []Change  `json:"changes"`
 }
 
 // A PingRequestsSendEvent is sent when the node sends a ping requests to remote nodes
 type PingRequestsSendEvent struct {
-	Local  string
-	Target string
-	Peers  []string
+	Local  string    `json:"local"`
+	Target string    `json:"target"`
+	Peers  []string  `json:"peers"`
 }
 
 // A PingRequestReceiveEvent is sent when the node receives a pign request from a remote node
 type PingRequestReceiveEvent struct {
-	Local   string
-	Source  string
-	Target  string
-	Changes []Change
+	Local   string      `json:"local"`
+	Source  string      `json:"source"`
+	Target  string      `json:"target"`
+	Changes []Change    `json:"changes"`
 }
 
 // A PingRequestPingEvent is sent when the node sends a ping to the target node at the
 // behest of the source node and receives a response
 type PingRequestPingEvent struct {
-	Local    string
-	Source   string
-	Target   string
-	Duration time.Duration
+	Local    string           `json:"local"`
+	Source   string           `json:"source"`
+	Target   string           `json:"target"`
+	Duration time.Duration    `json:"duration"`
 }

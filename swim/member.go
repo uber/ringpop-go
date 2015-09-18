@@ -26,26 +26,27 @@ import (
 )
 
 const (
-	// Alive is the member "Alive" state
-	Alive = "Alive"
+	// Alive is the member "alive" state
+	Alive = "alive"
 
-	// Faulty is the member "Faulty" state
-	Faulty = "Faulty"
+	// Faulty is the member "faulty" state
+	Faulty = "faulty"
 
-	// Leave is the member "Leave" state
-	Leave = "Leave"
+	// Leave is the member "leave" state
+	Leave = "leave"
 
-	// Suspect is the memeber "Suspect" state
-	Suspect = "Suspect"
+	// Suspect is the memeber "suspect" state
+	Suspect = "suspect"
 )
 
 // A Member is a member in the member list
 type Member struct {
-	Address     string
-	Status      string
-	Incarnation int64
+	Address     string  `json:"address"`
+	Status      string  `json:"status"`
+	Incarnation int64   `json:"incarnationNumber"`
 }
 
+// suspect interface
 func (m Member) address() string {
 	return m.Address
 }
@@ -54,7 +55,7 @@ func (m Member) incarnation() int64 {
 	return m.Incarnation
 }
 
-// shuffles slice of members pseudo-randomly
+// shuffles slice of members pseudo-randomly, returns new slice
 func shuffle(members []*Member) []*Member {
 	newMembers := make([]*Member, len(members), cap(members))
 	newIndexes := rand.Perm(len(members))
@@ -113,11 +114,12 @@ type Change struct {
 	Source            string    `json:"source"`
 	SourceIncarnation int64     `json:"sourceIncarnation"`
 	Address           string    `json:"address"`
-	Incarnation       int64     `json:"incarnation"`
+	Incarnation       int64     `json:"incarnationNumber"`
 	Status            string    `json:"status"`
 	Timestamp         time.Time `json:"timestamp"`
 }
 
+// suspect interface
 func (c Change) address() string {
 	return c.Address
 }

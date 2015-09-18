@@ -52,7 +52,8 @@ func (n *Node) joinHandler(ctx json.Context, req *joinRequest) (*joinResponse, e
 	if err != nil {
 		n.log.WithFields(log.Fields{
 			"error": err,
-		}).Debug("failed to receive join")
+			"joinRequest": req,
+		}).Debug("invalid join request received")
 		return nil, err
 	}
 

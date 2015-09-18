@@ -27,8 +27,8 @@ import "fmt"
 type joinResponse struct {
 	App         string   `json:"app"`
 	Coordinator string   `json:"coordinator"`
-	Changes     []Change `json:"changes"`
-	Checksum    uint32   `json:"checksum"`
+	Membership  []Change `json:"membership"`
+	Checksum    uint32   `json:"membershipChecksum"`
 }
 
 // TODO: Denying joins?
@@ -71,7 +71,7 @@ func handleJoin(node *Node, req *joinRequest) (*joinResponse, error) {
 	res := &joinResponse{
 		App:         node.app,
 		Coordinator: node.address,
-		Changes:     node.disseminator.FullSync(),
+		Membership:  node.disseminator.FullSync(),
 		Checksum:    node.memberlist.Checksum(),
 	}
 

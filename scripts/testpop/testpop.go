@@ -38,19 +38,23 @@ var (
 )
 
 func main() {
+	verbose := flag.Bool("verbose", false, "enable debug level logging")
 	flag.Parse()
 
 	if !hostportPattern.MatchString(*hostport) {
 		log.Fatalf("bad hostport: %s", *hostport)
 	}
 
-	ch, err := tchannel.NewChannel("testpop", nil)
+	ch, err := tchannel.NewChannel("ringpop", nil)
 	if err != nil {
 		log.Fatalf("could not create channel: %v", err)
 	}
 
 	logger := log.StandardLogger()
-	rp := ringpop.NewRingpop("testpop", *hostport, ch, &ringpop.Options{
+	if *verbose {
+		logger.Level = log.DebugLevel
+	}
+	rp := ringpop.NewRingpop("ringpop", *hostport, ch, &ringpop.Options{
 		Logger: bark.NewLoggerFromLogrus(logger),
 	})
 
