@@ -263,7 +263,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		m.node.rollup.TrackUpdates(applied)
 	}
 
-	return
+	return applied
 }
 
 // gets a random position in [0, length of member list)

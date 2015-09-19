@@ -168,7 +168,7 @@ func (r *updateRollup) FlushBuffer() {
 		"sinceFirstUpdate": sinceFirstUpdate,
 		"sinceLastFlush":   sinceLastFlush,
 		"numUpdates":       r.numUpdates(),
-		// "updates":          r.buffer,
+		"updates":          r.buffer,
 	}).Debug("rollup flushed update buffer")
 
 	r.buffer.updates = make(map[string][]Change)

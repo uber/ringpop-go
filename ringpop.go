@@ -214,8 +214,6 @@ type BootstrapOptions struct {
 
 // Bootstrap starts the Ringpop
 func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
-	time.Sleep(10 * time.Millisecond)
-
 	joined, err := rp.node.Bootstrap(&opts.BootstrapOptions)
 	if err != nil {
 		rp.log.WithField("error", err).Info("bootstrap failed")

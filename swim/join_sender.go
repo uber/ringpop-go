@@ -54,7 +54,7 @@ const (
 type joinRequest struct {
 	App         string        `json:"app"`
 	Source      string        `json:"source"`
-	Incarnation int64         `json:"incarnation"`
+	Incarnation int64         `json:"incarnationNumber"`
 	Timeout     time.Duration `json:"timeout"`
 }
 
@@ -316,7 +316,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 					failed = true
 					break
 				}
-				j.node.memberlist.Update(res.Changes)
+				j.node.memberlist.Update(res.Membership)
 
 			case <-ctx.Done():
 				j.node.log.WithFields(log.Fields{

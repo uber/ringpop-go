@@ -40,7 +40,7 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 	return stats{
 		"hooks":      nil,
 		"membership": rp.node.MemberStats(),
-		"prcess": stats{
+		"process": stats{
 			"memory": stats{
 				"rss":       memStats.Sys,
 				"heapTotal": memStats.HeapSys,

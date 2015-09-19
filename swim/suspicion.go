@@ -23,6 +23,8 @@ package swim
 import (
 	"sync"
 	"time"
+
+	log "github.com/uber/bark"
 )
 
 type suspect interface {
@@ -32,51 +34,53 @@ type suspect interface {
 
 // Suspicion handles the suspicion sub-protocol of the SWIM protocol
 type suspicion struct {
+	sync.Mutex
+
 	node *Node
+	log log.Logger
 
 	timeout time.Duration
 	timers  map[string]*time.Timer
 	enabled bool
-
-	sync.Mutex
 }
 
-// NewSuspicion returns a new suspicion SWIM sub-protocol with the given timeout
+// newSuspicion returns a new suspicion SWIM sub-protocol with the given timeout
 func newSuspicion(n *Node, timeout time.Duration) *suspicion {
 	suspicion := &suspicion{
 		node:    n,
 		timeout: timeout,
 		timers:  make(map[string]*time.Timer),
 		enabled: true,
+		log:     n.log.WithField("protocol", "suspicion"),
 	}
 
 	return suspicion
 }
 
 func (s *suspicion) Start(suspect suspect) {
-	if !s.enabled {
-		s.node.log.Warn("cannot start suspect period while disabled")
-		return
-	}
+	s.withLock(func() {
+		if !s.enabled {
+			s.log.Warn("cannot start suspect period while disabled")
+			return
+		}
 
-	if s.node.Address() == suspect.address() {
-		s.node.log.Warn("cannot start suspect period for local member")
-		return
-	}
+		if s.node.Address() == suspect.address() {
+			s.log.Warn("cannot start suspect period for local member")
+			return
+		}
 
-	s.Stop(suspect)
+		if _, ok := s.timers[suspect.address()]; ok {
+			s.log.Warn("redundant call to start suspect ignored")
+			return
+		}
 
-	s.Lock()
+		s.timers[suspect.address()] = time.AfterFunc(s.timeout, func() {
+			s.log.WithField("faulty", suspect.address()).Info("member declared faulty")
+			s.node.memberlist.MakeFaulty(suspect.address(), suspect.incarnation())
+		})
 
-	s.timers[suspect.address()] = time.AfterFunc(s.timeout, func() {
-		s.node.log.WithField("faulty", suspect.address()).Info("member declared faulty")
-		s.node.memberlist.MakeFaulty(suspect.address(), suspect.incarnation())
+		s.log.WithField("suspect", suspect.address()).Debug("started member suspect period")
 	})
-
-	s.Unlock()
-
-	s.node.log.WithField("suspect", suspect.address()).Debug("started member suspect period")
-
 }
 
 func (s *suspicion) Stop(suspect suspect) {
@@ -85,7 +89,7 @@ func (s *suspicion) Stop(suspect suspect) {
 	if timer, ok := s.timers[suspect.address()]; ok {
 		timer.Stop()
 		delete(s.timers, suspect.address())
-		s.node.log.WithField("suspect", suspect.address()).Debug("stopped member suspect period")
+		s.log.WithField("suspect", suspect.address()).Debug("stopped member suspect period")
 	}
 
 	s.Unlock()
@@ -96,15 +100,14 @@ func (s *suspicion) Reenable() {
 	s.Lock()
 
 	if s.enabled {
-		s.node.log.Warn("suspicion already enabled")
+		s.log.Warn("suspicion already enabled")
 		s.Unlock()
 		return
 	}
 
 	s.enabled = true
 	s.Unlock()
-
-	s.node.log.Info("reenabled suspicion protocol")
+	s.log.Info("reenabled suspicion protocol")
 }
 
 // stop all suspicion timers and disables suspicion protocol
@@ -112,7 +115,7 @@ func (s *suspicion) Disable() {
 	s.Lock()
 
 	if !s.enabled {
-		s.node.log.Warn("suspicion already disabled")
+		s.log.Warn("suspicion already disabled")
 		s.Unlock()
 		return
 	}
@@ -126,13 +129,20 @@ func (s *suspicion) Disable() {
 	}
 
 	s.Unlock()
-	s.node.log.WithField("timersStopped", numTimers).Info("disabled suspicion protocol")
+	s.log.WithField("timersStopped", numTimers).Info("disabled suspicion protocol")
 }
 
 // testing func to avoid data races
 func (s *suspicion) Timer(address string) *time.Timer {
-	s.Lock()
-	defer s.Unlock()
+	var rv *time.Timer
+	s.withLock(func() {
+		rv = s.timers[address]
+	})
+	return rv
+}
 
-	return s.timers[address]
+func (s *suspicion) withLock(f func()) {
+	s.Lock()
+	f()
+	s.Unlock()
 }
