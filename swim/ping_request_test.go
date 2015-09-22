@@ -47,13 +47,13 @@ func (s *PingRequestTestSuite) TearDownTest() {
 	destroyNodes(append(s.peers, s.tnode)...)
 }
 
-func (s *PingRequestTestSuite) TestOK() {
+func (s *PingRequestTestSuite) TestOk() {
 	bootstrapNodes(s.T(), append(s.peers, s.tnode)...)
 
 	response := <-sendPingRequests(s.node, s.peers[0].node.Address(), 1, time.Second)
 	switch res := response.(type) {
 	case *pingResponse:
-		s.True(res.OK, "expected remote ping to succeed")
+		s.True(res.Ok, "expected remote ping to succeed")
 	default:
 		s.Fail("expected response from ping request peer")
 	}
@@ -65,7 +65,7 @@ func (s *PingRequestTestSuite) TestRemoteFail() {
 	response := <-sendPingRequests(s.node, "127.0.0.1:3005", 1, time.Second)
 	switch res := response.(type) {
 	case *pingResponse:
-		s.False(res.OK, "expected remote ping to fail")
+		s.False(res.Ok, "expected remote ping to fail")
 	default:
 		s.Fail("expected response from ping request peer")
 	}
@@ -79,7 +79,7 @@ func (s *PingRequestTestSuite) TestRemoteTimesOut() {
 	response := <-sendPingRequests(s.node, "127.0.0.2:3001", 1, time.Second)
 	switch res := response.(type) {
 	case *pingResponse:
-		s.False(res.OK, "expected remote ping to fail")
+		s.False(res.Ok, "expected remote ping to fail")
 	default:
 		s.Fail("expected response from ping request peer")
 	}
