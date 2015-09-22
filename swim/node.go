@@ -489,7 +489,7 @@ func (n *Node) pingNextMember() {
 	for response := range sendPingRequests(n, member.Address, n.pingRequestSize, n.pingRequestTimeout) {
 		switch res := response.(type) {
 		case *pingResponse:
-			if res.OK {
+			if res.Ok {
 				n.log.WithField("target", member.Address).Info("ping request target reachable")
 				n.memberlist.Update(res.Changes)
 				return

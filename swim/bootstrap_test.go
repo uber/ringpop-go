@@ -45,7 +45,7 @@ func (s *BootstrapTestSuite) TearDownTest() {
 	destroyNodes(append(s.peers, s.tnode)...)
 }
 
-func (s *BootstrapTestSuite) TestBootstrapOK() {
+func (s *BootstrapTestSuite) TestBootstrapOk() {
 	s.peers = genChannelNodes(s.T(), genAddresses(1, 2, 6))
 
 	bootstrapNodes(s.T(), append(s.peers, s.tnode)...)
