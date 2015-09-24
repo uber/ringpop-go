@@ -93,11 +93,19 @@ type PingReceiveEvent struct {
 	Changes []Change `json:"changes"`
 }
 
-// A PingRequestsSendEvent is sent when the node sends a ping requests to remote nodes
+// A PingRequestsSendEvent is sent when the node sends ping requests to remote nodes
 type PingRequestsSendEvent struct {
 	Local  string   `json:"local"`
 	Target string   `json:"target"`
 	Peers  []string `json:"peers"`
+}
+
+// A PingRequestsSendCompleteEvent is sent when the node finished sending ping requests to remote nodes
+type PingRequestsSendCompleteEvent struct {
+	Local    string        `json:"local"`
+	Target   string        `json:"target"`
+	Peers    []string      `json:"peers"`
+	Duration time.Duration `json:"duration"`
 }
 
 // A PingRequestReceiveEvent is sent when the node receives a pign request from a remote node

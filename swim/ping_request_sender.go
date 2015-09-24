@@ -138,10 +138,17 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 				"target": p.target,
 			}).Debug("sending ping request")
 
+			var startTime = time.Now()
 			res, err := p.SendPingRequest()
 			if err != nil {
 				resC <- err
 			} else {
+				node.emit(PingRequestsSendCompleteEvent{
+					Local:    node.Address(),
+					Target:   target,
+					Peers:    peerAddresses,
+					Duration: time.Now().Sub(startTime),
+				})
 				resC <- res
 			}
 
