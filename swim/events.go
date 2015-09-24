@@ -134,3 +134,9 @@ type ProtocolDelayComputeEvent struct {
 type ProtocolFrequencyEvent struct {
 	Duration time.Duration `json:"duration"`
 }
+
+// A ChecksumComputeEvent is sent when a the rings checksum is computed
+type ChecksumComputeEvent struct {
+	Duration time.Duration `json:"duration"`
+	Checksum uint32        `json:"checksum"`
+}

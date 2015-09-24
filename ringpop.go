@@ -281,6 +281,10 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.ProtocolFrequencyEvent:
 		rp.statter.RecordTimer(rp.getStatKey("protocol.frequency"), nil, event.Duration)
+
+	case swim.ChecksumComputeEvent:
+		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
+		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
 	}
 }
 
