@@ -124,3 +124,13 @@ type PingRequestPingEvent struct {
 	Target   string        `json:"target"`
 	Duration time.Duration `json:"duration"`
 }
+
+// A ProtocolDelayComputeEvent is sent when protocol delay is computed during a gossip run
+type ProtocolDelayComputeEvent struct {
+	Duration time.Duration `json:"duration"`
+}
+
+// A ProtocolFrequencyEvent is sent when a gossip run is finished
+type ProtocolFrequencyEvent struct {
+	Duration time.Duration `json:"duration"`
+}

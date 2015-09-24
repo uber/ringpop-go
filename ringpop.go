@@ -275,6 +275,12 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.PingRequestPingEvent:
 		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
+
+	case swim.ProtocolDelayComputeEvent:
+		rp.statter.RecordTimer(rp.getStatKey("protocol.delay"), nil, event.Duration)
+
+	case swim.ProtocolFrequencyEvent:
+		rp.statter.RecordTimer(rp.getStatKey("protocol.frequency"), nil, event.Duration)
 	}
 }
 
