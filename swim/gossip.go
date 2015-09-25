@@ -149,9 +149,17 @@ func (g *gossip) RunProtocolPeriodLoop() {
 		startTime := time.Now()
 		for !g.Stopped() {
 			delay := g.ComputeProtocolDelay()
+			g.node.emit(ProtocolDelayComputeEvent{
+				Duration: delay,
+			})
+
+			startTimeFreq := time.Now()
 			time.Sleep(delay)
 
 			g.ProtocolPeriod()
+			g.node.emit(ProtocolFrequencyEvent{
+				Duration: time.Now().Sub(startTimeFreq),
+			})
 		}
 
 		g.node.log.WithFields(log.Fields{

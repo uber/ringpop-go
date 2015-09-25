@@ -236,7 +236,13 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	switch event := event.(type) {
 	case swim.MemberlistChangesReceivedEvent:
-		// TODO: stat
+		for _, change := range event.Changes {
+			status := change.Status
+			if len(status) == 0 {
+				status = "unknown"
+			}
+			rp.statter.IncCounter(rp.getStatKey("membership-update."+status), nil, 1)
+		}
 
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
@@ -258,17 +264,33 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.PingSendEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping.send"), nil, 1)
 
+	case swim.PingSendCompleteEvent:
+		rp.statter.RecordTimer(rp.getStatKey("ping"), nil, event.Duration)
+
 	case swim.PingReceiveEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping.recv"), nil, 1)
 
 	case swim.PingRequestsSendEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, int64(len(event.Peers)))
 
+	case swim.PingRequestsSendCompleteEvent:
+		rp.statter.RecordTimer(rp.getStatKey("ping-req"), nil, event.Duration)
+
 	case swim.PingRequestReceiveEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping-req.recv"), nil, 1)
 
 	case swim.PingRequestPingEvent:
 		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
+
+	case swim.ProtocolDelayComputeEvent:
+		rp.statter.RecordTimer(rp.getStatKey("protocol.delay"), nil, event.Duration)
+
+	case swim.ProtocolFrequencyEvent:
+		rp.statter.RecordTimer(rp.getStatKey("protocol.frequency"), nil, event.Duration)
+
+	case swim.ChecksumComputeEvent:
+		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
+		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
 	}
 }
 

@@ -67,9 +67,15 @@ func (m *memberlist) Checksum() uint32 {
 
 // computes membership checksum
 func (m *memberlist) ComputeChecksum() {
+	startTime := time.Now()
 	m.members.Lock()
-	m.members.checksum = farm.Hash32([]byte(m.GenChecksumString()))
+	checksum := farm.Hash32([]byte(m.GenChecksumString()))
+	m.members.checksum = checksum
 	m.members.Unlock()
+	m.node.emit(ChecksumComputeEvent{
+		Duration: time.Now().Sub(startTime),
+		Checksum: checksum,
+	})
 }
 
 // generates string to use when computing checksum

@@ -95,6 +95,8 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 			"changes": req.Changes,
 		}).Debug("ping send")
 
+		var startTime = time.Now()
+
 		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, res)
 		if err != nil {
 			p.node.log.WithFields(log.Fields{
@@ -104,6 +106,13 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 			errC <- err
 			return
 		}
+
+		p.node.emit(PingSendCompleteEvent{
+			Local:    p.node.Address(),
+			Remote:   p.target,
+			Changes:  req.Changes,
+			Duration: time.Now().Sub(startTime),
+		})
 
 		errC <- nil
 	}()
