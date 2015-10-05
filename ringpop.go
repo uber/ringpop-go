@@ -55,8 +55,9 @@ import (
 
 // Options to create a Ringpop with
 type Options struct {
-	Logger  log.Logger
-	Statter log.StatsReporter
+	Logger        log.Logger
+	Statter       log.StatsReporter
+	ReplicaPoints int
 }
 
 func defaultOptions() *Options {
@@ -65,8 +66,9 @@ func defaultOptions() *Options {
 	})
 
 	opts := &Options{
-		Logger:  logger,
-		Statter: new(noopStatsReporter),
+		Logger:        logger,
+		Statter:       new(noopStatsReporter),
+		ReplicaPoints: 100,
 	}
 
 	return opts
@@ -85,6 +87,10 @@ func mergeDefault(opts *Options) *Options {
 
 	if opts.Statter == nil {
 		opts.Statter = def.Statter
+	}
+
+	if opts.ReplicaPoints <= 0 {
+		opts.ReplicaPoints = def.ReplicaPoints
 	}
 
 	return opts
@@ -145,7 +151,7 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 	})
 	ringpop.node.RegisterListener(ringpop)
 
-	ringpop.ring = newHashRing(ringpop, farm.Hash32)
+	ringpop.ring = newHashRing(ringpop, farm.Hash32, opts.ReplicaPoints)
 
 	ringpop.stats.hostport = genStatsHostport(ringpop.address)
 	ringpop.stats.prefix = fmt.Sprintf("ringpop.%s", ringpop.stats.hostport)

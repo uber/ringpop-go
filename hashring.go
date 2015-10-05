@@ -44,11 +44,11 @@ type hashRing struct {
 	}
 }
 
-func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32) *hashRing {
+func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32, replicaPoints int) *hashRing {
 	ring := &hashRing{
 		ringpop:       ringpop,
 		hashfunc:      hashfunc,
-		replicaPoints: 3,
+		replicaPoints: replicaPoints,
 	}
 
 	ring.servers.byAddress = make(map[string]bool)
