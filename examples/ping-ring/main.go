@@ -72,7 +72,7 @@ func (w *worker) PingHandler(ctx json.Context, ping *Ping) (*Pong, error) {
 	var pong Pong
 	var res []byte
 
-	handle, err := w.ringpop.HandleOrForward(ping.Key, ping.Bytes(), &res, "ping", "/ping", nil)
+	handle, err := w.ringpop.HandleOrForward(ping.Key, ping.Bytes(), &res, "ping", "/ping", tchannel.JSON, nil)
 	if handle {
 		return &Pong{"Hello, world!", w.ringpop.WhoAmI()}, nil
 	}
