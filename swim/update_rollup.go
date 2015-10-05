@@ -80,7 +80,7 @@ func (r *updateRollup) AddUpdates(changes []Change) {
 
 	timestamp := time.Now()
 	for _, change := range changes {
-		change.Timestamp = timestamp
+		change.Timestamp = util.Timestamp(timestamp)
 		r.buffer.updates[change.Address] = append(r.buffer.updates[change.Address], change)
 	}
 

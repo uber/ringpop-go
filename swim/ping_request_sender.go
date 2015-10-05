@@ -32,7 +32,7 @@ import (
 // A PingRequest is used to make a ping request to a remote node
 type pingRequest struct {
 	Source            string   `json:"source"`
-	SourceIncarnation int64    `json:"sourceIncarnation"`
+	SourceIncarnation int64    `json:"sourceIncarnationNumber"`
 	Target            string   `json:"target"`
 	Checksum          uint32   `json:"checksum"`
 	Changes           []Change `json:"changes"`

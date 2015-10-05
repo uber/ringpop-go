@@ -34,7 +34,7 @@ type ping struct {
 	Changes           []Change `json:"changes"`
 	Checksum          uint32   `json:"checksum"`
 	Source            string   `json:"source"`
-	SourceIncarnation int64    `json:"sourceIncarnation"`
+	SourceIncarnation int64    `json:"sourceIncarnationNumber"`
 }
 
 // A PingSender is used to send a SWIM gossip ping over TChannel to target node

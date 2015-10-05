@@ -21,8 +21,8 @@
 package swim
 
 import (
+	"github.com/uber/ringpop-go/swim/util"
 	"math/rand"
-	"time"
 )
 
 const (
@@ -41,9 +41,9 @@ const (
 
 // A Member is a member in the member list
 type Member struct {
-	Address     string  `json:"address"`
-	Status      string  `json:"status"`
-	Incarnation int64   `json:"incarnationNumber"`
+	Address     string `json:"address"`
+	Status      string `json:"status"`
+	Incarnation int64  `json:"incarnationNumber"`
 }
 
 // suspect interface
@@ -111,12 +111,14 @@ func (m *Member) localSuspectOverride(local string, change Change) bool {
 
 // A Change is a change a member to be applied
 type Change struct {
-	Source            string    `json:"source"`
-	SourceIncarnation int64     `json:"sourceIncarnation"`
-	Address           string    `json:"address"`
-	Incarnation       int64     `json:"incarnationNumber"`
-	Status            string    `json:"status"`
-	Timestamp         time.Time `json:"timestamp"`
+	Source            string `json:"source"`
+	SourceIncarnation int64  `json:"sourceIncarnationNumber"`
+	Address           string `json:"address"`
+	Incarnation       int64  `json:"incarnationNumber"`
+	Status            string `json:"status"`
+	// Use util.Timestamp for bi-direction binding to time encoded as
+	// integer Unix timestamp in JSON
+	Timestamp util.Timestamp `json:"timestamp"`
 }
 
 // suspect interface

@@ -207,7 +207,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		Address:           address,
 		Incarnation:       incarnation,
 		Status:            status,
-		Timestamp:         time.Now(),
+		Timestamp:         util.Timestamp(time.Now()),
 	}})
 }
 
@@ -239,7 +239,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				Address:           change.Address,
 				Incarnation:       util.TimeNowMS(),
 				Status:            Alive,
-				Timestamp:         time.Now(),
+				Timestamp:         util.Timestamp(time.Now()),
 			}
 
 			m.Apply(overrideChange)
