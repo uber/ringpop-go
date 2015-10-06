@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/tchannel/golang"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
 

@@ -30,7 +30,7 @@ import (
 	"github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 // fake stats

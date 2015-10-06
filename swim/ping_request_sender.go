@@ -26,7 +26,7 @@ import (
 	"time"
 
 	log "github.com/uber/bark"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go/json"
 )
 
 // A PingRequest is used to make a ping request to a remote node

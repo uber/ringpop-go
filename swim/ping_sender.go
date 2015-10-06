@@ -26,7 +26,7 @@ import (
 
 	log "github.com/uber/bark"
 
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go/json"
 )
 
 // A Ping is used as an Arg3 for the ping TChannel call / response

@@ -30,7 +30,7 @@ import (
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 // Options to create a SWIM with

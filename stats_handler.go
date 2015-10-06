@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 func handleStats(rp *Ringpop) map[string]interface{} {

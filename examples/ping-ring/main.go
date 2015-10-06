@@ -27,8 +27,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/bark"
 	"github.com/uber/ringpop-go"
-	"github.com/uber/tchannel/golang"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
 
