@@ -38,6 +38,8 @@ func (n *Node) registerHandlers() error {
 		"/admin/debugSet":    n.debugSetHandler,
 		"/admin/debugClear":  n.debugClearHandler,
 		"/admin/gossip":      n.gossipHandler,
+		"/admin/gossip/start":n.gossipHandlerStart,
+		"/admin/gossip/stop": n.gossipHandlerStop,
 		"/admin/tick":        n.tickHandler,
 	}
 
@@ -86,6 +88,16 @@ func (n *Node) gossipHandler(ctx json.Context, req *Arg) (*Arg, error) {
 		n.gossip.Stop()
 	}
 
+	return &Arg{}, nil
+}
+
+func (n *Node) gossipHandlerStart(ctx json.Context, req *Arg) (*Arg, error) {
+	n.gossip.Start()
+	return &Arg{}, nil
+}
+
+func (n *Node) gossipHandlerStop(ctx json.Context, req *Arg) (*Arg, error) {
+	n.gossip.Stop()
 	return &Arg{}, nil
 }
 
