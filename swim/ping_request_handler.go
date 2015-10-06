@@ -25,7 +25,6 @@ import "time"
 // A PingResponse is the response from a successful ping request call
 type pingResponse struct {
 	Ok      bool     `json:"pingStatus"`
-	Source  string   `json:"source"`
 	Target  string   `json:"target"`
 	Changes []Change `json:"changes"`
 }
@@ -74,7 +73,6 @@ func handlePingRequest(node *Node, req *pingRequest) *pingResponse {
 	}
 
 	return &pingResponse{
-		Source:  node.Address(),
 		Target:  req.Target,
 		Ok:      true,
 		Changes: changes,

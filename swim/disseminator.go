@@ -138,6 +138,8 @@ func (d *disseminator) IssueAsReceiver(senderAddress string,
 func (d *disseminator) issueChanges(filter func(*pChange) bool) (changes []Change) {
 	d.Lock()
 
+	// To make JSON output [] instead of null on empty change list
+	changes = make([]Change, 0)
 	for _, change := range d.changes {
 		if filter != nil && filter(change) {
 			// TODO: stat - filtered-change - increment

@@ -48,11 +48,14 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 			},
 			"pid": os.Getpid(),
 		},
-		"protocol":        rp.node.ProtocolStats(),
-		"ring":            servers,
+		"protocol": rp.node.ProtocolStats(),
+		"ring": stats{
+			"servers":  servers,
+			"checksum": rp.ring.Checksum(),
+		},
 		"version":         "???", // TODO: version!
-		"timestamp":       time.Now(),
+		"timestamp":       time.Now().Unix(),
 		"uptime":          rp.Uptime(),
-		"tchannelversion": strconv.Itoa(tchannel.CurrentProtocolVersion), // get proper version
+		"tchannelVersion": strconv.Itoa(tchannel.CurrentProtocolVersion), // get proper version
 	}
 }

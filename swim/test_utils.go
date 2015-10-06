@@ -42,7 +42,7 @@ var testSuspect = Change{
 	Source:            "127.0.0.1:3001",
 	SourceIncarnation: testInc,
 	Status:            Suspect,
-	Timestamp:         testNow,
+	Timestamp:         util.Timestamp(testNow),
 }
 
 type dummyIter struct{}
