@@ -28,7 +28,7 @@ import (
 	"github.com/uber/ringpop-go"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 var (

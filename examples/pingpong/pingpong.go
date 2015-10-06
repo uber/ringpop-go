@@ -8,8 +8,8 @@ import (
 	"github.com/uber/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
-	"github.com/uber/tchannel/golang"
-	"github.com/uber/tchannel/golang/thrift"
+	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 var (

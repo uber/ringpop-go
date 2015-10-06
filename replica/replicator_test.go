@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/forward"
-	"github.com/uber/tchannel/golang"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
 

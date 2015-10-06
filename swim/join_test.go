@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go/json"
 )
 
 func seedBootstrapHosts(node *Node, addresses []string) {

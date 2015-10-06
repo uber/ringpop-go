@@ -21,7 +21,7 @@
 package ringpop
 
 import (
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
 

@@ -50,7 +50,7 @@ import (
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 // Options to create a Ringpop with

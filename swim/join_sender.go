@@ -29,7 +29,7 @@ import (
 
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel/golang/json"
+	"github.com/uber/tchannel-go/json"
 )
 
 const (

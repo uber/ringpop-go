@@ -28,7 +28,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 // A Sender is used to route the request to the proper destination,

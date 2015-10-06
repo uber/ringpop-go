@@ -27,8 +27,8 @@ import (
 	"golang.org/x/net/context"
 
 	log "github.com/uber/bark"
-	"github.com/uber/tchannel/golang"
-	"github.com/uber/tchannel/golang/raw"
+	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/raw"
 )
 
 // A requestSender is used to send a request to its destination, as defined by the sender's

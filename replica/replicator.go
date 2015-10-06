@@ -31,7 +31,7 @@ import (
 	log "github.com/uber/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/replica/util"
-	"github.com/uber/tchannel/golang"
+	"github.com/uber/tchannel-go"
 )
 
 // FanoutMode defines how a replicator should fanout it's requests
