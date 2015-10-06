@@ -37,10 +37,11 @@ func (n *Node) registerHandlers() error {
 		"/protocol/ping-req": n.pingRequestHandler,
 		"/admin/debugSet":    n.debugSetHandler,
 		"/admin/debugClear":  n.debugClearHandler,
-		"/admin/gossip":      n.gossipHandler,
+		"/admin/gossip":      n.gossipHandler, // Deprecated
 		"/admin/gossip/start":n.gossipHandlerStart,
 		"/admin/gossip/stop": n.gossipHandlerStop,
-		"/admin/tick":        n.tickHandler,
+		"/admin/tick":        n.tickHandler, // Deprecated
+		"/admin/gossip/tick": n.tickHandler,
 	}
 
 	return json.Register(n.channel, handlers, func(ctx context.Context, err error) {
