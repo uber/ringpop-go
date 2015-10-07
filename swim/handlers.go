@@ -31,6 +31,10 @@ import (
 // nothing to be passed to Arg3
 type Arg struct{}
 
+type Status struct{
+	Status string `json:"status"`
+}
+
 func (n *Node) registerHandlers() error {
 	handlers := map[string]interface{}{
 		"/protocol/join":     n.joinHandler,
@@ -110,12 +114,12 @@ func (n *Node) tickHandler(ctx json.Context, req *Arg) (*ping, error) {
 	return &ping{Checksum: n.memberlist.Checksum()}, nil
 }
 
-func (n *Node) adminJoinHandler(ctx json.Context, req *Arg) (*Arg, error) {
+func (n *Node) adminJoinHandler(ctx json.Context, req *Arg) (*Status, error) {
 	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
-	return nil, nil
+	return &Status{ Status: "rejoined" }, nil
 }
 
-func (n *Node) adminLeaveHandler(ctx json.Context, req *Arg) (*Arg, error) {
+func (n *Node) adminLeaveHandler(ctx json.Context, req *Arg) (*Status, error) {
 	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
-	return nil, nil
+	return &Status{ Status: "ok" }, nil
 }
