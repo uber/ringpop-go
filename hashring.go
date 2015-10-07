@@ -83,7 +83,7 @@ func (r *hashRing) ComputeChecksum() {
 	}
 
 	old := r.servers.checksum
-	r.servers.checksum = farm.Hash32(buffer.Bytes())
+	r.servers.checksum = farm.Fingerprint32(buffer.Bytes())
 	r.ringpop.ringEvent(RingChecksumEvent{
 		OldChecksum: old,
 		NewChecksum: r.servers.checksum,

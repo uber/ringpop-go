@@ -151,7 +151,7 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 	})
 	ringpop.node.RegisterListener(ringpop)
 
-	ringpop.ring = newHashRing(ringpop, farm.Hash32, opts.ReplicaPoints)
+	ringpop.ring = newHashRing(ringpop, farm.Fingerprint32, opts.ReplicaPoints)
 
 	ringpop.stats.hostport = genStatsHostport(ringpop.address)
 	ringpop.stats.prefix = fmt.Sprintf("ringpop.%s", ringpop.stats.hostport)
