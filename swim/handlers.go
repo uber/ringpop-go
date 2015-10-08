@@ -24,11 +24,16 @@ import (
 	log "github.com/uber/bark"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
+	"github.com/uber/ringpop-go/swim/util"
 )
 
 // An Arg is a blank argument used as filler for making TChannel calls that require
 // nothing to be passed to Arg3
 type Arg struct{}
+
+type Status struct{
+	Status string `json:"status"`
+}
 
 func (n *Node) registerHandlers() error {
 	handlers := map[string]interface{}{
@@ -37,8 +42,13 @@ func (n *Node) registerHandlers() error {
 		"/protocol/ping-req": n.pingRequestHandler,
 		"/admin/debugSet":    n.debugSetHandler,
 		"/admin/debugClear":  n.debugClearHandler,
-		"/admin/gossip":      n.gossipHandler,
-		"/admin/tick":        n.tickHandler,
+		"/admin/gossip":      n.gossipHandler, // Deprecated
+		"/admin/gossip/start":n.gossipHandlerStart,
+		"/admin/gossip/stop": n.gossipHandlerStop,
+		"/admin/tick":        n.tickHandler, // Deprecated
+		"/admin/gossip/tick": n.tickHandler,
+		"/admin/member/leave":n.adminLeaveHandler,
+		"/admin/member/join": n.adminJoinHandler,
 	}
 
 	return json.Register(n.channel, handlers, func(ctx context.Context, err error) {
@@ -89,15 +99,27 @@ func (n *Node) gossipHandler(ctx json.Context, req *Arg) (*Arg, error) {
 	return &Arg{}, nil
 }
 
+func (n *Node) gossipHandlerStart(ctx json.Context, req *Arg) (*Arg, error) {
+	n.gossip.Start()
+	return &Arg{}, nil
+}
+
+func (n *Node) gossipHandlerStop(ctx json.Context, req *Arg) (*Arg, error) {
+	n.gossip.Stop()
+	return &Arg{}, nil
+}
+
 func (n *Node) tickHandler(ctx json.Context, req *Arg) (*ping, error) {
 	n.gossip.ProtocolPeriod()
 	return &ping{Checksum: n.memberlist.Checksum()}, nil
 }
 
-func (n *Node) adminJoinHandler(ctx json.Context, req *Arg) (*Arg, error) {
-	return nil, nil
+func (n *Node) adminJoinHandler(ctx json.Context, req *Arg) (*Status, error) {
+	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
+	return &Status{ Status: "rejoined" }, nil
 }
 
-func (n *Node) adminLeaveHandler(ctx json.Context, req *Arg) (*Arg, error) {
-	return nil, nil
+func (n *Node) adminLeaveHandler(ctx json.Context, req *Arg) (*Status, error) {
+	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
+	return &Status{ Status: "ok" }, nil
 }
