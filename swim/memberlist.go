@@ -69,7 +69,7 @@ func (m *memberlist) Checksum() uint32 {
 func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
-	checksum := farm.Hash32([]byte(m.GenChecksumString()))
+	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
 	m.members.checksum = checksum
 	m.members.Unlock()
 	m.node.emit(ChecksumComputeEvent{
