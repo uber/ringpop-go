@@ -93,7 +93,7 @@ type callOptions struct {
 // ownership of some data.
 type Replicator struct {
 	sender    Sender
-	channel   *tchannel.SubChannel
+	channel   tchannel.Registrar
 	forwarder *forward.Forwarder
 	logger    log.Logger
 	defaults  *Options
@@ -126,7 +126,7 @@ func mergeDefaultOptions(opts *Options, def *Options) *Options {
 // NewReplicator returns a new Replicator instance that makes calls with the given
 // SubChannel to the service defined by SubChannel.GetServiceName(). The given n/w/r
 // values will be used as defaults for the replicator when none are provided
-func NewReplicator(s Sender, channel *tchannel.SubChannel, logger log.Logger,
+func NewReplicator(s Sender, channel tchannel.Registrar, logger log.Logger,
 	opts *Options) *Replicator {
 
 	if logger == nil {

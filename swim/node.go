@@ -122,7 +122,7 @@ type Node struct {
 	bootstrapFile  string
 	bootstrapHosts map[string][]string
 
-	channel      *tchannel.SubChannel
+	channel      tchannel.Registrar
 	memberlist   *memberlist
 	memberiter   memberIter
 	disseminator *disseminator
@@ -147,7 +147,7 @@ type Node struct {
 }
 
 // NewNode returns a new SWIM node
-func NewNode(app, address string, channel *tchannel.SubChannel, opts *Options) *Node {
+func NewNode(app, address string, channel tchannel.Registrar, opts *Options) *Node {
 	// use defaults for options that are unspecified
 	opts = mergeDefaultOptions(opts)
 

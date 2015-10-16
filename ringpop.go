@@ -107,7 +107,7 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
-	channel   *tchannel.SubChannel
+	channel   tchannel.Registrar
 	node      *swim.Node
 	ring      *hashRing
 	forwarder *forward.Forwarder

@@ -88,12 +88,12 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 // A Forwarder is used to forward requests to their destinations
 type Forwarder struct {
 	sender  Sender
-	channel *tchannel.SubChannel
+	channel tchannel.Registrar
 	logger  log.Logger
 }
 
 // NewForwarder returns a new forwarder
-func NewForwarder(s Sender, ch *tchannel.SubChannel, logger log.Logger) *Forwarder {
+func NewForwarder(s Sender, ch tchannel.Registrar, logger log.Logger) *Forwarder {
 	if logger == nil {
 		logger = log.NewLoggerFromLogrus(&logrus.Logger{
 			Out: ioutil.Discard,
