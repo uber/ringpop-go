@@ -37,6 +37,9 @@ var (
 const (
 	messageExchangeSetInbound  = "inbound"
 	messageExchangeSetOutbound = "outbound"
+
+	// mexChannelBufferSize is the size of the message exchange channel buffer.
+	mexChannelBufferSize = 2
 )
 
 // A messageExchange tracks this Connections's side of a message exchange with a
@@ -58,8 +61,10 @@ func (mex *messageExchange) forwardPeerFrame(frame *Frame) error {
 	select {
 	case mex.recvCh <- frame:
 		return nil
-	default:
-		return errMexChannelFull
+	case <-mex.ctx.Done():
+		// Note: One slow reader processing a large request could stall the connection.
+		// If we see this, we need to increase the recvCh buffer size.
+		return mex.ctx.Err()
 	}
 }
 
@@ -232,7 +237,8 @@ func (mexset *messageExchangeSet) forwardPeerFrame(frame *Frame) error {
 	}
 
 	if err := mex.forwardPeerFrame(frame); err != nil {
-		mexset.log.Warnf("Unable to forward %s to peer: %v", frame, err)
+		mexset.log.Warnf("Unable to forward frame ID %v type %v length %v to peer: %v",
+			frame.Header.ID, frame.Header.messageType, frame.Header.FrameSize(), err)
 		return err
 	}
 

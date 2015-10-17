@@ -26,6 +26,12 @@ import (
 	"golang.org/x/net/context"
 )
 
+type SubChannelOption func(*SubChannel)
+
+func Isolated(s *SubChannel) {
+	s.peers = s.topChannel.peers.newSibling()
+}
+
 // SubChannel allows calling a specific service on a channel.
 // TODO(prashant): Allow creating a subchannel with default call options.
 // TODO(prashant): Allow registering handlers on a subchannel.

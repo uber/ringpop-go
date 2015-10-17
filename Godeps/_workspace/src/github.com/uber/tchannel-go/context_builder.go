@@ -38,6 +38,9 @@ type ContextBuilder struct {
 	// CallOptions are TChannel call options for the specific call.
 	CallOptions *CallOptions
 
+	// TracingDisabled disables trace reporting for calls using this context.
+	TracingDisabled bool
+
 	// Hidden fields: we do not want users outside of tchannel to set these.
 	incomingCall IncomingCall
 	span         *Span
@@ -47,6 +50,7 @@ type ContextBuilder struct {
 func NewContextBuilder(timeout time.Duration) *ContextBuilder {
 	return &ContextBuilder{
 		Timeout: timeout,
+		span:    NewRootSpan(),
 	}
 }
 
@@ -90,6 +94,12 @@ func (cb *ContextBuilder) SetFormat(f Format) *ContextBuilder {
 	return cb
 }
 
+// DisableTracing disables tracing.
+func (cb *ContextBuilder) DisableTracing() *ContextBuilder {
+	cb.TracingDisabled = true
+	return cb
+}
+
 // SetIncomingCallForTest sets an IncomingCall in the context.
 // This should only be used in unit tests.
 func (cb *ContextBuilder) SetIncomingCallForTest(call IncomingCall) *ContextBuilder {
@@ -117,6 +127,10 @@ func (cb *ContextBuilder) Build() (ContextWithHeaders, context.CancelFunc) {
 	timeout := cb.Timeout
 	if timeout == 0 {
 		timeout = defaultTimeout
+	}
+
+	if cb.TracingDisabled {
+		cb.span.EnableTracing(false)
 	}
 
 	params := &tchannelCtxParams{

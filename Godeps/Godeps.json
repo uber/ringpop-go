@@ -38,7 +38,7 @@
 		},
 		{
 			"ImportPath": "github.com/uber/tchannel-go",
-			"Rev": "780ec2930efc56fdbe0d072ad0c0c04c30a21082"
+			"Rev": "507b03bdd9eb65a49672006473454d76d1277304"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

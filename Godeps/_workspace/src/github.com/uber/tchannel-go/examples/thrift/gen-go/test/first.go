@@ -15,6 +15,8 @@ var _ = fmt.Printf
 var _ = bytes.Equal
 
 type First interface {
+	Base
+
 	// Parameters:
 	//  - Msg
 	Echo(msg string) (r string, err error)
@@ -23,29 +25,15 @@ type First interface {
 }
 
 type FirstClient struct {
-	Transport       thrift.TTransport
-	ProtocolFactory thrift.TProtocolFactory
-	InputProtocol   thrift.TProtocol
-	OutputProtocol  thrift.TProtocol
-	SeqId           int32
+	*BaseClient
 }
 
 func NewFirstClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *FirstClient {
-	return &FirstClient{Transport: t,
-		ProtocolFactory: f,
-		InputProtocol:   f.GetProtocol(t),
-		OutputProtocol:  f.GetProtocol(t),
-		SeqId:           0,
-	}
+	return &FirstClient{BaseClient: NewBaseClientFactory(t, f)}
 }
 
 func NewFirstClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *FirstClient {
-	return &FirstClient{Transport: t,
-		ProtocolFactory: nil,
-		InputProtocol:   iprot,
-		OutputProtocol:  oprot,
-		SeqId:           0,
-	}
+	return &FirstClient{BaseClient: NewBaseClientProtocol(t, iprot, oprot)}
 }
 
 // Parameters:
@@ -98,16 +86,16 @@ func (p *FirstClient) recvEcho() (value string, err error) {
 		return
 	}
 	if mTypeId == thrift.EXCEPTION {
-		error0 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
-		var error1 error
-		error1, err = error0.Read(iprot)
+		error4 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
+		var error5 error
+		error5, err = error4.Read(iprot)
 		if err != nil {
 			return
 		}
 		if err = iprot.ReadMessageEnd(); err != nil {
 			return
 		}
-		err = error1
+		err = error5
 		return
 	}
 	if mTypeId != thrift.REPLY {
@@ -171,16 +159,16 @@ func (p *FirstClient) recvHealthcheck() (value *HealthCheckRes, err error) {
 		return
 	}
 	if mTypeId == thrift.EXCEPTION {
-		error2 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
-		var error3 error
-		error3, err = error2.Read(iprot)
+		error6 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
+		var error7 error
+		error7, err = error6.Read(iprot)
 		if err != nil {
 			return
 		}
 		if err = iprot.ReadMessageEnd(); err != nil {
 			return
 		}
-		err = error3
+		err = error7
 		return
 	}
 	if mTypeId != thrift.REPLY {
@@ -244,16 +232,16 @@ func (p *FirstClient) recvAppError() (err error) {
 		return
 	}
 	if mTypeId == thrift.EXCEPTION {
-		error4 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
-		var error5 error
-		error5, err = error4.Read(iprot)
+		error8 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
+		var error9 error
+		error9, err = error8.Read(iprot)
 		if err != nil {
 			return
 		}
 		if err = iprot.ReadMessageEnd(); err != nil {
 			return
 		}
-		err = error5
+		err = error9
 		return
 	}
 	if mTypeId != thrift.REPLY {
@@ -271,49 +259,15 @@ func (p *FirstClient) recvAppError() (err error) {
 }
 
 type FirstProcessor struct {
-	processorMap map[string]thrift.TProcessorFunction
-	handler      First
-}
-
-func (p *FirstProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
-	p.processorMap[key] = processor
-}
-
-func (p *FirstProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
-	processor, ok = p.processorMap[key]
-	return processor, ok
-}
-
-func (p *FirstProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
-	return p.processorMap
+	*BaseProcessor
 }
 
 func NewFirstProcessor(handler First) *FirstProcessor {
-
-	self6 := &FirstProcessor{handler: handler, processorMap: make(map[string]thrift.TProcessorFunction)}
-	self6.processorMap["Echo"] = &firstProcessorEcho{handler: handler}
-	self6.processorMap["Healthcheck"] = &firstProcessorHealthcheck{handler: handler}
-	self6.processorMap["AppError"] = &firstProcessorAppError{handler: handler}
-	return self6
-}
-
-func (p *FirstProcessor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-	name, _, seqId, err := iprot.ReadMessageBegin()
-	if err != nil {
-		return false, err
-	}
-	if processor, ok := p.GetProcessorFunction(name); ok {
-		return processor.Process(seqId, iprot, oprot)
-	}
-	iprot.Skip(thrift.STRUCT)
-	iprot.ReadMessageEnd()
-	x7 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function "+name)
-	oprot.WriteMessageBegin(name, thrift.EXCEPTION, seqId)
-	x7.Write(oprot)
-	oprot.WriteMessageEnd()
-	oprot.Flush()
-	return false, x7
-
+	self10 := &FirstProcessor{NewBaseProcessor(handler)}
+	self10.AddToProcessorMap("Echo", &firstProcessorEcho{handler: handler})
+	self10.AddToProcessorMap("Healthcheck", &firstProcessorHealthcheck{handler: handler})
+	self10.AddToProcessorMap("AppError", &firstProcessorAppError{handler: handler})
+	return self10
 }
 
 type firstProcessorEcho struct {

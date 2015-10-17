@@ -51,23 +51,50 @@ type Res struct {
 	Arg3  []byte
 }
 
+// ReadArgs reads the *Args from the given call.
+func ReadArgs(call *tchannel.InboundCall) (*Args, error) {
+	var args Args
+	args.Caller = call.CallerName()
+	args.Format = call.Format()
+	args.Operation = string(call.Operation())
+	if err := tchannel.NewArgReader(call.Arg2Reader()).Read(&args.Arg2); err != nil {
+		return nil, err
+	}
+	if err := tchannel.NewArgReader(call.Arg3Reader()).Read(&args.Arg3); err != nil {
+		return nil, err
+	}
+	return &args, nil
+}
+
+// WriteResponse writes the given Res to the InboundCallResponse.
+func WriteResponse(response *tchannel.InboundCallResponse, resp *Res) error {
+	if resp.SystemErr != nil {
+		return response.SendSystemError(resp.SystemErr)
+	}
+	if resp.IsErr {
+		if err := response.SetApplicationError(); err != nil {
+			return err
+		}
+	}
+	if err := tchannel.NewArgWriter(response.Arg2Writer()).Write(resp.Arg2); err != nil {
+		return err
+	}
+	if err := tchannel.NewArgWriter(response.Arg3Writer()).Write(resp.Arg3); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Wrap wraps a Handler as a tchannel.Handler that can be passed to tchannel.Register.
 func Wrap(handler Handler) tchannel.Handler {
 	return tchannel.HandlerFunc(func(ctx context.Context, call *tchannel.InboundCall) {
-		var args Args
-		args.Caller = call.CallerName()
-		args.Format = call.Format()
-		args.Operation = string(call.Operation())
-		if err := tchannel.NewArgReader(call.Arg2Reader()).Read(&args.Arg2); err != nil {
-			handler.OnError(ctx, err)
-			return
-		}
-		if err := tchannel.NewArgReader(call.Arg3Reader()).Read(&args.Arg3); err != nil {
+		args, err := ReadArgs(call)
+		if err != nil {
 			handler.OnError(ctx, err)
 			return
 		}
 
-		resp, err := handler.Handle(ctx, &args)
+		resp, err := handler.Handle(ctx, args)
 		response := call.Response()
 		if err != nil {
 			resp = &Res{
@@ -76,26 +103,8 @@ func Wrap(handler Handler) tchannel.Handler {
 				Arg3:  []byte(err.Error()),
 			}
 		}
-
-		if resp.SystemErr != nil {
-			if err := response.SendSystemError(resp.SystemErr); err != nil {
-				handler.OnError(ctx, err)
-			}
-			return
-		}
-		if resp.IsErr {
-			if err := response.SetApplicationError(); err != nil {
-				handler.OnError(ctx, err)
-				return
-			}
-		}
-		if err := tchannel.NewArgWriter(response.Arg2Writer()).Write(resp.Arg2); err != nil {
+		if err := WriteResponse(response, resp); err != nil {
 			handler.OnError(ctx, err)
-			return
-		}
-		if err := tchannel.NewArgWriter(response.Arg3Writer()).Write(resp.Arg3); err != nil {
-			handler.OnError(ctx, err)
-			return
 		}
 	})
 }

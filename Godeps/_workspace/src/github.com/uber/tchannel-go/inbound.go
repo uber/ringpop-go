@@ -60,7 +60,7 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	call := new(InboundCall)
 	ctx, cancel := newIncomingContext(call, callReq.TimeToLive, &callReq.Tracing)
 
-	mex, err := c.inbound.newExchange(ctx, c.framePool, callReq.messageType(), frame.Header.ID, 512)
+	mex, err := c.inbound.newExchange(ctx, c.framePool, callReq.messageType(), frame.Header.ID, mexChannelBufferSize)
 	if err != nil {
 		if err == errDuplicateMex {
 			err = errInboundRequestAlreadyActive
@@ -92,10 +92,10 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	response.AddAnnotation(AnnotationKeyServerReceive)
 	response.mex = mex
 	response.conn = c
-	response.contents = newFragmentingWriter(response, initialFragment.checksumType.New())
 	response.cancel = cancel
 	response.span = callReq.Tracing
 	response.log = c.log.WithFields(LogField{"In-Response", callReq.ID()})
+	response.contents = newFragmentingWriter(response.log, response, initialFragment.checksumType.New())
 	response.headers = transportHeaders{}
 	response.messageForFragment = func(initial bool) message {
 		if initial {
@@ -119,7 +119,7 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	call.response = response
 	call.log = c.log.WithFields(LogField{"In-Call", callReq.ID()})
 	call.messageForFragment = func(initial bool) message { return new(callReqContinue) }
-	call.contents = newFragmentingReader(call)
+	call.contents = newFragmentingReader(call.log, call)
 	call.statsReporter = c.statsReporter
 	call.createStatsTags(c.commonStatsTags)
 
@@ -136,7 +136,8 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 // defragmentation
 func (c *Connection) handleCallReqContinue(frame *Frame) bool {
 	if err := c.inbound.forwardPeerFrame(frame); err != nil {
-		c.inbound.removeExchange(frame.Header.ID)
+		// If forward fails, it's due to a timeout.
+		c.inbound.timeoutExchange(frame.Header.ID)
 		return true
 	}
 	return false
@@ -283,7 +284,6 @@ type InboundCallResponse struct {
 // complete after this method is called, and no further data can be written.
 func (response *InboundCallResponse) SendSystemError(err error) error {
 	// Fail all future attempts to read fragments
-	response.cancel()
 	response.state = reqResWriterComplete
 	response.systemError = true
 	response.doneSending()
@@ -336,6 +336,9 @@ func (response *InboundCallResponse) doneSending() {
 	} else {
 		response.statsReporter.IncCounter("inbound.calls.success", response.commonStatsTags, 1)
 	}
+
+	// Cancel the context since the response is complete.
+	response.cancel()
 
 	// The message exchange is still open if there are no errors, call shutdown.
 	if response.err == nil {

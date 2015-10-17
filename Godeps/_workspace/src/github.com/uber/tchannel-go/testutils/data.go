@@ -21,6 +21,7 @@
 package testutils
 
 import (
+	"encoding/base32"
 	"math/rand"
 	"sync"
 )
@@ -82,6 +83,13 @@ func RandBytes(n int) []byte {
 		data = append(data, randBytes(s)...)
 	}
 	return data
+}
+
+// RandString returns a random alphanumeric string for testing.
+func RandString(n int) string {
+	encoding := base32.StdEncoding
+	numBytes := encoding.DecodedLen(n) + 5
+	return base32.StdEncoding.EncodeToString(RandBytes(numBytes))[:n]
 }
 
 func randBytes(n int) []byte {

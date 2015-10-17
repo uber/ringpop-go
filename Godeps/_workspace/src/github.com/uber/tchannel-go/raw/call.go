@@ -65,3 +65,15 @@ func Call(ctx context.Context, ch *tchannel.Channel, hostPort string, serviceNam
 
 	return WriteArgs(call, arg2, arg3)
 }
+
+// CallSC makes a call using the given subcahnnel
+func CallSC(ctx context.Context, sc *tchannel.SubChannel, operation string, arg2, arg3 []byte) (
+	[]byte, []byte, *tchannel.OutboundCallResponse, error) {
+
+	call, err := sc.BeginCall(ctx, operation, nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return WriteArgs(call, arg2, arg3)
+}

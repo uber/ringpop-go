@@ -38,24 +38,57 @@ var (
 	peerRng = NewRand(time.Now().UnixNano())
 )
 
+type Connectable interface {
+	Connect(context.Context, string, *ConnectionOptions) (*Connection, error)
+	ConnectionOptions() *ConnectionOptions
+}
+
 // PeerList maintains a list of Peers.
 type PeerList struct {
-	channel *Channel
+	channel Connectable
+	parent  *PeerList
 
 	mut             sync.RWMutex // mut protects peers.
 	peersByHostPort map[string]*Peer
 	peers           []*Peer
 }
 
-func newPeerList(channel *Channel) *PeerList {
+func newPeerList(channel Connectable) *PeerList {
 	return &PeerList{
 		channel:         channel,
 		peersByHostPort: make(map[string]*Peer),
 	}
 }
 
+func (l *PeerList) isRoot() bool {
+	return l.parent == nil
+}
+
+// Siblings don't share peer lists (though they take care not to double-connect
+// to the same hosts).
+func (l *PeerList) newSibling() *PeerList {
+	sib := newPeerList(l.channel)
+	sib.parent = l.parent
+	return sib
+}
+
+// Children ensure that their parent's peer list is a superset of their own.
+func (l *PeerList) newChild() *PeerList {
+	child := newPeerList(l.channel)
+	child.parent = l
+	return child
+}
+
 // Add adds a peer to the list if it does not exist, or returns any existing peer.
 func (l *PeerList) Add(hostPort string) *Peer {
+	l.mut.RLock()
+
+	if p, ok := l.peersByHostPort[hostPort]; ok {
+		l.mut.RUnlock()
+		return p
+	}
+
+	l.mut.RUnlock()
 	l.mut.Lock()
 	defer l.mut.Unlock()
 
@@ -63,7 +96,14 @@ func (l *PeerList) Add(hostPort string) *Peer {
 		return p
 	}
 
-	p := newPeer(l.channel, hostPort)
+	var p *Peer
+	if l.isRoot() {
+		// To avoid duplicate connections, only the root list should create new
+		// peers. All other lists should keep refs to the root list's peers.
+		p = newPeer(l.channel, hostPort)
+	} else {
+		p = l.parent.Add(hostPort)
+	}
 	l.peersByHostPort[hostPort] = p
 	l.peers = append(l.peers, p)
 	return p
@@ -100,7 +140,7 @@ func (l *PeerList) GetOrAdd(hostPort string) *Peer {
 	return l.Add(hostPort)
 }
 
-// Copy returns a copy of the peer list. This method should only be used for testing.
+// Copy returns a map of the peer list. This method should only be used for testing.
 func (l *PeerList) Copy() map[string]*Peer {
 	l.mut.RLock()
 	defer l.mut.RUnlock()
@@ -124,14 +164,14 @@ func (l *PeerList) Close() {
 
 // Peer represents a single autobahn service or client with a unique host:port.
 type Peer struct {
-	channel  *Channel
+	channel  Connectable
 	hostPort string
 
 	mut         sync.RWMutex // mut protects connections.
 	connections []*Connection
 }
 
-func newPeer(channel *Channel, hostPort string) *Peer {
+func newPeer(channel Connectable, hostPort string) *Peer {
 	return &Peer{
 		channel:  channel,
 		hostPort: hostPort,
@@ -198,7 +238,7 @@ func (p *Peer) AddConnection(c *Connection) error {
 
 // Connect adds a new outbound connection to the peer.
 func (p *Peer) Connect(ctx context.Context) (*Connection, error) {
-	c, err := p.channel.Connect(ctx, p.hostPort, &p.channel.connectionOptions)
+	c, err := p.channel.Connect(ctx, p.hostPort, p.channel.ConnectionOptions())
 	if err != nil {
 		return nil, err
 	}

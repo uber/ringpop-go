@@ -89,6 +89,7 @@ func (r *ZipkinTraceReporter) Report(
 
 func (r *ZipkinTraceReporter) zipkinReport(data *zipkinData) error {
 	ctx, cancel := tc.NewContextBuilder(time.Second).
+		DisableTracing().
 		SetShardKey(base64Encode(data.Span.TraceID())).Build()
 	defer cancel()
 

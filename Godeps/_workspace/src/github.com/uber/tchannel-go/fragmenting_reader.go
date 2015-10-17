@@ -72,6 +72,7 @@ func (s fragmentingReadState) isReadingArgument() bool {
 }
 
 type fragmentingReader struct {
+	logger           Logger
 	state            fragmentingReadState
 	remainingChunks  [][]byte
 	curChunk         []byte
@@ -82,8 +83,9 @@ type fragmentingReader struct {
 	err              error
 }
 
-func newFragmentingReader(receiver fragmentReceiver) *fragmentingReader {
+func newFragmentingReader(logger Logger, receiver fragmentReceiver) *fragmentingReader {
 	return &fragmentingReader{
+		logger:           logger,
 		receiver:         receiver,
 		hasMoreFragments: true,
 	}

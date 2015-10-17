@@ -30,12 +30,17 @@ import (
 	"golang.org/x/net/context"
 )
 
+type handler struct {
+	server         TChanServer
+	postResponseCB PostResponseCB
+}
+
 // Server handles incoming TChannel calls and forwards them to the matching TChanServer.
 type Server struct {
 	ch            tchannel.Registrar
 	log           tchannel.Logger
 	mut           sync.RWMutex
-	handlers      map[string]TChanServer
+	handlers      map[string]handler
 	healthHandler *healthHandler
 }
 
@@ -45,7 +50,7 @@ func NewServer(registrar tchannel.Registrar) *Server {
 	server := &Server{
 		ch:            registrar,
 		log:           registrar.Logger(),
-		handlers:      make(map[string]TChanServer),
+		handlers:      make(map[string]handler),
 		healthHandler: healthHandler,
 	}
 
@@ -55,11 +60,15 @@ func NewServer(registrar tchannel.Registrar) *Server {
 
 // Register registers the given TChanServer to be called on any incoming call for its' services.
 // TODO(prashant): Replace Register call with this call.
-func (s *Server) Register(svr TChanServer) {
+func (s *Server) Register(svr TChanServer, opts ...RegisterOption) {
 	service := svr.Service()
+	handler := &handler{server: svr}
+	for _, opt := range opts {
+		opt.Apply(handler)
+	}
 
 	s.mut.Lock()
-	s.handlers[service] = svr
+	s.handlers[service] = *handler
 	s.mut.Unlock()
 
 	for _, m := range svr.Methods() {
@@ -77,7 +86,7 @@ func (s *Server) onError(err error) {
 	s.log.Errorf("thrift Server error: %v", err)
 }
 
-func (s *Server) handle(origCtx context.Context, handler TChanServer, method string, call *tchannel.InboundCall) error {
+func (s *Server) handle(origCtx context.Context, handler handler, method string, call *tchannel.InboundCall) error {
 	reader, err := call.Arg2Reader()
 	if err != nil {
 		return err
@@ -97,7 +106,7 @@ func (s *Server) handle(origCtx context.Context, handler TChanServer, method str
 
 	ctx := WithHeaders(origCtx, headers)
 	protocol := thrift.NewTBinaryProtocolTransport(&readWriterTransport{Reader: reader})
-	success, resp, err := handler.Handle(ctx, method, protocol)
+	success, resp, err := handler.server.Handle(ctx, method, protocol)
 	if err != nil {
 		reader.Close()
 		call.Response().SendSystemError(err)
@@ -126,11 +135,13 @@ func (s *Server) handle(origCtx context.Context, handler TChanServer, method str
 	writer, err = call.Response().Arg3Writer()
 	protocol = thrift.NewTBinaryProtocolTransport(&readWriterTransport{Writer: writer})
 	resp.Write(protocol)
-	if err := writer.Close(); err != nil {
-		return err
+	err = writer.Close()
+
+	if handler.postResponseCB != nil {
+		handler.postResponseCB(method, resp)
 	}
 
-	return nil
+	return err
 }
 
 // Handle handles an incoming TChannel call and forwards it to the correct handler.

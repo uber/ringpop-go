@@ -249,6 +249,8 @@ func (w *WriteBuffer) DeferByte() ByteRef {
 		return ByteRef(nil)
 	}
 
+	// Always zero out references, since the caller expects the default to be 0.
+	w.remaining[0] = 0
 	bufRef := ByteRef(w.remaining[0:])
 	w.remaining = w.remaining[1:]
 	return bufRef
@@ -257,25 +259,33 @@ func (w *WriteBuffer) DeferByte() ByteRef {
 // DeferUint16 reserves space in the buffer for a uint16, and returns a
 // reference that can be used to update that uint16
 func (w *WriteBuffer) DeferUint16() Uint16Ref {
-	return Uint16Ref(w.reserve(2))
+	return Uint16Ref(w.deferred(2))
 }
 
 // DeferUint32 reserves space in the buffer for a uint32, and returns a
 // reference that can be used to update that uint32
 func (w *WriteBuffer) DeferUint32() Uint32Ref {
-	return Uint32Ref(w.reserve(4))
+	return Uint32Ref(w.deferred(4))
 }
 
 // DeferUint64 reserves space in the buffer for a uint64, and returns a
 // reference that can be used to update that uint64
 func (w *WriteBuffer) DeferUint64() Uint64Ref {
-	return Uint64Ref(w.reserve(8))
+	return Uint64Ref(w.deferred(8))
 }
 
 // DeferBytes reserves space in the buffer for a fixed sequence of bytes, and
 // returns a reference that can be used to update those bytes
 func (w *WriteBuffer) DeferBytes(n int) BytesRef {
-	return BytesRef(w.reserve(n))
+	return BytesRef(w.deferred(n))
+}
+
+func (w *WriteBuffer) deferred(n int) []byte {
+	bs := w.reserve(n)
+	for i := range bs {
+		bs[i] = 0
+	}
+	return bs
 }
 
 func (w *WriteBuffer) reserve(n int) []byte {

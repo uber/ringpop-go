@@ -105,6 +105,7 @@ type Annotations struct {
 	binaryAnnotations []BinaryAnnotation
 }
 
+// SetOperation sets the operation being called.
 func (as *Annotations) SetOperation(operation string) {
 	as.endpoint.Operation = operation
 }

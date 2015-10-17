@@ -3,12 +3,16 @@ struct HealthCheckRes {
   2: string msg,
 }
 
-service First {
-    string Echo(1:string msg)
-    HealthCheckRes Healthcheck()
-    void AppError()
+service Base {
+  void BaseCall()
+}
+
+service First extends Base {
+  string Echo(1:string msg)
+  HealthCheckRes Healthcheck()
+  void AppError()
 }
 
 service Second {
-    void Test()
+  void Test()
 }

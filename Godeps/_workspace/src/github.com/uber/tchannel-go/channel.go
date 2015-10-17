@@ -153,7 +153,7 @@ func NewChannel(serviceName string, opts *ChannelOptions) (*Channel, error) {
 		handlers:          &handlerMap{},
 		subChannels:       &subChannelMap{},
 	}
-	ch.peers = newPeerList(ch)
+	ch.peers = newPeerList(ch).newChild()
 
 	ch.mutable.peerInfo = LocalPeerInfo{
 		PeerInfo: PeerInfo{
@@ -175,7 +175,13 @@ func NewChannel(serviceName string, opts *ChannelOptions) (*Channel, error) {
 	}
 	ch.traceReporter = traceReporter
 
+	ch.registerInternal()
 	return ch, nil
+}
+
+// ConnectionOptions returns the channel's connection options.
+func (ch *Channel) ConnectionOptions() *ConnectionOptions {
+	return &ch.connectionOptions
 }
 
 // Serve serves incoming requests using the provided listener.
@@ -277,13 +283,25 @@ func (ch *Channel) createCommonStats() {
 
 // GetSubChannel returns a SubChannel for the given service name. If the subchannel does not
 // exist, it is created.
-func (ch *Channel) GetSubChannel(serviceName string) *SubChannel {
-	return ch.subChannels.getOrAdd(serviceName, ch)
+func (ch *Channel) GetSubChannel(serviceName string, opts ...SubChannelOption) *SubChannel {
+	sub := ch.subChannels.getOrAdd(serviceName, ch)
+	for _, opt := range opts {
+		opt(sub)
+	}
+	return sub
 }
 
 // Peers returns the PeerList for the channel.
 func (ch *Channel) Peers() *PeerList {
 	return ch.peers
+}
+
+// rootPeers returns the root PeerList for the channel, which is the sole place
+// new Peers are created. All children of the root list (including ch.Peers())
+// automatically re-use peers from the root list and create new peers in the
+// root list.
+func (ch *Channel) rootPeers() *PeerList {
+	return ch.peers.parent
 }
 
 // BeginCall starts a new call to a remote peer, returning an OutboundCall that can
@@ -361,6 +379,11 @@ func (ch *Channel) StatsReporter() StatsReporter {
 	return ch.statsReporter
 }
 
+// TraceReporter returns the trace reporter for this channel.
+func (ch *Channel) TraceReporter() TraceReporter {
+	return ch.traceReporter
+}
+
 // StatsTags returns the common tags that should be used when reporting stats.
 // It returns a new map for each call.
 func (ch *Channel) StatsTags() map[string]string {
@@ -421,7 +444,11 @@ func (ch *Channel) Connect(ctx context.Context, hostPort string, connectionOptio
 // incomingConnectionActive adds a new active connection to our peer list.
 func (ch *Channel) incomingConnectionActive(c *Connection) {
 	c.log.Debugf("Add connection as an active peer for %v", c.remotePeerInfo.HostPort)
-	p := ch.peers.GetOrAdd(c.remotePeerInfo.HostPort)
+	// TODO: Alter TChannel spec to allow optionally include the service name
+	// when initializing a connection. As-is, we have to keep these peers in
+	// rootPeers (which isn't used for outbound calls) because we don't know
+	// what services they implement.
+	p := ch.rootPeers().GetOrAdd(c.remotePeerInfo.HostPort)
 	p.AddConnection(c)
 
 	ch.mutable.mut.Lock()
@@ -479,7 +506,7 @@ func (ch *Channel) State() ChannelState {
 
 // Close starts a graceful Close for the channel. This does not happen immediately:
 // 1. This call closes the Listener and starts closing connections.
-// 2. When all incoming connections are drainged, the connection blocks new outgoing calls.
+// 2. When all incoming connections are drained, the connection blocks new outgoing calls.
 // 3. When all connections are drainged, the channel's state is updated to Closed.
 func (ch *Channel) Close() {
 	ch.mutable.mut.Lock()
@@ -494,5 +521,5 @@ func (ch *Channel) Close() {
 	}
 	ch.mutable.mut.Unlock()
 
-	ch.peers.Close()
+	ch.rootPeers().Close()
 }

@@ -14,11 +14,11 @@ var _ = thrift.ZERO
 var _ = fmt.Printf
 var _ = bytes.Equal
 
-type Second interface {
-	Test() (err error)
+type Base interface {
+	BaseCall() (err error)
 }
 
-type SecondClient struct {
+type BaseClient struct {
 	Transport       thrift.TTransport
 	ProtocolFactory thrift.TProtocolFactory
 	InputProtocol   thrift.TProtocol
@@ -26,8 +26,8 @@ type SecondClient struct {
 	SeqId           int32
 }
 
-func NewSecondClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *SecondClient {
-	return &SecondClient{Transport: t,
+func NewBaseClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *BaseClient {
+	return &BaseClient{Transport: t,
 		ProtocolFactory: f,
 		InputProtocol:   f.GetProtocol(t),
 		OutputProtocol:  f.GetProtocol(t),
@@ -35,8 +35,8 @@ func NewSecondClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *Sec
 	}
 }
 
-func NewSecondClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *SecondClient {
-	return &SecondClient{Transport: t,
+func NewBaseClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *BaseClient {
+	return &BaseClient{Transport: t,
 		ProtocolFactory: nil,
 		InputProtocol:   iprot,
 		OutputProtocol:  oprot,
@@ -44,24 +44,24 @@ func NewSecondClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot 
 	}
 }
 
-func (p *SecondClient) Test() (err error) {
-	if err = p.sendTest(); err != nil {
+func (p *BaseClient) BaseCall() (err error) {
+	if err = p.sendBaseCall(); err != nil {
 		return
 	}
-	return p.recvTest()
+	return p.recvBaseCall()
 }
 
-func (p *SecondClient) sendTest() (err error) {
+func (p *BaseClient) sendBaseCall() (err error) {
 	oprot := p.OutputProtocol
 	if oprot == nil {
 		oprot = p.ProtocolFactory.GetProtocol(p.Transport)
 		p.OutputProtocol = oprot
 	}
 	p.SeqId++
-	if err = oprot.WriteMessageBegin("Test", thrift.CALL, p.SeqId); err != nil {
+	if err = oprot.WriteMessageBegin("BaseCall", thrift.CALL, p.SeqId); err != nil {
 		return
 	}
-	args := SecondTestArgs{}
+	args := BaseBaseCallArgs{}
 	if err = args.Write(oprot); err != nil {
 		return
 	}
@@ -71,7 +71,7 @@ func (p *SecondClient) sendTest() (err error) {
 	return oprot.Flush()
 }
 
-func (p *SecondClient) recvTest() (err error) {
+func (p *BaseClient) recvBaseCall() (err error) {
 	iprot := p.InputProtocol
 	if iprot == nil {
 		iprot = p.ProtocolFactory.GetProtocol(p.Transport)
@@ -81,32 +81,32 @@ func (p *SecondClient) recvTest() (err error) {
 	if err != nil {
 		return
 	}
-	if method != "Test" {
-		err = thrift.NewTApplicationException(thrift.WRONG_METHOD_NAME, "Test failed: wrong method name")
+	if method != "BaseCall" {
+		err = thrift.NewTApplicationException(thrift.WRONG_METHOD_NAME, "BaseCall failed: wrong method name")
 		return
 	}
 	if p.SeqId != seqId {
-		err = thrift.NewTApplicationException(thrift.BAD_SEQUENCE_ID, "Test failed: out of sequence response")
+		err = thrift.NewTApplicationException(thrift.BAD_SEQUENCE_ID, "BaseCall failed: out of sequence response")
 		return
 	}
 	if mTypeId == thrift.EXCEPTION {
-		error12 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
-		var error13 error
-		error13, err = error12.Read(iprot)
+		error0 := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "Unknown Exception")
+		var error1 error
+		error1, err = error0.Read(iprot)
 		if err != nil {
 			return
 		}
 		if err = iprot.ReadMessageEnd(); err != nil {
 			return
 		}
-		err = error13
+		err = error1
 		return
 	}
 	if mTypeId != thrift.REPLY {
-		err = thrift.NewTApplicationException(thrift.INVALID_MESSAGE_TYPE_EXCEPTION, "Test failed: invalid message type")
+		err = thrift.NewTApplicationException(thrift.INVALID_MESSAGE_TYPE_EXCEPTION, "BaseCall failed: invalid message type")
 		return
 	}
-	result := SecondTestResult{}
+	result := BaseBaseCallResult{}
 	if err = result.Read(iprot); err != nil {
 		return
 	}
@@ -116,32 +116,32 @@ func (p *SecondClient) recvTest() (err error) {
 	return
 }
 
-type SecondProcessor struct {
+type BaseProcessor struct {
 	processorMap map[string]thrift.TProcessorFunction
-	handler      Second
+	handler      Base
 }
 
-func (p *SecondProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
+func (p *BaseProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
 	p.processorMap[key] = processor
 }
 
-func (p *SecondProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
+func (p *BaseProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
 	processor, ok = p.processorMap[key]
 	return processor, ok
 }
 
-func (p *SecondProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
+func (p *BaseProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
 	return p.processorMap
 }
 
-func NewSecondProcessor(handler Second) *SecondProcessor {
+func NewBaseProcessor(handler Base) *BaseProcessor {
 
-	self14 := &SecondProcessor{handler: handler, processorMap: make(map[string]thrift.TProcessorFunction)}
-	self14.processorMap["Test"] = &secondProcessorTest{handler: handler}
-	return self14
+	self2 := &BaseProcessor{handler: handler, processorMap: make(map[string]thrift.TProcessorFunction)}
+	self2.processorMap["BaseCall"] = &baseProcessorBaseCall{handler: handler}
+	return self2
 }
 
-func (p *SecondProcessor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+func (p *BaseProcessor) Process(iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
 	name, _, seqId, err := iprot.ReadMessageBegin()
 	if err != nil {
 		return false, err
@@ -151,25 +151,25 @@ func (p *SecondProcessor) Process(iprot, oprot thrift.TProtocol) (success bool, 
 	}
 	iprot.Skip(thrift.STRUCT)
 	iprot.ReadMessageEnd()
-	x15 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function "+name)
+	x3 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function "+name)
 	oprot.WriteMessageBegin(name, thrift.EXCEPTION, seqId)
-	x15.Write(oprot)
+	x3.Write(oprot)
 	oprot.WriteMessageEnd()
 	oprot.Flush()
-	return false, x15
+	return false, x3
 
 }
 
-type secondProcessorTest struct {
-	handler Second
+type baseProcessorBaseCall struct {
+	handler Base
 }
 
-func (p *secondProcessorTest) Process(seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-	args := SecondTestArgs{}
+func (p *baseProcessorBaseCall) Process(seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+	args := BaseBaseCallArgs{}
 	if err = args.Read(iprot); err != nil {
 		iprot.ReadMessageEnd()
 		x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err.Error())
-		oprot.WriteMessageBegin("Test", thrift.EXCEPTION, seqId)
+		oprot.WriteMessageBegin("BaseCall", thrift.EXCEPTION, seqId)
 		x.Write(oprot)
 		oprot.WriteMessageEnd()
 		oprot.Flush()
@@ -177,17 +177,17 @@ func (p *secondProcessorTest) Process(seqId int32, iprot, oprot thrift.TProtocol
 	}
 
 	iprot.ReadMessageEnd()
-	result := SecondTestResult{}
+	result := BaseBaseCallResult{}
 	var err2 error
-	if err2 = p.handler.Test(); err2 != nil {
-		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing Test: "+err2.Error())
-		oprot.WriteMessageBegin("Test", thrift.EXCEPTION, seqId)
+	if err2 = p.handler.BaseCall(); err2 != nil {
+		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing BaseCall: "+err2.Error())
+		oprot.WriteMessageBegin("BaseCall", thrift.EXCEPTION, seqId)
 		x.Write(oprot)
 		oprot.WriteMessageEnd()
 		oprot.Flush()
 		return true, err2
 	}
-	if err2 = oprot.WriteMessageBegin("Test", thrift.REPLY, seqId); err2 != nil {
+	if err2 = oprot.WriteMessageBegin("BaseCall", thrift.REPLY, seqId); err2 != nil {
 		err = err2
 	}
 	if err2 = result.Write(oprot); err == nil && err2 != nil {
@@ -207,14 +207,14 @@ func (p *secondProcessorTest) Process(seqId int32, iprot, oprot thrift.TProtocol
 
 // HELPER FUNCTIONS AND STRUCTURES
 
-type SecondTestArgs struct {
+type BaseBaseCallArgs struct {
 }
 
-func NewSecondTestArgs() *SecondTestArgs {
-	return &SecondTestArgs{}
+func NewBaseBaseCallArgs() *BaseBaseCallArgs {
+	return &BaseBaseCallArgs{}
 }
 
-func (p *SecondTestArgs) Read(iprot thrift.TProtocol) error {
+func (p *BaseBaseCallArgs) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -240,8 +240,8 @@ func (p *SecondTestArgs) Read(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *SecondTestArgs) Write(oprot thrift.TProtocol) error {
-	if err := oprot.WriteStructBegin("Test_args"); err != nil {
+func (p *BaseBaseCallArgs) Write(oprot thrift.TProtocol) error {
+	if err := oprot.WriteStructBegin("BaseCall_args"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
 	if err := oprot.WriteFieldStop(); err != nil {
@@ -253,21 +253,21 @@ func (p *SecondTestArgs) Write(oprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *SecondTestArgs) String() string {
+func (p *BaseBaseCallArgs) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("SecondTestArgs(%+v)", *p)
+	return fmt.Sprintf("BaseBaseCallArgs(%+v)", *p)
 }
 
-type SecondTestResult struct {
+type BaseBaseCallResult struct {
 }
 
-func NewSecondTestResult() *SecondTestResult {
-	return &SecondTestResult{}
+func NewBaseBaseCallResult() *BaseBaseCallResult {
+	return &BaseBaseCallResult{}
 }
 
-func (p *SecondTestResult) Read(iprot thrift.TProtocol) error {
+func (p *BaseBaseCallResult) Read(iprot thrift.TProtocol) error {
 	if _, err := iprot.ReadStructBegin(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
@@ -293,8 +293,8 @@ func (p *SecondTestResult) Read(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *SecondTestResult) Write(oprot thrift.TProtocol) error {
-	if err := oprot.WriteStructBegin("Test_result"); err != nil {
+func (p *BaseBaseCallResult) Write(oprot thrift.TProtocol) error {
+	if err := oprot.WriteStructBegin("BaseCall_result"); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 	}
 	if err := oprot.WriteFieldStop(); err != nil {
@@ -306,9 +306,9 @@ func (p *SecondTestResult) Write(oprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *SecondTestResult) String() string {
+func (p *BaseBaseCallResult) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("SecondTestResult(%+v)", *p)
+	return fmt.Sprintf("BaseBaseCallResult(%+v)", *p)
 }

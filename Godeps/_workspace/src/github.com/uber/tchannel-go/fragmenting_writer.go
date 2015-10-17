@@ -135,6 +135,7 @@ func (s fragmentingWriterState) isWritingArgument() bool {
 // checksum.  It relies on an underlying fragmentSender, which creates and
 // flushes the fragments as needed
 type fragmentingWriter struct {
+	logger      Logger
 	sender      fragmentSender
 	checksum    Checksum
 	curFragment *writableFragment
@@ -144,8 +145,9 @@ type fragmentingWriter struct {
 }
 
 // newFragmentingWriter creates a new fragmenting writer
-func newFragmentingWriter(sender fragmentSender, checksum Checksum) *fragmentingWriter {
+func newFragmentingWriter(logger Logger, sender fragmentSender, checksum Checksum) *fragmentingWriter {
 	return &fragmentingWriter{
+		logger:   logger,
 		sender:   sender,
 		checksum: checksum,
 		state:    fragmentingWriteStart,

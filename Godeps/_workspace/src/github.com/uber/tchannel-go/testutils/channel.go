@@ -52,8 +52,8 @@ type ChannelOpts struct {
 	// ProcessName defaults to ServiceName + "-[port]"
 	ProcessName string
 
-	// EnableLog defaults to false.
-	EnableLog bool
+	// Logger sets the logger.
+	Logger tchannel.Logger
 
 	// StatsReporter specifies the StatsReporter to use.
 	StatsReporter tchannel.StatsReporter
@@ -74,7 +74,9 @@ func defaultString(v string, defaultValue string) string {
 
 func getChannelOptions(opts *ChannelOpts, processName string) *tchannel.ChannelOptions {
 	var logger tchannel.Logger
-	if opts.EnableLog || *connectionLog {
+	if opts.Logger != nil {
+		logger = opts.Logger
+	} else if *connectionLog {
 		logger = tchannel.SimpleLogger
 	}
 

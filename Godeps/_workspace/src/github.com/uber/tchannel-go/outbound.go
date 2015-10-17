@@ -55,7 +55,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 	}
 
 	requestID := c.NextMessageID()
-	mex, err := c.outbound.newExchange(ctx, c.framePool, messageTypeCallReq, requestID, 512)
+	mex, err := c.outbound.newExchange(ctx, c.framePool, messageTypeCallReq, requestID, mexChannelBufferSize)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 		return new(callReqContinue)
 	}
 
-	call.contents = newFragmentingWriter(call, c.checksumType.New())
+	call.contents = newFragmentingWriter(call.log, call, c.checksumType.New())
 	span := CurrentSpan(ctx)
 	if span != nil {
 		call.callReq.Tracing = *span.NewChildSpan()
@@ -131,7 +131,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 
 		return new(callResContinue)
 	}
-	response.contents = newFragmentingReader(response)
+	response.contents = newFragmentingReader(response.log, response)
 	response.statsReporter = call.statsReporter
 	response.commonStatsTags = call.commonStatsTags
 
