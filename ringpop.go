@@ -142,7 +142,7 @@ func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *
 	}
 
 	if channel != nil {
-		ringpop.channel = channel.GetSubChannel("ringpop")
+		ringpop.channel = channel.GetSubChannel("ringpop", tchannel.Isolated)
 		ringpop.registerHandlers()
 	}
 
