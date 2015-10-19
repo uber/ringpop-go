@@ -28,7 +28,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/replica/util"
 	"github.com/uber/tchannel-go"

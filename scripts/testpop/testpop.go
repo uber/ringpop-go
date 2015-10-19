@@ -24,7 +24,7 @@ import (
 	"flag"
 	"regexp"
 
-	"github.com/uber/bark"
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 
 	log "github.com/Sirupsen/logrus"

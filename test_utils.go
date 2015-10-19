@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/uber/bark"
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go"

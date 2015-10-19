@@ -47,7 +47,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/dgryski/go-farm"
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"

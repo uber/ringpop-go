@@ -25,7 +25,7 @@ import (
 	"flag"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/uber/bark"
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"

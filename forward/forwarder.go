@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go"
 )

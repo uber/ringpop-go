@@ -25,7 +25,7 @@ import (
 	"log"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/uber/bark"
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
 	"github.com/uber/tchannel-go"
