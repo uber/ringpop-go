@@ -1,6 +1,9 @@
 {
 	"ImportPath": "github.com/uber/ringpop-go",
 	"GoVersion": "go1.5.1",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
@@ -33,7 +36,7 @@
 			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
 		},
 		{
-			"ImportPath": "github.com/uber/bark",
+			"ImportPath": "github.com/uber-common/bark",
 			"Rev": "d52ffa061726911f47fcd3d9e8b9b55f22794772"
 		},
 		{
