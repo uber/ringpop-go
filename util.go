@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uber/bark"
+	"github.com/uber-common/bark"
 )
 
 type noopStatsReporter struct{}

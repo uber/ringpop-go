@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
 	"github.com/uber/tchannel-go/json"
 )
 

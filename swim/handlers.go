@@ -21,34 +21,34 @@
 package swim
 
 import (
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
-	"github.com/uber/ringpop-go/swim/util"
 )
 
 // An Arg is a blank argument used as filler for making TChannel calls that require
 // nothing to be passed to Arg3
 type Arg struct{}
 
-type Status struct{
+type Status struct {
 	Status string `json:"status"`
 }
 
 func (n *Node) registerHandlers() error {
 	handlers := map[string]interface{}{
-		"/protocol/join":     n.joinHandler,
-		"/protocol/ping":     n.pingHandler,
-		"/protocol/ping-req": n.pingRequestHandler,
-		"/admin/debugSet":    n.debugSetHandler,
-		"/admin/debugClear":  n.debugClearHandler,
-		"/admin/gossip":      n.gossipHandler, // Deprecated
-		"/admin/gossip/start":n.gossipHandlerStart,
-		"/admin/gossip/stop": n.gossipHandlerStop,
-		"/admin/tick":        n.tickHandler, // Deprecated
-		"/admin/gossip/tick": n.tickHandler,
-		"/admin/member/leave":n.adminLeaveHandler,
-		"/admin/member/join": n.adminJoinHandler,
+		"/protocol/join":      n.joinHandler,
+		"/protocol/ping":      n.pingHandler,
+		"/protocol/ping-req":  n.pingRequestHandler,
+		"/admin/debugSet":     n.debugSetHandler,
+		"/admin/debugClear":   n.debugClearHandler,
+		"/admin/gossip":       n.gossipHandler, // Deprecated
+		"/admin/gossip/start": n.gossipHandlerStart,
+		"/admin/gossip/stop":  n.gossipHandlerStop,
+		"/admin/tick":         n.tickHandler, // Deprecated
+		"/admin/gossip/tick":  n.tickHandler,
+		"/admin/member/leave": n.adminLeaveHandler,
+		"/admin/member/join":  n.adminJoinHandler,
 	}
 
 	return json.Register(n.channel, handlers, func(ctx context.Context, err error) {
@@ -116,10 +116,10 @@ func (n *Node) tickHandler(ctx json.Context, req *Arg) (*ping, error) {
 
 func (n *Node) adminJoinHandler(ctx json.Context, req *Arg) (*Status, error) {
 	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
-	return &Status{ Status: "rejoined" }, nil
+	return &Status{Status: "rejoined"}, nil
 }
 
 func (n *Node) adminLeaveHandler(ctx json.Context, req *Arg) (*Status, error) {
 	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
-	return &Status{ Status: "ok" }, nil
+	return &Status{Status: "ok"}, nil
 }

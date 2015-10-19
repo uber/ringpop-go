@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/raw"
 )

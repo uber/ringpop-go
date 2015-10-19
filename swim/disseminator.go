@@ -24,7 +24,7 @@ import (
 	"math"
 	"sync"
 
-	log "github.com/uber/bark"
+	log "github.com/uber-common/bark"
 )
 
 var log10 = math.Log(10)
