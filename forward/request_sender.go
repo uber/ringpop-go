@@ -38,6 +38,7 @@ type requestSender struct {
 	channel tchannel.Registrar
 
 	request           []byte
+	headers           []byte
 	destination       string
 	service, endpoint string
 	keys              []string
@@ -56,13 +57,14 @@ type requestSender struct {
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
-func newRequestSender(sender Sender, channel tchannel.Registrar, request []byte, keys []string,
+func newRequestSender(sender Sender, channel tchannel.Registrar, request, headers []byte, keys []string,
 	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
 	return &requestSender{
 		sender:         sender,
 		channel:        channel,
 		request:        request,
+		headers:        headers,
 		keys:           keys,
 		destination:    destination,
 		service:        service,
@@ -127,7 +129,7 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error 
 			return
 		}
 
-		_, arg3, _, err := raw.WriteArgs(call, nil, s.request)
+		_, arg3, _, err := raw.WriteArgs(call, s.headers, s.request)
 		if err != nil {
 			errC <- err
 			return
