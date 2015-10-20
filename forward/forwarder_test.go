@@ -61,11 +61,12 @@ func (p Ping) Bytes() []byte {
 type Pong struct {
 	Message string `json:"message"`
 	From    string `json:"from"`
+	Headers map[string]string
 }
 
 func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Channel) {
 	handler := func(ctx json.Context, ping *Ping) (*Pong, error) {
-		return &Pong{"Hello, world!", address}, nil
+		return &Pong{"Hello, world!", address, ctx.Headers()}, nil
 	}
 	hmap := map[string]interface{}{"/ping": handler}
 
@@ -101,13 +102,15 @@ func (s *ForwarderTestSuite) TestForward() {
 	s.sender.lookup = "127.0.0.1:3002"
 	dest := s.sender.Lookup("some key")
 
-	res, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"some key"},
+	headerBytes := []byte(`{"hdr1": "val1"}`)
+	res, err := s.forwarder.ForwardRequest(ping.Bytes(), headerBytes, dest, "test", "/ping", []string{"some key"},
 		tchannel.JSON, nil)
 	s.NoError(err, "expected request to be forwarded")
 
 	s.NoError(json2.Unmarshal(res, &pong))
 	s.Equal("127.0.0.1:3002", pong.From)
 	s.Equal("Hello, world!", pong.Message)
+	s.Equal(map[string]string{"hdr1": "val1"}, pong.Headers)
 }
 
 func (s *ForwarderTestSuite) TestMaxRetries() {
@@ -116,7 +119,7 @@ func (s *ForwarderTestSuite) TestMaxRetries() {
 	s.sender.lookup = "127.0.0.1:3003"
 	dest := s.sender.Lookup("some key")
 
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"some key"},
+	_, err := s.forwarder.ForwardRequest(ping.Bytes(), nil, dest, "test", "/ping", []string{"some key"},
 		tchannel.JSON, &Options{
 			MaxRetries:    2,
 			RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond},
@@ -132,7 +135,7 @@ func (s *ForwarderTestSuite) TestKeysDiverged() {
 	dest := s.sender.Lookup("some key")
 
 	// no keys should result in destinations length of 0 during retry, causing abortion of request
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
+	_, err := s.forwarder.ForwardRequest(ping.Bytes(), nil, dest, "test", "/ping", nil, tchannel.JSON,
 		&Options{MaxRetries: 2, RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond}})
 
 	s.EqualError(err, "key destinations have diverged")
@@ -144,7 +147,7 @@ func (s *ForwarderTestSuite) TestRequestTimesOut() {
 	s.sender.lookup = "127.0.0.2:3001"
 	dest := s.sender.Lookup("some key")
 
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
+	_, err := s.forwarder.ForwardRequest(ping.Bytes(), nil, dest, "test", "/ping", nil, tchannel.JSON,
 		&Options{Timeout: time.Millisecond})
 
 	s.EqualError(err, "request timed out")
@@ -156,7 +159,7 @@ func (s *ForwarderTestSuite) TestRequestRerouted() {
 
 	s.sender.lookup = "127.0.0.1:3002"
 
-	res, err := s.forwarder.ForwardRequest(ping.Bytes(), "127.0.0.1:3003", "test", "/ping", []string{"some key"},
+	res, err := s.forwarder.ForwardRequest(ping.Bytes(), nil, "127.0.0.1:3003", "test", "/ping", []string{"some key"},
 		tchannel.JSON, &Options{
 			MaxRetries:     1,
 			RerouteRetries: true,
@@ -174,7 +177,7 @@ func (s *ForwarderTestSuite) TestRequestNoReroutes() {
 
 	s.sender.lookup = "127.0.0.1:3002"
 
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), "127.0.0.1:3003", "test", "/ping", []string{"some key"},
+	_, err := s.forwarder.ForwardRequest(ping.Bytes(), nil, "127.0.0.1:3003", "test", "/ping", []string{"some key"},
 		tchannel.JSON, &Options{
 			MaxRetries:    1,
 			RetrySchedule: []time.Duration{time.Millisecond},

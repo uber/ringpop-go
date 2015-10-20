@@ -110,10 +110,10 @@ func NewForwarder(s Sender, ch tchannel.Registrar, logger log.Logger) *Forwarder
 // ForwardRequest forwards a request to the given service and endpoint returns the response.
 // Keys are used by the sender to lookup the destination on retry. If you have multiple keys
 // and their destinations diverge on a retry then the call is aborted.
-func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoint string,
+func (f *Forwarder) ForwardRequest(request, headers []byte, destination, service, endpoint string,
 	keys []string, format tchannel.Format, opts *Options) ([]byte, error) {
 
 	opts = f.mergeDefaultOptions(opts)
-	rs := newRequestSender(f.sender, f.channel, request, keys, destination, service, endpoint, format, opts)
+	rs := newRequestSender(f.sender, f.channel, request, headers, keys, destination, service, endpoint, format, opts)
 	return rs.Send()
 }
