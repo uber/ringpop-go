@@ -127,7 +127,12 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error 
 			return
 		}
 
-		_, arg3, _, err := raw.WriteArgs(call, []byte{0, 0}, s.request)
+		var arg3 []byte
+		if s.format == tchannel.Thrift {
+			_, arg3, _, err = raw.WriteArgs(call, []byte{0, 0}, s.request)
+		} else {
+			_, arg3, _, err = raw.WriteArgs(call, nil, s.request)
+		}
 		if err != nil {
 			errC <- err
 			return
