@@ -398,10 +398,17 @@ func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte,
 		return true, nil
 	}
 
-	res, err := rp.forwarder.ForwardRequest(request, dest, service, endpoint, []string{key}, format, opts)
+	res, err := rp.Forward(dest, []string{key}, request, service, endpoint, format, opts)
 	*response = res
 
 	return false, err
+}
+
+// Forward forwards the request to given destination host and returns the response.
+func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, endpoint string,
+	format tchannel.Format, opts *forward.Options) ([]byte, error) {
+
+	return rp.forwarder.ForwardRequest(request, dest, service, endpoint, keys, format, opts)
 }
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes
