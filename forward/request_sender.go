@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/context"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/raw"
 )
@@ -77,7 +78,7 @@ func newRequestSender(sender Sender, channel tchannel.Registrar, request []byte,
 }
 
 func (s *requestSender) Send() (res []byte, err error) {
-	ctx, cancel := tchannel.NewContext(s.timeout)
+	ctx, cancel := shared.NewTChannelContext(s.timeout)
 	defer cancel()
 
 	select {

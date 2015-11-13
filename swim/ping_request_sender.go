@@ -26,6 +26,7 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -64,7 +65,7 @@ func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
 		"target": p.target,
 	}).Debug("ping request send")
 
-	ctx, cancel := json.NewContext(p.timeout)
+	ctx, cancel := shared.NewTChannelContext(p.timeout)
 	defer cancel()
 
 	var res pingResponse

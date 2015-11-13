@@ -26,6 +26,7 @@ import (
 
 	log "github.com/uber-common/bark"
 
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -56,7 +57,8 @@ func newPingSender(node *Node, target string, timeout time.Duration) *pingSender
 }
 
 func (p *pingSender) SendPing() (*ping, error) {
-	ctx, cancel := json.NewContext(p.timeout)
+	ctx, cancel := shared.NewTChannelContext(p.timeout)
+
 	defer cancel()
 
 	var res ping
