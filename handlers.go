@@ -35,6 +35,7 @@ func (rp *Ringpop) registerHandlers() error {
 		"/health":       rp.health,
 		"/admin/stats":  rp.adminStatsHandler,
 		"/admin/lookup": rp.adminLookupHandler,
+		"/tapring":      rp.tapRingHandler,
 	}
 
 	return json.Register(rp.channel, handlers, func(ctx context.Context, err error) {
@@ -48,6 +49,10 @@ func (rp *Ringpop) health(ctx json.Context, req *Arg) (*Arg, error) {
 
 func (rp *Ringpop) adminStatsHandler(ctx json.Context, req *Arg) (map[string]interface{}, error) {
 	return handleStats(rp), nil
+}
+
+func (rp *Ringpop) tapRingHandler(ctx json.Context, req *tapRequest) (*tapResponse, error) {
+	return handleTapRing(rp, req), nil
 }
 
 type lookupRequest struct {

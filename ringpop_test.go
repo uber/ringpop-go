@@ -139,6 +139,34 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(11, listener.EventCount(), "expected 11 total events to be recorded")
 }
 
+func (s *RingpopTestSuite) TestTapRing() {
+	// create a brand new ring
+	listenCh, err := tchannel.NewChannel("test-1", nil)
+	s.Require().NoError(err, "channel must create successfully")
+
+	listenRing := NewRingpop("test-1", "127.0.0.1:3002", listenCh, &Options{})
+
+	stats := newDummyStats()
+	listenStats := newDummyStats()
+	s.ringpop.statter = stats
+	listenRing.statter = listenStats
+
+	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
+		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
+	})
+
+	s.Len(s.ringpop.ring.GetServers(), 10)
+
+	// Now handle update on the new ring
+	res := handleTapRing(s.ringpop, &tapRequest{
+		Checksum: listenRing.ring.Checksum(),
+	})
+
+	listenRing.ring.updateServers(res.Servers, res.Checksum)
+	// Now check for the new ring and it must be updated as well
+	s.Len(listenRing.ring.GetServers(), 10)
+}
+
 func TestRingpopTestSuite(t *testing.T) {
 	suite.Run(t, new(RingpopTestSuite))
 }
