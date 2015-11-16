@@ -3,9 +3,9 @@ package shared
 import (
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/uber/tchannel-go"
+
+	"golang.org/x/net/context"
 )
 
 var retryOptions = &tchannel.RetryOptions{
