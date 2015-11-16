@@ -28,6 +28,7 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go/json"
 )
@@ -300,7 +301,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	for _, node := range group {
 		wg.Add(1)
 		go func(n string) {
-			ctx, cancel := json.NewContext(j.timeout)
+			ctx, cancel := shared.NewTChannelContext(j.timeout)
 			defer cancel()
 
 			var res joinResponse
