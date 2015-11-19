@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
+	"github.com/uber/tchannel-go/thrift"
 	"golang.org/x/net/context"
 )
 
@@ -189,4 +190,48 @@ func (s *ForwarderTestSuite) TestRequestNoReroutes() {
 
 func TestForwarderTestSuite(t *testing.T) {
 	suite.Run(t, new(ForwarderTestSuite))
+}
+
+func TestSetForwardedHeader(t *testing.T) {
+	ctx, _ := thrift.NewContext(0 * time.Second)
+	ctx = SetForwardedHeader(ctx)
+	if ctx.Headers()["ringpop-forwarded"] != "true" {
+		t.Errorf("ringpop forwarding header is not set")
+	}
+
+	ctx, _ = thrift.NewContext(0 * time.Second)
+	ctx = thrift.WithHeaders(ctx, map[string]string{
+		"keep": "this key",
+	})
+	ctx = SetForwardedHeader(ctx)
+
+	if ctx.Headers()["ringpop-forwarded"] != "true" {
+		t.Errorf("ringpop forwarding header is not set if there were headers set already")
+	}
+	if ctx.Headers()["keep"] != "this key" {
+		t.Errorf("ringpop forwarding header removed a header that was already present")
+	}
+}
+
+func TestHasForwardedHeader(t *testing.T) {
+	ctx, _ := thrift.NewContext(0 * time.Second)
+	if HasForwardedHeader(ctx) {
+		t.Errorf("ringpop claimed that the forwarded header was set before it was set")
+	}
+	ctx = SetForwardedHeader(ctx)
+	if !HasForwardedHeader(ctx) {
+		t.Errorf("ringpop was not able to identify that the forwarded header was set")
+	}
+
+	ctx, _ = thrift.NewContext(0 * time.Second)
+	ctx = thrift.WithHeaders(ctx, map[string]string{
+		"keep": "this key",
+	})
+	if HasForwardedHeader(ctx) {
+		t.Errorf("ringpop claimed that the forwarded header was set before it was set in the case of alread present headers")
+	}
+	ctx = SetForwardedHeader(ctx)
+	if !HasForwardedHeader(ctx) {
+		t.Errorf("ringpop was not able to identify that the forwarded header was set in the case of alread present headers")
+	}
 }

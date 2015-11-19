@@ -153,6 +153,32 @@ func (_m *Ringpop) LookupN(key string, n int) ([]string, error) {
 
 	return r0, r1
 }
+func (_m *Ringpop) GetReachableMembers() []string {
+	ret := _m.Called()
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func() []string); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	return r0
+}
+func (_m *Ringpop) CountReachableMembers() int {
+	ret := _m.Called()
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
 func (_m *Ringpop) HandleOrForward(key string, request []byte, response *[]byte, service string, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error) {
 	ret := _m.Called(key, request, response, service, endpoint, format, opts)
 

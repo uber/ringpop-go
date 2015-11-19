@@ -330,11 +330,25 @@ func (m *memberlist) GetReachableMembers() []string {
 
 	m.members.RLock()
 	for _, member := range m.members.list {
-		if member.Status == Alive || member.Status == Suspect {
+		if member.isReachable() {
 			active = append(active, member.Address)
 		}
 	}
 	m.members.RUnlock()
 
 	return active
+}
+
+func (m *memberlist) CountReachableMembers() int {
+	count := 0
+
+	m.members.RLock()
+	for _, member := range m.members.list {
+		if member.isReachable() {
+			count++
+		}
+	}
+	m.members.RUnlock()
+
+	return count
 }

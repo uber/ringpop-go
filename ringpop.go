@@ -44,7 +44,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
@@ -67,6 +67,8 @@ type Interface interface {
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
+	GetReachableMembers() ([]string, error)
+	CountReachableMembers() (int, error)
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
@@ -466,11 +468,22 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 	}
 }
 
+// GetReachableMembers returns the list of members the ring believes to be
+// available for requests.
 func (rp *Ringpop) GetReachableMembers() ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
 	return rp.node.GetReachableMembers(), nil
+}
+
+// CountReachableMembers returns the number of members the ring believes to be
+// available for requests
+func (rp *Ringpop) CountReachableMembers() (int, error) {
+	if !rp.Ready() {
+		return 0, ErrNotBootstrapped
+	}
+	return rp.node.CountReachableMembers(), nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -539,12 +552,12 @@ func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, 
 // of that struct using the thrift binary protocol. This is a temporary
 // measure before frames can forwarded directly past the endpoint to the proper
 // destinaiton.
-func SerializeThrift(s thrift.TStruct) ([]byte, error) {
+func SerializeThrift(s athrift.TStruct) ([]byte, error) {
 	var b []byte
 	var buffer = bytes.NewBuffer(b)
 
-	transport := thrift.NewStreamTransportW(buffer)
-	if err := s.Write(thrift.NewTBinaryProtocolTransport(transport)); err != nil {
+	transport := athrift.NewStreamTransportW(buffer)
+	if err := s.Write(athrift.NewTBinaryProtocolTransport(transport)); err != nil {
 		return nil, err
 	}
 
@@ -558,8 +571,8 @@ func SerializeThrift(s thrift.TStruct) ([]byte, error) {
 // given thrift struct using the thrift binary protocol. This is a temporary
 // measure before frames can forwarded directly past the endpoint to the proper
 // destinaiton.
-func DeserializeThrift(b []byte, s thrift.TStruct) error {
+func DeserializeThrift(b []byte, s athrift.TStruct) error {
 	reader := bytes.NewReader(b)
-	transport := thrift.NewStreamTransportR(reader)
-	return s.Read(thrift.NewTBinaryProtocolTransport(transport))
+	transport := athrift.NewStreamTransportR(reader)
+	return s.Read(athrift.NewTBinaryProtocolTransport(transport))
 }

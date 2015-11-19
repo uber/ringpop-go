@@ -12,6 +12,7 @@ mocks:
 	test/gen-mocks
 
 test:
+	go generate ./...
 	go test -v ./...
 
 testpop:	clean
