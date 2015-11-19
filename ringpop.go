@@ -362,6 +362,17 @@ func (rp *Ringpop) ringEvent(event interface{}) {
 	}
 }
 
+func (rp *Ringpop) GetMembers() []string {
+	members := rp.node.MemberStats().Members
+	var addresses []string
+	for _, member := range members {
+		if member.Status == swim.Alive || member.Status == swim.Suspect {
+			addresses = append(addresses, member.Address)
+		}
+	}
+	return addresses
+}
+
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //	Stats
