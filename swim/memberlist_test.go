@@ -21,6 +21,7 @@
 package swim
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -214,6 +215,25 @@ func (s *MemberlistTestSuite) TestRandomPingable() {
 
 	members = s.m.RandomPingableMembers(1, excluding)
 	s.Len(members, 1, "expected only one member")
+}
+
+func (s *MemberlistTestSuite) TestGetActiveMemberAddresses() {
+	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
+	defer nodeA.Destroy()
+
+	nodeA.memberlist.MakeAlive("127.0.0.1:3001", s.incarnation)
+	nodeA.memberlist.MakeAlive("127.0.0.1:3002", s.incarnation)
+	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
+	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
+
+	activeMembers := nodeA.memberlist.GetActiveMemberAddresses()
+	sort.Strings(activeMembers)
+
+	s.Equal([]string{
+		"127.0.0.1:3001",
+		"127.0.0.1:3002",
+		"127.0.0.1:3003",
+	}, activeMembers, "Expected a list of 3 specific nodes")
 }
 
 func TestMemberlistTestSuite(t *testing.T) {

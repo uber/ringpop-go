@@ -512,12 +512,5 @@ func (n *Node) pingNextMember() {
 }
 
 func (n *Node) GetMembers() []string {
-	var addresses []string
-	for i := 0; i < n.memberlist.NumMembers(); i++ {
-		member := n.memberlist.MemberAt(i)
-		if member.Status == Alive || member.Status == Suspect {
-			addresses = append(addresses, member.Address)
-		}
-	}
-	return addresses
+	return n.memberlist.GetActiveMemberAddresses()
 }

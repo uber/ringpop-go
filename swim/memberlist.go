@@ -324,3 +324,17 @@ func (m *memberlist) String() string {
 func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
 }
+
+func (m *memberlist) GetActiveMemberAddresses() []string {
+	var active []string
+
+	m.members.RLock()
+	for _, member := range m.members.list {
+		if member.Status == Alive || member.Status == Suspect {
+			active = append(active, member.Address)
+		}
+	}
+	m.members.RUnlock()
+
+	return active
+}
