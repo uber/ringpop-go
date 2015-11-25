@@ -510,3 +510,14 @@ func (n *Node) pingNextMember() {
 		"numErrors": len(errs),
 	}).Warn("ping request inconclusive due to errors")
 }
+
+func (n *Node) GetMembers() []string {
+	var addresses []string
+	for i := 0; i < n.memberlist.NumMembers(); i++ {
+		member := n.memberlist.MemberAt(i)
+		if member.Status == Alive || member.Status == Suspect {
+			addresses = append(addresses, member.Address)
+		}
+	}
+	return addresses
+}
