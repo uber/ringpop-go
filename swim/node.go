@@ -511,6 +511,6 @@ func (n *Node) pingNextMember() {
 	}).Warn("ping request inconclusive due to errors")
 }
 
-func (n *Node) GetMembers() []string {
-	return n.memberlist.GetActiveMemberAddresses()
+func (n *Node) GetReachableMembers() []string {
+	return n.memberlist.GetReachableMembers()
 }

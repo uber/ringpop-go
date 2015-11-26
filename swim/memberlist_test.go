@@ -217,7 +217,7 @@ func (s *MemberlistTestSuite) TestRandomPingable() {
 	s.Len(members, 1, "expected only one member")
 }
 
-func (s *MemberlistTestSuite) TestGetActiveMemberAddresses() {
+func (s *MemberlistTestSuite) TestGetReachableMembers() {
 	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
 	defer nodeA.Destroy()
 
@@ -226,7 +226,7 @@ func (s *MemberlistTestSuite) TestGetActiveMemberAddresses() {
 	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
 	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
 
-	activeMembers := nodeA.memberlist.GetActiveMemberAddresses()
+	activeMembers := nodeA.memberlist.GetReachableMembers()
 	sort.Strings(activeMembers)
 
 	s.Equal([]string{

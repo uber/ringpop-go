@@ -362,8 +362,8 @@ func (rp *Ringpop) ringEvent(event interface{}) {
 	}
 }
 
-func (rp *Ringpop) GetMembers() []string {
-	return rp.node.GetMembers()
+func (rp *Ringpop) GetReachableMembers() []string {
+	return rp.node.GetReachableMembers()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

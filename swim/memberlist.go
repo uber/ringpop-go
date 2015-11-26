@@ -325,7 +325,7 @@ func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
 }
 
-func (m *memberlist) GetActiveMemberAddresses() []string {
+func (m *memberlist) GetReachableMembers() []string {
 	var active []string
 
 	m.members.RLock()
