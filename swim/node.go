@@ -510,3 +510,7 @@ func (n *Node) pingNextMember() {
 		"numErrors": len(errs),
 	}).Warn("ping request inconclusive due to errors")
 }
+
+func (n *Node) GetReachableMembers() []string {
+	return n.memberlist.GetReachableMembers()
+}
