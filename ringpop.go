@@ -230,6 +230,12 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	return joined, nil
 }
 
+// Ready returns whether or not ringpop is bootstrapped and should receive
+// requests
+func (rp *Ringpop) Ready() bool {
+	return rp.node.Ready()
+}
+
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //	SWIM Events

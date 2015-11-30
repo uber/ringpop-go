@@ -139,6 +139,22 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(11, listener.EventCount(), "expected 11 total events to be recorded")
 }
 
+func (s *RingpopTestSuite) TestRingpopReady() {
+	s.False(s.ringpop.Ready())
+	// Create single node cluster.
+	s.ringpop.Bootstrap(&BootstrapOptions{
+		swim.BootstrapOptions{
+			Hosts: []string{"127.0.0.1:3001"},
+		},
+	})
+	s.True(s.ringpop.Ready())
+}
+
+func (s *RingpopTestSuite) TestRingpopNotReady() {
+	// Ringpop should not be ready until bootstrapped
+	s.False(s.ringpop.Ready())
+}
+
 func TestRingpopTestSuite(t *testing.T) {
 	suite.Run(t, new(RingpopTestSuite))
 }
