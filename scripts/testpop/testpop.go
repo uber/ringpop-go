@@ -54,9 +54,11 @@ func main() {
 	if *verbose {
 		logger.Level = log.DebugLevel
 	}
-	rp := ringpop.NewRingpop("ringpop", *hostport, ch, &ringpop.Options{
-		Logger: bark.NewLoggerFromLogrus(logger),
-	})
+	rp, _ := ringpop.New("ringpop",
+		ringpop.Channel(ch),
+		ringpop.Identity(*hostport),
+		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
+	)
 
 	if err := ch.ListenAndServe(rp.WhoAmI()); err != nil {
 		log.Fatalf("could not listen on %s: %v", rp.WhoAmI(), err)

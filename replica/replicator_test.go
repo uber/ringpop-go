@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
@@ -113,7 +114,7 @@ func (s *ReplicatorTestSuite) ResetLookupN() {
 	s.sender.lookupN = lookupN
 }
 
-func (s *ReplicatorTestSuite) RegisterHandler(ch tchannel.Registrar, address string) {
+func (s *ReplicatorTestSuite) RegisterHandler(ch shared.SubChannel, address string) {
 	handler := map[string]interface{}{
 		"/ping": func(ctx json.Context, ping *Ping) (*Pong, error) {
 			s.Equal(ping.From, "127.0.0.1:3001")

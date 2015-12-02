@@ -45,11 +45,18 @@ type worker struct {
 func newWorker(address string, channel *tchannel.Channel) *worker {
 	logger := bark.NewLoggerFromLogrus(logrus.StandardLogger())
 
+	rp, err := ringpop.New("pingpong",
+		ringpop.Channel(channel),
+		ringpop.Identity(address),
+		ringpop.Logger(logger),
+	)
+	if err != nil {
+		log.Fatalf("Unable to create Ringpop: %v", err)
+	}
+
 	return &worker{
 		address: address,
-		ringpop: ringpop.NewRingpop("pingpong", address, channel, &ringpop.Options{
-			Logger: logger,
-		}),
+		ringpop: rp,
 	}
 }
 

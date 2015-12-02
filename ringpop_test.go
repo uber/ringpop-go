@@ -39,20 +39,12 @@ func (s *RingpopTestSuite) SetupTest() {
 	ch, err := tchannel.NewChannel("test", nil)
 	s.Require().NoError(err, "channel must create successfully")
 	s.channel = ch
-	s.ringpop = NewRingpop("test", "127.0.0.1:3001", ch, nil)
+	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
+	s.Require().NoError(err, "Ringpop must create successfully")
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
 	s.ringpop.Destroy()
-}
-
-func (s *RingpopTestSuite) TestMergeDefault() {
-	s.ringpop = NewRingpop("test", "127.0.0.1:3001", s.channel, &Options{})
-
-	def := defaultOptions()
-
-	s.EqualValues(s.ringpop.logger, def.Logger, "expected default logger to be used")
-	s.EqualValues(s.ringpop.statter, def.Statter, "expected default stats to be used")
 }
 
 func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
