@@ -111,11 +111,10 @@ type Ringpop struct {
 type state uint
 
 const (
-	Created state = iota
-	Initialized
-	Bootstrapping
-	Ready
-	Destroyed
+	created state = iota
+	initialized
+	ready
+	destroyed
 )
 
 // New returns a new Ringpop instance!
@@ -144,7 +143,7 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 		return nil, fmt.Errorf("%v", errs)
 	}
 
-	ringpop.setState(Created)
+	ringpop.setState(created)
 
 	return ringpop, nil
 }
@@ -177,7 +176,7 @@ func (rp *Ringpop) init() error {
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
 
-	rp.setState(Initialized)
+	rp.setState(initialized)
 
 	return nil
 }
@@ -205,17 +204,16 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 // Destroy Ringpop
 func (rp *Ringpop) Destroy() {
 
-	// Only destroy the node if it has been created
-	if rp.getState() > Created {
+	if rp.node != nil {
 		rp.node.Destroy()
 	}
 
-	rp.setState(Destroyed)
+	rp.setState(destroyed)
 }
 
-// Destroyed returns
-func (rp *Ringpop) Destroyed() bool {
-	return rp.getState() == Destroyed
+// destroyed returns
+func (rp *Ringpop) destroyed() bool {
+	return rp.getState() == destroyed
 }
 
 // App returns the app the ringpop belongs to
@@ -229,8 +227,7 @@ func (rp *Ringpop) WhoAmI() (string, error) {
 	if !rp.Ready() {
 		return "", ErrNotBootstrapped
 	}
-	address, _ := rp.identity()
-	return address, nil
+	return rp.identity()
 }
 
 // Uptime returns the amount of time that the ringpop has been running for
@@ -277,20 +274,21 @@ func (rp *Ringpop) setState(s state) {
 // Bootstrap starts the Ringpop
 func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 
-	if rp.getState() < Initialized {
-		rp.init()
+	if rp.getState() < initialized {
+		err := rp.init()
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	rp.setState(Bootstrapping)
 
 	joined, err := rp.node.Bootstrap(opts)
 	if err != nil {
 		rp.log.WithField("error", err).Info("bootstrap failed")
-		rp.setState(Initialized)
+		rp.setState(initialized)
 		return nil, err
 	}
 
-	rp.setState(Ready)
+	rp.setState(ready)
 
 	rp.log.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
@@ -299,7 +297,7 @@ func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 // Ready returns whether or not ringpop is bootstrapped and should receive
 // requests
 func (rp *Ringpop) Ready() bool {
-	if rp.state != Ready {
+	if rp.getState() != ready {
 		return false
 	}
 	return rp.node.Ready()

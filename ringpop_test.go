@@ -40,12 +40,11 @@ type RingpopTestSuite struct {
 func (s *RingpopTestSuite) SetupTest() {
 
 	ch, err := tchannel.NewChannel("test", nil)
-	s.Require().NoError(err, "channel must create successfully")
+	s.NoError(err, "channel must create successfully")
 	s.channel = ch
 
 	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
-	s.ringpop.init()
-	s.Require().NoError(err, "Ringpop must create successfully")
+	s.NoError(err, "Ringpop must create successfully")
 
 	s.mockRingpop = &mocks.Ringpop{}
 }
@@ -62,6 +61,9 @@ func (s *RingpopTestSuite) TestCanAssignRingpopToRingpopInterface() {
 }
 
 func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
+	// Fake bootstrap
+	s.ringpop.init()
+
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
 	})
@@ -94,6 +96,9 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 }
 
 func (s *RingpopTestSuite) TestHandleEvents() {
+	// Fake bootstrap
+	s.ringpop.init()
+
 	stats := newDummyStats()
 	s.ringpop.statter = stats
 
@@ -162,12 +167,91 @@ func (s *RingpopTestSuite) TestRingpopNotReady() {
 // TestStateCreated tests that Ringpop is in a created state just after
 // instantiating.
 func (s *RingpopTestSuite) TestStateCreated() {
+	s.Equal(created, s.ringpop.getState())
+}
 
-	rp, err := New("test", Channel(s.channel))
-	s.Require().NoError(err)
-	s.Require().NotNil(rp)
+// TestStateInitialized tests that Ringpop is in an initialized state after
+// a failed bootstrap attempt.
+func (s *RingpopTestSuite) TestStateInitialized() {
 
-	s.Equal(Created, rp.getState())
+	// Create channel and start listening so we can actually attempt to
+	// bootstrap
+	ch, _ := tchannel.NewChannel("test2", nil)
+	ch.ListenAndServe("127.0.0.1:0")
+
+	rp, err := New("test2", Channel(ch))
+	s.NoError(err)
+	s.NotNil(rp)
+
+	// Bootstrap that will fail
+	_, err = rp.Bootstrap(&BootstrapOptions{
+		swim.BootstrapOptions{
+			Hosts: []string{
+				"127.0.0.1:9000",
+				"127.0.0.1:9001",
+			},
+			// A MaxJoinDuration of 1 millisecond should fail immediately
+			// without prolonging the test suite.
+			MaxJoinDuration: time.Millisecond,
+		},
+	})
+	s.Error(err)
+
+	s.Equal(initialized, rp.getState())
+}
+
+// TestStateReady tests that Ringpop is ready after successful bootstrapping.
+func (s *RingpopTestSuite) TestStateReady() {
+
+	// Create channel and start listening so we can actually attempt to
+	// bootstrap
+	ch, _ := tchannel.NewChannel("test2", nil)
+	ch.ListenAndServe("127.0.0.1:0")
+
+	rp, err := New("test2", Channel(ch))
+	s.NoError(err)
+	s.NotNil(rp)
+
+	// Create single node cluster.
+	_, err = rp.Bootstrap(&BootstrapOptions{
+		swim.BootstrapOptions{
+			Hosts: []string{"127.0.0.1:3001"},
+		},
+	})
+	s.NoError(err)
+
+	s.Equal(ready, rp.state)
+}
+
+// TestStateDestroyed tests that Ringpop is in a destroyed state after calling
+// Destroy().
+func (s *RingpopTestSuite) TestStateDestroyed() {
+
+	// Create single node cluster.
+	_, err := s.ringpop.Bootstrap(&BootstrapOptions{
+		swim.BootstrapOptions{
+			Hosts: []string{"127.0.0.1:3001"},
+		},
+	})
+	s.NoError(err)
+
+	// Destroy
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+}
+
+// TestDestroyIsIndempotent tests that Destroy() can be called multiple times.
+func (s *RingpopTestSuite) TestDestroyIsIndempotent() {
+	// Ringpop starts in the created state
+	s.Equal(created, s.ringpop.state)
+
+	// Should be destroyed straight away
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+
+	// Can destroy again
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
 }
 
 func TestRingpopTestSuite(t *testing.T) {
