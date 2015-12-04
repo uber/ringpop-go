@@ -35,8 +35,6 @@ type Configuration struct {
 	// that App is taken as an argument of the Ringpop constructor and not a
 	// configuration option. This is to prevent accidental misconfiguration.
 	App string
-
-	ReplicaPoints int
 }
 
 // "Options" are modifier functions that configure/modify a real Ringpop
