@@ -62,9 +62,8 @@ func (rp *Ringpop) adminLookupHandler(ctx json.Context, req *lookupRequest) (*lo
 	dest, err := rp.Lookup(req.Key)
 	if err != nil {
 		return nil, err
-	} else {
-		return &lookupResponse{Dest: dest}, nil
 	}
+	return &lookupResponse{Dest: dest}, nil
 }
 
 func (rp *Ringpop) adminReloadHandler(ctx json.Context, req *Arg) (*Arg, error) {
