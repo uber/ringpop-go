@@ -31,6 +31,10 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
+type HashRingConfiguration struct {
+	ReplicaPoints int
+}
+
 type hashRing struct {
 	ringpop       *Ringpop
 	hashfunc      func([]byte) uint32

@@ -39,78 +39,38 @@ package ringpop
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 )
 
-// Options to create a Ringpop with
-type Options struct {
-	Logger        log.Logger
-	Statter       log.StatsReporter
-	ReplicaPoints int
-}
-
-func defaultOptions() *Options {
-	logger := log.NewLoggerFromLogrus(&logrus.Logger{
-		Out: ioutil.Discard,
-	})
-
-	opts := &Options{
-		Logger:        logger,
-		Statter:       new(noopStatsReporter),
-		ReplicaPoints: 100,
-	}
-
-	return opts
-}
-
-func mergeDefault(opts *Options) *Options {
-	def := defaultOptions()
-
-	if opts == nil {
-		return def
-	}
-
-	if opts.Logger == nil {
-		opts.Logger = def.Logger
-	}
-
-	if opts.Statter == nil {
-		opts.Statter = def.Statter
-	}
-
-	if opts.ReplicaPoints <= 0 {
-		opts.ReplicaPoints = def.ReplicaPoints
-	}
-
-	return opts
-}
-
 // Ringpop is a consistent hash-ring that uses a gossip prtocol to disseminate changes around the
 // ring
 type Ringpop struct {
-	app     string
-	address string
+	config         *Configuration
+	configHashRing *HashRingConfiguration
+
+	identityResolver IdentityResolver
 
 	state struct {
 		read, destroyed bool
 		sync.RWMutex
 	}
 
-	channel   tchannel.Registrar
-	node      *swim.Node
-	ring      *hashRing
-	forwarder *forward.Forwarder
+	channel    shared.TChannel
+	subChannel shared.SubChannel
+	node       *swim.Node
+	ring       *hashRing
+	forwarder  *forward.Forwarder
 
 	listeners []EventListener
 
@@ -129,37 +89,82 @@ type Ringpop struct {
 	startTime time.Time
 }
 
-// NewRingpop returns a new Ringpop instance
-func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *Ringpop {
-	opts = mergeDefault(opts)
+// New returns a new Ringpop instance!
+func New(app string, opts ...Option) (*Ringpop, error) {
+
+	var err error
 
 	ringpop := &Ringpop{
-		app:     app,
-		address: address,
-		logger:  opts.Logger,
-		log:     opts.Logger.WithField("local", address),
-		statter: opts.Statter,
+		config: &Configuration{
+			App: app,
+		},
 	}
 
-	if channel != nil {
-		ringpop.channel = channel.GetSubChannel("ringpop", tchannel.Isolated)
-		ringpop.registerHandlers()
+	err = applyOptions(ringpop, defaultOptions)
+	if err != nil {
+		panic(fmt.Errorf("Error applying default Ringpop options: %v", err))
 	}
 
-	ringpop.node = swim.NewNode(app, address, ringpop.channel, &swim.Options{
-		Logger: ringpop.logger,
+	err = applyOptions(ringpop, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	errs := checkOptions(ringpop)
+	if len(errs) != 0 {
+		return nil, fmt.Errorf("%v", errs)
+	}
+
+	err = ringpop.init()
+	if err != nil {
+		return nil, err
+	}
+
+	return ringpop, nil
+}
+
+// init configures a Ringpop instance and makes it ready to do comms.
+func (rp *Ringpop) init() error {
+
+	if rp.channel == nil {
+		return errors.New("Missing channel")
+	}
+
+	address, err := rp.identity()
+	if err != nil {
+		return err
+	}
+
+	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
+	rp.registerHandlers()
+
+	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
+		Logger: rp.logger,
 	})
-	ringpop.node.RegisterListener(ringpop)
+	rp.node.RegisterListener(rp)
 
-	ringpop.ring = newHashRing(ringpop, farm.Fingerprint32, opts.ReplicaPoints)
+	rp.ring = newHashRing(rp, farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 
-	ringpop.stats.hostport = genStatsHostport(ringpop.address)
-	ringpop.stats.prefix = fmt.Sprintf("ringpop.%s", ringpop.stats.hostport)
-	ringpop.stats.keys = make(map[string]string)
+	rp.stats.hostport = genStatsHostport(address)
+	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
+	rp.stats.keys = make(map[string]string)
 
-	ringpop.forwarder = forward.NewForwarder(ringpop, ringpop.channel, ringpop.logger)
+	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
 
-	return ringpop
+	return nil
+}
+
+// identity returns a host:port string of the address that Ringpop should
+// use as its identifier.
+func (rp *Ringpop) identity() (string, error) {
+	return rp.identityResolver()
+}
+
+// r.channelIdentityResolver resolves the hostport identity from the current
+// TChannel object on the Ringpop instance.
+func (rp *Ringpop) channelIdentityResolver() (string, error) {
+	hostport := rp.channel.PeerInfo().HostPort
+	return hostport, nil
 }
 
 // Destroy Ringpop
@@ -182,12 +187,13 @@ func (rp *Ringpop) Destroyed() bool {
 
 // App returns the app the ringpop belongs to
 func (rp *Ringpop) App() string {
-	return rp.app
+	return rp.config.App
 }
 
 // WhoAmI returns the local address of the Ringpop node
 func (rp *Ringpop) WhoAmI() string {
-	return rp.address
+	address, _ := rp.identity()
+	return address
 }
 
 // Uptime returns the amount of time that the ringpop has been running for

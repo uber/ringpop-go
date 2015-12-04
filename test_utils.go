@@ -26,11 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel-go"
 )
 
 // fake stats
@@ -74,14 +72,10 @@ func (d *dummyListener) HandleEvent(event interface{}) {
 }
 
 func testPop(t *testing.T, hostport string) (*Ringpop, func()) {
-	ch, err := tchannel.NewChannel("test-app", nil)
-	require.NoError(t, err, "cannot have error when creating channel")
-
-	ringpop := NewRingpop("test-app", hostport, ch, nil)
+	ringpop, _ := New("test-app")
 
 	destroy := func() {
 		ringpop.Destroy()
-		ch.Close()
 	}
 
 	return ringpop, destroy

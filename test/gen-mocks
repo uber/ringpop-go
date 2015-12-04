@@ -1,0 +1,9 @@
+#!/bin/sh -x
+#
+# Generate mocks for ringpop and subpackages.
+#
+mock_directory="${0%/*}/mocks"
+
+# Generate mocks for bark
+mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
+mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name StatsReporter

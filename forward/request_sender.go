@@ -36,7 +36,7 @@ import (
 // lookup method
 type requestSender struct {
 	sender  Sender
-	channel tchannel.Registrar
+	channel shared.SubChannel
 
 	request           []byte
 	destination       string
@@ -57,7 +57,7 @@ type requestSender struct {
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
-func newRequestSender(sender Sender, channel tchannel.Registrar, request []byte, keys []string,
+func newRequestSender(sender Sender, channel shared.SubChannel, request []byte, keys []string,
 	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
 	return &requestSender{

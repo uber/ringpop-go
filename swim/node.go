@@ -29,8 +29,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel-go"
 )
 
 // Options to create a SWIM with
@@ -122,7 +122,7 @@ type Node struct {
 	bootstrapFile  string
 	bootstrapHosts map[string][]string
 
-	channel      tchannel.Registrar
+	channel      shared.SubChannel
 	memberlist   *memberlist
 	memberiter   memberIter
 	disseminator *disseminator
@@ -147,7 +147,7 @@ type Node struct {
 }
 
 // NewNode returns a new SWIM node
-func NewNode(app, address string, channel tchannel.Registrar, opts *Options) *Node {
+func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Node {
 	// use defaults for options that are unspecified
 	opts = mergeDefaultOptions(opts)
 

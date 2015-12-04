@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/tchannel-go"
 )
 
 type RingTestSuite struct {
@@ -34,7 +35,14 @@ type RingTestSuite struct {
 }
 
 func (s *RingTestSuite) SetupTest() {
-	s.ringpop = NewRingpop("test", "127.0.0.1:3001", nil, nil)
+	ch, err := tchannel.NewChannel("test", nil)
+	s.Require().NoError(err, "channel must create successfully")
+
+	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
+
+	s.NoError(err)
+	s.NotNil(s.ringpop)
+
 	s.ring = s.ringpop.ring
 }
 

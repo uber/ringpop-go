@@ -27,6 +27,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go"
 )
@@ -88,12 +89,12 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 // A Forwarder is used to forward requests to their destinations
 type Forwarder struct {
 	sender  Sender
-	channel tchannel.Registrar
+	channel shared.SubChannel
 	logger  log.Logger
 }
 
 // NewForwarder returns a new forwarder
-func NewForwarder(s Sender, ch tchannel.Registrar, logger log.Logger) *Forwarder {
+func NewForwarder(s Sender, ch shared.SubChannel, logger log.Logger) *Forwarder {
 	if logger == nil {
 		logger = log.NewLoggerFromLogrus(&logrus.Logger{
 			Out: ioutil.Discard,

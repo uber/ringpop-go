@@ -95,12 +95,19 @@ func main() {
 
 	logger := log.StandardLogger()
 
+	rp, err := ringpop.New("ping-app",
+		ringpop.Channel(ch),
+		ringpop.Identity(*hostport),
+		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
+	)
+	if err != nil {
+		log.Fatalf("Unable to create Ringpop: %v", err)
+	}
+
 	worker := &worker{
 		channel: ch,
-		ringpop: ringpop.NewRingpop("ping-app", *hostport, ch, &ringpop.Options{
-			Logger: bark.NewLoggerFromLogrus(logger),
-		}),
-		logger: logger,
+		ringpop: rp,
+		logger:  logger,
 	}
 
 	if err := worker.RegisterPong(); err != nil {
