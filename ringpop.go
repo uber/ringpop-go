@@ -111,9 +111,19 @@ type Ringpop struct {
 type state uint
 
 const (
+	// created means the Ringpop instance has been created but the swim node,
+	// stats and hasring haven't been set up. The listen address has not been
+	// resolved yet either.
 	created state = iota
+	// initialized means the listen address has been resolved and the swim
+	// node, stats and hashring have been instantiated onto the Ringpop
+	// instance.
 	initialized
+	// ready means Bootstrap has been called, the ring has successfully
+	// bootstrapped and is now ready to receive requests.
 	ready
+	// destroyed means the Ringpop instance has been shut down, is no longer
+	// ready for requests and cannot be revived.
 	destroyed
 )
 
