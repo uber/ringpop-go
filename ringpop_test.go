@@ -201,6 +201,7 @@ func (s *RingpopTestSuite) TestStateInitialized() {
 	// bootstrap
 	ch, _ := tchannel.NewChannel("test2", nil)
 	ch.ListenAndServe("127.0.0.1:0")
+	defer ch.Close()
 
 	rp, err := New("test2", Channel(ch))
 	s.NoError(err)
@@ -221,9 +222,6 @@ func (s *RingpopTestSuite) TestStateInitialized() {
 	s.Error(err)
 
 	s.Equal(initialized, rp.getState())
-
-	// Clean up
-	ch.Close()
 }
 
 // TestStateReady tests that Ringpop is ready after successful bootstrapping.
