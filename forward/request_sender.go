@@ -91,8 +91,10 @@ func (s *requestSender) Send() (res []byte, err error) {
 			return s.ScheduleRetry()
 		}
 
+		identity, _ := s.sender.WhoAmI()
+
 		s.logger.WithFields(log.Fields{
-			"local":       s.sender.WhoAmI(),
+			"local":       identity,
 			"destination": s.destination,
 			"service":     s.service,
 			"endpoint":    s.endpoint,
@@ -101,8 +103,11 @@ func (s *requestSender) Send() (res []byte, err error) {
 		return nil, errors.New("max retries exceeded")
 
 	case <-ctx.Done(): // request timed out
+
+		identity, _ := s.sender.WhoAmI()
+
 		s.logger.WithFields(log.Fields{
-			"local":       s.sender.WhoAmI(),
+			"local":       identity,
 			"destination": s.destination,
 			"service":     s.service,
 			"endpoint":    s.endpoint,
@@ -183,7 +188,11 @@ func (s *requestSender) RerouteRetry(destination string) ([]byte, error) {
 
 func (s *requestSender) LookupKeys(keys []string) (dests []string) {
 	for _, key := range keys {
-		dests = append(dests, s.sender.Lookup(key))
+		dest, err := s.sender.Lookup(key)
+		if err != nil {
+			continue
+		}
+		dests = append(dests, dest)
 	}
 
 	return dests
