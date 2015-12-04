@@ -50,6 +50,7 @@ func (s *RingpopTestSuite) SetupTest() {
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
+	s.channel.Close()
 	s.ringpop.Destroy()
 }
 
@@ -198,6 +199,9 @@ func (s *RingpopTestSuite) TestStateInitialized() {
 	s.Error(err)
 
 	s.Equal(initialized, rp.getState())
+
+	// Clean up
+	ch.Close()
 }
 
 // TestStateReady tests that Ringpop is ready after successful bootstrapping.
@@ -221,6 +225,9 @@ func (s *RingpopTestSuite) TestStateReady() {
 	s.NoError(err)
 
 	s.Equal(ready, rp.state)
+
+	// Clean up
+	ch.Close()
 }
 
 // TestStateDestroyed tests that Ringpop is in a destroyed state after calling
