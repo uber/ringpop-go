@@ -26,6 +26,7 @@ import (
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/swim"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel-go"
@@ -64,7 +65,7 @@ func main() {
 		log.Fatalf("could not listen on %s: %v", rp.WhoAmI(), err)
 	}
 
-	opts := &ringpop.BootstrapOptions{}
+	opts := &swim.BootstrapOptions{}
 	opts.File = *hostfile
 
 	_, err = rp.Bootstrap(opts)

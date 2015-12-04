@@ -27,6 +27,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
@@ -118,7 +119,7 @@ func main() {
 		log.Fatalf("could not listen on given hostport: %v", err)
 	}
 
-	opts := new(ringpop.BootstrapOptions)
+	opts := new(swim.BootstrapOptions)
 	opts.File = *hostfile
 
 	if _, err := worker.ringpop.Bootstrap(opts); err != nil {

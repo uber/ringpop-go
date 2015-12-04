@@ -28,6 +28,7 @@ import (
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
+	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 )
@@ -106,7 +107,7 @@ func main() {
 		log.Fatalf("could not listen on hostport: %v", err)
 	}
 
-	bsopts := new(ringpop.BootstrapOptions)
+	bsopts := new(swim.BootstrapOptions)
 	bsopts.File = *hostfile
 	bsopts.Stopped = true
 	if _, err := worker.ringpop.Bootstrap(bsopts); err != nil {
