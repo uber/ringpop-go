@@ -1,6 +1,6 @@
-.PHONY: clean testpop mocks out
+.PHONY: clean clean-mocks testpop mocks out test
 
-out:	testpop
+out:	test
 
 clean:
 	rm -f testpop
