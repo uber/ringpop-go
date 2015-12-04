@@ -21,7 +21,7 @@ Developing
 Run the tests by doing:
 
 ```
-make test
+make
 ```
 
 Documentation

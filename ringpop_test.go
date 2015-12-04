@@ -26,21 +26,27 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
 
 type RingpopTestSuite struct {
 	suite.Suite
-	ringpop *Ringpop
-	channel *tchannel.Channel
+	ringpop     *Ringpop
+	channel     *tchannel.Channel
+	mockRingpop *mocks.Ringpop
 }
 
 func (s *RingpopTestSuite) SetupTest() {
+
 	ch, err := tchannel.NewChannel("test", nil)
 	s.Require().NoError(err, "channel must create successfully")
 	s.channel = ch
+
 	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
 	s.Require().NoError(err, "Ringpop must create successfully")
+
+	s.mockRingpop = &mocks.Ringpop{}
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
@@ -134,10 +140,8 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 func (s *RingpopTestSuite) TestRingpopReady() {
 	s.False(s.ringpop.Ready())
 	// Create single node cluster.
-	s.ringpop.Bootstrap(&BootstrapOptions{
-		swim.BootstrapOptions{
-			Hosts: []string{"127.0.0.1:3001"},
-		},
+	s.ringpop.Bootstrap(&swim.BootstrapOptions{
+		Hosts: []string{"127.0.0.1:3001"},
 	})
 	s.True(s.ringpop.Ready())
 }

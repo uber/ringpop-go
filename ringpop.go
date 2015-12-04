@@ -47,11 +47,33 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 )
+
+// Interface specifies the public facing methods a user of ringpop is able to
+// use.
+type Interface interface {
+	Destroy()
+	Destroyed() bool
+	App() string
+	WhoAmI() (string, error)
+	Uptime() (time.Duration, error)
+	RegisterListener(l events.EventListener)
+	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
+	HandleEvent(event interface{})
+	Checksum() (uint32, error)
+	Lookup(key string) (string, error)
+	LookupN(key string, n int) ([]string, error)
+	GetReachableMembers() ([]string, error)
+	CountReachableMembers() (int, error)
+
+	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
+	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
+}
 
 // Ringpop is a consistent hash-ring that uses a gossip prtocol to disseminate changes around the
 // ring
@@ -72,7 +94,7 @@ type Ringpop struct {
 	ring       *hashRing
 	forwarder  *forward.Forwarder
 
-	listeners []EventListener
+	listeners []events.EventListener
 
 	statter log.StatsReporter
 	stats   struct {
@@ -209,7 +231,7 @@ func (rp *Ringpop) emit(event interface{}) {
 
 // RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
 // should be thread safe
-func (rp *Ringpop) RegisterListener(l EventListener) {
+func (rp *Ringpop) RegisterListener(l events.EventListener) {
 	rp.listeners = append(rp.listeners, l)
 }
 
@@ -219,14 +241,9 @@ func (rp *Ringpop) RegisterListener(l EventListener) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// BootstrapOptions are used to bootstrap the ringpop
-type BootstrapOptions struct {
-	swim.BootstrapOptions
-}
-
 // Bootstrap starts the Ringpop
-func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
-	joined, err := rp.node.Bootstrap(&opts.BootstrapOptions)
+func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
+	joined, err := rp.node.Bootstrap(opts)
 	if err != nil {
 		rp.log.WithField("error", err).Info("bootstrap failed")
 		return nil, err
@@ -344,7 +361,7 @@ func (rp *Ringpop) Lookup(key string) string {
 
 	dest, ok := rp.ring.Lookup(key)
 
-	rp.emit(LookupEvent{key, time.Now().Sub(startTime)})
+	rp.emit(events.LookupEvent{key, time.Now().Sub(startTime)})
 
 	if !ok {
 		rp.log.WithField("key", key).Warn("could not find destination for key")
@@ -359,16 +376,16 @@ func (rp *Ringpop) LookupN(key string, n int) []string {
 	return rp.ring.LookupN(key, n)
 }
 
-func (rp *Ringpop) ringEvent(event interface{}) {
-	rp.emit(event)
+func (rp *Ringpop) ringEvent(e interface{}) {
+	rp.emit(e)
 
-	switch event := event.(type) {
-	case RingChecksumEvent:
+	switch e := e.(type) {
+	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
 
-	case RingChangedEvent:
-		added := int64(len(event.ServersAdded))
-		removed := int64(len(event.ServersRemoved))
+	case events.RingChangedEvent:
+		added := int64(len(e.ServersAdded))
+		removed := int64(len(e.ServersRemoved))
 		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
 		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
 	}
