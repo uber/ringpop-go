@@ -60,16 +60,14 @@ type Interface interface {
 	Destroy()
 	Destroyed() bool
 	App() string
-	WhoAmI() (string, error)
-	Uptime() (time.Duration, error)
+	WhoAmI() string
+	Uptime() time.Duration
 	RegisterListener(l events.EventListener)
 	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
 	HandleEvent(event interface{})
-	Checksum() (uint32, error)
-	Lookup(key string) (string, error)
-	LookupN(key string, n int) ([]string, error)
-	GetReachableMembers() ([]string, error)
-	CountReachableMembers() (int, error)
+	Checksum() uint32
+	Lookup(key string) string
+	LookupN(key string, n int) []string
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)

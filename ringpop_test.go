@@ -53,6 +53,13 @@ func (s *RingpopTestSuite) TearDownTest() {
 	s.ringpop.Destroy()
 }
 
+func (s *RingpopTestSuite) TestCanAssignRingpopToRingpopInterface() {
+	var ri Interface
+	ri = s.ringpop
+
+	s.Assert().Equal(ri, s.ringpop, "ringpop in the interface is not equal to ringpop")
+}
+
 func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
