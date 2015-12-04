@@ -32,6 +32,7 @@ import (
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/replica/util"
 	"github.com/uber/ringpop-go/shared"
+	"github.com/uber/tchannel-go"
 )
 
 // FanoutMode defines how a replicator should fanout it's requests
@@ -87,6 +88,7 @@ type callOptions struct {
 	Request    []byte
 	KeysByDest map[string][]string
 	Operation  string
+	Format tchannel.Format
 }
 
 // A Replicator is used to replicate a request across nodes such that they share
@@ -319,7 +321,7 @@ func (r *Replicator) forwardRequest(dest string, copts *callOptions, fopts *forw
 	var keys = copts.KeysByDest[dest]
 
 	res, err := r.forwarder.ForwardRequest(copts.Request, dest, r.channel.ServiceName(),
-		copts.Operation, keys, fopts)
+		copts.Operation, keys, copts.Format, fopts)
 
 	if err != nil {
 		r.logger.WithFields(log.Fields{
