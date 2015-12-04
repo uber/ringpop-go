@@ -197,7 +197,7 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 	// ListenAndService is called. If the hostport is 0.0.0.0:0, it means
 	// TChannel is not yet listening and the hostport cannot be resolved.
 	if hostport == "0.0.0.0:0" {
-		return "", fmt.Errorf("Unable to resolve valid listen address (TChannel hostport is %s)", hostport)
+		return "", fmt.Errorf("unable to resolve valid listen address (TChannel hostport is %s)", hostport)
 	}
 	return hostport, nil
 }
