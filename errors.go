@@ -2,4 +2,4 @@ package ringpop
 
 import "errors"
 
-var ErrNotBootstrapped = errors.New("Ringpop has not been bootstrapped")
+var ErrNotBootstrapped = errors.New("ringpop is not bootstrapped")
