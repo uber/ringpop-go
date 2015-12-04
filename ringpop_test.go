@@ -44,6 +44,7 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.channel = ch
 
 	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
+	s.ringpop.init()
 	s.Require().NoError(err, "Ringpop must create successfully")
 
 	s.mockRingpop = &mocks.Ringpop{}
@@ -156,6 +157,17 @@ func (s *RingpopTestSuite) TestRingpopReady() {
 func (s *RingpopTestSuite) TestRingpopNotReady() {
 	// Ringpop should not be ready until bootstrapped
 	s.False(s.ringpop.Ready())
+}
+
+// TestStateCreated tests that Ringpop is in a created state just after
+// instantiating.
+func (s *RingpopTestSuite) TestStateCreated() {
+
+	rp, err := New("test", Channel(s.channel))
+	s.Require().NoError(err)
+	s.Require().NotNil(rp)
+
+	s.Equal(Created, rp.getState())
 }
 
 func TestRingpopTestSuite(t *testing.T) {

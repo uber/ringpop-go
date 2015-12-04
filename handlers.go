@@ -59,7 +59,12 @@ type lookupResponse struct {
 }
 
 func (rp *Ringpop) adminLookupHandler(ctx json.Context, req *lookupRequest) (*lookupResponse, error) {
-	return &lookupResponse{Dest: rp.Lookup(req.Key)}, nil
+	dest, err := rp.Lookup(req.Key)
+	if err != nil {
+		return nil, err
+	} else {
+		return &lookupResponse{Dest: dest}, nil
+	}
 }
 
 func (rp *Ringpop) adminReloadHandler(ctx json.Context, req *Arg) (*Arg, error) {

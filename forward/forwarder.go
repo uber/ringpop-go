@@ -36,10 +36,10 @@ import (
 // the server returned by Lookup(key)
 type Sender interface {
 	// WhoAmI should return the address of the local sender
-	WhoAmI() string
+	WhoAmI() (string, error)
 
 	// Lookup should return the server the request belongs to
-	Lookup(string) string
+	Lookup(string) (string, error)
 }
 
 // Options for the creation of a forwarder

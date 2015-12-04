@@ -37,6 +37,8 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 
 	type stats map[string]interface{}
 
+	uptime, _ := rp.Uptime()
+
 	return stats{
 		"hooks":      nil,
 		"membership": rp.node.MemberStats(),
@@ -55,7 +57,7 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 		},
 		"version":         "???", // TODO: version!
 		"timestamp":       time.Now().Unix(),
-		"uptime":          rp.Uptime(),
+		"uptime":          uptime,
 		"tchannelVersion": strconv.Itoa(tchannel.CurrentProtocolVersion), // get proper version
 	}
 }

@@ -81,10 +81,8 @@ type Ringpop struct {
 
 	identityResolver IdentityResolver
 
-	state struct {
-		read, destroyed bool
-		sync.RWMutex
-	}
+	state      state
+	stateMutex sync.RWMutex
 
 	channel    shared.TChannel
 	subChannel shared.SubChannel
@@ -108,6 +106,17 @@ type Ringpop struct {
 
 	startTime time.Time
 }
+
+// state represents the internal state of a Ringpop instance.
+type state uint
+
+const (
+	Created state = iota
+	Initialized
+	Bootstrapping
+	Ready
+	Destroyed
+)
 
 // New returns a new Ringpop instance!
 func New(app string, opts ...Option) (*Ringpop, error) {
@@ -135,10 +144,7 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 		return nil, fmt.Errorf("%v", errs)
 	}
 
-	err = ringpop.init()
-	if err != nil {
-		return nil, err
-	}
+	ringpop.setState(Created)
 
 	return ringpop, nil
 }
@@ -171,6 +177,8 @@ func (rp *Ringpop) init() error {
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
 
+	rp.setState(Initialized)
+
 	return nil
 }
 
@@ -184,25 +192,30 @@ func (rp *Ringpop) identity() (string, error) {
 // TChannel object on the Ringpop instance.
 func (rp *Ringpop) channelIdentityResolver() (string, error) {
 	hostport := rp.channel.PeerInfo().HostPort
+	// Check that TChannel is listening. By default, TChannel listens on an
+	// ephemeral host/port. The real port is then assigned by the OS when
+	// ListenAndService is called. If the hostport is 0.0.0.0:0, it means
+	// TChannel is not yet listening and the hostport cannot be resolved.
+	if hostport == "0.0.0.0:0" {
+		return "", fmt.Errorf("Unable to resolve valid listen address (TChannel hostport is %s)", hostport)
+	}
 	return hostport, nil
 }
 
 // Destroy Ringpop
 func (rp *Ringpop) Destroy() {
-	rp.node.Destroy()
 
-	rp.state.Lock()
-	rp.state.destroyed = true
-	rp.state.Unlock()
+	// Only destroy the node if it has been created
+	if rp.getState() > Created {
+		rp.node.Destroy()
+	}
+
+	rp.setState(Destroyed)
 }
 
 // Destroyed returns
 func (rp *Ringpop) Destroyed() bool {
-	rp.state.Lock()
-	destroyed := rp.state.destroyed
-	rp.state.Unlock()
-
-	return destroyed
+	return rp.getState() == Destroyed
 }
 
 // App returns the app the ringpop belongs to
@@ -210,15 +223,22 @@ func (rp *Ringpop) App() string {
 	return rp.config.App
 }
 
-// WhoAmI returns the local address of the Ringpop node
-func (rp *Ringpop) WhoAmI() string {
+// WhoAmI returns the address of the current/local Ringpop node. It returns an
+// error if Ringpop is not yet initialised/bootstrapped.
+func (rp *Ringpop) WhoAmI() (string, error) {
+	if !rp.Ready() {
+		return "", ErrNotBootstrapped
+	}
 	address, _ := rp.identity()
-	return address
+	return address, nil
 }
 
 // Uptime returns the amount of time that the ringpop has been running for
-func (rp *Ringpop) Uptime() time.Duration {
-	return time.Now().Sub(rp.startTime)
+func (rp *Ringpop) Uptime() (time.Duration, error) {
+	if !rp.Ready() {
+		return 0, ErrNotBootstrapped
+	}
+	return time.Now().Sub(rp.startTime), nil
 }
 
 func (rp *Ringpop) emit(event interface{}) {
@@ -233,6 +253,20 @@ func (rp *Ringpop) RegisterListener(l events.EventListener) {
 	rp.listeners = append(rp.listeners, l)
 }
 
+// getState gets the state of the current Ringpop instance.
+func (rp *Ringpop) getState() state {
+	rp.stateMutex.Lock()
+	defer rp.stateMutex.Unlock()
+	return rp.state
+}
+
+// setState sets the state of the current Ringpop instance.
+func (rp *Ringpop) setState(s state) {
+	rp.stateMutex.Lock()
+	rp.state = s
+	rp.stateMutex.Unlock()
+}
+
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //	Bootstrap
@@ -241,11 +275,21 @@ func (rp *Ringpop) RegisterListener(l events.EventListener) {
 
 // Bootstrap starts the Ringpop
 func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
+
+	if rp.getState() < Initialized {
+		rp.init()
+	}
+
+	rp.setState(Bootstrapping)
+
 	joined, err := rp.node.Bootstrap(opts)
 	if err != nil {
 		rp.log.WithField("error", err).Info("bootstrap failed")
+		rp.setState(Initialized)
 		return nil, err
 	}
+
+	rp.setState(Ready)
 
 	rp.log.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
@@ -254,6 +298,9 @@ func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 // Ready returns whether or not ringpop is bootstrapped and should receive
 // requests
 func (rp *Ringpop) Ready() bool {
+	if rp.state != Ready {
+		return false
+	}
 	return rp.node.Ready()
 }
 
@@ -349,12 +396,22 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // Checksum returns the checksum of the ringpop's hashring
-func (rp *Ringpop) Checksum() uint32 {
-	return rp.ring.Checksum()
+func (rp *Ringpop) Checksum() (uint32, error) {
+	if !rp.Ready() {
+		return 0, ErrNotBootstrapped
+	}
+	return rp.ring.Checksum(), nil
 }
 
-// Lookup hashes a key to a server in the ring
-func (rp *Ringpop) Lookup(key string) string {
+// Lookup returns the address of the server in the ring that is responsible
+// for the specified key. It returns an error if the Ringpop instance is not
+// yet initialised/bootstrapped.
+func (rp *Ringpop) Lookup(key string) (string, error) {
+
+	if !rp.Ready() {
+		return "", ErrNotBootstrapped
+	}
+
 	startTime := time.Now()
 
 	dest, ok := rp.ring.Lookup(key)
@@ -362,16 +419,21 @@ func (rp *Ringpop) Lookup(key string) string {
 	rp.emit(events.LookupEvent{key, time.Now().Sub(startTime)})
 
 	if !ok {
-		rp.log.WithField("key", key).Warn("could not find destination for key")
-		return rp.WhoAmI()
+		identity, _ := rp.WhoAmI()
+		err := errors.New("could not find destination for key")
+		rp.log.WithField("key", key).Warn(err)
+		return identity, err
 	}
 
-	return dest
+	return dest, nil
 }
 
 // LookupN hashes a key to N servers in the ring
-func (rp *Ringpop) LookupN(key string, n int) []string {
-	return rp.ring.LookupN(key, n)
+func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
+	}
+	return rp.ring.LookupN(key, n), nil
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {
@@ -389,8 +451,11 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 	}
 }
 
-func (rp *Ringpop) GetReachableMembers() []string {
-	return rp.node.GetReachableMembers()
+func (rp *Ringpop) GetReachableMembers() ([]string, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
+	}
+	return rp.node.GetReachableMembers(), nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -424,8 +489,21 @@ func (rp *Ringpop) getStatKey(key string) string {
 func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string,
 	format tchannel.Format, opts *forward.Options) (bool, error) {
 
-	dest := rp.Lookup(key)
-	if dest == rp.WhoAmI() {
+	if !rp.Ready() {
+		return false, ErrNotBootstrapped
+	}
+
+	dest, err := rp.Lookup(key)
+	if err != nil {
+		return false, err
+	}
+
+	identity, err := rp.WhoAmI()
+	if err != nil {
+		return false, err
+	}
+
+	if dest == identity {
 		return true, nil
 	}
 

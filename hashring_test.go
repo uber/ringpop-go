@@ -39,6 +39,7 @@ func (s *RingTestSuite) SetupTest() {
 	s.Require().NoError(err, "channel must create successfully")
 
 	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
+	s.ringpop.init()
 
 	s.NoError(err)
 	s.NotNil(s.ringpop)
