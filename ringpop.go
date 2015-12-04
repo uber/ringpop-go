@@ -413,15 +413,14 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	startTime := time.Now()
 
-	dest, ok := rp.ring.Lookup(key)
+	dest, success := rp.ring.Lookup(key)
 
 	rp.emit(events.LookupEvent{key, time.Now().Sub(startTime)})
 
-	if !ok {
-		identity, _ := rp.WhoAmI()
+	if !success {
 		err := errors.New("could not find destination for key")
 		rp.log.WithField("key", key).Warn(err)
-		return identity, err
+		return "", err
 	}
 
 	return dest, nil
