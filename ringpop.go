@@ -255,9 +255,10 @@ func (rp *Ringpop) RegisterListener(l events.EventListener) {
 
 // getState gets the state of the current Ringpop instance.
 func (rp *Ringpop) getState() state {
-	rp.stateMutex.Lock()
-	defer rp.stateMutex.Unlock()
-	return rp.state
+	rp.stateMutex.RLock()
+	r := rp.state
+	rp.stateMutex.RUnlock()
+	return r
 }
 
 // setState sets the state of the current Ringpop instance.
