@@ -240,8 +240,8 @@ func (s *RingpopTestSuite) TestStateDestroyed() {
 	s.Equal(destroyed, s.ringpop.state)
 }
 
-// TestDestroyIsIndempotent tests that Destroy() can be called multiple times.
-func (s *RingpopTestSuite) TestDestroyIsIndempotent() {
+// TestDestroyIsIdempotent tests that Destroy() can be called multiple times.
+func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
 	// Ringpop starts in the created state
 	s.Equal(created, s.ringpop.state)
 
