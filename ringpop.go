@@ -194,7 +194,7 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 	hostport := rp.channel.PeerInfo().HostPort
 	// Check that TChannel is listening. By default, TChannel listens on an
 	// ephemeral host/port. The real port is then assigned by the OS when
-	// ListenAndService is called. If the hostport is 0.0.0.0:0, it means
+	// ListenAndServe is called. If the hostport is 0.0.0.0:0, it means
 	// TChannel is not yet listening and the hostport cannot be resolved.
 	if hostport == "0.0.0.0:0" {
 		return "", fmt.Errorf("unable to resolve valid listen address (TChannel hostport is %s)", hostport)
