@@ -11,7 +11,7 @@ clean-mocks:
 mocks:
 	test/gen-mocks
 
-test: mocks
+test:
 	go test ./...
 
 testpop:	clean
