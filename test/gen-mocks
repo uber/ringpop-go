@@ -1,7 +1,9 @@
-#!/bin/sh -x
+#!/bin/bash -x
 #
 # Generate mocks for ringpop and subpackages.
 #
+set -eo pipefail
+
 mock_directory="${0%/*}/mocks"
 
 # Generate mocks for bark
