@@ -24,9 +24,9 @@ type HashRing interface {
     AddServer(address string)
     Checksum() uint32
     GetServers() []string
-    RemoveServer(address string)
     HasServer(address string) bool
     Lookup(key string) (string, bool)
     LookupN(key string, n int) []string
+    RemoveServer(address string)
     ServerCount() int
 }
