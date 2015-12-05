@@ -128,7 +128,6 @@ const (
 
 // New returns a new Ringpop instance!
 func New(app string, opts ...Option) (*Ringpop, error) {
-
 	var err error
 
 	ringpop := &Ringpop{
@@ -159,7 +158,6 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 
 // init configures a Ringpop instance and makes it ready to do comms.
 func (rp *Ringpop) init() error {
-
 	if rp.channel == nil {
 		return errors.New("Missing channel")
 	}
@@ -212,7 +210,6 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 
 // Destroy Ringpop
 func (rp *Ringpop) Destroy() {
-
 	if rp.node != nil {
 		rp.node.Destroy()
 	}
@@ -282,7 +279,6 @@ func (rp *Ringpop) setState(s state) {
 
 // Bootstrap starts the Ringpop
 func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
-
 	if rp.getState() < initialized {
 		err := rp.init()
 		if err != nil {
@@ -415,7 +411,6 @@ func (rp *Ringpop) Checksum() (uint32, error) {
 // for the specified key. It returns an error if the Ringpop instance is not
 // yet initialised/bootstrapped.
 func (rp *Ringpop) Lookup(key string) (string, error) {
-
 	if !rp.Ready() {
 		return "", ErrNotBootstrapped
 	}
