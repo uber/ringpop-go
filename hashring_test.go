@@ -21,17 +21,17 @@
 package ringpop
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/internal/deps"
 	"github.com/uber/tchannel-go"
 )
 
 type RingTestSuite struct {
 	suite.Suite
 	ringpop *Ringpop
-	ring    *hashRing
+	ring    deps.HashRing
 }
 
 func (s *RingTestSuite) SetupTest() {
@@ -48,11 +48,6 @@ func (s *RingTestSuite) SetupTest() {
 
 func (s *RingTestSuite) TearDownTest() {
 	s.ringpop.Destroy()
-}
-
-func testRing(t *testing.T) (*hashRing, func()) {
-	ringpop, destroy := testPop(t, "127.0.0.1:3001")
-	return ringpop.ring, destroy
 }
 
 func (s *RingTestSuite) TestAddServer() {
@@ -140,7 +135,7 @@ func (s *RingTestSuite) TestLookup() {
 
 	s.ring.RemoveServer("server1")
 	s.ring.RemoveServer("server2")
-	s.ring.RemoveServer(s.ring.ringpop.node.Address())
+	s.ring.RemoveServer(s.ringpop.WhoAmI())
 
 	_, ok = s.ring.Lookup("key")
 
@@ -153,7 +148,8 @@ func (s *RingTestSuite) TestLookupN() {
 
 	unique := make(map[string]bool)
 
-	s.ring.AddRemoveServers(genAddresses(1, 1, 10), nil)
+	addresses := genAddresses(1, 1, 10)
+	s.ring.AddRemoveServers(addresses, nil)
 
 	servers = s.ring.LookupN("key", 5)
 	s.Len(servers, 5, "expected five servers to be returned by lookup")
@@ -171,16 +167,9 @@ func (s *RingTestSuite) TestLookupN() {
 	}
 	s.Len(unique, 10, "expected to get 10 unique servers")
 
-	s.ring.RemoveReplicas("127.0.0.1:3001")
-
-	// bug the ring out by removing server from tree but not the ring itself
-	for i := 0; i < s.ring.replicaPoints; i++ {
-		address := fmt.Sprintf("%s%v", "127.0.0.1:3001", i)
-		s.ring.servers.tree.Delete(int(s.ring.hashfunc([]byte(address))))
-	}
-
 	unique = make(map[string]bool)
 
+	s.ring.RemoveServer(addresses[0])
 	servers = s.ring.LookupN("yet another key", 10)
 	s.Len(servers, 9, "expected to get nine servers")
 	for _, server := range servers {

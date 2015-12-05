@@ -49,6 +49,7 @@ import (
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/internal/deps"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
@@ -89,7 +90,7 @@ type Ringpop struct {
 	channel    shared.TChannel
 	subChannel shared.SubChannel
 	node       *swim.Node
-	ring       *hashRing
+	ring       deps.HashRing
 	forwarder  *forward.Forwarder
 
 	listeners []events.EventListener
