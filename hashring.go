@@ -27,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/internal/deps"
 	"github.com/uber/ringpop-go/rbtree"
 
 	"github.com/dgryski/go-farm"
@@ -49,7 +50,7 @@ type hashRing struct {
 	}
 }
 
-func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32, replicaPoints int) *hashRing {
+func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32, replicaPoints int) deps.HashRing {
 	ring := &hashRing{
 		ringpop:       ringpop,
 		hashfunc:      hashfunc,
