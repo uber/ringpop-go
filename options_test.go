@@ -36,7 +36,6 @@ type RingpopOptionsTestSuite struct {
 }
 
 func (s *RingpopOptionsTestSuite) SetupTest() {
-
 	ch, err := tchannel.NewChannel("test", nil)
 	s.Require().NoError(err, "Channel creation failed")
 
@@ -46,7 +45,6 @@ func (s *RingpopOptionsTestSuite) SetupTest() {
 // TestDefaults tests that the default options are applied to a Ringpop
 // instance during construction, when none are specified by the user.
 func (s *RingpopOptionsTestSuite) TestDefaults() {
-
 	rp, err := New("test", Channel(s.channel))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
@@ -72,7 +70,6 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 // TestDefaultIdentityResolver tests that Ringpop gets the identity from the
 // TChannel object by default.
 func (s *RingpopOptionsTestSuite) TestDefaultIdentityResolver() {
-
 	// Start listening, to get a hostport assigned
 	s.channel.ListenAndServe("127.0.0.1:0")
 	hostport := s.channel.PeerInfo().HostPort
@@ -100,7 +97,6 @@ func (s *RingpopOptionsTestSuite) TestChannelRequired() {
 // TestLogger tests that the logger that's passed in gets applied correctly to
 // the Ringpop instance.
 func (s *RingpopOptionsTestSuite) TestLogger() {
-
 	mockLogger := &mocks.Logger{}
 	mockLogger.On("WithField", mock.Anything, mock.Anything).Return(mockLogger)
 
@@ -114,7 +110,6 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 // TestStatter tests that the statter that's passed in gets applied correctly
 // to the Ringpop instance.
 func (s *RingpopOptionsTestSuite) TestStatter() {
-
 	mockStatter := &mocks.StatsReporter{}
 
 	rp, err := New("test", Channel(s.channel), Statter(mockStatter))
@@ -127,7 +122,6 @@ func (s *RingpopOptionsTestSuite) TestStatter() {
 // TestHashRingConfig tests that the HashRing config that's passed in is
 // applied and used correctly.
 func (s *RingpopOptionsTestSuite) TestHashRingConfig() {
-
 	rp, err := New("test", Channel(s.channel), HashRingConfig(
 		&HashRingConfiguration{
 			ReplicaPoints: 42,
@@ -142,7 +136,6 @@ func (s *RingpopOptionsTestSuite) TestHashRingConfig() {
 // TestIdentityResolverFunc tests the func that's passed gets applied to the
 // Ringpop instance.
 func (s *RingpopOptionsTestSuite) TestIdentityResolverFunc() {
-
 	f := func() (string, error) {
 		return "127.0.0.1:3001", nil
 	}
@@ -160,7 +153,6 @@ func (s *RingpopOptionsTestSuite) TestIdentityResolverFunc() {
 // TestMissingIdentityResolver tests the Ringpop constructor throws an error
 // if the user sets the identity resolver to nil
 func (s *RingpopOptionsTestSuite) TestMissingIdentityResolver() {
-
 	rp, err := New("test", Channel(s.channel), IdentityResolverFunc(nil))
 	s.Nil(rp)
 	s.Error(err)

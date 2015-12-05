@@ -40,7 +40,6 @@ type RingpopTestSuite struct {
 // createSingleNodeCluster is a helper function to create a single-node cluster
 // during the tests
 func createSingleNodeCluster(rp *Ringpop) error {
-
 	// We must resolve the identity in order to be able to Bootstrap with the
 	// correct options.
 	identity, err := rp.identity()
@@ -196,7 +195,6 @@ func (s *RingpopTestSuite) TestStateCreated() {
 // TestStateInitialized tests that Ringpop is in an initialized state after
 // a failed bootstrap attempt.
 func (s *RingpopTestSuite) TestStateInitialized() {
-
 	// Create channel and start listening so we can actually attempt to
 	// bootstrap
 	ch, _ := tchannel.NewChannel("test2", nil)
@@ -226,7 +224,6 @@ func (s *RingpopTestSuite) TestStateInitialized() {
 
 // TestStateReady tests that Ringpop is ready after successful bootstrapping.
 func (s *RingpopTestSuite) TestStateReady() {
-
 	// Bootstrap
 	createSingleNodeCluster(s.ringpop)
 
@@ -236,7 +233,6 @@ func (s *RingpopTestSuite) TestStateReady() {
 // TestStateDestroyed tests that Ringpop is in a destroyed state after calling
 // Destroy().
 func (s *RingpopTestSuite) TestStateDestroyed() {
-
 	// Bootstrap
 	createSingleNodeCluster(s.ringpop)
 
@@ -268,7 +264,6 @@ func (s *RingpopTestSuite) TestDestroyFromInitialized() {
 
 // TestDestroyIsIdempotent tests that Destroy() can be called multiple times.
 func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
-
 	createSingleNodeCluster(s.ringpop)
 
 	s.ringpop.Destroy()
@@ -282,7 +277,6 @@ func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
 // TestWhoAmI tests that WhoAmI only operates when the Ringpop instance is in
 // a ready state.
 func (s *RingpopTestSuite) TestWhoAmI() {
-
 	s.NotEqual(ready, s.ringpop.state)
 	identity, err := s.ringpop.WhoAmI()
 	s.Equal("", identity)
@@ -298,7 +292,6 @@ func (s *RingpopTestSuite) TestWhoAmI() {
 // TestUptime tests that Uptime only operates when the Ringpop instance is in
 // a ready state.
 func (s *RingpopTestSuite) TestUptime() {
-
 	s.NotEqual(ready, s.ringpop.state)
 	uptime, err := s.ringpop.Uptime()
 	s.Zero(uptime)
@@ -314,7 +307,6 @@ func (s *RingpopTestSuite) TestUptime() {
 // TestChecksum tests that Checksum only operates when the Ringpop instance is in
 // a ready state.
 func (s *RingpopTestSuite) TestChecksum() {
-
 	s.NotEqual(ready, s.ringpop.state)
 	checksum, err := s.ringpop.Checksum()
 	s.Zero(checksum)
