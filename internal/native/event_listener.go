@@ -19,16 +19,4 @@
 // THE SOFTWARE.
 package native
 
-type HashRing interface {
-	EventEmitter
-
-	AddRemoveServers(add []string, remove []string) bool
-	AddServer(address string)
-	Checksum() uint32
-	GetServers() []string
-	HasServer(address string) bool
-	Lookup(key string) (string, bool)
-	LookupN(key string, n int) []string
-	RemoveServer(address string)
-	ServerCount() int
-}
+type EventListener func(interface{})

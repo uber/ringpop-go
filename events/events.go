@@ -28,19 +28,6 @@ type EventListener interface {
 	HandleEvent(event interface{})
 }
 
-// A RingChangedEvent is sent when servers are added and/or removed from the ring
-type RingChangedEvent struct {
-	ServersAdded   []string
-	ServersRemoved []string
-}
-
-// RingChecksumEvent is sent when a server is removed or added and a new checksum
-// for the ring is calculated
-type RingChecksumEvent struct {
-	OldChecksum uint32
-	NewChecksum uint32
-}
-
 // A LookupEvent is sent when a lookup is performed on the Ringpop's ring
 type LookupEvent struct {
 	Key      string

@@ -17,18 +17,17 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-package native
+package ring
 
-type HashRing interface {
-	EventEmitter
+// A RingChangedEvent is sent when servers are added and/or removed from the ring
+type RingChangedEvent struct {
+	ServersAdded   []string
+	ServersRemoved []string
+}
 
-	AddRemoveServers(add []string, remove []string) bool
-	AddServer(address string)
-	Checksum() uint32
-	GetServers() []string
-	HasServer(address string) bool
-	Lookup(key string) (string, bool)
-	LookupN(key string, n int) []string
-	RemoveServer(address string)
-	ServerCount() int
+// RingChecksumEvent is sent when a server is removed or added and a new checksum
+// for the ring is calculated
+type RingChecksumEvent struct {
+	OldChecksum uint32
+	NewChecksum uint32
 }
