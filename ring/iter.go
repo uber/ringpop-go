@@ -19,7 +19,7 @@
 // THE SOFTWARE.
 
 // Package rbtree provides an implementation of a Red Black Tree.
-package rbtree
+package ring
 
 //Iter returns an iterator starting at the leftmost node in the tree
 func (t *RBTree) Iter() *RBIter {

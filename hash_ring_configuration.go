@@ -18,18 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package events
+package ringpop
 
-import "time"
-
-// An EventListener handles events given to it by the Ringpop, as well as forwarded events from
-// the SWIM node contained by the ringpop. HandleEvent should be thread safe.
-type EventListener interface {
-	HandleEvent(event interface{})
-}
-
-// A LookupEvent is sent when a lookup is performed on the Ringpop's ring
-type LookupEvent struct {
-	Key      string
-	Duration time.Duration
+type HashRingConfiguration struct {
+	ReplicaPoints int
 }

@@ -17,19 +17,17 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+package ring
 
-package events
-
-import "time"
-
-// An EventListener handles events given to it by the Ringpop, as well as forwarded events from
-// the SWIM node contained by the ringpop. HandleEvent should be thread safe.
-type EventListener interface {
-	HandleEvent(event interface{})
+// A RingChangedEvent is sent when servers are added and/or removed from the ring
+type RingChangedEvent struct {
+	ServersAdded   []string
+	ServersRemoved []string
 }
 
-// A LookupEvent is sent when a lookup is performed on the Ringpop's ring
-type LookupEvent struct {
-	Key      string
-	Duration time.Duration
+// RingChecksumEvent is sent when a server is removed or added and a new checksum
+// for the ring is calculated
+type RingChecksumEvent struct {
+	OldChecksum uint32
+	NewChecksum uint32
 }
