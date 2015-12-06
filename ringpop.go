@@ -50,6 +50,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/internal/native"
+	"github.com/uber/ringpop-go/ring"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
@@ -164,7 +165,10 @@ func (rp *Ringpop) init() error {
 	})
 	rp.node.RegisterListener(rp)
 
-	rp.ring = newHashRing(rp, farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	var hashRing native.HashRing
+	hashRing = ring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	hashRing.RegisterListener(rp.onRingEvent)
+	rp.ring = hashRing
 
 	rp.stats.hostport = genStatsHostport(address)
 	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
@@ -375,14 +379,14 @@ func (rp *Ringpop) LookupN(key string, n int) []string {
 	return rp.ring.LookupN(key, n)
 }
 
-func (rp *Ringpop) ringEvent(e interface{}) {
+func (rp *Ringpop) onRingEvent(e interface{}) {
 	rp.emit(e)
 
 	switch e := e.(type) {
-	case events.RingChecksumEvent:
+	case ring.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
 
-	case events.RingChangedEvent:
+	case ring.RingChangedEvent:
 		added := int64(len(e.ServersAdded))
 		removed := int64(len(e.ServersRemoved))
 		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)

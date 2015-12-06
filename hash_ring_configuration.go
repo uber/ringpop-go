@@ -17,18 +17,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-package native
 
-type HashRing interface {
-	EventEmitter
+package ringpop
 
-	AddRemoveServers(add []string, remove []string) bool
-	AddServer(address string)
-	Checksum() uint32
-	GetServers() []string
-	HasServer(address string) bool
-	Lookup(key string) (string, bool)
-	LookupN(key string, n int) []string
-	RemoveServer(address string)
-	ServerCount() int
+type HashRingConfiguration struct {
+	ReplicaPoints int
 }
