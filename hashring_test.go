@@ -24,14 +24,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/internal/deps"
+	"github.com/uber/ringpop-go/internal/native"
 	"github.com/uber/tchannel-go"
 )
 
 type RingTestSuite struct {
 	suite.Suite
 	ringpop *Ringpop
-	ring    deps.HashRing
+	ring    native.HashRing
 }
 
 func (s *RingTestSuite) SetupTest() {
