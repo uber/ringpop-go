@@ -1,9 +1,18 @@
-#!/bin/sh -x
+#!/bin/bash -x
 #
 # Generate mocks for ringpop and subpackages.
 #
+set -eo pipefail
+
 mock_directory="${0%/*}/mocks"
 
 # Generate mocks for bark
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name StatsReporter
+
+# Generate mock file for ringpop.Interface, but rename the mocked object to
+# mocks.Ringpop
+mockery -name Interface -print \
+    |sed 's/_m \*Interface/_m \*Ringpop/g' \
+    |sed 's/type Interface/type Ringpop/g' \
+    > "$mock_directory"/ringpop.go

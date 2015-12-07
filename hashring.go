@@ -26,6 +26,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/rbtree"
 
 	"github.com/dgryski/go-farm"
@@ -88,7 +89,7 @@ func (r *hashRing) ComputeChecksum() {
 
 	old := r.servers.checksum
 	r.servers.checksum = farm.Fingerprint32(buffer.Bytes())
-	r.ringpop.ringEvent(RingChecksumEvent{
+	r.ringpop.ringEvent(events.RingChecksumEvent{
 		OldChecksum: old,
 		NewChecksum: r.servers.checksum,
 	})
@@ -102,7 +103,7 @@ func (r *hashRing) AddServer(address string) {
 	}
 
 	r.AddReplicas(address)
-	r.ringpop.ringEvent(RingChangedEvent{ServersAdded: []string{address}})
+	r.ringpop.ringEvent(events.RingChangedEvent{ServersAdded: []string{address}})
 	r.ComputeChecksum()
 }
 
@@ -125,7 +126,7 @@ func (r *hashRing) RemoveServer(address string) {
 	}
 
 	r.RemoveReplicas(address)
-	r.ringpop.ringEvent(RingChangedEvent{ServersRemoved: []string{address}})
+	r.ringpop.ringEvent(events.RingChangedEvent{ServersRemoved: []string{address}})
 	r.ComputeChecksum()
 }
 
@@ -163,7 +164,7 @@ func (r *hashRing) AddRemoveServers(add []string, remove []string) bool {
 	changed = added || removed
 
 	if changed {
-		r.ringpop.ringEvent(RingChangedEvent{add, remove})
+		r.ringpop.ringEvent(events.RingChangedEvent{add, remove})
 		r.ComputeChecksum()
 	}
 

@@ -26,28 +26,66 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
 
 type RingpopTestSuite struct {
 	suite.Suite
-	ringpop *Ringpop
-	channel *tchannel.Channel
+	ringpop     *Ringpop
+	channel     *tchannel.Channel
+	mockRingpop *mocks.Ringpop
+}
+
+// createSingleNodeCluster is a helper function to create a single-node cluster
+// during the tests
+func createSingleNodeCluster(rp *Ringpop) error {
+	// We must resolve the identity in order to be able to Bootstrap with the
+	// correct options.
+	identity, err := rp.identity()
+	if err != nil {
+		return err
+	}
+
+	// Bootstrapping with a single host that matches the Ringpop instance's
+	// identity will created a single-node cluster.
+	_, err = rp.Bootstrap(&BootstrapOptions{
+		swim.BootstrapOptions{
+			Hosts: []string{identity},
+		},
+	})
+
+	return err
 }
 
 func (s *RingpopTestSuite) SetupTest() {
+
 	ch, err := tchannel.NewChannel("test", nil)
-	s.Require().NoError(err, "channel must create successfully")
+	s.NoError(err, "channel must create successfully")
 	s.channel = ch
+
 	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
-	s.Require().NoError(err, "Ringpop must create successfully")
+	s.NoError(err, "Ringpop must create successfully")
+
+	s.mockRingpop = &mocks.Ringpop{}
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
+	s.channel.Close()
 	s.ringpop.Destroy()
 }
 
+func (s *RingpopTestSuite) TestCanAssignRingpopToRingpopInterface() {
+	var ri Interface
+	ri = s.ringpop
+
+	s.Assert().Equal(ri, s.ringpop, "ringpop in the interface is not equal to ringpop")
+}
+
 func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
+	// Fake bootstrap
+	s.ringpop.init()
+
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
 	})
@@ -80,6 +118,9 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 }
 
 func (s *RingpopTestSuite) TestHandleEvents() {
+	// Fake bootstrap
+	s.ringpop.init()
+
 	stats := newDummyStats()
 	s.ringpop.statter = stats
 
@@ -134,10 +175,8 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 func (s *RingpopTestSuite) TestRingpopReady() {
 	s.False(s.ringpop.Ready())
 	// Create single node cluster.
-	s.ringpop.Bootstrap(&BootstrapOptions{
-		swim.BootstrapOptions{
-			Hosts: []string{"127.0.0.1:3001"},
-		},
+	s.ringpop.Bootstrap(&swim.BootstrapOptions{
+		Hosts: []string{"127.0.0.1:3001"},
 	})
 	s.True(s.ringpop.Ready())
 }
@@ -145,6 +184,166 @@ func (s *RingpopTestSuite) TestRingpopReady() {
 func (s *RingpopTestSuite) TestRingpopNotReady() {
 	// Ringpop should not be ready until bootstrapped
 	s.False(s.ringpop.Ready())
+}
+
+// TestStateCreated tests that Ringpop is in a created state just after
+// instantiating.
+func (s *RingpopTestSuite) TestStateCreated() {
+	s.Equal(created, s.ringpop.getState())
+}
+
+// TestStateInitialized tests that Ringpop is in an initialized state after
+// a failed bootstrap attempt.
+func (s *RingpopTestSuite) TestStateInitialized() {
+	// Create channel and start listening so we can actually attempt to
+	// bootstrap
+	ch, _ := tchannel.NewChannel("test2", nil)
+	ch.ListenAndServe("127.0.0.1:0")
+	defer ch.Close()
+
+	rp, err := New("test2", Channel(ch))
+	s.NoError(err)
+	s.NotNil(rp)
+
+	// Bootstrap that will fail
+	_, err = rp.Bootstrap(&BootstrapOptions{
+		swim.BootstrapOptions{
+			Hosts: []string{
+				"127.0.0.1:9000",
+				"127.0.0.1:9001",
+			},
+			// A MaxJoinDuration of 1 millisecond should fail immediately
+			// without prolonging the test suite.
+			MaxJoinDuration: time.Millisecond,
+		},
+	})
+	s.Error(err)
+
+	s.Equal(initialized, rp.getState())
+}
+
+// TestStateReady tests that Ringpop is ready after successful bootstrapping.
+func (s *RingpopTestSuite) TestStateReady() {
+	// Bootstrap
+	createSingleNodeCluster(s.ringpop)
+
+	s.Equal(ready, s.ringpop.state)
+}
+
+// TestStateDestroyed tests that Ringpop is in a destroyed state after calling
+// Destroy().
+func (s *RingpopTestSuite) TestStateDestroyed() {
+	// Bootstrap
+	createSingleNodeCluster(s.ringpop)
+
+	// Destroy
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+}
+
+// TestDestroyFromCreated tests that Destroy() can be called straight away.
+func (s *RingpopTestSuite) TestDestroyFromCreated() {
+	// Ringpop starts in the created state
+	s.Equal(created, s.ringpop.state)
+
+	// Should be destroyed straight away
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+}
+
+// TestDestroyFromInitialized tests that Destroy() can be called from the
+// initialized state.
+func (s *RingpopTestSuite) TestDestroyFromInitialized() {
+	// Init
+	s.ringpop.init()
+	s.Equal(initialized, s.ringpop.state)
+
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+}
+
+// TestDestroyIsIdempotent tests that Destroy() can be called multiple times.
+func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
+	createSingleNodeCluster(s.ringpop)
+
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+
+	// Can destroy again
+	s.ringpop.Destroy()
+	s.Equal(destroyed, s.ringpop.state)
+}
+
+// TestWhoAmI tests that WhoAmI only operates when the Ringpop instance is in
+// a ready state.
+func (s *RingpopTestSuite) TestWhoAmI() {
+	s.NotEqual(ready, s.ringpop.state)
+	identity, err := s.ringpop.WhoAmI()
+	s.Equal("", identity)
+	s.Error(err)
+
+	createSingleNodeCluster(s.ringpop)
+	s.Equal(ready, s.ringpop.state)
+	identity, err = s.ringpop.WhoAmI()
+	s.NoError(err)
+	s.Equal("127.0.0.1:3001", identity)
+}
+
+// TestUptime tests that Uptime only operates when the Ringpop instance is in
+// a ready state.
+func (s *RingpopTestSuite) TestUptime() {
+	s.NotEqual(ready, s.ringpop.state)
+	uptime, err := s.ringpop.Uptime()
+	s.Zero(uptime)
+	s.Error(err)
+
+	createSingleNodeCluster(s.ringpop)
+	s.Equal(ready, s.ringpop.state)
+	uptime, err = s.ringpop.Uptime()
+	s.NoError(err)
+	s.NotZero(uptime)
+}
+
+// TestChecksum tests that Checksum only operates when the Ringpop instance is in
+// a ready state.
+func (s *RingpopTestSuite) TestChecksum() {
+	s.NotEqual(ready, s.ringpop.state)
+	checksum, err := s.ringpop.Checksum()
+	s.Zero(checksum)
+	s.Error(err)
+
+	createSingleNodeCluster(s.ringpop)
+	s.Equal(ready, s.ringpop.state)
+	checksum, err = s.ringpop.Checksum()
+	s.NoError(err)
+	//s.NotZero(checksum)
+}
+
+// TestApp tests that App() returns the correct app name.
+func (s *RingpopTestSuite) TestApp() {
+	s.Equal("test", s.ringpop.App())
+}
+
+// TestLookupNotReady tests that Lookup fails when Ringpop is not ready.
+func (s *RingpopTestSuite) TestLookupNotReady() {
+	result, err := s.ringpop.Lookup("foo")
+	s.Error(err)
+	s.Empty(result)
+}
+
+// TestLookupNNotReady tests that LookupN fails when Ringpop is not ready.
+func (s *RingpopTestSuite) TestLookupNNotReady() {
+	result, err := s.ringpop.LookupN("foo", 3)
+	s.Error(err)
+	s.Nil(result)
+}
+
+// TestGetReachableMembersNotReady tests that GetReachableMembers fails when
+// Ringpop is not ready.
+func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
+	result, err := s.ringpop.GetReachableMembers()
+	s.Error(err)
+	s.Nil(result)
 }
 
 func TestRingpopTestSuite(t *testing.T) {
