@@ -61,8 +61,8 @@ func main() {
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
 
-	if err := ch.ListenAndServe(rp.WhoAmI()); err != nil {
-		log.Fatalf("could not listen on %s: %v", rp.WhoAmI(), err)
+	if err := ch.ListenAndServe(*hostport); err != nil {
+		log.Fatalf("could not listen on %s: %v", *hostport, err)
 	}
 
 	opts := &swim.BootstrapOptions{}
