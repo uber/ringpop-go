@@ -40,17 +40,9 @@ type RingpopTestSuite struct {
 // createSingleNodeCluster is a helper function to create a single-node cluster
 // during the tests
 func createSingleNodeCluster(rp *Ringpop) error {
-	// We must resolve the identity in order to be able to Bootstrap with the
-	// correct options.
-	identity, err := rp.identity()
-	if err != nil {
-		return err
-	}
-
-	// Bootstrapping with a single host that matches the Ringpop instance's
-	// identity will created a single-node cluster.
-	_, err = rp.Bootstrap(&swim.BootstrapOptions{
-		Hosts: []string{identity},
+	// Bootstrapping with an empty list will created a single-node cluster.
+	_, err := rp.Bootstrap(&swim.BootstrapOptions{
+		Hosts: []string{},
 	})
 
 	return err
@@ -340,6 +332,13 @@ func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
 	result, err := s.ringpop.GetReachableMembers()
 	s.Error(err)
 	s.Nil(result)
+}
+
+// TestEmptyJoinListCreatesSingleNodeCluster tests that when you call Bootstrap
+// with no hosts or bootstrap file, a single-node cluster is created.
+func (s *RingpopTestSuite) TestEmptyJoinListCreatesSingleNodeCluster() {
+	createSingleNodeCluster(s.ringpop)
+	s.Equal(ready, s.ringpop.state)
 }
 
 func TestRingpopTestSuite(t *testing.T) {
