@@ -33,12 +33,12 @@ import (
 
 type DummySender struct{ local, lookup string }
 
-func (d DummySender) Lookup(key string) string {
-	return d.lookup
+func (d DummySender) Lookup(key string) (string, error) {
+	return d.lookup, nil
 }
 
-func (d DummySender) WhoAmI() string {
-	return d.local
+func (d DummySender) WhoAmI() (string, error) {
+	return d.local, nil
 }
 
 type ForwarderTestSuite struct {
@@ -99,7 +99,8 @@ func (s *ForwarderTestSuite) TestForward() {
 	var pong Pong
 
 	s.sender.lookup = "127.0.0.1:3002"
-	dest := s.sender.Lookup("some key")
+	dest, err := s.sender.Lookup("some key")
+	s.NoError(err)
 
 	res, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"some key"},
 		tchannel.JSON, nil)
@@ -114,9 +115,10 @@ func (s *ForwarderTestSuite) TestMaxRetries() {
 	var ping Ping
 
 	s.sender.lookup = "127.0.0.1:3003"
-	dest := s.sender.Lookup("some key")
+	dest, err := s.sender.Lookup("some key")
+	s.NoError(err)
 
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"some key"},
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"some key"},
 		tchannel.JSON, &Options{
 			MaxRetries:    2,
 			RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond},
@@ -129,10 +131,11 @@ func (s *ForwarderTestSuite) TestKeysDiverged() {
 	var ping Ping
 
 	s.sender.lookup = "127.0.0.1:3003"
-	dest := s.sender.Lookup("some key")
+	dest, err := s.sender.Lookup("some key")
+	s.NoError(err)
 
 	// no keys should result in destinations length of 0 during retry, causing abortion of request
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
 		&Options{MaxRetries: 2, RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond}})
 
 	s.EqualError(err, "key destinations have diverged")
@@ -142,9 +145,10 @@ func (s *ForwarderTestSuite) TestRequestTimesOut() {
 	var ping Ping
 
 	s.sender.lookup = "127.0.0.2:3001"
-	dest := s.sender.Lookup("some key")
+	dest, err := s.sender.Lookup("some key")
+	s.NoError(err)
 
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
 		&Options{Timeout: time.Millisecond})
 
 	s.EqualError(err, "request timed out")

@@ -44,16 +44,16 @@ type dummySender struct {
 	lookupN []string
 }
 
-func (d dummySender) WhoAmI() string {
-	return d.local
+func (d dummySender) WhoAmI() (string, error) {
+	return d.local, nil
 }
 
-func (d dummySender) Lookup(key string) string {
-	return d.lookup
+func (d dummySender) Lookup(key string) (string, error) {
+	return d.lookup, nil
 }
 
-func (d dummySender) LookupN(key string, n int) []string {
-	return d.lookupN
+func (d dummySender) LookupN(key string, n int) ([]string, error) {
+	return d.lookupN, nil
 }
 
 type ReplicatorTestSuite struct {

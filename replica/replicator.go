@@ -60,13 +60,13 @@ const (
 // A Sender is used to lookup the destinations for requests given a key.
 type Sender interface {
 	// Lookup should return a server address
-	Lookup(string) string
+	Lookup(string) (string, error)
 
 	// LookupN should return n server addresses
-	LookupN(string, int) []string
+	LookupN(string, int) ([]string, error)
 
 	// WhoAmI should return the local address of the sender
-	WhoAmI() string
+	WhoAmI() (string, error)
 }
 
 // A Response is a response from a replicator read/write request.
@@ -176,7 +176,7 @@ func (r *Replicator) groupReplicas(keys []string, n int) (map[string][]string,
 	keysByDest := make(map[string][]string)
 
 	for _, key := range keys {
-		dests := r.sender.LookupN(key, n)
+		dests, _ := r.sender.LookupN(key, n)
 		destsByKey[key] = dests
 
 		if len(dests) == 0 {
