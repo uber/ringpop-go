@@ -86,7 +86,7 @@ type Ringpop struct {
 	channel    shared.TChannel
 	subChannel shared.SubChannel
 	node       *swim.Node
-	ring       *hashRing
+	ring       HashRing
 	forwarder  *forward.Forwarder
 
 	listeners []events.EventListener

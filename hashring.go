@@ -32,6 +32,16 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
+type HashRing interface {
+	AddRemoveServers(add []string, remove []string) bool
+	Checksum() uint32
+	GetServers() []string
+	HasServer(address string) bool
+	Lookup(key string) (string, bool)
+	LookupN(key string, n int) []string
+	RemoveServer(address string)
+}
+
 type HashRingConfiguration struct {
 	ReplicaPoints int
 }
@@ -71,7 +81,7 @@ func (r *hashRing) Checksum() uint32 {
 }
 
 // computeChecksum computes checksum of all servers in the ring
-func (r *hashRing) ComputeChecksum() {
+func (r *hashRing) computeChecksum() {
 	var addresses sort.StringSlice
 	var buffer bytes.Buffer
 
@@ -102,13 +112,13 @@ func (r *hashRing) AddServer(address string) {
 		return
 	}
 
-	r.AddReplicas(address)
+	r.addReplicas(address)
 	r.ringpop.ringEvent(events.RingChangedEvent{ServersAdded: []string{address}})
-	r.ComputeChecksum()
+	r.computeChecksum()
 }
 
 // inserts server replicas into ring
-func (r *hashRing) AddReplicas(server string) {
+func (r *hashRing) addReplicas(server string) {
 	r.servers.Lock()
 	r.servers.byAddress[server] = true
 
@@ -127,7 +137,7 @@ func (r *hashRing) RemoveServer(address string) {
 
 	r.RemoveReplicas(address)
 	r.ringpop.ringEvent(events.RingChangedEvent{ServersRemoved: []string{address}})
-	r.ComputeChecksum()
+	r.computeChecksum()
 }
 
 func (r *hashRing) RemoveReplicas(server string) {
@@ -149,7 +159,7 @@ func (r *hashRing) AddRemoveServers(add []string, remove []string) bool {
 
 	for _, server := range add {
 		if !r.HasServer(server) {
-			r.AddReplicas(server)
+			r.addReplicas(server)
 			added = true
 		}
 	}
@@ -165,7 +175,7 @@ func (r *hashRing) AddRemoveServers(add []string, remove []string) bool {
 
 	if changed {
 		r.ringpop.ringEvent(events.RingChangedEvent{add, remove})
-		r.ComputeChecksum()
+		r.computeChecksum()
 	}
 
 	return changed
