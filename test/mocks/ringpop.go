@@ -17,18 +17,6 @@ type Ringpop struct {
 func (_m *Ringpop) Destroy() {
 	_m.Called()
 }
-func (_m *Ringpop) Destroyed() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
 func (_m *Ringpop) App() string {
 	ret := _m.Called()
 
@@ -41,7 +29,7 @@ func (_m *Ringpop) App() string {
 
 	return r0
 }
-func (_m *Ringpop) WhoAmI() string {
+func (_m *Ringpop) WhoAmI() (string, error) {
 	ret := _m.Called()
 
 	var r0 string
@@ -51,9 +39,16 @@ func (_m *Ringpop) WhoAmI() string {
 		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
-func (_m *Ringpop) Uptime() time.Duration {
+func (_m *Ringpop) Uptime() (time.Duration, error) {
 	ret := _m.Called()
 
 	var r0 time.Duration
@@ -63,7 +58,14 @@ func (_m *Ringpop) Uptime() time.Duration {
 		r0 = ret.Get(0).(time.Duration)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 func (_m *Ringpop) RegisterListener(l events.EventListener) {
 	_m.Called(l)
@@ -92,7 +94,7 @@ func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 func (_m *Ringpop) HandleEvent(event interface{}) {
 	_m.Called(event)
 }
-func (_m *Ringpop) Checksum() uint32 {
+func (_m *Ringpop) Checksum() (uint32, error) {
 	ret := _m.Called()
 
 	var r0 uint32
@@ -102,9 +104,16 @@ func (_m *Ringpop) Checksum() uint32 {
 		r0 = ret.Get(0).(uint32)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
-func (_m *Ringpop) Lookup(key string) string {
+func (_m *Ringpop) Lookup(key string) (string, error) {
 	ret := _m.Called(key)
 
 	var r0 string
@@ -114,9 +123,16 @@ func (_m *Ringpop) Lookup(key string) string {
 		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(key)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
-func (_m *Ringpop) LookupN(key string, n int) []string {
+func (_m *Ringpop) LookupN(key string, n int) ([]string, error) {
 	ret := _m.Called(key, n)
 
 	var r0 []string
@@ -128,7 +144,14 @@ func (_m *Ringpop) LookupN(key string, n int) []string {
 		}
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, int) error); ok {
+		r1 = rf(key, n)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 func (_m *Ringpop) HandleOrForward(key string, request []byte, response *[]byte, service string, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error) {
 	ret := _m.Called(key, request, response, service, endpoint, format, opts)
