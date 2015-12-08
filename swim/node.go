@@ -514,3 +514,7 @@ func (n *Node) pingNextMember() {
 func (n *Node) GetReachableMembers() []string {
 	return n.memberlist.GetReachableMembers()
 }
+
+func (n *Node) CountReachableMembers() int {
+	return n.memberlist.CountReachableMembers()
+}

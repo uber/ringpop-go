@@ -1,1 +1,4 @@
 Godeps/_workspace
+.DS_Store
+testpop
+hosts.json

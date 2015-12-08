@@ -30,6 +30,7 @@ import (
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 // A Sender is used to route the request to the proper destination,
@@ -117,4 +118,33 @@ func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoin
 	opts = f.mergeDefaultOptions(opts)
 	rs := newRequestSender(f.sender, f.channel, request, keys, destination, service, endpoint, format, opts)
 	return rs.Send()
+}
+
+var (
+	forwardedHeaderName  = "ringpop-forwarded"
+	staticForwardHeaders = map[string]string{forwardedHeaderName: "true"}
+)
+
+// SetForwardedHeader adds a header to the current thrift context indicating
+// that the call has been forwarded by another node in the ringpop ring.
+// This header is used when a remote call is received to determine if forwarding
+// checks needs to be applied. By not forwarding already forwarded calls we
+// prevent unbound forwarding in the ring in case of memebership disagreement.
+func SetForwardedHeader(ctx thrift.Context) thrift.Context {
+	headers := ctx.Headers()
+	if len(headers) == 0 {
+		return thrift.WithHeaders(ctx, staticForwardHeaders)
+	}
+
+	headers[forwardedHeaderName] = "true"
+	return thrift.WithHeaders(ctx, headers)
+}
+
+// HasForwardedHeader takes the headers that came in via TChannel and looks for
+// the precense of a specific ringpop header to see if ringpop already forwarded
+// the message. When a message has already been forwarded by ringpop the
+// forwarding logic should not be used to prevent unbound forwarding.
+func HasForwardedHeader(ctx thrift.Context) bool {
+	_, ok := ctx.Headers()[forwardedHeaderName]
+	return ok
 }

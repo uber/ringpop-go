@@ -1,4 +1,9 @@
 language: go
 go:
   - 1.5
-script: make
+before_script:
+  - ./scripts/travis/get-thrift.sh
+  - go get github.com/uber/tchannel-go/thrift/thrift-gen
+  - go get github.com/vektra/mockery/.../
+script:
+  - make

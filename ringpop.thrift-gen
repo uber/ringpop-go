@@ -1,0 +1,117 @@
+{{ define "arguments" }}ctx {{ contextType }}{{ range .Arguments }}, {{ .Name }} {{ .Type | goType }}{{ end }}{{ end}}
+{{ define "call" }}ctx {{ range .Arguments }}, {{ .Name }}{{ end }}{{ end}}
+{{ define "returnType" }}{{ if .ReturnType }}r {{ .ReturnType | goType }}, {{ end }}err error{{ end}}
+
+{{ $Root := . }}
+package {{ .Package }}
+
+import (
+    "errors"
+    "fmt"
+
+    "github.com/uber/ringpop-go"
+    "github.com/uber/ringpop-go/forward"
+    "github.com/uber/ringpop-go/router"
+    "github.com/uber/tchannel-go"
+    "github.com/uber/tchannel-go/thrift"
+)
+
+{{ range .AST.Services }}
+{{ $Service := . }}
+{{ $TChanInterface :=  print "TChan" $Service.Name }}
+{{ $Adapter :=  (print "Ringpop" $Service.Name "Adapter") | goPrivateName }}
+{{ $EndpointConfigurations :=  print $Service.Name "Configuration" }}
+
+// ------ Generated code for {{ $Service.Name }} ------
+type {{ $Adapter }} struct {
+    impl        {{ $TChanInterface }}
+    ringpop     ringpop.Interface
+    ch          *tchannel.Channel
+    config      {{ $EndpointConfigurations }}
+    router      router.Router
+}
+
+type {{ $EndpointConfigurations }} struct {
+    // structs for all service endpoints containing forwarding behavior
+    {{ range .Methods }}
+        {{ .Name | goPublicName }} *{{ $Service.Name }}{{ .Name | goPublicName }}Configuration
+    {{ end }}
+}
+
+func (c *{{ $EndpointConfigurations }}) validate() error {
+    {{ range .Methods }}
+        if c.{{ .Name | goPublicName }} != nil {
+            if c.{{ .Name | goPublicName }}.Key == nil {
+                return errors.New("configuration for endpoint {{ .Name | goPublicName }} is missing a Key function")
+            }
+        }
+    {{ end }}
+    return nil
+}
+
+func New{{ $Adapter }}(
+    impl   {{ $TChanInterface }},
+    rp     ringpop.Interface,
+    ch     *tchannel.Channel,
+    config {{ $EndpointConfigurations }},
+) ({{ $TChanInterface }}, error) {
+    err := config.validate()
+    if err != nil {
+        return nil, err
+    }
+
+    adapter := &{{ $Adapter }}{
+        impl:    impl,
+        ringpop: rp,
+        ch:      ch,
+        config:  config,
+    }
+    // create ringpop router for routing based on ring membership
+    adapter.router = router.New(rp, adapter, ch)
+
+    return adapter, nil
+}
+
+func (a *{{ $Adapter }}) GetLocalClient() interface{} {
+    return a.impl
+}
+
+func (a *{{ $Adapter }}) MakeRemoteClient(client thrift.TChanClient) interface{} {
+    return New{{ $TChanInterface }}Client(client)
+}
+
+{{ range .Methods }}
+{{ $Method := .}}
+{{ $PublicName := $Method.Name | goPublicName }}
+{{ $cfg := print "config." $PublicName }}
+{{ $RingpopRouterConfiguration := print ($Service.Name | goPublicName) $PublicName "Configuration"}}
+
+// ------ 'Generated' code for {{ $Method.Name | goPublicName }} ------ {{ $cfg }}
+type {{ $RingpopRouterConfiguration }} struct {
+    Key     func({{ template "arguments" $Method}}) (string, error)
+}
+
+func (a *{{ $Adapter }}) {{ $PublicName }} ({{ template "arguments" $Method }}) ({{ template "returnType" $Method }}) {
+    // check if the function should be called locally
+    if a.{{ $cfg }} == nil || forward.HasForwardedHeader(ctx) {
+        return a.impl.{{ $PublicName }}({{ template "call" $Method }})
+    }
+
+    // find the key to shard on
+    ringpopKey, err := a.{{ $cfg }}.Key({{ template "call" $Method }})
+    if err != nil {
+        return {{ if $Method.ReturnType }}r, {{ end }}fmt.Errorf("could not get key: %q", err)
+    }
+
+    clientInterface, err := a.router.GetClient(ringpopKey)
+    if err != nil {
+        return {{ if $Method.ReturnType }}r, {{ end }}err
+    }
+
+    client := clientInterface.({{ $TChanInterface }})
+    ctx = forward.SetForwardedHeader(ctx)
+    return client.{{ $PublicName }}({{ template "call" $Method }})
+}
+{{ end}}
+// ------ End of {{ $Service.Name }} ------
+{{ end}}

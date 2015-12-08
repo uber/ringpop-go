@@ -21,8 +21,9 @@
 package swim
 
 import (
-	"github.com/uber/ringpop-go/swim/util"
 	"math/rand"
+
+	"github.com/uber/ringpop-go/swim/util"
 )
 
 const (
@@ -107,6 +108,10 @@ func (m *Member) localFaultyOverride(local string, change Change) bool {
 
 func (m *Member) localSuspectOverride(local string, change Change) bool {
 	return m.Address == local && change.Status == Suspect
+}
+
+func (m *Member) isReachable() bool {
+	return m.Status == Alive || m.Status == Suspect
 }
 
 // A Change is a change a member to be applied

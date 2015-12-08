@@ -1,3 +1,5 @@
+export PATH := $(shell pwd)/scripts/travis/thrift-release/linux-x86_64:$(PATH)
+
 .PHONY: clean clean-mocks testpop mocks out test
 
 out:	test
@@ -12,6 +14,7 @@ mocks:
 	test/gen-mocks
 
 test:
+	go generate ./...
 	go test -v ./...
 
 testpop:	clean

@@ -233,7 +233,21 @@ func (s *MemberlistTestSuite) TestGetReachableMembers() {
 		"127.0.0.1:3001",
 		"127.0.0.1:3002",
 		"127.0.0.1:3003",
-	}, activeMembers, "Expected a list of 3 specific nodes")
+	}, activeMembers, "expected a list of 3 specific nodes")
+}
+
+func (s *MemberlistTestSuite) TestCountReachableMembers() {
+	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
+	defer nodeA.Destroy()
+
+	nodeA.memberlist.MakeAlive("127.0.0.1:3001", s.incarnation)
+	nodeA.memberlist.MakeAlive("127.0.0.1:3002", s.incarnation)
+	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
+	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
+
+	reachableMemberCount := nodeA.memberlist.CountReachableMembers()
+
+	s.Equal(3, reachableMemberCount, "expected 3 reachable members")
 }
 
 func TestMemberlistTestSuite(t *testing.T) {
