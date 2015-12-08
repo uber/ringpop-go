@@ -12,7 +12,7 @@ mocks:
 	test/gen-mocks
 
 test:
-	go test ./...
+	go test -v ./...
 
 testpop:	clean
 	godep go build scripts/testpop/testpop.go
