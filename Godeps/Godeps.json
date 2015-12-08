@@ -28,11 +28,23 @@
 			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
 		},
 		{
+			"ImportPath": "github.com/stretchr/objx",
+			"Rev": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
+		},
+		{
 			"ImportPath": "github.com/stretchr/testify/assert",
 			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
 		},
 		{
+			"ImportPath": "github.com/stretchr/testify/mock",
+			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+		},
+		{
 			"ImportPath": "github.com/stretchr/testify/require",
+			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/suite",
 			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
 		},
 		{
@@ -41,7 +53,7 @@
 		},
 		{
 			"ImportPath": "github.com/uber/tchannel-go",
-			"Rev": "507b03bdd9eb65a49672006473454d76d1277304"
+			"Rev": "6d6b4475787065b7f9a8fca02c9c0cb94f0ac9e9"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
