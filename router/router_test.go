@@ -34,8 +34,8 @@ func TestRingpopRouterGetLocalClient(t *testing.T) {
 
 	rp := &mocks.Ringpop{}
 	rp.On("RegisterListener", mock.Anything).Return()
-	rp.On("Lookup", "hello").Return("127.0.0.1:3000")
-	rp.On("WhoAmI").Return("127.0.0.1:3000")
+	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	router := NewRouter(rp, cf, nil)
 
@@ -50,8 +50,8 @@ func TestRingpopRouterGetLocalClientCached(t *testing.T) {
 
 	rp := &mocks.Ringpop{}
 	rp.On("RegisterListener", mock.Anything).Return()
-	rp.On("Lookup", "hello").Return("127.0.0.1:3000")
-	rp.On("WhoAmI").Return("127.0.0.1:3000")
+	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	router := NewRouter(rp, cf, nil)
 
@@ -75,8 +75,8 @@ func TestRingpopRouterMakeRemoteClient(t *testing.T) {
 
 	rp := &mocks.Ringpop{}
 	rp.On("RegisterListener", mock.Anything).Return()
-	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
-	rp.On("WhoAmI").Return("127.0.0.1:3000")
+	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	router := NewRouter(rp, cf, ch)
 
@@ -97,8 +97,8 @@ func TestRingpopRouterMakeRemoteClientCached(t *testing.T) {
 
 	rp := &mocks.Ringpop{}
 	rp.On("RegisterListener", mock.Anything).Return()
-	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
-	rp.On("WhoAmI").Return("127.0.0.1:3000")
+	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	router := NewRouter(rp, cf, ch)
 

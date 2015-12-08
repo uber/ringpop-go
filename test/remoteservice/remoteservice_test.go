@@ -56,8 +56,8 @@ func TestNewRingpopRemoteServiceAdapterInputValidation(t *testing.T) {
 func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 	rp := &mocks.Ringpop{}
 	rp.On("RegisterListener", mock.Anything).Return()
-	rp.On("Lookup", "hello").Return("127.0.0.1:3000")
-	rp.On("WhoAmI").Return("127.0.0.1:3000")
+	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, "hello").Return(nil)
@@ -81,8 +81,8 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	rp := &mocks.Ringpop{}
 	rp.On("RegisterListener", mock.Anything).Return()
-	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
-	rp.On("WhoAmI").Return("127.0.0.1:3000")
+	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, "hello").Return(nil)

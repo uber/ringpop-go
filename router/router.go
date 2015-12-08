@@ -40,7 +40,7 @@ type router struct {
 
 // A Router creates instances of TChannel Thrift Clients via the help of the ClientFactory
 type Router interface {
-	GetClient(key string) interface{}
+	GetClient(key string) (interface{}, error)
 }
 
 // A ClientFactory is able to provide an implementation of a TChan[Service]
@@ -84,13 +84,17 @@ func (r *router) handleChange(change swim.Change) {
 
 // Get the client for a certain destination from our internal cache, or
 // delegates the creation to the ClientFactory.
-func (r *router) GetClient(key string) interface{} {
-	dest := r.ringpop.Lookup(key)
+func (r *router) GetClient(key string) (interface{}, error) {
+	dest, err := r.ringpop.Lookup(key)
+	if err != nil {
+		return nil, err
+	}
+
 	r.rw.RLock()
 	client, ok := r.clientCache[dest]
 	r.rw.RUnlock()
 	if ok {
-		return client
+		return client, nil
 	}
 
 	// no match so far, get a complete lock for creation
@@ -100,11 +104,16 @@ func (r *router) GetClient(key string) interface{} {
 	// double check it is not created between read and complete lock
 	client, ok = r.clientCache[dest]
 	if ok {
-		return client
+		return client, nil
+	}
+
+	me, err := r.ringpop.WhoAmI()
+	if err != nil {
+		return nil, err
 	}
 
 	// use the ClientFactory to get the client
-	if dest == r.ringpop.WhoAmI() {
+	if dest == me {
 		client = r.factory.GetLocalClient()
 	} else {
 		thriftClient := thrift.NewClient(
@@ -119,7 +128,7 @@ func (r *router) GetClient(key string) interface{} {
 
 	// cache the client
 	r.clientCache[dest] = client
-	return client
+	return client, nil
 }
 
 func (r *router) removeClient(hostport string) {
