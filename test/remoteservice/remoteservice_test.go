@@ -15,7 +15,7 @@ import (
 
 //go:generate mkdir -p .gen/go
 //go:generate thrift-gen --generateThrift --outputDir .gen/go --inputFile remoteservice.thrift --template github.com/uber/ringpop-go/ringpop.thrift-gen
-//go:generate cp -R .gen/go/remoteservice/ .
+//go:generate cp -R .gen/go/remoteservice ../
 //go:generate rm -rf .gen
 //go:generate mockery --name=TChanRemoteService
 
