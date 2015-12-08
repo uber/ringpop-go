@@ -65,7 +65,7 @@ func (w *worker) Ping(ctx thrift.Context, request *pingpong.Ping) (*pingpong.Pon
 	var req, res []byte
 	var err error
 
-	if req, err = ringpop.SerializeThrift(&pingpong.PingArgs{Request: request}); err != nil {
+	if req, err = ringpop.SerializeThrift(&pingpong.PingPongPingArgs{Request: request}); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +77,7 @@ func (w *worker) Ping(ctx thrift.Context, request *pingpong.Ping) (*pingpong.Pon
 			return nil, err
 		}
 
-		var pongResult pingpong.PingResult
+		var pongResult pingpong.PingPongPingResult
 		if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func (w *worker) Ping(ctx thrift.Context, request *pingpong.Ping) (*pingpong.Pon
 	}
 
 	// handle request locally
-	return &pingpong.Pong{From: w.address}, nil
+	return &pingpong.Pong{Source: w.address}, nil
 }
 
 func main() {

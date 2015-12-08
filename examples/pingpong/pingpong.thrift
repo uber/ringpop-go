@@ -3,7 +3,7 @@ struct ping {
 }
 
 struct pong {
-    1: string from,
+    1: string source,
 }
 
 service PingPong {
