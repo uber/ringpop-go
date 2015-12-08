@@ -1,4 +1,4 @@
-export PATH := $(realpath ./scripts/travis/thrift-release/linux-x86_64):$(PATH)
+export PATH := $(shell pwd)/scripts/travis/thrift-release/linux-x86_64:$(PATH)
 
 .PHONY: clean clean-mocks testpop mocks out test
 

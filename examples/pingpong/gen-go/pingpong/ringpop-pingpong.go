@@ -52,7 +52,7 @@ func NewRingpopPingPongAdapter(
 		config:  config,
 	}
 	// create ringpop router for routing based on ring membership
-	adapter.router = router.NewRouter(rp, adapter, ch)
+	adapter.router = router.New(rp, adapter, ch)
 
 	return adapter, nil
 }

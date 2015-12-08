@@ -37,7 +37,7 @@ func TestRingpopRouterGetLocalClient(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	router := NewRouter(rp, cf, nil)
+	router := New(rp, cf, nil)
 
 	router.GetClient("hello")
 	cf.AssertCalled(t, "GetLocalClient")
@@ -53,7 +53,7 @@ func TestRingpopRouterGetLocalClientCached(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	router := NewRouter(rp, cf, nil)
+	router := New(rp, cf, nil)
 
 	router.GetClient("hello")
 	cf.AssertCalled(t, "GetLocalClient")
@@ -78,7 +78,7 @@ func TestRingpopRouterMakeRemoteClient(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	router := NewRouter(rp, cf, ch)
+	router := New(rp, cf, ch)
 
 	router.GetClient("hello")
 	cf.AssertCalled(t, "MakeRemoteClient", mock.Anything)
@@ -100,7 +100,7 @@ func TestRingpopRouterMakeRemoteClientCached(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	router := NewRouter(rp, cf, ch)
+	router := New(rp, cf, ch)
 
 	router.GetClient("hello")
 	cf.AssertCalled(t, "MakeRemoteClient", mock.Anything)

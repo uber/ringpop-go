@@ -52,10 +52,10 @@ type ClientFactory interface {
 	MakeRemoteClient(client thrift.TChanClient) interface{}
 }
 
-// NewRouter creates an instance that validates the Router interface. A Router
+// New creates an instance that validates the Router interface. A Router
 // will be used to get implementations of service interfaces that implement a
 // distributed microservice.
-func NewRouter(rp ringpop.Interface, f ClientFactory, ch *tchannel.Channel) Router {
+func New(rp ringpop.Interface, f ClientFactory, ch *tchannel.Channel) Router {
 	r := &router{
 		ringpop:     rp,
 		factory:     f,

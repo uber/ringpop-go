@@ -6,7 +6,7 @@ set -eo pipefail
 
 mock_directory="${0%/*}/mocks"
 
-# Generate mocks for bark
+# Generate mocks for dependencies
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name StatsReporter
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber/tchannel-go/thrift -recursive -output "$mock_directory" -name TChanClient
