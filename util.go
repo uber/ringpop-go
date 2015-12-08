@@ -36,3 +36,12 @@ func (noopStatsReporter) RecordTimer(name string, tags bark.Tags, d time.Duratio
 func genStatsHostport(hostport string) string {
 	return strings.Replace(strings.Replace(hostport, ".", "_", -1), ":", "_", -1)
 }
+
+func stringInSlice(s []string, a string) bool {
+	for _, b := range s {
+		if a == b {
+			return true
+		}
+	}
+	return false
+}

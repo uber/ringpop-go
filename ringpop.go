@@ -278,7 +278,7 @@ func (rp *Ringpop) setState(s state) {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // Bootstrap starts the Ringpop
-func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
+func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string, error) {
 	if rp.getState() < initialized {
 		err := rp.init()
 		if err != nil {
@@ -286,7 +286,20 @@ func (rp *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 		}
 	}
 
-	joined, err := rp.node.Bootstrap(opts)
+	identity, err := rp.identity()
+	if err != nil {
+		return nil, err
+	}
+
+	// Check we're in the bootstrap host list and add ourselves if we're not
+	// there. If the host list is empty, this will create a single-node
+	// cluster.
+	bootstrapOpts := *userBootstrapOpts
+	if !stringInSlice(bootstrapOpts.Hosts, identity) {
+		bootstrapOpts.Hosts = append(bootstrapOpts.Hosts, identity)
+	}
+
+	joined, err := rp.node.Bootstrap(&bootstrapOpts)
 	if err != nil {
 		rp.log.WithField("error", err).Info("bootstrap failed")
 		rp.setState(initialized)
