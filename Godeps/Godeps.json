@@ -20,8 +20,16 @@
 			"Rev": "8947bd0d9e04e8c27671c33753340b51b835efdc"
 		},
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+		},
+		{
 			"ImportPath": "github.com/dgryski/go-farm",
 			"Rev": "fc41e106ee0e4394f69a56046e5c5adbaf29d912"
+		},
+		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "e8554b8641db39598be7f6342874b958f12ae1d4"
 		},
 		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
@@ -33,19 +41,19 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/suite",
-			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/uber-common/bark",
