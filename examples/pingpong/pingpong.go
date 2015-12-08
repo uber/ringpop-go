@@ -21,6 +21,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 
@@ -62,37 +63,13 @@ func newWorker(address string, channel *tchannel.Channel) *worker {
 }
 
 func (w *worker) Ping(ctx thrift.Context, request *pingpong.Ping) (*pingpong.Pong, error) {
-	var req, res []byte
-	var err error
-
-	if req, err = ringpop.SerializeThrift(&pingpong.PingPongPingArgs{Request: request}); err != nil {
-		return nil, err
-	}
-
-	handle, err := w.ringpop.HandleOrForward(request.Key, req, &res, "pingpong",
-		"PingPong::Ping", tchannel.Thrift, nil)
-
-	if !handle {
-		if err != nil {
-			return nil, err
-		}
-
-		var pongResult pingpong.PingPongPingResult
-		if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
-			return nil, err
-		}
-
-		return pongResult.GetSuccess(), nil
-	}
-
-	// handle request locally
 	return &pingpong.Pong{Source: w.address}, nil
 }
 
 func main() {
 	flag.Parse()
 
-	channel, err := tchannel.NewChannel("worker", &tchannel.ChannelOptions{
+	channel, err := tchannel.NewChannel("pingpong", &tchannel.ChannelOptions{
 	// Logger: tchannel.NewLevelLogger(tchannel.SimpleLogger, tchannel.LogLevelWarn),
 	})
 	if err != nil {
@@ -100,8 +77,27 @@ func main() {
 	}
 
 	worker := newWorker(*hostport, channel)
-	server := thrift.NewServer(channel.GetSubChannel("pingpong"))
-	server.Register(pingpong.NewTChanPingPongServer(worker))
+	server := thrift.NewServer(channel)
+
+	var handler pingpong.TChanPingPong
+	handler = worker
+
+	// wrap the PingPong handler by a ringpop adapter for routing RPC calls
+	handler, err = pingpong.NewRingpopPingPongAdapter(handler, worker.ringpop, channel, pingpong.PingPongConfiguration{
+		Ping: &pingpong.PingPongPingConfiguration{
+			Key: func(ctx thrift.Context, request *pingpong.Ping) (string, error) {
+				if request == nil {
+					return "", errors.New("missing request in call to Ping")
+				}
+				return request.Key, nil
+			},
+		},
+	})
+	if err != nil {
+		log.Fatalf("unable to wrap the handler: %q", err)
+	}
+
+	server.Register(pingpong.NewTChanPingPongServer(handler))
 
 	if err := channel.ListenAndServe(*hostport); err != nil {
 		log.Fatalf("could not listen on hostport: %v", err)

@@ -1,9 +1,9 @@
 struct ping {
-    1: string key,
+    1: required string key,
 }
 
 struct pong {
-    1: string source,
+    1: required string source,
 }
 
 service PingPong {

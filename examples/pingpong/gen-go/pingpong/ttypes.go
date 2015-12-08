@@ -19,7 +19,7 @@ var GoUnusedProtection__ int
 // Attributes:
 //  - Key
 type Ping struct {
-	Key string `thrift:"key,1" json:"key"`
+	Key string `thrift:"key,1,required" json:"key"`
 }
 
 func NewPing() *Ping {
@@ -34,6 +34,8 @@ func (p *Ping) Read(iprot thrift.TProtocol) error {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
 
+	var issetKey bool = false
+
 	for {
 		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
 		if err != nil {
@@ -47,6 +49,7 @@ func (p *Ping) Read(iprot thrift.TProtocol) error {
 			if err := p.readField1(iprot); err != nil {
 				return err
 			}
+			issetKey = true
 		default:
 			if err := iprot.Skip(fieldTypeId); err != nil {
 				return err
@@ -58,6 +61,9 @@ func (p *Ping) Read(iprot thrift.TProtocol) error {
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	}
+	if !issetKey {
+		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("Required field Key is not set"))
 	}
 	return nil
 }
@@ -110,7 +116,7 @@ func (p *Ping) String() string {
 // Attributes:
 //  - Source
 type Pong struct {
-	Source string `thrift:"source,1" json:"source"`
+	Source string `thrift:"source,1,required" json:"source"`
 }
 
 func NewPong() *Pong {
@@ -125,6 +131,8 @@ func (p *Pong) Read(iprot thrift.TProtocol) error {
 		return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
 	}
 
+	var issetSource bool = false
+
 	for {
 		_, fieldTypeId, fieldId, err := iprot.ReadFieldBegin()
 		if err != nil {
@@ -138,6 +146,7 @@ func (p *Pong) Read(iprot thrift.TProtocol) error {
 			if err := p.readField1(iprot); err != nil {
 				return err
 			}
+			issetSource = true
 		default:
 			if err := iprot.Skip(fieldTypeId); err != nil {
 				return err
@@ -149,6 +158,9 @@ func (p *Pong) Read(iprot thrift.TProtocol) error {
 	}
 	if err := iprot.ReadStructEnd(); err != nil {
 		return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	}
+	if !issetSource {
+		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("Required field Source is not set"))
 	}
 	return nil
 }
