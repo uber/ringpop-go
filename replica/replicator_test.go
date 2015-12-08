@@ -138,7 +138,8 @@ func (s *ReplicatorTestSuite) TestRead() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var dests = s.sender.LookupN("key", 3)
+	var dests, err = s.sender.LookupN("key", 3)
+	s.NoError(err)
 
 	// parallel
 	responses, err := s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, nil)
@@ -178,7 +179,8 @@ func (s *ReplicatorTestSuite) TestMultipleKeys() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var dests = s.sender.LookupN("key", 3)
+	var dests, err = s.sender.LookupN("key", 3)
+	s.NoError(err)
 
 	// parallel
 	responses, err := s.replicator.Read([]string{"key1", "key2"}, ping.Bytes(), "/ping", foptsTimeout, nil)
@@ -198,7 +200,8 @@ func (s *ReplicatorTestSuite) TestWrite() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var dests = s.sender.LookupN("key", 3)
+	var dests, err = s.sender.LookupN("key", 3)
+	s.NoError(err)
 
 	// parallel
 	responses, err := s.replicator.Write([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, nil)
