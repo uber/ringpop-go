@@ -17,6 +17,13 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-package shared
 
-type EventListener func(Event)
+package ringpop
+
+import "time"
+
+// A LookupEvent is sent when a lookup is performed on the Ringpop's ring
+type LookupEvent struct {
+	Key      string
+	Duration time.Duration
+}

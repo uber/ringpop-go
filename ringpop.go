@@ -47,7 +47,6 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/ring"
 	"github.com/uber/ringpop-go/shared"
@@ -58,13 +57,13 @@ import (
 // Interface specifies the public facing methods a user of ringpop is able to
 // use.
 type Interface interface {
+	shared.EventEmitter
+
 	Destroy()
 	App() string
 	WhoAmI() (string, error)
 	Uptime() (time.Duration, error)
-	RegisterListener(l events.EventListener)
 	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
-	HandleEvent(event interface{})
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
@@ -90,21 +89,14 @@ type Ringpop struct {
 	ring       HashRing
 	forwarder  *forward.Forwarder
 
-	listeners []events.EventListener
-
-	statter log.StatsReporter
-	stats   struct {
-		hostport string
-		prefix   string
-		keys     map[string]string
-		hooks    []string
-		sync.RWMutex
-	}
+	listeners []shared.EventListener
 
 	logger log.Logger
 	log    log.Logger
 
 	startTime time.Time
+	reporter  log.StatsReporter
+	statter   *statter
 }
 
 // state represents the internal state of a Ringpop instance.
@@ -174,18 +166,18 @@ func (rp *Ringpop) init() error {
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
 		Logger: rp.logger,
 	})
-	rp.node.RegisterListener(rp)
+	rp.node.RegisterListener(rp.onSwimEvent)
 
 	var hashRing HashRing
 	hashRing = ring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 	hashRing.RegisterListener(rp.onRingEvent)
 	rp.ring = hashRing
 
-	rp.stats.hostport = genStatsHostport(address)
-	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
-	rp.stats.keys = make(map[string]string)
-
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
+
+	// Statter registers listeners on the event emitters passed to it
+	// upon construction.
+	rp.statter = NewStatter(address, rp.reporter, hashRing)
 
 	rp.setState(initialized)
 
@@ -250,13 +242,13 @@ func (rp *Ringpop) Uptime() (time.Duration, error) {
 
 func (rp *Ringpop) emit(event interface{}) {
 	for _, listener := range rp.listeners {
-		go listener.HandleEvent(event)
+		go listener(event)
 	}
 }
 
 // RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
 // should be thread safe
-func (rp *Ringpop) RegisterListener(l events.EventListener) {
+func (rp *Ringpop) RegisterListener(l shared.EventListener) {
 	rp.listeners = append(rp.listeners, l)
 }
 
@@ -314,91 +306,6 @@ func (rp *Ringpop) Ready() bool {
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
-//	SWIM Events
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-// HandleEvent is used to satisfy the swim.EventListener interface. No touchy.
-func (rp *Ringpop) HandleEvent(event interface{}) {
-	rp.emit(event)
-
-	switch event := event.(type) {
-	case swim.MemberlistChangesReceivedEvent:
-		for _, change := range event.Changes {
-			status := change.Status
-			if len(status) == 0 {
-				status = "unknown"
-			}
-			rp.statter.IncCounter(rp.getStatKey("membership-update."+status), nil, 1)
-		}
-
-	case swim.MemberlistChangesAppliedEvent:
-		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
-		rp.handleChanges(event.Changes)
-
-	case swim.FullSyncEvent:
-		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
-
-	case swim.MaxPAdjustedEvent:
-		rp.statter.UpdateGauge(rp.getStatKey("max-p"), nil, int64(event.NewPCount))
-
-	case swim.JoinReceiveEvent:
-		rp.statter.IncCounter(rp.getStatKey("join.recv"), nil, 1)
-
-	case swim.JoinCompleteEvent:
-		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
-		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
-
-	case swim.PingSendEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping.send"), nil, 1)
-
-	case swim.PingSendCompleteEvent:
-		rp.statter.RecordTimer(rp.getStatKey("ping"), nil, event.Duration)
-
-	case swim.PingReceiveEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping.recv"), nil, 1)
-
-	case swim.PingRequestsSendEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, int64(len(event.Peers)))
-
-	case swim.PingRequestsSendCompleteEvent:
-		rp.statter.RecordTimer(rp.getStatKey("ping-req"), nil, event.Duration)
-
-	case swim.PingRequestReceiveEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping-req.recv"), nil, 1)
-
-	case swim.PingRequestPingEvent:
-		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
-
-	case swim.ProtocolDelayComputeEvent:
-		rp.statter.RecordTimer(rp.getStatKey("protocol.delay"), nil, event.Duration)
-
-	case swim.ProtocolFrequencyEvent:
-		rp.statter.RecordTimer(rp.getStatKey("protocol.frequency"), nil, event.Duration)
-
-	case swim.ChecksumComputeEvent:
-		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
-		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
-	}
-}
-
-func (rp *Ringpop) handleChanges(changes []swim.Change) {
-	var serversToAdd, serversToRemove []string
-
-	for _, change := range changes {
-		switch change.Status {
-		case swim.Alive:
-			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave:
-			serversToRemove = append(serversToRemove, change.Address)
-		}
-	}
-
-	rp.ring.AddRemoveServers(serversToAdd, serversToRemove)
-}
-
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
 //	Ring
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -423,7 +330,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	dest, success := rp.ring.Lookup(key)
 
-	rp.emit(events.LookupEvent{key, time.Now().Sub(startTime)})
+	rp.emit(LookupEvent{key, time.Now().Sub(startTime)})
 
 	if !success {
 		err := errors.New("could not find destination for key")
@@ -442,44 +349,11 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	return rp.ring.LookupN(key, n), nil
 }
 
-func (rp *Ringpop) onRingEvent(e interface{}) {
-	rp.emit(e)
-
-	switch e := e.(type) {
-	case ring.RingChecksumEvent:
-		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
-
-	case ring.RingChangedEvent:
-		added := int64(len(e.ServersAdded))
-		removed := int64(len(e.ServersRemoved))
-		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
-		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
-	}
-}
-
 func (rp *Ringpop) GetReachableMembers() ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
 	return rp.node.GetReachableMembers(), nil
-}
-
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-//
-//	Stats
-//
-//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
-
-func (rp *Ringpop) getStatKey(key string) string {
-	rp.stats.Lock()
-	rpKey, ok := rp.stats.keys[key]
-	if !ok {
-		rpKey = fmt.Sprintf("%s.%s", rp.stats.prefix, key)
-		rp.stats.keys[key] = rpKey
-	}
-	rp.stats.Unlock()
-
-	return rpKey
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -553,4 +427,29 @@ func DeserializeThrift(b []byte, s thrift.TStruct) error {
 	reader := bytes.NewReader(b)
 	transport := thrift.NewStreamTransportR(reader)
 	return s.Read(thrift.NewTBinaryProtocolTransport(transport))
+}
+
+// Event orchestration
+func (rp *Ringpop) onRingEvent(event shared.Event) {
+	rp.emit(event)
+}
+
+func (rp *Ringpop) onSwimEvent(event shared.Event) {
+	rp.emit(event)
+
+	switch event := event.(type) {
+	case swim.MemberlistChangesAppliedEvent:
+		var serversToAdd, serversToRemove []string
+
+		for _, change := range event.Changes {
+			switch change.Status {
+			case swim.Alive:
+				serversToAdd = append(serversToAdd, change.Address)
+			case swim.Faulty, swim.Leave:
+				serversToRemove = append(serversToRemove, change.Address)
+			}
+		}
+
+		rp.ring.AddRemoveServers(serversToAdd, serversToRemove)
+	}
 }

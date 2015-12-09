@@ -4,10 +4,10 @@ import "github.com/stretchr/testify/mock"
 
 import "time"
 
-import "github.com/uber/ringpop-go/events"
 import "github.com/uber/ringpop-go/forward"
-
+import "github.com/uber/ringpop-go/shared"
 import "github.com/uber/ringpop-go/swim"
+
 import "github.com/uber/tchannel-go"
 
 type Ringpop struct {
@@ -65,7 +65,7 @@ func (_m *Ringpop) Uptime() time.Duration {
 
 	return r0
 }
-func (_m *Ringpop) RegisterListener(l events.EventListener) {
+func (_m *Ringpop) RegisterListener(l shared.EventListener) {
 	_m.Called(l)
 }
 func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {

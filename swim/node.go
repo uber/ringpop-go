@@ -134,7 +134,7 @@ type Node struct {
 
 	pingRequestSize int
 
-	listeners []EventListener
+	listeners []shared.EventListener
 
 	clientRate metrics.Meter
 	serverRate metrics.Meter
@@ -203,15 +203,15 @@ func (n *Node) Incarnation() int64 {
 	return -1
 }
 
-func (n *Node) emit(event interface{}) {
-	for _, listener := range n.listeners {
-		go listener.HandleEvent(event)
-	}
+// RegisterListener adds a listener that will be sent swim events
+func (n *Node) RegisterListener(l shared.EventListener) {
+	n.listeners = append(n.listeners, l)
 }
 
-// RegisterListener adds a listener that will be sent swim events
-func (n *Node) RegisterListener(l EventListener) {
-	n.listeners = append(n.listeners, l)
+func (n *Node) emit(event interface{}) {
+	for _, listener := range n.listeners {
+		listener(event)
+	}
 }
 
 // Start starts the SWIM protocol and all sub-protocols

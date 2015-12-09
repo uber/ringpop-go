@@ -101,7 +101,7 @@ func Logger(l log.Logger) Option {
 
 func Statter(s log.StatsReporter) Option {
 	return func(r *Ringpop) error {
-		r.statter = s
+		r.reporter = s
 		return nil
 	}
 }
