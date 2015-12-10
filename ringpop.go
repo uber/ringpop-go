@@ -359,6 +359,7 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.JoinCompleteEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
+		rp.statter.IncCounter(rp.getStatKey("join.succeeded"), nil, 1)
 		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
 
 	case swim.PingSendEvent:
@@ -400,6 +401,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.JoinFailedEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.failed."+string(event.Reason)), nil, 1)
+
+	case swim.JoinTriesUpdateEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
 	}
 }
 

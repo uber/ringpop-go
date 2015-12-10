@@ -167,3 +167,8 @@ type ChangesCalculatedEvent struct {
 type ChangeFilteredEvent struct {
 	Change Change `json:"change"`
 }
+
+// A JoinTriesUpdateEvent is sent when the joiner tries to join a group
+type JoinTriesUpdateEvent struct {
+	Retries int
+}

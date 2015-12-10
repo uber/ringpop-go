@@ -94,6 +94,8 @@ type joinSender struct {
 	roundPotentialNodes    []string
 	roundPreferredNodes    []string
 	roundNonPreferredNodes []string
+
+	numTries int
 }
 
 // newJoinSender returns a new JoinSender to join a cluster with
@@ -306,6 +308,9 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	var startTime = time.Now()
 
 	var wg sync.WaitGroup
+
+	j.numTries++
+	j.node.emit(JoinTriesUpdateEvent{j.numTries})
 
 	for _, node := range group {
 		wg.Add(1)

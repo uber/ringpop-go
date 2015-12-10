@@ -25,8 +25,8 @@ that Ringpop emits:
 |join.failed.destroyed|Join process failed because Ringpop had been destroyed|count|Yes
 |join.failed.err|Join process failed because of an error|count|Yes
 |join.recv|Join request received|count|Yes
-|join.retries|Number of retries required by join process|gauge|-
-|join.succeeded|Join process succeeded|count|-
+|join.retries|Number of retries required by join process|gauge|Yes
+|join.succeeded|Join process succeeded|count|Yes
 |join|Time required to complete join process successfully|timer|Yes
 |lookup|Time required to perform a ring lookup|timer|-
 |make-alive|A member was declared alive|count|-

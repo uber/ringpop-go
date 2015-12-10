@@ -45,7 +45,7 @@ func (s *dummmyStats) IncCounter(key string, tags bark.Tags, val int64) {
 }
 
 func (s *dummmyStats) UpdateGauge(key string, tags bark.Tags, val int64) {
-	s.vals[key] += val
+	s.vals[key] = val
 }
 
 func (s *dummmyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
