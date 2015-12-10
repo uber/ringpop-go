@@ -177,3 +177,8 @@ type JoinTriesUpdateEvent struct {
 type MakeNodeStatusEvent struct {
 	Status string `json:"status"`
 }
+
+// A RequestBeforeReadyEvent is sent if a remote request came in for a ringpop endpoint while ringpop was not ready to process requests
+type RequestBeforeReadyEvent struct {
+	Endpoint Endpoint `json:"endpoint"`
+}

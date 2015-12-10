@@ -46,8 +46,8 @@ that Ringpop emits:
 |membership-update.suspect|A member was updated to be suspect|count|Yes
 |membership-update.unknown|A member was updated in the unknown state|count|Yes
 |membership.checksum-computed|Membership checksum was computed|count|Yes
-|not-ready.ping-req|Ping-req received before Ringpop was ready|count|-
-|not-ready.ping|Ping received before Ringpop was ready|count|-
+|not-ready.ping-req|Ping-req received before Ringpop was ready|count|Yes
+|not-ready.ping|Ping received before Ringpop was ready|count|Yes
 |num-members|Number of members in the membership|gauge|-
 |ping-req-ping|Indirect ping sent|timer|Yes
 |ping-req.other-members|Number of members selected for ping-req fanout|timer|-

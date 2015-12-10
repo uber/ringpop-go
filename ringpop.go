@@ -418,6 +418,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.MakeNodeStatusEvent:
 		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
+
+	case swim.RequestBeforeReadyEvent:
+		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
 	}
 }
 

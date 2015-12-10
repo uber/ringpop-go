@@ -29,7 +29,12 @@ type pingResponse struct {
 	Changes []Change `json:"changes"`
 }
 
-func handlePingRequest(node *Node, req *pingRequest) *pingResponse {
+func handlePingRequest(node *Node, req *pingRequest) (*pingResponse, error) {
+	if !node.Ready() {
+		node.emit(RequestBeforeReadyEvent{PingReqEndpoint})
+		return nil, ErrNodeNotReady
+	}
+
 	node.emit(PingRequestReceiveEvent{
 		Local:   node.Address(),
 		Source:  req.Source,
@@ -53,7 +58,7 @@ func handlePingRequest(node *Node, req *pingRequest) *pingResponse {
 			Target:  req.Target,
 			Ok:      false,
 			Changes: changes,
-		}
+		}, nil
 	}
 
 	node.emit(PingRequestPingEvent{
@@ -76,5 +81,5 @@ func handlePingRequest(node *Node, req *pingRequest) *pingResponse {
 		Target:  req.Target,
 		Ok:      true,
 		Changes: changes,
-	}
+	}, nil
 }
