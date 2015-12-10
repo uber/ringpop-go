@@ -125,42 +125,42 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
 	})
-	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.changes.apply"])
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ring.checksum-computed"])
+	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.changes.apply"], "missing stats for applied changes")
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ring.checksum-computed"], "missing stats for checksums being computed")
 	// expected listener to record 3 events (forwarded swim event, checksum event,
 	// and ring changed event)
 
 	s.ringpop.HandleEvent(swim.MaxPAdjustedEvent{NewPCount: 100})
-	s.Equal(int64(100), stats.vals["ringpop.127_0_0_1_3001.max-p"])
+	s.Equal(int64(100), stats.vals["ringpop.127_0_0_1_3001.max-piggyback"], "missing stats for piggyback adjustment")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinReceiveEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.recv"])
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.recv"], "missing stats for joins received")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinCompleteEvent{Duration: time.Second})
-	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.join"])
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.complete"])
+	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.join"], "missing stats for join initiated")
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.complete"], "missing stats for join completed")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingSendEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping.send"])
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping.send"], "missing stats for sent pings")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingReceiveEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping.recv"])
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping.recv"], "missing stats for received pings")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestsSendEvent{Peers: genAddresses(1, 2, 5)})
-	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.ping-req.send"])
+	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.ping-req.send"], "missing stats for sent ping-reqs")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestReceiveEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping-req.recv"])
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping-req.recv"], "missing stats for received ping-reqs")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestPingEvent{Duration: time.Second})
-	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.ping-req.ping"])
+	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.ping-req-ping"], "missing stats for ping-req pings executed")
 	// expected listener to record 1 event
 
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
