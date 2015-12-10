@@ -22,8 +22,8 @@ that Ringpop emits:
 |filtered-change|A change to be disseminated was deduped|count|Yes
 |full-sync|Number of full syncs transmitted|count|Yes
 |join.complete|Join process completed successfully|count|Yes
-|join.failed.destroyed|Join process failed because Ringpop had been destroyed|count|-
-|join.failed.err|Join process failed because of an error|count|-
+|join.failed.destroyed|Join process failed because Ringpop had been destroyed|count|Yes
+|join.failed.err|Join process failed because of an error|count|Yes
 |join.recv|Join request received|count|Yes
 |join.retries|Number of retries required by join process|gauge|-
 |join.succeeded|Join process succeeded|count|-

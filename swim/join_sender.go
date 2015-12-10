@@ -229,6 +229,10 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 
 	for {
 		if j.node.Destroyed() {
+			j.node.emit(JoinFailedEvent{
+				Reason: DESTROYED,
+				Error:  nil,
+			})
 			return nil, errors.New("node destroyed while attempting to join cluster")
 		}
 		// join group of nodes
@@ -264,6 +268,11 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 
 			err := fmt.Errorf("join duration of %v exceeded max %v",
 				joinDuration, j.maxJoinDuration)
+
+			j.node.emit(JoinFailedEvent{
+				Reason: ERROR,
+				Error:  err,
+			})
 			return nodesJoined, err
 		}
 

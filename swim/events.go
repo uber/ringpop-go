@@ -71,6 +71,23 @@ type JoinCompleteEvent struct {
 	Joined    []string      `json:"joined"`
 }
 
+// JoinFailedReason indicates the reason a join failed
+type JoinFailedReason string
+
+const (
+	// ERROR as a JoinFailedReason indicates that the join failed because of an error
+	ERROR JoinFailedReason = "err"
+
+	// DESTROYED as a JoinFailedReason indicates that the join failed because ringpop was destroyed during the join
+	DESTROYED = "destroyed"
+)
+
+// A JoinFailedEvent is sent when a join request to remote node did not successfully
+type JoinFailedEvent struct {
+	Reason JoinFailedReason
+	Error  error
+}
+
 // A PingSendEvent is sent when the node sends a ping to a remote node
 type PingSendEvent struct {
 	Local   string   `json:"local"`

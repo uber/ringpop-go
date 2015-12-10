@@ -397,6 +397,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.ChangeFilteredEvent:
 		rp.statter.IncCounter(rp.getStatKey("filtered-change"), nil, 1)
+
+	case swim.JoinFailedEvent:
+		rp.statter.IncCounter(rp.getStatKey("join.failed."+string(event.Reason)), nil, 1)
 	}
 }
 

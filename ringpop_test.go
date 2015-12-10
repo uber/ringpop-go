@@ -163,8 +163,16 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.ping-req-ping"], "missing stats for ping-req pings executed")
 	// expected listener to record 1 event
 
+	s.ringpop.HandleEvent(swim.JoinFailedEvent{Reason: swim.ERROR})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.failed.err"], "missing stats for join failed due to error")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(swim.JoinFailedEvent{Reason: swim.DESTROYED})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.failed.destroyed"], "missing stats for join failed due to error")
+	// expected listener to record 1 event
+
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(11, listener.EventCount(), "expected 11 total events to be recorded")
+	s.Equal(13, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
