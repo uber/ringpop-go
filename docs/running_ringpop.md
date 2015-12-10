@@ -19,7 +19,7 @@ that Ringpop emits:
 |damper.flapper.added|Flap damping detected a flappy node|count|N/A
 |damper.flapper.removed|Flap damping removed a flappy node|count|N/A
 |damper.flappers|Number of current flappers|gauge|N/A
-|filtered-change|A change to be disseminated was deduped|count|-
+|filtered-change|A change to be disseminated was deduped|count|Yes
 |full-sync|Number of full syncs transmitted|count|Yes
 |join.complete|Join process completed successfully|count|Yes
 |join.failed.destroyed|Join process failed because Ringpop had been destroyed|count|-

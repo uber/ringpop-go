@@ -142,7 +142,7 @@ func (d *disseminator) issueChanges(filter func(*pChange) bool) (changes []Chang
 	changes = make([]Change, 0)
 	for _, change := range d.changes {
 		if filter != nil && filter(change) {
-			// TODO: stat - filtered-change - increment
+			d.node.emit(ChangeFilteredEvent{change.Change})
 			continue
 		}
 

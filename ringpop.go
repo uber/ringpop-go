@@ -394,6 +394,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.ChangesCalculatedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.disseminate"), nil, int64(len(event.Changes)))
+
+	case swim.ChangeFilteredEvent:
+		rp.statter.IncCounter(rp.getStatKey("filtered-change"), nil, 1)
 	}
 }
 

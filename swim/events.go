@@ -145,3 +145,8 @@ type ChecksumComputeEvent struct {
 type ChangesCalculatedEvent struct {
 	Changes []Change `json:"changes"`
 }
+
+// A ChangeFilteredEvent is sent when a change has been filtered from the list to be disseminated
+type ChangeFilteredEvent struct {
+	Change Change `json:"change"`
+}
