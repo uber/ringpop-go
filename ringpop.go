@@ -352,7 +352,7 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
 	case swim.MaxPAdjustedEvent:
-		rp.statter.UpdateGauge(rp.getStatKey("max-p"), nil, int64(event.NewPCount))
+		rp.statter.UpdateGauge(rp.getStatKey("max-piggyback"), nil, int64(event.NewPCount))
 
 	case swim.JoinReceiveEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.recv"), nil, 1)
@@ -380,7 +380,7 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ping-req.recv"), nil, 1)
 
 	case swim.PingRequestPingEvent:
-		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
+		rp.statter.RecordTimer(rp.getStatKey("ping-req-ping"), nil, event.Duration)
 
 	case swim.ProtocolDelayComputeEvent:
 		rp.statter.RecordTimer(rp.getStatKey("protocol.delay"), nil, event.Duration)
