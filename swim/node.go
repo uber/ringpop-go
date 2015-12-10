@@ -108,6 +108,17 @@ func mergeDefaultOptions(opts *Options) *Options {
 	return opts
 }
 
+type NodeInterface interface {
+	Bootstrap(opts *BootstrapOptions) ([]string, error)
+	CountReachableMembers() int
+	Destroy()
+	GetReachableMembers() []string
+	MemberStats() MemberStats
+	ProtocolStats() ProtocolStats
+	Ready() bool
+	RegisterListener(l EventListener)
+}
+
 // A Node is a SWIM member
 type Node struct {
 	app     string
