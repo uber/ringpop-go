@@ -28,7 +28,7 @@ that Ringpop emits:
 |join.retries|Number of retries required by join process|gauge|Yes
 |join.succeeded|Join process succeeded|count|Yes
 |join|Time required to complete join process successfully|timer|Yes
-|lookup|Time required to perform a ring lookup|timer|-
+|lookup|Time required to perform a ring lookup|timer|Yes
 |make-alive|A member was declared alive|count|-
 |make-damped|A member was declared damped|count|-
 |make-faulty|A member was declared faulty|count|-

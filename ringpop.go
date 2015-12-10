@@ -404,6 +404,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.JoinTriesUpdateEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
+
+	case events.LookupEvent:
+		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
 	}
 }
 

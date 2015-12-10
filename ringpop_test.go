@@ -26,6 +26,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -180,8 +181,15 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.join.retries"], "join tries didn't update")
 	// expected listener to record 1 event
 
+	s.ringpop.HandleEvent(events.LookupEvent{
+		Key:      "hello",
+		Duration: time.Second,
+	})
+	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.lookup"], "missing lookup timer")
+	// expected listener to record 1 event
+
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(15, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(16, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
