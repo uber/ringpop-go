@@ -91,14 +91,16 @@ func genAddresses(host, fromPort, toPort int) []string {
 	return addresses
 }
 
-func genChanges(addresses []string, status string) []swim.Change {
+func genChanges(addresses []string, statusses ...string) []swim.Change {
 	var changes []swim.Change
 
 	for _, address := range addresses {
-		changes = append(changes, swim.Change{
-			Address: address,
-			Status:  status,
-		})
+		for _, status := range statusses {
+			changes = append(changes, swim.Change{
+				Address: address,
+				Status:  status,
+			})
+		}
 	}
 
 	return changes

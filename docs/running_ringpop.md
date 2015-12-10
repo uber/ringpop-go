@@ -35,11 +35,11 @@ that Ringpop emits:
 |make-leave|A member was declared leave|count|Yes
 |make-suspect|A member was declared suspect|count|Yes
 |max-piggyback|Value of the max piggyback factor|gauge|Yes
-|membership-set.alive|A member was initialized in the alive state|count|-
-|membership-set.faulty|A member was initialized in the faulty state|count|-
-|membership-set.leave|A member was initialized in the leave state|count|-
-|membership-set.suspect|A member was initialized in the suspect state|count|-
-|membership-set.unknown|A member was initialized in an unknown state|count|-
+|membership-set.alive|A member was initialized in the alive state|count|Yes
+|membership-set.faulty|A member was initialized in the faulty state|count|Yes
+|membership-set.leave|A member was initialized in the leave state|count|Yes
+|membership-set.suspect|A member was initialized in the suspect state|count|Yes
+|membership-set.unknown|A member was initialized in an unknown state|count|Yes
 |membership-update.alive|A member was updated to be alive|count|Yes
 |membership-update.faulty|A member was updated to be faulty|count|Yes
 |membership-update.leave|A member was updated in the leave state|count|Yes

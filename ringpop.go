@@ -347,6 +347,13 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
 		rp.handleChanges(event.Changes)
+		for _, change := range event.Changes {
+			status := change.Status
+			if len(status) == 0 {
+				status = "unknown"
+			}
+			rp.statter.IncCounter(rp.getStatKey("membership-set."+status), nil, 1)
+		}
 
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
