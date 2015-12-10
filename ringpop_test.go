@@ -179,7 +179,8 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestsSendEvent{Peers: genAddresses(1, 2, 5)})
-	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.ping-req.send"], "missing stats for sent ping-reqs")
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ping-req.send"], "missing ping-req.send stats")
+	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.ping-req.other-members"], "missing ping-req.other-members stats")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestReceiveEvent{})

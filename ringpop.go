@@ -386,7 +386,8 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ping.recv"), nil, 1)
 
 	case swim.PingRequestsSendEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, int64(len(event.Peers)))
+		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, 1)
+		rp.statter.IncCounter(rp.getStatKey("ping-req.other-members"), nil, int64(len(event.Peers)))
 
 	case swim.PingRequestsSendCompleteEvent:
 		rp.statter.RecordTimer(rp.getStatKey("ping-req"), nil, event.Duration)

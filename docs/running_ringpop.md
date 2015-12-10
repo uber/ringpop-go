@@ -50,9 +50,9 @@ that Ringpop emits:
 |not-ready.ping|Ping received before Ringpop was ready|count|Yes
 |num-members|Number of members in the membership|gauge|Yes
 |ping-req-ping|Indirect ping sent|timer|Yes
-|ping-req.other-members|Number of members selected for ping-req fanout|timer|-
+|ping-req.other-members|Number of members selected for ping-req fanout| ~~timer~~ count|Yes
 |ping-req.recv|Ping-req request received|count|Yes
-|ping-req.send|Ping-req request sent|count|Yes (validate same count)
+|ping-req.send|Ping-req request sent|count|Yes 
 |ping-req|Ping-req response time|timer|Yes
 |ping.recv|Ping request received|count|Yes
 |ping.send|Ping request sent|count|Yes
