@@ -172,3 +172,8 @@ type ChangeFilteredEvent struct {
 type JoinTriesUpdateEvent struct {
 	Retries int
 }
+
+// A MakeNodeStatusEvent is sent when Make[Status] is called on member list
+type MakeNodeStatusEvent struct {
+	Status string `json:"status"`
+}

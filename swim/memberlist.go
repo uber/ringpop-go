@@ -176,18 +176,22 @@ func (m *memberlist) GetMembers() (members []Member) {
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Alive})
 	return m.MakeChange(address, incarnation, Alive)
 }
 
 func (m *memberlist) MakeSuspect(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Suspect})
 	return m.MakeChange(address, incarnation, Suspect)
 }
 
 func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Faulty})
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
 func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Leave})
 	return m.MakeChange(address, incarnation, Leave)
 }
 

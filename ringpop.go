@@ -407,6 +407,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case events.LookupEvent:
 		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
+
+	case swim.MakeNodeStatusEvent:
+		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
 	}
 }
 

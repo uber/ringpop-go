@@ -29,11 +29,11 @@ that Ringpop emits:
 |join.succeeded|Join process succeeded|count|Yes
 |join|Time required to complete join process successfully|timer|Yes
 |lookup|Time required to perform a ring lookup|timer|Yes
-|make-alive|A member was declared alive|count|-
-|make-damped|A member was declared damped|count|-
-|make-faulty|A member was declared faulty|count|-
-|make-leave|A member was declared leave|count|-
-|make-suspect|A member was declared suspect|count|-
+|make-alive|A member was declared alive|count|Yes
+|make-damped|A member was declared damped|count|N/A
+|make-faulty|A member was declared faulty|count|Yes
+|make-leave|A member was declared leave|count|Yes
+|make-suspect|A member was declared suspect|count|Yes
 |max-piggyback|Value of the max piggyback factor|gauge|Yes
 |membership-set.alive|A member was initialized in the alive state|count|-
 |membership-set.faulty|A member was initialized in the faulty state|count|-

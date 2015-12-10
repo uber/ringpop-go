@@ -188,8 +188,24 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.lookup"], "missing lookup timer")
 	// expected listener to record 1 event
 
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Alive})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-alive"], "missing make-alive stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Faulty})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-faulty"], "missing make-faulty stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Suspect})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-suspect"], "missing make-suspect stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Leave})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-leave"], "missing make-leave stat")
+	// expected listener to record 1 event
+
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(16, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(20, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
