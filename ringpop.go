@@ -432,6 +432,17 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
+
+	case events.RingChecksumEvent:
+		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
+
+	case events.RingChangedEvent:
+		added := int64(len(event.ServersAdded))
+		removed := int64(len(event.ServersRemoved))
+		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
+		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
+		rp.statter.IncCounter(rp.getStatKey("ring.changed"), nil, 1)
+
 	}
 }
 
@@ -496,18 +507,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {
-	rp.emit(e)
-
-	switch e := e.(type) {
-	case events.RingChecksumEvent:
-		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
-
-	case events.RingChangedEvent:
-		added := int64(len(e.ServersAdded))
-		removed := int64(len(e.ServersRemoved))
-		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
-		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
-	}
+	rp.HandleEvent(e)
 }
 
 // GetReachableMembers returns the list of members the ring believes to be
