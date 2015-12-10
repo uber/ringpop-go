@@ -45,7 +45,7 @@ that Ringpop emits:
 |membership-update.leave|A member was updated in the leave state|count|Yes
 |membership-update.suspect|A member was updated to be suspect|count|Yes
 |membership-update.unknown|A member was updated in the unknown state|count|Yes
-|membership.checksum-computed|Membership checksum was computed|count|-
+|membership.checksum-computed|Membership checksum was computed|count|Yes
 |not-ready.ping-req|Ping-req received before Ringpop was ready|count|-
 |not-ready.ping|Ping received before Ringpop was ready|count|-
 |num-members|Number of members in the membership|gauge|-

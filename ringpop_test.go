@@ -223,8 +223,17 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-leave"], "missing make-leave stat")
 	// expected listener to record 1 event
 
+	s.ringpop.HandleEvent(swim.ChecksumComputeEvent{
+		Duration: 3 * time.Second,
+		Checksum: 42,
+	})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.membership.checksum-computed"], "missing membership.checksum-computed stat")
+	s.Equal(int64(42), stats.vals["ringpop.127_0_0_1_3001.checksum"], "missing checksum stat")
+	s.Equal(int64(3000), stats.vals["ringpop.127_0_0_1_3001.compute-checksum"], "missing compute-checksum stat")
+	// expected listener to record 1 event
+
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(24, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(25, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
