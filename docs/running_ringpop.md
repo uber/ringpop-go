@@ -8,7 +8,7 @@ that Ringpop emits:
 |Node.js Path|Description|Type|Golang
 |----|----|----|----
 |changes.apply|Number of changes applied per membership update|gauge|Yes
-|changes.disseminate|Number of changes disseminated per request/response|gauge|-
+|changes.disseminate|Number of changes disseminated per request/response|gauge|Yes
 |checksum|Value of membership checksum|gauge|Yes
 |compute-checksum|Time required to compute membership checksum|timer|Yes
 |damp-req.recv|Damp-req request received|count|N/A

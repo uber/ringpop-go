@@ -158,6 +158,8 @@ func (d *disseminator) issueChanges(filter func(*pChange) bool) (changes []Chang
 
 	d.Unlock()
 
+	d.node.emit(ChangesCalculatedEvent{changes})
+
 	return changes
 }
 

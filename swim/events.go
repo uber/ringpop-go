@@ -140,3 +140,8 @@ type ChecksumComputeEvent struct {
 	Duration time.Duration `json:"duration"`
 	Checksum uint32        `json:"checksum"`
 }
+
+// A ChangesCalculatedEvent is sent when the disseminator generated the list of changes to send in a ping or its response
+type ChangesCalculatedEvent struct {
+	Changes []Change `json:"changes"`
+}

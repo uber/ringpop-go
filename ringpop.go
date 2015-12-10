@@ -391,6 +391,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.ChecksumComputeEvent:
 		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
 		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
+
+	case swim.ChangesCalculatedEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("changes.disseminate"), nil, int64(len(event.Changes)))
 	}
 }
 
