@@ -354,6 +354,13 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 			}
 			rp.statter.IncCounter(rp.getStatKey("membership-set."+status), nil, 1)
 		}
+		mc, err := rp.CountReachableMembers()
+		if err != nil {
+			rp.logger.Errorf("unable to count members of the ring for statting: %q", err)
+		} else {
+			rp.statter.UpdateGauge(rp.getStatKey("num-members"), nil, int64(mc))
+		}
+		rp.statter.IncCounter(rp.getStatKey("updates"), nil, int64(len(event.Changes)))
 
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)

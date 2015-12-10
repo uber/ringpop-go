@@ -127,27 +127,33 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
 	})
 	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.changes.apply"], "missing stats for applied changes")
+	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.updates"], "missing updates stats")
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.ring.checksum-computed"], "missing stats for checksums being computed")
 	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.membership-set.alive"], "missing stats for member being set to alive")
-	// expected listener to record 3 events (forwarded swim event, checksum event,
-	// and ring changed event)
+	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), stats.vals["ringpop.127_0_0_1_3001.num-members"], "missing num-members stats for member being set to alive")
+	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.membership-set.alive"], "missing stats for member being set to alive")
+	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 1), swim.Faulty, swim.Leave, swim.Suspect),
 	})
 	s.Equal(int64(3), stats.vals["ringpop.127_0_0_1_3001.changes.apply"], "missing stats for applied changes for three status changes")
+	s.Equal(int64(13), stats.vals["ringpop.127_0_0_1_3001.updates"], "missing updates stats for three status changes")
 	s.Equal(int64(2 /* 1 + 1 from before */), stats.vals["ringpop.127_0_0_1_3001.ring.checksum-computed"], "missing stats for checksums being computed for three status changes")
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.membership-set.faulty"], "missing stats for member being set to faulty")
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.membership-set.leave"], "missing stats for member being set to leave")
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.membership-set.suspect"], "missing stats for member being set to suspect")
+	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), stats.vals["ringpop.127_0_0_1_3001.num-members"], "missing num-members stats for three status changes")
 	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 1), ""),
 	})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.changes.apply"], "missing stats for applied changes for unknown status change")
+	s.Equal(int64(14), stats.vals["ringpop.127_0_0_1_3001.updates"], "missing updates stats for unknown status change")
 	s.Equal(int64(2 /* 2 from before, no changes */), stats.vals["ringpop.127_0_0_1_3001.ring.checksum-computed"], "unexpected stats for checksums being computed for unknown status change")
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.membership-set.unknown"], "missing stats for member being set to unknown")
+	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), stats.vals["ringpop.127_0_0_1_3001.num-members"], "missing num-members stats for member being set to unknown")
 	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
 	s.ringpop.HandleEvent(swim.MaxPAdjustedEvent{NewPCount: 100})

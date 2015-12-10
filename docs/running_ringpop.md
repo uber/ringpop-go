@@ -48,7 +48,7 @@ that Ringpop emits:
 |membership.checksum-computed|Membership checksum was computed|count|Yes
 |not-ready.ping-req|Ping-req received before Ringpop was ready|count|Yes
 |not-ready.ping|Ping received before Ringpop was ready|count|Yes
-|num-members|Number of members in the membership|gauge|-
+|num-members|Number of members in the membership|gauge|Yes
 |ping-req-ping|Indirect ping sent|timer|Yes
 |ping-req.other-members|Number of members selected for ping-req fanout|timer|-
 |ping-req.recv|Ping-req request received|count|Yes
@@ -81,4 +81,4 @@ that Ringpop emits:
 |ring.checksum-computed|Hash ring checksum was computed|count|Yes
 |ring.server-added|Node (and its points) added to hash ring|count|Yes
 |ring.server-removed|Node (and its points) removed from hash ring|count|Yes
-|updates|Number of membership updates applied|timer|-
+|updates|Number of membership updates applied| ~~timer~~ count|Yes
