@@ -182,3 +182,6 @@ type MakeNodeStatusEvent struct {
 type RequestBeforeReadyEvent struct {
 	Endpoint Endpoint `json:"endpoint"`
 }
+
+// A RefuteUpdateEvent is sent when a node detects gossip about its own state that needs to be corrected
+type RefuteUpdateEvent struct{}

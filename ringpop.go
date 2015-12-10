@@ -429,6 +429,9 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 
 	case swim.RequestBeforeReadyEvent:
 		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
+
+	case swim.RefuteUpdateEvent:
+		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
 	}
 }
 

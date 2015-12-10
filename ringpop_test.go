@@ -247,8 +247,11 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.not-ready.ping-req"], "missing not-ready.ping-req stat")
 	// expected listener to record 1 event
 
+	s.ringpop.HandleEvent(swim.RefuteUpdateEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.refuted-update"], "missing refuted-update stat")
+
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(27, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(28, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {

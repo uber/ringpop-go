@@ -237,6 +237,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 		// if change is local override, reassert member is alive
 		if member.localOverride(m.node.Address(), change) {
+			m.node.emit(RefuteUpdateEvent{})
 			overrideChange := Change{
 				Source:            change.Source,
 				SourceIncarnation: change.SourceIncarnation,

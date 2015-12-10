@@ -57,10 +57,10 @@ that Ringpop emits:
 |ping.recv|Ping request received|count|Yes
 |ping.send|Ping request sent|count|Yes
 |ping|Ping response time|timer|Yes
-|protocol.damp-req|Damp-req response time|timer|-
+|protocol.damp-req|Damp-req response time|timer|N/A
 |protocol.delay|How often gossip protocol is expected to tick|timer|Yes
 |protocol.frequency|How often gossip protocol actually ticks|timer|Yes
-|refuted-update|A member refuted an update for itself|count|-
+|refuted-update|A member refuted an update for itself|count|Yes
 |requestProxy.checksumsDiffer|Checksums differed when a forwarded request was received|count|-
 |requestProxy.egress|Request was forwarded|count|-
 |requestProxy.inflight|Number of inflight forwarded requests|gauge|-
