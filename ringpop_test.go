@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -262,8 +263,63 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(5), stats.vals["ringpop.127_0_0_1_3001.ring.server-removed"], "missing ring.server-removed stat")
 	s.Equal(int64(3), stats.vals["ringpop.127_0_0_1_3001.ring.changed"], "missing ring.changed stat")
 
+	s.ringpop.HandleEvent(forward.RequestForwardedEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.egress"], "missing requestProxy.egress stat")
+	// expected listener to record 1 event
+
+	// forward.InflightRequestsChangedEvent:
+	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{5})
+	s.Equal(int64(5), stats.vals["ringpop.127_0_0_1_3001.requestProxy.inflight"], "missing requestProxy.inflight stat")
+	// expected listener to record 1 event
+
+	// test an update on the Inflight requests count
+	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{4})
+	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.requestProxy.inflight"], "missing requestProxy.inflight stat (update)")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{forward.InflightIncrement})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.miscount.increment"], "missing requestProxy.miscount.increment stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{forward.InflightDecrement})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.miscount.decrement"], "missing requestProxy.miscount.decrement stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.SuccessEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.send.success"], "missing requestProxy.send.success stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.FailedEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.send.error"], "missing requestProxy.send.error stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.MaxRetriesEvent{3})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.failed"], "missing requestProxy.retry.failed stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.RetryAttemptEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.attempted"], "missing requestProxy.retry.attempted stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.RetryAbortEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.aborted"], "missing requestProxy.retry.aborted stat")
+	// expected listener to record 1 event
+
+	me, _ := s.ringpop.WhoAmI()
+	s.ringpop.HandleEvent(forward.RerouteEvent{genAddresses(1, 1, 1)[0], me})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.reroute.local"], "missing requestProxy.retry.reroute.local stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.RerouteEvent{genAddresses(1, 1, 1)[0], genAddresses(1, 2, 2)[0]})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.reroute.remote"], "missing requestProxy.retry.reroute.remote stat")
+	// expected listener to record 1 event
+
+	s.ringpop.HandleEvent(forward.RetrySuccessEvent{1})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.succeeded"], "missing requestProxy.retry.reroute.remote stat")
+	// expected listener to record 1 event
+
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(29, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(42, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {

@@ -62,21 +62,21 @@ that Ringpop emits:
 |protocol.frequency|How often gossip protocol actually ticks|timer|Yes
 |refuted-update|A member refuted an update for itself|count|Yes
 |requestProxy.checksumsDiffer|Checksums differed when a forwarded request was received|count|-
-|requestProxy.egress|Request was forwarded|count|-
-|requestProxy.inflight|Number of inflight forwarded requests|gauge|-
+|requestProxy.egress|Request was forwarded|count|Yes
+|requestProxy.inflight|Number of inflight forwarded requests|gauge|Yes
 |requestProxy.ingress|Forward request was received|count|-
-|requestProxy.miscount.decrement|Number of inflight requests were miscounted after decrement|count|-
-|requestProxy.miscount.increment|Number of inflight requests were miscounted after increment|count|-
+|requestProxy.miscount.decrement|Number of inflight requests were miscounted after decrement|count|Yes
+|requestProxy.miscount.increment|Number of inflight requests were miscounted after increment|count|Yes
 |requestProxy.refused.eventloop|Request was refused due to event loop lag|count|-
 |requestProxy.refused.inflight|Request was refused due to number of inflight requests|count|-
-|requestProxy.retry.aborted|Forwarded request retry was aborted|count|-
-|requestProxy.retry.attempted|Forwarded request retry was attempted|count|-
-|requestProxy.retry.failed|Forwarded request failed after retries|count|-
-|requestProxy.retry.reroute.local|Forwarded request retry was rerouted to local node|count|-
-|requestProxy.retry.reroute.remote|Forwarded request retry was rerouted to remote node|count|-
-|requestProxy.retry.succeeded|Forwarded request succeeded after retries|count|-
-|requestProxy.send.error|Forwarded request failed|count|-
-|requestProxy.send.success|Forwarded request was successful|count|-
+|requestProxy.retry.aborted|Forwarded request retry was aborted|count|Yes
+|requestProxy.retry.attempted|Forwarded request retry was attempted|count|Yes
+|requestProxy.retry.failed|Forwarded request failed after retries|count|Yes
+|requestProxy.retry.reroute.local|Forwarded request retry was rerouted to local node|count|Yes
+|requestProxy.retry.reroute.remote|Forwarded request retry was rerouted to remote node|count|Yes
+|requestProxy.retry.succeeded|Forwarded request succeeded after retries|count|Yes
+|requestProxy.send.error|Forwarded request failed|count|Yes
+|requestProxy.send.success|Forwarded request was successful|count|Yes
 |ring.change**d**|Hash ring keyspace changed| ~~gauge~~ count |Yes
 |ring.checksum-computed|Hash ring checksum was computed|count|Yes
 |ring.server-added|Node (and its points) added to hash ring|count|Yes

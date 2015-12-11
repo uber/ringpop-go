@@ -36,6 +36,7 @@ import (
 // lookup method
 type requestSender struct {
 	sender  Sender
+	emitter eventEmitter
 	channel shared.SubChannel
 
 	request           []byte
@@ -57,11 +58,12 @@ type requestSender struct {
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
-func newRequestSender(sender Sender, channel shared.SubChannel, request []byte, keys []string,
+func newRequestSender(sender Sender, emitter eventEmitter, channel shared.SubChannel, request []byte, keys []string,
 	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
 	return &requestSender{
 		sender:         sender,
+		emitter:        emitter,
 		channel:        channel,
 		request:        request,
 		keys:           keys,
@@ -84,6 +86,10 @@ func (s *requestSender) Send() (res []byte, err error) {
 	select {
 	case err := <-s.MakeCall(ctx, &res):
 		if err == nil {
+			if s.retries > 0 {
+				// forwarding succeeded after retries
+				s.emitter.emit(RetrySuccessEvent{s.retries})
+			}
 			return res, nil
 		}
 
@@ -99,6 +105,8 @@ func (s *requestSender) Send() (res []byte, err error) {
 			"service":     s.service,
 			"endpoint":    s.endpoint,
 		}).Warn("max retries exceeded for request")
+
+		s.emitter.emit(MaxRetriesEvent{s.maxRetries})
 
 		return nil, errors.New("max retries exceeded")
 
@@ -164,8 +172,11 @@ func (s *requestSender) ScheduleRetry() ([]byte, error) {
 func (s *requestSender) AttemptRetry() ([]byte, error) {
 	s.retries++
 
+	s.emitter.emit(RetryAttemptEvent{})
+
 	dests := s.LookupKeys(s.keys)
 	if len(dests) > 1 || len(dests) == 0 {
+		s.emitter.emit(RetryAbortEvent{"key destinations have diverged"})
 		return nil, errors.New("key destinations have diverged")
 	}
 
@@ -182,7 +193,13 @@ func (s *requestSender) AttemptRetry() ([]byte, error) {
 }
 
 func (s *requestSender) RerouteRetry(destination string) ([]byte, error) {
+	s.emitter.emit(RerouteEvent{
+		s.destination,
+		destination,
+	})
+
 	s.destination = destination // update request destination
+
 	return s.Send()
 }
 

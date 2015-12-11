@@ -184,6 +184,7 @@ func (rp *Ringpop) init() error {
 	rp.stats.keys = make(map[string]string)
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
+	rp.forwarder.RegisterListener(rp)
 
 	rp.setState(initialized)
 
@@ -443,6 +444,40 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
 		rp.statter.IncCounter(rp.getStatKey("ring.changed"), nil, 1)
 
+	case forward.RequestForwardedEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.egress"), nil, 1)
+
+	case forward.InflightRequestsChangedEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("requestProxy.inflight"), nil, event.Inflight)
+
+	case forward.InflightRequestsMiscountEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.miscount."+string(event.Operation)), nil, 1)
+
+	case forward.FailedEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.send.error"), nil, 1)
+
+	case forward.SuccessEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.send.success"), nil, 1)
+
+	case forward.MaxRetriesEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.failed"), nil, 1)
+
+	case forward.RetryAttemptEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.attempted"), nil, 1)
+
+	case forward.RetryAbortEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.aborted"), nil, 1)
+
+	case forward.RerouteEvent:
+		me, _ := rp.WhoAmI()
+		if event.NewDestination == me {
+			rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.reroute.local"), nil, 1)
+		} else {
+			rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.reroute.remote"), nil, 1)
+		}
+
+	case forward.RetrySuccessEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.succeeded"), nil, 1)
 	}
 }
 
