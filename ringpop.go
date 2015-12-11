@@ -87,7 +87,7 @@ type Ringpop struct {
 
 	channel    shared.TChannel
 	subChannel shared.SubChannel
-	node       *swim.Node
+	node       swim.NodeInterface
 	ring       HashRing
 	forwarder  *forward.Forwarder
 
@@ -293,11 +293,12 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 		return nil, err
 	}
 
-	// Check we're in the bootstrap host list and add ourselves if we're not
+	// If the user has provided a list of hosts (and not a bootstrap file),
+	// check we're in the bootstrap host list and add ourselves if we're not
 	// there. If the host list is empty, this will create a single-node
 	// cluster.
 	bootstrapOpts := *userBootstrapOpts
-	if !stringInSlice(bootstrapOpts.Hosts, identity) {
+	if len(bootstrapOpts.File) == 0 && !stringInSlice(bootstrapOpts.Hosts, identity) {
 		bootstrapOpts.Hosts = append(bootstrapOpts.Hosts, identity)
 	}
 

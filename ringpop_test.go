@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
@@ -32,9 +33,10 @@ import (
 
 type RingpopTestSuite struct {
 	suite.Suite
-	ringpop     *Ringpop
-	channel     *tchannel.Channel
-	mockRingpop *mocks.Ringpop
+	ringpop      *Ringpop
+	channel      *tchannel.Channel
+	mockRingpop  *mocks.Ringpop
+	mockSwimNode *mocks.SwimNode
 }
 
 // createSingleNodeCluster is a helper function to create a single-node cluster
@@ -58,6 +60,9 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.NoError(err, "Ringpop must create successfully")
 
 	s.mockRingpop = &mocks.Ringpop{}
+	s.mockSwimNode = &mocks.SwimNode{}
+
+	s.mockSwimNode.On("Destroy").Return()
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
@@ -332,6 +337,54 @@ func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
 	result, err := s.ringpop.GetReachableMembers()
 	s.Error(err)
 	s.Nil(result)
+}
+
+// TestAddSelfToBootstrapList tests that Ringpop automatically adds its own
+// identity to the bootstrap host list.
+func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
+	// Init ringpop, but then override the swim node with mock node
+	s.ringpop.init()
+	s.ringpop.node = s.mockSwimNode
+
+	s.mockSwimNode.On("Bootstrap", mock.Anything).Return(
+		[]string{"127.0.0.1:3001", "127.0.0.1:3002"},
+		nil,
+	)
+
+	// Call Bootstrap with ourselves missing
+	_, err := s.ringpop.Bootstrap(&swim.BootstrapOptions{
+		Hosts: []string{"127.0.0.1:3002"},
+	})
+
+	// Test that self was added
+	s.mockSwimNode.AssertCalled(s.T(), "Bootstrap", &swim.BootstrapOptions{
+		Hosts: []string{"127.0.0.1:3002", "127.0.0.1:3001"},
+	})
+	s.Nil(err)
+}
+
+// TestDontAddSelfForFileBootstrap tests that Ringpop only adds itself to the
+// bootstrap host list automatically, if Hosts is the bootstrap mode.
+func (s *RingpopTestSuite) TestDontAddSelfForFileBootstrap() {
+	// Init ringpop, but then override the swim node with mock node
+	s.ringpop.init()
+	s.ringpop.node = s.mockSwimNode
+
+	s.mockSwimNode.On("Bootstrap", mock.Anything).Return(
+		[]string{"127.0.0.1:3001", "127.0.0.1:3002"},
+		nil,
+	)
+
+	// Call Bootstrap with File option and no Hosts
+	_, err := s.ringpop.Bootstrap(&swim.BootstrapOptions{
+		File: "./hosts.json",
+	})
+
+	// Test that Hosts is still empty
+	s.mockSwimNode.AssertCalled(s.T(), "Bootstrap", &swim.BootstrapOptions{
+		File: "./hosts.json",
+	})
+	s.Nil(err)
 }
 
 // TestEmptyJoinListCreatesSingleNodeCluster tests that when you call Bootstrap

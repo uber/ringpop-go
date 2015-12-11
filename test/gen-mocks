@@ -18,4 +18,11 @@ mockery -name Interface -print \
     |sed 's/type Interface/type Ringpop/g' \
     > "$mock_directory"/ringpop.go
 
+echo
+
+mockery -name NodeInterface -recursive -print \
+    |sed 's/_m \*NodeInterface/_m \*SwimNode/g' \
+    |sed 's/type NodeInterface/type SwimNode/g' \
+    > "$mock_directory"/swim_node.go
+
 mockery -case=underscore -dir router -recursive -output "$mock_directory" -name ClientFactory
