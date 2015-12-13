@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package ringpop
+package ring
 
 import (
 	"bytes"
@@ -26,48 +26,36 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/uber/ringpop-go/events"
-	"github.com/uber/ringpop-go/rbtree"
-
 	"github.com/dgryski/go-farm"
+    "github.com/uber/ringpop-go/shared"
 )
-
-type HashRing interface {
-	AddRemoveServers(add []string, remove []string) bool
-	Checksum() uint32
-	GetServers() []string
-	HasServer(address string) bool
-	Lookup(key string) (string, bool)
-	LookupN(key string, n int) []string
-	RemoveServer(address string)
-}
 
 type HashRingConfiguration struct {
 	ReplicaPoints int
 }
 
 type hashRing struct {
-	ringpop       *Ringpop
 	hashfunc      func([]byte) uint32
 	replicaPoints int
 
 	servers struct {
 		byAddress map[string]bool
-		tree      *rbtree.RBTree
+		tree      *RBTree
 		checksum  uint32
 		sync.RWMutex
 	}
+
+    listeners []shared.EventListener
 }
 
-func newHashRing(ringpop *Ringpop, hashfunc func([]byte) uint32, replicaPoints int) *hashRing {
+func New(hashfunc func([]byte) uint32, replicaPoints int) *hashRing {
 	ring := &hashRing{
-		ringpop:       ringpop,
 		hashfunc:      hashfunc,
 		replicaPoints: replicaPoints,
 	}
 
 	ring.servers.byAddress = make(map[string]bool)
-	ring.servers.tree = &rbtree.RBTree{}
+	ring.servers.tree = &RBTree{}
 
 	return ring
 }
@@ -99,7 +87,7 @@ func (r *hashRing) computeChecksum() {
 
 	old := r.servers.checksum
 	r.servers.checksum = farm.Fingerprint32(buffer.Bytes())
-	r.ringpop.ringEvent(events.RingChecksumEvent{
+	r.emit(RingChecksumEvent{
 		OldChecksum: old,
 		NewChecksum: r.servers.checksum,
 	})
@@ -113,7 +101,7 @@ func (r *hashRing) AddServer(address string) {
 	}
 
 	r.addReplicas(address)
-	r.ringpop.ringEvent(events.RingChangedEvent{ServersAdded: []string{address}})
+	r.emit(RingChangedEvent{ServersAdded: []string{address}})
 	r.computeChecksum()
 }
 
@@ -135,12 +123,12 @@ func (r *hashRing) RemoveServer(address string) {
 		return
 	}
 
-	r.RemoveReplicas(address)
-	r.ringpop.ringEvent(events.RingChangedEvent{ServersRemoved: []string{address}})
+	r.removeReplicas(address)
+	r.emit(RingChangedEvent{ServersRemoved: []string{address}})
 	r.computeChecksum()
 }
 
-func (r *hashRing) RemoveReplicas(server string) {
+func (r *hashRing) removeReplicas(server string) {
 	r.servers.Lock()
 
 	delete(r.servers.byAddress, server)
@@ -166,7 +154,7 @@ func (r *hashRing) AddRemoveServers(add []string, remove []string) bool {
 
 	for _, server := range remove {
 		if r.HasServer(server) {
-			r.RemoveReplicas(server)
+			r.removeReplicas(server)
 			removed = true
 		}
 	}
@@ -174,7 +162,7 @@ func (r *hashRing) AddRemoveServers(add []string, remove []string) bool {
 	changed = added || removed
 
 	if changed {
-		r.ringpop.ringEvent(events.RingChangedEvent{add, remove})
+		r.emit(RingChangedEvent{add, remove})
 		r.computeChecksum()
 	}
 
@@ -258,4 +246,14 @@ func (r *hashRing) LookupN(key string, n int) []string {
 	r.servers.RUnlock()
 
 	return servers
+}
+
+func (h *hashRing) RegisterListener(listener shared.EventListener) {
+    h.listeners = append(h.listeners, listener)
+}
+
+func (h *hashRing) emit(event interface{}) {
+    for _, listener := range h.listeners {
+        listener(event)
+    }
 }

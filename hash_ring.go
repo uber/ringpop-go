@@ -17,19 +17,16 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+package ringpop
 
-package events
+import "github.com/uber/ringpop-go/shared"
 
-import "time"
+type HashRing interface {
+	shared.EventEmitter
 
-// An EventListener handles events given to it by the Ringpop, as well as forwarded events from
-// the SWIM node contained by the ringpop. HandleEvent should be thread safe.
-type EventListener interface {
-	HandleEvent(event interface{})
-}
-
-// A LookupEvent is sent when a lookup is performed on the Ringpop's ring
-type LookupEvent struct {
-	Key      string
-	Duration time.Duration
+	AddRemoveServers(add []string, remove []string) bool
+	Checksum() uint32
+	GetServers() []string
+	Lookup(key string) (string, bool)
+	LookupN(key string, n int) []string
 }
