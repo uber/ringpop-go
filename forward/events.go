@@ -1,12 +1,10 @@
 package forward
 
-// An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
-type EventListener interface {
-	HandleEvent(interface{})
-}
+import "github.com/uber/ringpop-go/events"
 
+// An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
 type eventEmitter interface {
-	emit(interface{})
+	emit(events.Event)
 }
 
 // A RequestForwardedEvent is emitted for every forwarded request

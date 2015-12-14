@@ -91,9 +91,6 @@ func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 
 	return r0, r1
 }
-func (_m *Ringpop) HandleEvent(event interface{}) {
-	_m.Called(event)
-}
 func (_m *Ringpop) Checksum() (uint32, error) {
 	ret := _m.Called()
 

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/swim/util"
 )
@@ -65,7 +66,7 @@ func (d *dummyListener) EventCount() int {
 	return d.events
 }
 
-func (d *dummyListener) HandleEvent(event interface{}) {
+func (d *dummyListener) HandleEvent(event events.Event) {
 	d.l.Lock()
 	d.events++
 	d.l.Unlock()

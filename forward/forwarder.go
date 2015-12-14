@@ -28,6 +28,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go"
@@ -97,7 +98,7 @@ type Forwarder struct {
 	inflightLock sync.Mutex
 	inflight     int64
 
-	listeners []EventListener
+	listeners []events.EventListener
 }
 
 // NewForwarder returns a new forwarder
@@ -115,7 +116,7 @@ func NewForwarder(s Sender, ch shared.SubChannel, logger log.Logger) *Forwarder 
 	}
 }
 
-func (f *Forwarder) emit(event interface{}) {
+func (f *Forwarder) emit(event events.Event) {
 	for _, listener := range f.listeners {
 		go listener.HandleEvent(event)
 	}
@@ -123,7 +124,7 @@ func (f *Forwarder) emit(event interface{}) {
 
 // RegisterListener adds a listener to the forwarder. The listener's HandleEvent
 // will be called for every emit on Forwarder. The HandleEvent method must be thread safe
-func (f *Forwarder) RegisterListener(l EventListener) {
+func (f *Forwarder) RegisterListener(l events.EventListener) {
 	f.listeners = append(f.listeners, l)
 }
 

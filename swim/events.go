@@ -20,11 +20,15 @@
 
 package swim
 
-import "time"
+import (
+	"time"
+
+	"github.com/uber/ringpop-go/events"
+)
 
 // An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
 type EventListener interface {
-	HandleEvent(interface{})
+	HandleEvent(events.Event)
 }
 
 // A MaxPAdjustedEvent occurs when the disseminator adjusts the max propogation

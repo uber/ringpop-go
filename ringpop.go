@@ -63,7 +63,6 @@ type Interface interface {
 	Uptime() (time.Duration, error)
 	RegisterListener(l events.EventListener)
 	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
-	HandleEvent(event interface{})
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
@@ -332,7 +331,7 @@ func (rp *Ringpop) Ready() bool {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // HandleEvent is used to satisfy the swim.EventListener interface. No touchy.
-func (rp *Ringpop) HandleEvent(event interface{}) {
+func (rp *Ringpop) HandleEvent(event events.Event) {
 	rp.emit(event)
 
 	switch event := event.(type) {

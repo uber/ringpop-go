@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
@@ -66,7 +67,7 @@ func New(rp ringpop.Interface, f ClientFactory, ch *tchannel.Channel) Router {
 	return r
 }
 
-func (r *router) HandleEvent(event interface{}) {
+func (r *router) HandleEvent(event events.Event) {
 	switch event := event.(type) {
 	case swim.MemberlistChangesReceivedEvent:
 		for _, change := range event.Changes {

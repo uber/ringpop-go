@@ -22,10 +22,13 @@ package events
 
 import "time"
 
+// Event is an empty interface that is type switched when handeled.
+type Event interface{}
+
 // An EventListener handles events given to it by the Ringpop, as well as forwarded events from
 // the SWIM node contained by the ringpop. HandleEvent should be thread safe.
 type EventListener interface {
-	HandleEvent(event interface{})
+	HandleEvent(event Event)
 }
 
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
