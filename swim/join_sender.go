@@ -232,7 +232,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 	for {
 		if j.node.Destroyed() {
 			j.node.emit(JoinFailedEvent{
-				Reason: DESTROYED,
+				Reason: Destroyed,
 				Error:  nil,
 			})
 			return nil, errors.New("node destroyed while attempting to join cluster")
@@ -272,7 +272,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 				joinDuration, j.maxJoinDuration)
 
 			j.node.emit(JoinFailedEvent{
-				Reason: ERROR,
+				Reason: Error,
 				Error:  err,
 			})
 			return nodesJoined, err

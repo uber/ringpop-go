@@ -79,11 +79,11 @@ type JoinCompleteEvent struct {
 type JoinFailedReason string
 
 const (
-	// ERROR as a JoinFailedReason indicates that the join failed because of an error
-	ERROR JoinFailedReason = "err"
+	// Error as a JoinFailedReason indicates that the join failed because of an error
+	Error JoinFailedReason = "err"
 
-	// DESTROYED as a JoinFailedReason indicates that the join failed because ringpop was destroyed during the join
-	DESTROYED = "destroyed"
+	// Destroyed as a JoinFailedReason indicates that the join failed because ringpop was destroyed during the join
+	Destroyed = "destroyed"
 )
 
 // A JoinFailedEvent is sent when a join request to remote node did not successfully
@@ -164,12 +164,12 @@ type ChecksumComputeEvent struct {
 
 // A ChangesCalculatedEvent is sent when the disseminator generated the list of changes to send in a ping or its response
 type ChangesCalculatedEvent struct {
-	Changes []Change `json:"changes"`
+	Changes []Change
 }
 
 // A ChangeFilteredEvent is sent when a change has been filtered from the list to be disseminated
 type ChangeFilteredEvent struct {
-	Change Change `json:"change"`
+	Change Change
 }
 
 // A JoinTriesUpdateEvent is sent when the joiner tries to join a group
@@ -179,12 +179,12 @@ type JoinTriesUpdateEvent struct {
 
 // A MakeNodeStatusEvent is sent when Make[Status] is called on member list
 type MakeNodeStatusEvent struct {
-	Status string `json:"status"`
+	Status string
 }
 
 // A RequestBeforeReadyEvent is sent if a remote request came in for a ringpop endpoint while ringpop was not ready to process requests
 type RequestBeforeReadyEvent struct {
-	Endpoint Endpoint `json:"endpoint"`
+	Endpoint Endpoint
 }
 
 // A RefuteUpdateEvent is sent when a node detects gossip about its own state that needs to be corrected
