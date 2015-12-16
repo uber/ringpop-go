@@ -18,23 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Package ringpop brings cooperation and coordination to applications that would
-// otherwise run as a set of independent worker processes.
-//
-// Ringpop implements a membership protocol that allows those workers to discover
-// one another and use the communication channels established between them as a
-// means of disseminating information, detecting failure, and ultimately converging
-// on a consistent membership list. Consistent hashing is then applied on top of
-// that list and gives an application the ability to define predictable behavior
-// and data storage facilities within a custom keyspace. The keyspace is partitioned
-// and evenly assigned to the individual instances of an application. Clients of
-// the application remain simple and need not know of the underlying cooperation
-// between workers nor chosen partitioning scheme. A request can be sent to any
-// instance, and Ringpop intelligently forwards the request to the “correct” instance
-// as defined by a hash ring lookup.
-//
-// Ringpop makes it possible to build extremely scalable and fault-tolerant distributed
-// systems with 3 main capabilities: membership protocol, consistent hashing, and forwarding.
+// Package ringpop is a library that maintains a consistent hash ring atop a
+// gossip-based membership protocol. It can be used by applications to
+// arbitrarily shard data in a scalable and fault-tolerant manner.
 package ringpop
 
 import (
@@ -73,10 +59,10 @@ type Interface interface {
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
 }
 
-// Ringpop is a consistent hash-ring that uses a gossip prtocol to disseminate changes around the
-// ring
+// Ringpop is a consistent hashring that uses a gossip protocol to disseminate
+// changes around the ring.
 type Ringpop struct {
-	config         *Configuration
+	config         *configuration
 	configHashRing *HashRingConfiguration
 
 	identityResolver IdentityResolver
@@ -127,12 +113,12 @@ const (
 	destroyed
 )
 
-// New returns a new Ringpop instance!
+// New returns a new Ringpop instance.
 func New(app string, opts ...Option) (*Ringpop, error) {
 	var err error
 
 	ringpop := &Ringpop{
-		config: &Configuration{
+		config: &configuration{
 			App: app,
 		},
 	}
@@ -210,7 +196,9 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 	return hostport, nil
 }
 
-// Destroy Ringpop
+// Destroy stops all communication. Note that this does not close the TChannel
+// instance that was passed to Ringpop in the constructor. Once an instance is
+// destroyed, it cannot be restarted.
 func (rp *Ringpop) Destroy() {
 	if rp.node != nil {
 		rp.node.Destroy()
@@ -224,13 +212,15 @@ func (rp *Ringpop) destroyed() bool {
 	return rp.getState() == destroyed
 }
 
-// App returns the app the ringpop belongs to
+// App returns the name of the application this Ringpop instance belongs to.
+// The application name is set in the constructor when the Ringpop instance is
+// created.
 func (rp *Ringpop) App() string {
 	return rp.config.App
 }
 
 // WhoAmI returns the address of the current/local Ringpop node. It returns an
-// error if Ringpop is not yet initialised/bootstrapped.
+// error if Ringpop is not yet initialized/bootstrapped.
 func (rp *Ringpop) WhoAmI() (string, error) {
 	if !rp.Ready() {
 		return "", ErrNotBootstrapped
@@ -238,7 +228,8 @@ func (rp *Ringpop) WhoAmI() (string, error) {
 	return rp.identity()
 }
 
-// Uptime returns the amount of time that the ringpop has been running for
+// Uptime returns the amount of time that this Ringpop instance has been
+// bootstrapped for.
 func (rp *Ringpop) Uptime() (time.Duration, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
@@ -253,7 +244,7 @@ func (rp *Ringpop) emit(event interface{}) {
 }
 
 // RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
-// should be thread safe
+// should be thread safe.
 func (rp *Ringpop) RegisterListener(l events.EventListener) {
 	rp.listeners = append(rp.listeners, l)
 }
@@ -279,7 +270,13 @@ func (rp *Ringpop) setState(s state) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// Bootstrap starts the Ringpop
+// Bootstrap starts communication for this Ringpop instance.
+//
+// When Bootstrap is called, this Ringpop instance will attempt to contact
+// other instances from a seed list provided either in the BootstrapOptions or
+// as a JSON file.
+//
+// If no seed hosts are provided, a single-node cluster will be created.
 func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string, error) {
 	if rp.getState() < initialized {
 		err := rp.init()
@@ -315,8 +312,8 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 	return joined, nil
 }
 
-// Ready returns whether or not ringpop is bootstrapped and should receive
-// requests
+// Ready returns whether or not ringpop is bootstrapped and ready to receive
+// requests.
 func (rp *Ringpop) Ready() bool {
 	if rp.getState() != ready {
 		return false
@@ -501,7 +498,7 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// Checksum returns the checksum of the ringpop's hashring
+// Checksum returns the current checksum of this Ringpop instance's hashring.
 func (rp *Ringpop) Checksum() (uint32, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
@@ -511,7 +508,7 @@ func (rp *Ringpop) Checksum() (uint32, error) {
 
 // Lookup returns the address of the server in the ring that is responsible
 // for the specified key. It returns an error if the Ringpop instance is not
-// yet initialised/bootstrapped.
+// yet initialized/bootstrapped.
 func (rp *Ringpop) Lookup(key string) (string, error) {
 	if !rp.Ready() {
 		return "", ErrNotBootstrapped
@@ -532,7 +529,9 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 	return dest, nil
 }
 
-// LookupN hashes a key to N servers in the ring
+// LookupN returns the addresses of all the servers in the ring that are
+// responsible for the specified key. It returns an error if the Ringpop
+// instance is not yet initialized/bootstrapped.
 func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
@@ -544,8 +543,8 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 	rp.HandleEvent(e)
 }
 
-// GetReachableMembers returns the list of members the ring believes to be
-// available for requests.
+// GetReachableMembers returns a slice of members currently in this instance's
+// membership list that aren't faulty.
 func (rp *Ringpop) GetReachableMembers() ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
@@ -553,8 +552,8 @@ func (rp *Ringpop) GetReachableMembers() ([]string, error) {
 	return rp.node.GetReachableMembers(), nil
 }
 
-// CountReachableMembers returns the number of members the ring believes to be
-// available for requests
+// CountReachableMembers returns the number of members currently in this
+// instance's membership list that aren't faulty.
 func (rp *Ringpop) CountReachableMembers() (int, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped

@@ -29,7 +29,7 @@ import (
 	"github.com/uber/ringpop-go/shared"
 )
 
-type Configuration struct {
+type configuration struct {
 	// App is the name used to uniquely identify members of the same ring.
 	// Members will only talk to other members with the same app name. Note
 	// that App is taken as an argument of the Ringpop constructor and not a
@@ -37,7 +37,7 @@ type Configuration struct {
 	App string
 }
 
-// "Options" are modifier functions that configure/modify a real Ringpop
+// An Option is a modifier functions that configure/modify a real Ringpop
 // object.
 //
 // There are typically two types of runtime options you can provide: flags
@@ -77,6 +77,15 @@ func checkOptions(rp *Ringpop) []error {
 
 // Runtime options
 
+// Channel is used to provide a TChannel instance that Ringpop should use for
+// all communication.
+//
+// Example:
+//
+//     rp, err := ringpop.New("my-app", ringpop.Channel(myChannel))
+//
+// Channel is a required option. The constructor will throw an error if this
+// option is not present.
 func Channel(ch shared.TChannel) Option {
 	return func(r *Ringpop) error {
 		r.channel = ch
@@ -84,6 +93,20 @@ func Channel(ch shared.TChannel) Option {
 	}
 }
 
+// HashRingConfig takes a `HashRingConfiguration` struct that can be used to
+// configure the hash ring.
+//
+// Example:
+//
+//     rp, err := ringpop.New("my-app",
+//         ringpop.Channel(myChannel),
+//         ringpop.HashRingConfig(&HashRingConfiguration{
+//             ReplicaPoints: 100,
+//         }),
+//     )
+//
+// See documentation on the `HashRingConfiguration` struct for more information
+// about what options are available.
 func HashRingConfig(c *HashRingConfiguration) Option {
 	return func(r *Ringpop) error {
 		r.configHashRing = c
@@ -91,6 +114,9 @@ func HashRingConfig(c *HashRingConfiguration) Option {
 	}
 }
 
+// Logger is used to specify a bark-compatible logger that will be used for
+// all Ringpop logging. If a logger is not provided, one will be created
+// automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
 		r.logger = l
@@ -99,6 +125,9 @@ func Logger(l log.Logger) Option {
 	}
 }
 
+// Statter is used to specify a bark-compatible (bark.StatsReporter) stats
+// reporter that will be used to record ringpop stats. If a statter is not
+// provided, stats will be emitted to a null stats-reporter.
 func Statter(s log.StatsReporter) Option {
 	return func(r *Ringpop) error {
 		r.statter = s
@@ -106,22 +135,39 @@ func Statter(s log.StatsReporter) Option {
 	}
 }
 
+// Identity is used to specify a static hostport string as this Ringpop
+// instance's identity.
+//
+// Example:
+//
+//     ringpop.New("my-app",
+//         ringpop.Channel(myChannel),
+//         ringpop.Identity("10.32.12.2:21130"),
+//     )
+//
+// You should make sure the identity matches the listening address of the
+// TChannel object.
+//
+// By default, you do not need to provide an identity. If you do not provide
+// one, the identity will be resolved automatically by the default resolver.
+func Identity(hostport string) Option {
+	return IdentityResolverFunc(func() (string, error) {
+		return hostport, nil
+	})
+}
+
 // IdentityResolver is a function that returns the listen interface/port
 // that Ringpop should identify as.
 type IdentityResolver func() (string, error)
 
+// IdentityResolverFunc is used to specify a function that will called when
+// the Ringpop instance needs to resolve its identity (typically, on
+// bootstrap).
 func IdentityResolverFunc(resolver IdentityResolver) Option {
 	return func(r *Ringpop) error {
 		r.identityResolver = resolver
 		return nil
 	}
-}
-
-// Identity specifies a static hostport string as Ringpop's identity.
-func Identity(hostport string) Option {
-	return IdentityResolverFunc(func() (string, error) {
-		return hostport, nil
-	})
 }
 
 // Default options
