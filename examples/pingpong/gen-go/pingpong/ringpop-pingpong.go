@@ -11,7 +11,6 @@ import (
 	"github.com/uber/tchannel-go/thrift"
 )
 
-// ------ Generated code for PingPong ------
 type RingpopPingPongAdapter struct {
 	impl    TChanPingPong
 	ringpop ringpop.Interface
@@ -20,8 +19,9 @@ type RingpopPingPongAdapter struct {
 	router  router.Router
 }
 
+// PingPongConfiguration contains the forwarding configuration for the PingPong service. It has a field for every endpoint defined in the service. In this field the endpoint specific forward configuration can be stored. Populating these fields is optional, default behaviour is to call the service implementation locally to the process where the call came in.
 type PingPongConfiguration struct {
-	// structs for all service endpoints containing forwarding behavior
+	// Ping holds the forwarding configuration for the Ping endpoint defined in the service
 	Ping *PingPongPingConfiguration
 }
 
@@ -34,6 +34,27 @@ func (c *PingPongConfiguration) validate() error {
 	return nil
 }
 
+// NewRingpopPingPongAdapter creates an implementation of the TChanPingPong interface. This specific implementation will use to configuration provided during construction to deterministically route calls to nodes from a ringpop cluster. The channel should be the channel on which the service exposes its endpoints. Forwarded calls, calls to unconfigured endpoints and calls that already were executed on the right machine will be passed on the the implementation passed in during construction.
+//
+// Example usage:
+//  import "github.com/uber/tchannel-go/thrift"
+//
+//  var server thrift.Server
+//  server = ...
+//
+//  var handler TChanPingPong
+//  handler = &YourImplementation{}
+//
+//  adapter, _ := NewRingpopPingPongAdapter(handler, ringpop, channel,
+//    PingPongConfiguration{
+//      Ping: &PingPongConfiguration: {
+//        Key: func(ctx thrift.Context, request *Ping) (shardKey string, err error) {
+//          return "calculated-shard-key", nil
+//        },
+//      },
+//    },
+//  )
+//  server.Register(NewTChanPingPongServer(adapter))
 func NewRingpopPingPongAdapter(
 	impl TChanPingPong,
 	rp ringpop.Interface,
@@ -57,19 +78,23 @@ func NewRingpopPingPongAdapter(
 	return adapter, nil
 }
 
+// GetLocalClient satisfies the ClientFactory interface of ringpop-go/router
 func (a *RingpopPingPongAdapter) GetLocalClient() interface{} {
 	return a.impl
 }
 
+// MakeRemoteClient satisfies the ClientFactory interface of ringpop-go/router
 func (a *RingpopPingPongAdapter) MakeRemoteClient(client thrift.TChanClient) interface{} {
 	return NewTChanPingPongClient(client)
 }
 
-// ------ 'Generated' code for Ping ------ config.Ping
+// PingPongPingConfiguration contains the configuration on how to route calls to the thrift endpoint PingPong::Ping.
 type PingPongPingConfiguration struct {
+	// Key is a closure that generates a routable key based on the parameters of the incomming request.
 	Key func(ctx thrift.Context, request *Ping) (string, error)
 }
 
+// Ping satisfies the TChanPingPong interface. This function uses the configuration for Ping to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopPingPongAdapter) Ping(ctx thrift.Context, request *Ping) (r *Pong, err error) {
 	// check if the function should be called locally
 	if a.config.Ping == nil || forward.HasForwardedHeader(ctx) {
@@ -91,5 +116,3 @@ func (a *RingpopPingPongAdapter) Ping(ctx thrift.Context, request *Ping) (r *Pon
 	ctx = forward.SetForwardedHeader(ctx)
 	return client.Ping(ctx, request)
 }
-
-// ------ End of PingPong ------

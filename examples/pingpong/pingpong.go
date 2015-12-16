@@ -106,7 +106,8 @@ func main() {
 					return request.Key, nil
 				},
 			},
-		})
+		},
+	)
 	if err != nil {
 		log.Fatalf("unable to wrap the worker: %q", err)
 	}
