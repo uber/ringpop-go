@@ -47,7 +47,7 @@ func (c *PingPongConfiguration) validate() error {
 //
 //  adapter, _ := NewRingpopPingPongAdapter(handler, ringpop, channel,
 //    PingPongConfiguration{
-//      Ping: &PingPongConfiguration: {
+//      Ping: &PingPongPingConfiguration: {
 //        Key: func(ctx thrift.Context, request *Ping) (shardKey string, err error) {
 //          return "calculated-shard-key", nil
 //        },
