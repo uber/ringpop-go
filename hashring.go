@@ -32,6 +32,8 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
+// HashRing is an interface for a hash ring that Ringpop uses for consistent
+// hashing.
 type HashRing interface {
 	AddRemoveServers(add []string, remove []string) bool
 	Checksum() uint32
@@ -42,7 +44,13 @@ type HashRing interface {
 	RemoveServer(address string)
 }
 
+// HashRingConfiguration is a configuration struct that can be passed to the
+// Ringpop constructor to customize hash ring options.
 type HashRingConfiguration struct {
+	// ReplicaPoints is the number of positions a node will be assigned on the
+	// ring. A bigger number will provide better key distribution, but require
+	// more computation when building or traversing the ring (typically on
+	// lookups or membership changes).
 	ReplicaPoints int
 }
 
