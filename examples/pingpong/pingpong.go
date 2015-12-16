@@ -28,7 +28,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
-	"github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
+	gen "github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
@@ -62,42 +62,57 @@ func newWorker(address string, channel *tchannel.Channel) *worker {
 	}
 }
 
-func (w *worker) Ping(ctx thrift.Context, request *pingpong.Ping) (*pingpong.Pong, error) {
-	return &pingpong.Pong{Source: w.address}, nil
+func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) {
+	return &gen.Pong{Source: w.address}, nil
 }
 
 func main() {
 	flag.Parse()
 
-	channel, err := tchannel.NewChannel("pingpong", &tchannel.ChannelOptions{
-	// Logger: tchannel.NewLevelLogger(tchannel.SimpleLogger, tchannel.LogLevelWarn),
-	})
+	channel, err := tchannel.NewChannel("pingpong", &tchannel.ChannelOptions{})
 	if err != nil {
 		log.Fatalf("could not create channel: %v", err)
 	}
-
-	worker := newWorker(*hostport, channel)
 	server := thrift.NewServer(channel)
 
-	var handler pingpong.TChanPingPong
-	handler = worker
+	// The actual service implementation
+	worker := newWorker(*hostport, channel)
+	// wrap the PingPong worker by a ringpop adapter for routing RPC calls
+	// NewRingpopPingPongAdapter is in the package containing the generated code
+	// Its name is derived from the thrift service name as follows: `NewRingpop[Service Name]Adapter`
+	adapter, err := gen.NewRingpopPingPongAdapter(worker, worker.ringpop, channel,
+		// PingPongConfiguration contains the configuration for ringpop forwarding regaring this service
+		// The name is derived as follows `[Service Name]Configuration`
+		gen.PingPongConfiguration{
+			// The ping member of the configuration refers to the Ping endpoint within the service.
+			// Configuring an endpoint is optional and unconfigured endpoints will work but not be
+			// forwarded to a different ringpop node during invocation
+			// The name of the configuration struct passed in here is derived as follows:
+			// `[Service Name][Endpoint Name]Configuration`
+			Ping: &gen.PingPongPingConfiguration{
+				// The configuration structs only member is the Key closure. The purpose of this closure
+				// is to return the key used for ringpop sharding and forwarding. Calls that are sharded
+				// on the same key are guaranteed to be forwarded to the same node.
+				// The input signature for this closure is the same as the signature for your
+				// implementation. The output is always the tuple (shardKey string, err error).
+				Key: func(ctx thrift.Context, request *gen.Ping) (shardKey string, err error) {
+					// The body of the Key closure can perform whatever logic is needed to come to a
+					// meaningful shardKey for the the request
+					if request == nil {
+						return "", errors.New("missing request in call to Ping")
+					}
 
-	// wrap the PingPong handler by a ringpop adapter for routing RPC calls
-	handler, err = pingpong.NewRingpopPingPongAdapter(handler, worker.ringpop, channel, pingpong.PingPongConfiguration{
-		Ping: &pingpong.PingPongPingConfiguration{
-			Key: func(ctx thrift.Context, request *pingpong.Ping) (string, error) {
-				if request == nil {
-					return "", errors.New("missing request in call to Ping")
-				}
-				return request.Key, nil
+					// Here we route the ping's for the same key to the same machine
+					return request.Key, nil
+				},
 			},
-		},
-	})
+		})
 	if err != nil {
-		log.Fatalf("unable to wrap the handler: %q", err)
+		log.Fatalf("unable to wrap the worker: %q", err)
 	}
 
-	server.Register(pingpong.NewTChanPingPongServer(handler))
+	// now pass the ringpop adapter into the TChannel Thrift server for the PingPong Service
+	server.Register(gen.NewTChanPingPongServer(adapter))
 
 	if err := channel.ListenAndServe(*hostport); err != nil {
 		log.Fatalf("could not listen on hostport: %v", err)
