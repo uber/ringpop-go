@@ -31,6 +31,17 @@ import (
 // nothing to be passed to Arg3
 type Arg struct{}
 
+// Endpoint is an identifier for an internal swim endpoint
+type Endpoint string
+
+const (
+	// PingEndpoint is the identifier for /protocol/ping
+	PingEndpoint Endpoint = "ping"
+
+	// PingReqEndpoint is the identifier for /protocol/ping-req
+	PingReqEndpoint Endpoint = "ping-req"
+)
+
 type Status struct {
 	Status string `json:"status"`
 }
@@ -71,11 +82,11 @@ func (n *Node) joinHandler(ctx json.Context, req *joinRequest) (*joinResponse, e
 }
 
 func (n *Node) pingHandler(ctx json.Context, req *ping) (*ping, error) {
-	return handlePing(n, req), nil
+	return handlePing(n, req)
 }
 
 func (n *Node) pingRequestHandler(ctx json.Context, req *pingRequest) (*pingResponse, error) {
-	return handlePingRequest(n, req), nil
+	return handlePingRequest(n, req)
 }
 
 func (n *Node) debugSetHandler(ctx json.Context, req *Arg) (*Arg, error) {

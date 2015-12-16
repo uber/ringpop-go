@@ -63,7 +63,6 @@ type Interface interface {
 	Uptime() (time.Duration, error)
 	RegisterListener(l events.EventListener)
 	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
-	HandleEvent(event interface{})
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
@@ -184,6 +183,7 @@ func (rp *Ringpop) init() error {
 	rp.stats.keys = make(map[string]string)
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
+	rp.forwarder.RegisterListener(rp)
 
 	rp.setState(initialized)
 
@@ -331,7 +331,7 @@ func (rp *Ringpop) Ready() bool {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // HandleEvent is used to satisfy the swim.EventListener interface. No touchy.
-func (rp *Ringpop) HandleEvent(event interface{}) {
+func (rp *Ringpop) HandleEvent(event events.Event) {
 	rp.emit(event)
 
 	switch event := event.(type) {
@@ -347,18 +347,33 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
 		rp.handleChanges(event.Changes)
+		for _, change := range event.Changes {
+			status := change.Status
+			if len(status) == 0 {
+				status = "unknown"
+			}
+			rp.statter.IncCounter(rp.getStatKey("membership-set."+status), nil, 1)
+		}
+		mc, err := rp.CountReachableMembers()
+		if err != nil {
+			rp.logger.Errorf("unable to count members of the ring for statting: %q", err)
+		} else {
+			rp.statter.UpdateGauge(rp.getStatKey("num-members"), nil, int64(mc))
+		}
+		rp.statter.IncCounter(rp.getStatKey("updates"), nil, int64(len(event.Changes)))
 
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
 	case swim.MaxPAdjustedEvent:
-		rp.statter.UpdateGauge(rp.getStatKey("max-p"), nil, int64(event.NewPCount))
+		rp.statter.UpdateGauge(rp.getStatKey("max-piggyback"), nil, int64(event.NewPCount))
 
 	case swim.JoinReceiveEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.recv"), nil, 1)
 
 	case swim.JoinCompleteEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
+		rp.statter.IncCounter(rp.getStatKey("join.succeeded"), nil, 1)
 		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
 
 	case swim.PingSendEvent:
@@ -371,7 +386,8 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ping.recv"), nil, 1)
 
 	case swim.PingRequestsSendEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, int64(len(event.Peers)))
+		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, 1)
+		rp.statter.IncCounter(rp.getStatKey("ping-req.other-members"), nil, int64(len(event.Peers)))
 
 	case swim.PingRequestsSendCompleteEvent:
 		rp.statter.RecordTimer(rp.getStatKey("ping-req"), nil, event.Duration)
@@ -380,7 +396,7 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ping-req.recv"), nil, 1)
 
 	case swim.PingRequestPingEvent:
-		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
+		rp.statter.RecordTimer(rp.getStatKey("ping-req-ping"), nil, event.Duration)
 
 	case swim.ProtocolDelayComputeEvent:
 		rp.statter.RecordTimer(rp.getStatKey("protocol.delay"), nil, event.Duration)
@@ -391,6 +407,76 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.ChecksumComputeEvent:
 		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
 		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
+		rp.statter.IncCounter(rp.getStatKey("membership.checksum-computed"), nil, 1)
+
+	case swim.ChangesCalculatedEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("changes.disseminate"), nil, int64(len(event.Changes)))
+
+	case swim.ChangeFilteredEvent:
+		rp.statter.IncCounter(rp.getStatKey("filtered-change"), nil, 1)
+
+	case swim.JoinFailedEvent:
+		rp.statter.IncCounter(rp.getStatKey("join.failed."+string(event.Reason)), nil, 1)
+
+	case swim.JoinTriesUpdateEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
+
+	case events.LookupEvent:
+		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
+
+	case swim.MakeNodeStatusEvent:
+		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
+
+	case swim.RequestBeforeReadyEvent:
+		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
+
+	case swim.RefuteUpdateEvent:
+		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
+
+	case events.RingChecksumEvent:
+		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
+
+	case events.RingChangedEvent:
+		added := int64(len(event.ServersAdded))
+		removed := int64(len(event.ServersRemoved))
+		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
+		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
+		rp.statter.IncCounter(rp.getStatKey("ring.changed"), nil, 1)
+
+	case forward.RequestForwardedEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.egress"), nil, 1)
+
+	case forward.InflightRequestsChangedEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("requestProxy.inflight"), nil, event.Inflight)
+
+	case forward.InflightRequestsMiscountEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.miscount."+string(event.Operation)), nil, 1)
+
+	case forward.FailedEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.send.error"), nil, 1)
+
+	case forward.SuccessEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.send.success"), nil, 1)
+
+	case forward.MaxRetriesEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.failed"), nil, 1)
+
+	case forward.RetryAttemptEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.attempted"), nil, 1)
+
+	case forward.RetryAbortEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.aborted"), nil, 1)
+
+	case forward.RerouteEvent:
+		me, _ := rp.WhoAmI()
+		if event.NewDestination == me {
+			rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.reroute.local"), nil, 1)
+		} else {
+			rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.reroute.remote"), nil, 1)
+		}
+
+	case forward.RetrySuccessEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.succeeded"), nil, 1)
 	}
 }
 
@@ -455,18 +541,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {
-	rp.emit(e)
-
-	switch e := e.(type) {
-	case events.RingChecksumEvent:
-		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
-
-	case events.RingChangedEvent:
-		added := int64(len(e.ServersAdded))
-		removed := int64(len(e.ServersRemoved))
-		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
-		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
-	}
+	rp.HandleEvent(e)
 }
 
 // GetReachableMembers returns the list of members the ring believes to be

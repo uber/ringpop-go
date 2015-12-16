@@ -33,6 +33,11 @@ import (
 	"github.com/uber/ringpop-go/swim/util"
 )
 
+var (
+	// ErrNodeNotReady is returned when a remote request is being handled while the node is not yet ready
+	ErrNodeNotReady = errors.New("node is not ready to handle requests")
+)
+
 // Options to create a SWIM with
 type Options struct {
 	SuspicionTimeout  time.Duration

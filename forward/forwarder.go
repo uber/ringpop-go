@@ -23,10 +23,12 @@ package forward
 
 import (
 	"io/ioutil"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/util"
 	"github.com/uber/tchannel-go"
@@ -92,6 +94,11 @@ type Forwarder struct {
 	sender  Sender
 	channel shared.SubChannel
 	logger  log.Logger
+
+	inflightLock sync.Mutex
+	inflight     int64
+
+	listeners []events.EventListener
 }
 
 // NewForwarder returns a new forwarder
@@ -109,15 +116,64 @@ func NewForwarder(s Sender, ch shared.SubChannel, logger log.Logger) *Forwarder 
 	}
 }
 
+func (f *Forwarder) emit(event events.Event) {
+	for _, listener := range f.listeners {
+		go listener.HandleEvent(event)
+	}
+}
+
+// RegisterListener adds a listener to the forwarder. The listener's HandleEvent
+// will be called for every emit on Forwarder. The HandleEvent method must be thread safe
+func (f *Forwarder) RegisterListener(l events.EventListener) {
+	f.listeners = append(f.listeners, l)
+}
+
+func (f *Forwarder) incrementInflight() {
+	f.inflightLock.Lock()
+	f.inflight++
+	inflight := f.inflight
+	f.inflightLock.Unlock()
+
+	f.emit(InflightRequestsChangedEvent{inflight})
+}
+
+func (f *Forwarder) decrementInflight() {
+	f.inflightLock.Lock()
+	f.inflight--
+
+	// make sure that we do not decrement below 0
+	if f.inflight < 0 {
+		f.inflight = 0
+		f.emit(InflightRequestsMiscountEvent{InflightDecrement})
+	}
+
+	inflight := f.inflight
+	f.inflightLock.Unlock()
+
+	f.emit(InflightRequestsChangedEvent{inflight})
+}
+
 // ForwardRequest forwards a request to the given service and endpoint returns the response.
 // Keys are used by the sender to lookup the destination on retry. If you have multiple keys
 // and their destinations diverge on a retry then the call is aborted.
 func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoint string,
 	keys []string, format tchannel.Format, opts *Options) ([]byte, error) {
 
+	f.emit(RequestForwardedEvent{})
+
+	f.incrementInflight()
 	opts = f.mergeDefaultOptions(opts)
-	rs := newRequestSender(f.sender, f.channel, request, keys, destination, service, endpoint, format, opts)
-	return rs.Send()
+	rs := newRequestSender(f.sender, f, f.channel, request, keys, destination, service, endpoint, format, opts)
+	b, err := rs.Send()
+	f.decrementInflight()
+
+	if err != nil {
+		f.emit(FailedEvent{})
+	} else {
+		f.emit(SuccessEvent{})
+	}
+
+	return b, err
 }
 
 var (

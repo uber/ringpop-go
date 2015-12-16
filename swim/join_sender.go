@@ -94,6 +94,8 @@ type joinSender struct {
 	roundPotentialNodes    []string
 	roundPreferredNodes    []string
 	roundNonPreferredNodes []string
+
+	numTries int
 }
 
 // newJoinSender returns a new JoinSender to join a cluster with
@@ -229,6 +231,10 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 
 	for {
 		if j.node.Destroyed() {
+			j.node.emit(JoinFailedEvent{
+				Reason: Destroyed,
+				Error:  nil,
+			})
 			return nil, errors.New("node destroyed while attempting to join cluster")
 		}
 		// join group of nodes
@@ -264,6 +270,11 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 
 			err := fmt.Errorf("join duration of %v exceeded max %v",
 				joinDuration, j.maxJoinDuration)
+
+			j.node.emit(JoinFailedEvent{
+				Reason: Error,
+				Error:  err,
+			})
 			return nodesJoined, err
 		}
 
@@ -297,6 +308,9 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	var startTime = time.Now()
 
 	var wg sync.WaitGroup
+
+	j.numTries++
+	j.node.emit(JoinTriesUpdateEvent{j.numTries})
 
 	for _, node := range group {
 		wg.Add(1)
