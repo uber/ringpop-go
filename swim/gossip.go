@@ -104,10 +104,10 @@ func (g *gossip) ProtocolRate() time.Duration {
 
 // computes a ProtocolRate for the Gossip
 func (g *gossip) AdjustProtocolRate() {
-	g.protocol.RLock()
+	g.protocol.Lock()
 	observed := g.protocol.timing.Percentile(0.5) * 2.0
 	g.protocol.lastRate = time.Duration(math.Max(observed, float64(g.minProtocolPeriod)))
-	g.protocol.RUnlock()
+	g.protocol.Unlock()
 }
 
 func (g *gossip) ProtocolTiming() metrics.Histogram {

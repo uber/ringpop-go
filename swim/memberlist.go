@@ -306,8 +306,10 @@ func (m *memberlist) Apply(change Change) {
 		m.members.list = append(m.members.list[:i], append([]*Member{member}, m.members.list[i:]...)...)
 	}
 
+	member.Lock()
 	member.Status = change.Status
 	member.Incarnation = change.Incarnation
+	member.Unlock()
 }
 
 // shuffles the member list

@@ -22,6 +22,7 @@ package swim
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/uber/ringpop-go/swim/util"
 )
@@ -42,6 +43,7 @@ const (
 
 // A Member is a member in the member list
 type Member struct {
+	sync.RWMutex
 	Address     string `json:"address"`
 	Status      string `json:"status"`
 	Incarnation int64  `json:"incarnationNumber"`

@@ -214,7 +214,10 @@ func (n *Node) App() string {
 // Incarnation returns the incarnation number of the local node
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
-		return n.memberlist.local.Incarnation
+		n.memberlist.local.RLock()
+		incarnation := n.memberlist.local.Incarnation
+		n.memberlist.local.RUnlock()
+		return incarnation
 	}
 	return -1
 }
