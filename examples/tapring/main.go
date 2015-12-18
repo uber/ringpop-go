@@ -67,8 +67,8 @@ func (w *worker) RegisterLookup() error {
 
 func (w *worker) LookupHandler(ctx json.Context, look *Lookup) (*Result, error) {
 	var servers []string
-	log.Infof("tapping host: %v", look.Taphost)
-	err := w.ringpop.TapRing(look.Taphost)
+	log.Infof("tapping host: %v: remote ring: %v", look.Taphost, "parent-app")
+	err := w.ringpop.TapRing(look.Taphost, "parent-app")
 	if err == nil {
 		servers = w.ringpop.LookupN(look.Key, look.Replicas)
 	}
