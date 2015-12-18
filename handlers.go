@@ -21,6 +21,8 @@
 package ringpop
 
 import (
+	"fmt"
+
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
@@ -31,11 +33,12 @@ import (
 type Arg struct{}
 
 func (rp *Ringpop) registerHandlers() error {
+	tapring := fmt.Sprintf("/%s/tapring", rp.app)
 	handlers := map[string]interface{}{
 		"/health":       rp.health,
 		"/admin/stats":  rp.adminStatsHandler,
 		"/admin/lookup": rp.adminLookupHandler,
-		"/tapring":      rp.tapRingHandler,
+		tapring:         rp.tapRingHandler,
 	}
 
 	return json.Register(rp.channel, handlers, func(ctx context.Context, err error) {

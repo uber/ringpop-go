@@ -22,6 +22,7 @@ package ringpop
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/uber/tchannel-go/json"
@@ -39,7 +40,7 @@ type tapResponse struct {
 }
 
 // tapRemoteRing taps on the ring and gets the info from the remote node
-func tapRemoteRing(host string, rp *Ringpop) ([]string, uint32, error) {
+func tapRemoteRing(host string, remoteApp string, rp *Ringpop) ([]string, uint32, error) {
 	ctx, cancel := json.NewContext(3 * time.Second)
 	defer cancel()
 
@@ -47,7 +48,7 @@ func tapRemoteRing(host string, rp *Ringpop) ([]string, uint32, error) {
 	var err error
 
 	select {
-	case err = <-sendTap(ctx, rp, host, &resp):
+	case err = <-sendTap(ctx, rp, host, remoteApp, &resp):
 	case <-ctx.Done():
 		err = errors.New("ctx timed out")
 	}
@@ -56,19 +57,19 @@ func tapRemoteRing(host string, rp *Ringpop) ([]string, uint32, error) {
 }
 
 // sendTap sends the message to the specific node to get the info about the ring
-func sendTap(ctx json.Context, rp *Ringpop, node string, res *tapResponse) <-chan error {
+func sendTap(ctx json.Context, rp *Ringpop, remoteNode string, remoteAppName string, res *tapResponse) <-chan error {
 	errC := make(chan error)
 
 	go func() {
 		defer close(errC)
 
-		peer := rp.channel.Peers().GetOrAdd(node)
+		peer := rp.channel.Peers().GetOrAdd(remoteNode)
 
 		req := &tapRequest{
 			Checksum: rp.ring.Checksum(),
 		}
 
-		err := json.CallPeer(ctx, peer, rp.channel.ServiceName(), "/tapring", req, res)
+		err := json.CallPeer(ctx, peer, rp.channel.ServiceName(), fmt.Sprintf("/%s/tapring", remoteAppName), req, res)
 		if err != nil {
 			errC <- err
 			return

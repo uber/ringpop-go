@@ -233,8 +233,8 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 // TapRing attaches pulls the ring state from the given
 // host and updates its own ring accordingly
 // TODO: we should probably tap for a specific app on the host:port?
-func (rp *Ringpop) TapRing(host string) error {
-	servers, checksum, err := tapRemoteRing(host, rp)
+func (rp *Ringpop) TapRing(host string, remoteApp string) error {
+	servers, checksum, err := tapRemoteRing(host, remoteApp, rp)
 	if err != nil {
 		rp.log.WithFields(log.Fields{
 			"err":  err.Error(),
