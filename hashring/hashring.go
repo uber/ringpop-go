@@ -215,20 +215,12 @@ func (r *HashRing) ServerCount() int {
 	return count
 }
 
-func (r *HashRing) Lookup(key string) (string, bool) {
-	r.servers.RLock()
-
-	iter := r.servers.tree.IterAt(int(r.hashfunc([]byte(key))))
-	if iter.Nil() {
-		r.servers.RUnlock()
+func (r *hashRing) Lookup(key string) (string, bool) {
+	strs := r.LookupN(key, 1)
+	if len(strs) == 0 {
 		return "", false
 	}
-
-	server := iter.Str()
-
-	r.servers.RUnlock()
-
-	return server, true
+	return strs[0], true
 }
 
 func (r *HashRing) LookupN(key string, n int) []string {
@@ -237,31 +229,31 @@ func (r *HashRing) LookupN(key string, n int) []string {
 		n = serverCount
 	}
 
-	r.servers.RLock()
-	var servers []string
+	if n == 0 {
+		return nil
+	}
+
 	var unique = make(map[string]bool)
 
-	iter := r.servers.tree.IterAt(int(r.hashfunc([]byte(key))))
-	if iter.Nil() {
-		r.servers.RUnlock()
-		return servers
+	r.servers.RLock()
+	defer r.servers.RUnlock()
+
+	hash := int(r.hashfunc([]byte(key)))
+	iter := rbtree.NewIteratorAt(r.servers.tree, hash)
+
+	for node := iter.Next(); len(unique) < n; node = iter.Next() {
+		if node == nil {
+			// reached end of rb-tree, loop around
+			iter = rbtree.NewIterator(r.servers.tree)
+			node = iter.Next()
+		}
+		unique[node.Str()] = true
 	}
 
-	firstVal := iter.Val()
-	for {
-		res := iter.Str()
-		if !unique[res] {
-			servers = append(servers, res)
-			unique[res] = true
-		}
-		iter.Next()
-
-		if len(servers) == n || iter.Val() == firstVal {
-			break
-		}
+	var servers []string
+	for server := range unique {
+		servers = append(servers, server)
 	}
-
-	r.servers.RUnlock()
 
 	return servers
 }

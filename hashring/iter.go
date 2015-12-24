@@ -20,146 +20,70 @@
 
 package hashring
 
-//Iter returns an iterator starting at the leftmost node in the tree
-func (t *RBTree) Iter() *RBIter {
-	return NewRBIter(t)
+// Iterator is used to perform an in-order traversal of a Red-Black Tree
+type Iterator struct {
+	itFunc iteratorFunc
 }
 
-// IterAt returns an iter set at, or immediately after, val
-func (t *RBTree) IterAt(val int) *RBIter {
-	return NewRBIterAt(t, val)
+func NewIterator(tree *RBTree) Iterator {
+	return Iterator{iterate(tree.root)}
 }
 
-// An RBIter iterates over nodes in an RBTree
-type RBIter struct {
-	tree      *RBTree
-	current   *RBNode
-	ancestors []*RBNode
+func NewIteratorAt(tree *RBTree, x int) Iterator {
+	return Iterator{iterateAt(tree.root, x)}
 }
 
-// NewRBIter returns an RBIter for the given tree, or nil if the given tree is nil
-func NewRBIter(tree *RBTree) *RBIter {
-	if tree == nil {
+// Next returns the next value of the iteration. Yielding done indicates that
+// the iteration is finished.
+func (i *Iterator) Next() (n *Node) {
+	if i.itFunc == nil {
+		return nil
+	}
+	n, i.itFunc = i.itFunc()
+	return n
+}
+
+// Functional style iterators. Calling the iteratorFunc yields the next
+// value of the iterator and an iteratorFunc for the remaining values.
+type iteratorFunc func() (*Node, iteratorFunc)
+
+// Creates an iteratorFunc that iterates over the rb-tree in an in-order fashion
+func iterate(n *Node) iteratorFunc {
+	if n == nil {
+		return nil
+	}
+	leftIt := iterate(n.left)
+	rightIt := iterate(n.right)
+	return compose(leftIt, prepend(n, rightIt))
+}
+
+func iterateAt(n *Node, x int) iteratorFunc {
+	if n == nil {
 		return nil
 	}
 
-	iter := &RBIter{
-		tree:    tree,
-		current: nil,
-	}
-	iter.minNode(tree.root)
-
-	return iter
-}
-
-// NewRBIterAt returns an RBIter for the given tree at or immediately after the given
-// val, or nil if the tree, or the tree's root, is nil
-func NewRBIterAt(tree *RBTree, val int) *RBIter {
-	if tree == nil {
-		return nil
-	}
-
-	iter := &RBIter{
-		tree:    tree,
-		current: nil,
-	}
-
-	if tree.size == 0 {
-		return iter
-	}
-
-	iter.current = tree.root
-	for iter.current != nil {
-		if iter.current.val == val {
-			return iter
-		}
-
-		iter.pushA(iter.current) // add ancestor
-		iter.current = iter.current.Child(val > iter.current.val)
-	}
-
-	// iter current is nil, thus we did not find an equal value, so go back up
-	// ancestors and find the next greatest
-	for iter.current != tree.root {
-		iter.current = iter.popA()
-		if iter.current.val > val {
-			return iter
-		}
-	}
-
-	// val is greater than max in tree, go to min node
-	iter.minNode(tree.root)
-
-	return iter
-}
-
-// Nil returns true if the current node is nil
-func (i *RBIter) Nil() bool {
-	return i.current == nil
-}
-
-// Val returns the val contained at the current node
-func (i *RBIter) Val() int {
-	return i.current.Val()
-}
-
-// Str returns the str contained at the current node
-func (i *RBIter) Str() string {
-	return i.current.Str()
-}
-
-// Next returns the next node in the tree
-func (i *RBIter) Next() *RBNode {
-	if i.current == nil {
-		i.minNode(i.tree.root)
+	rightIt := iterate(n.right)
+	if x == n.val {
+		return prepend(n, rightIt)
+	} else if x > n.val {
+		return iterateAt(n.right, x)
 	} else {
-		if i.current.right == nil {
-			for {
-				save := i.current
-				i.current = i.popA()
-				if i.current == nil {
-					i.minNode(i.tree.root)
-					break
-				}
-
-				if i.current.right != save {
-					break
-				}
-			}
-
-		} else {
-			i.pushA(i.current)
-			i.minNode(i.current.right)
-		}
-
+		return compose(iterateAt(n.left, x), prepend(n, rightIt))
 	}
-
-	return i.current
 }
 
-// sets current to left most node in subtree of root
-func (i *RBIter) minNode(root *RBNode) {
-	if root == nil {
-		i.current = root
-		return
+// Composes two IteratorFuncs into one
+func compose(i1, i2 iteratorFunc) iteratorFunc {
+	if i1 == nil {
+		return i2
 	}
-	for root.left != nil {
-		i.pushA(root)
-		root = root.left
-	}
-	i.current = root
+	v, tail := i1()
+	return prepend(v, compose(tail, i2))
 }
 
-func (i *RBIter) pushA(node *RBNode) {
-	i.ancestors = append(i.ancestors, node)
-}
-
-func (i *RBIter) popA() *RBNode {
-	ind := len(i.ancestors) - 1
-	if ind < 0 {
-		return nil
+// Prepends a value to an iteratorFunc yielding the new InteratorFunc
+func prepend(n *Node, i iteratorFunc) iteratorFunc {
+	return func() (*Node, iteratorFunc) {
+		return n, i
 	}
-	a := i.ancestors[ind]
-	i.ancestors = i.ancestors[:ind]
-	return a
 }

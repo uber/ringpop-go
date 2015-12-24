@@ -20,20 +20,16 @@
 
 package hashring
 
-// TODO: change RBNode.val from int to int64?
-
-// An RBTree is an automatically balancing tree of KVP pairs (presumably)
 type RBTree struct {
-	root *RBNode
+	root *Node
 	size int
 }
 
-// An RBNode is a node in the RBTree
-type RBNode struct {
+type Node struct {
 	val   int
 	str   string
-	left  *RBNode
-	right *RBNode
+	left  *Node
+	right *Node
 	red   bool
 }
 
@@ -43,7 +39,7 @@ func (t *RBTree) Size() int {
 }
 
 // Child returns the left or right node of the RBTree
-func (n *RBNode) Child(right bool) *RBNode {
+func (n *Node) Child(right bool) *Node {
 	if right {
 		return n.right
 	}
@@ -51,16 +47,16 @@ func (n *RBNode) Child(right bool) *RBNode {
 }
 
 // Val returns the val contained in the node
-func (n *RBNode) Val() int {
+func (n *Node) Val() int {
 	return n.val
 }
 
 // Str returns the str contained in the node
-func (n *RBNode) Str() string {
+func (n *Node) Str() string {
 	return n.str
 }
 
-func (n *RBNode) setChild(right bool, node *RBNode) {
+func (n *Node) setChild(right bool, node *Node) {
 	if right {
 		n.right = node
 	} else {
@@ -69,11 +65,11 @@ func (n *RBNode) setChild(right bool, node *RBNode) {
 }
 
 // returns true if RingNode is red
-func isRed(node *RBNode) bool {
+func isRed(node *Node) bool {
 	return node != nil && node.red
 }
 
-func singleRotate(oldroot *RBNode, dir bool) *RBNode {
+func singleRotate(oldroot *Node, dir bool) *Node {
 	newroot := oldroot.Child(!dir)
 
 	oldroot.setChild(!dir, newroot.Child(dir))
@@ -85,7 +81,7 @@ func singleRotate(oldroot *RBNode, dir bool) *RBNode {
 	return newroot
 }
 
-func doubleRotate(root *RBNode, dir bool) *RBNode {
+func doubleRotate(root *Node, dir bool) *Node {
 	root.setChild(!dir, singleRotate(root.Child(!dir), !dir))
 	return singleRotate(root, dir)
 }
@@ -94,16 +90,16 @@ func doubleRotate(root *RBNode, dir bool) *RBNode {
 // Returns true on succesful insertion, false if duplicate exists
 func (t *RBTree) Insert(val int, str string) (ret bool) {
 	if t.root == nil {
-		t.root = &RBNode{val: val, str: str}
+		t.root = &Node{val: val, str: str}
 		ret = true
 	} else {
-		var head = &RBNode{}
+		var head = &Node{}
 
 		var dir = true
 		var last = true
 
-		var parent *RBNode  // parent
-		var gparent *RBNode // grandparent
+		var parent *Node    // parent
+		var gparent *Node   // grandparent
 		var ggparent = head // great grandparent
 		var node = t.root
 
@@ -112,7 +108,7 @@ func (t *RBTree) Insert(val int, str string) (ret bool) {
 		for {
 			if node == nil {
 				// insert new node at bottom
-				node = &RBNode{val: val, str: str, red: true}
+				node = &Node{val: val, str: str, red: true}
 				parent.setChild(dir, node)
 				ret = true
 			} else if isRed(node.left) && isRed(node.right) {
@@ -171,11 +167,11 @@ func (t *RBTree) Delete(val int) bool {
 		return false
 	}
 
-	var head = &RBNode{red: true} // fake red node to push down
+	var head = &Node{red: true} // fake red node to push down
 	var node = head
-	var parent *RBNode  //parent
-	var gparent *RBNode //grandparent
-	var found *RBNode
+	var parent *Node  //parent
+	var gparent *Node //grandparent
+	var found *Node
 
 	var dir = true
 
@@ -246,7 +242,7 @@ func (t *RBTree) Delete(val int) bool {
 	return found != nil
 }
 
-func (n *RBNode) search(val int) (string, bool) {
+func (n *Node) search(val int) (string, bool) {
 	if n.val == val {
 		return n.str, true
 	} else if val < n.val {

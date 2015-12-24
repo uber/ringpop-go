@@ -68,7 +68,7 @@ func TestEmptyTree(t *testing.T) {
 }
 
 // counts the black height of the tree and validates it along the way
-func validateRBTree(node *RBNode) (int, error) {
+func validateRBTree(node *Node) (int, error) {
 	if node == nil {
 		return 1, nil
 	}
@@ -107,23 +107,6 @@ func validateRBTree(node *RBNode) (int, error) {
 		return leftHeight + 1, nil
 	}
 	return 0, nil
-}
-
-func Walk(node *RBNode, bh int) {
-	if node == nil {
-		println("--", bh)
-		return
-	}
-	println(node.val, node.red)
-
-	var nbh int
-	if node.red == false {
-		nbh = bh + 1
-	} else {
-		nbh = bh
-	}
-	Walk(node.left, nbh)
-	Walk(node.right, nbh)
 }
 
 func TestInsert(t *testing.T) {
