@@ -20,20 +20,20 @@
 
 package hashring
 
-// Iterator is used to perform an in-order traversal of a Red-Black Tree
+// Iterator is used to perform an in-order traversal of the Red-Black Tree
 type Iterator struct {
 	itFunc iteratorFunc
 }
 
-func NewIterator(tree *RBTree) Iterator {
-	return Iterator{iterate(tree.root)}
+func NewIterator(tree *RBTree) *Iterator {
+	return &Iterator{iterate(tree.root)}
 }
 
-func NewIteratorAt(tree *RBTree, x int) Iterator {
-	return Iterator{iterateAt(tree.root, x)}
+func NewIteratorAt(tree *RBTree, x int) *Iterator {
+	return &Iterator{iterateAt(tree.root, x)}
 }
 
-// Next returns the next value of the iteration. Yielding done indicates that
+// Next returns the next value of the iteration. Yielding nil indicates that
 // the iteration is finished.
 func (i *Iterator) Next() (n *Node) {
 	if i.itFunc == nil {
@@ -43,7 +43,7 @@ func (i *Iterator) Next() (n *Node) {
 	return n
 }
 
-// Functional style iterators. Calling the iteratorFunc yields the next
+// Functional style iterators. Calling iteratorFunc yields the next
 // value of the iterator and an iteratorFunc for the remaining values.
 type iteratorFunc func() (*Node, iteratorFunc)
 
@@ -54,21 +54,27 @@ func iterate(n *Node) iteratorFunc {
 	}
 	leftIt := iterate(n.left)
 	rightIt := iterate(n.right)
+
+	// in-order traversal is: first left, then node itself, then right
 	return compose(leftIt, prepend(n, rightIt))
 }
 
-func iterateAt(n *Node, x int) iteratorFunc {
+func iterateAt(n *Node, v int) iteratorFunc {
 	if n == nil {
 		return nil
 	}
 
+	// find value, then iterate through all the values right from it
 	rightIt := iterate(n.right)
-	if x == n.val {
+	if v == n.val {
+		// if we find the value, the iteration starts at this node
 		return prepend(n, rightIt)
-	} else if x > n.val {
-		return iterateAt(n.right, x)
+	} else if v > n.val {
+		// search right, all the values to the left will not be iterated over
+		return iterateAt(n.right, v)
 	} else {
-		return compose(iterateAt(n.left, x), prepend(n, rightIt))
+		// search left but remember to iterate to the right values after that
+		return compose(iterateAt(n.left, v), prepend(n, rightIt))
 	}
 }
 

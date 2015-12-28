@@ -35,6 +35,7 @@ import (
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
@@ -164,7 +165,7 @@ func (rp *Ringpop) init() error {
 	})
 	rp.node.RegisterListener(rp)
 
-	rp.ring = hashring.NewHashRing(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 	rp.ring.RegisterListener(rp)
 
 	rp.stats.hostport = genStatsHostport(address)

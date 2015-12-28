@@ -38,6 +38,16 @@ type configuration struct {
 	App string
 }
 
+// HashRingConfiguration is a configuration struct that can be passed to the
+// Ringpop constructor to customize hash ring options.
+type HashRingConfiguration struct {
+	// ReplicaPoints is the number of positions a node will be assigned on the
+	// ring. A bigger number will provide better key distribution, but require
+	// more computation when building or traversing the ring (typically on
+	// lookups or membership changes).
+	ReplicaPoints int
+}
+
 // An Option is a modifier functions that configure/modify a real Ringpop
 // object.
 //

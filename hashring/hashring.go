@@ -18,12 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+// Package hashring provides a hashring implementation using a Red Black Tree.
 package hashring
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/uber/ringpop-go/events"
@@ -31,9 +32,9 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
-// HashRingConfiguration is a configuration struct that can be passed to the
+// Configuration is a configuration struct that can be passed to the
 // Ringpop constructor to customize hash ring options.
-type HashRingConfiguration struct {
+type Configuration struct {
 	// ReplicaPoints is the number of positions a node will be assigned on the
 	// ring. A bigger number will provide better key distribution, but require
 	// more computation when building or traversing the ring (typically on
@@ -61,56 +62,45 @@ func (r *HashRing) emit(event interface{}) {
 	}
 }
 
-// RegisterListener adds a listener that will be sent swim events.
+// RegisterListener adds a listener that will be sent swim events
 func (r *HashRing) RegisterListener(l events.EventListener) {
 	r.listeners = append(r.listeners, l)
 }
 
-func NewHashRing(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
+func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 	ring := &HashRing{
-		hashfunc:      hashfunc,
 		replicaPoints: replicaPoints,
+		hashfunc: func(str string) int {
+			return int(hashfunc([]byte(str)))
+		},
 	}
 
 	ring.servers.byAddress = make(map[string]bool)
-	ring.servers.tree = &RBTree{}
-
+	ring.servers.tree = new(RBTree)
 	return ring
 }
 
 func (r *HashRing) Checksum() uint32 {
 	r.servers.RLock()
-	checksum := r.servers.checksum
-	r.servers.RUnlock()
-
-	return checksum
+	defer r.servers.RUnlock()
+	return r.servers.checksum
 }
 
 // computeChecksum computes checksum of all servers in the ring
 func (r *HashRing) computeChecksum() {
-	var addresses sort.StringSlice
-	var buffer bytes.Buffer
+	addresses := r.GetServers()
+	sort.Strings(addresses)
+	bytes := []byte(strings.Join(addresses, ";"))
 
 	r.servers.Lock()
-	for address := range r.servers.byAddress {
-		addresses = append(addresses, address)
-	}
-
-	addresses.Sort()
-
-	for _, address := range addresses {
-		buffer.WriteString(address)
-		buffer.WriteString(";")
-	}
-
+	defer r.servers.Unlock()
 	old := r.servers.checksum
-	r.servers.checksum = farm.Fingerprint32(buffer.Bytes())
+	r.servers.checksum = farm.Fingerprint32(bytes)
+
 	r.emit(events.RingChecksumEvent{
 		OldChecksum: old,
 		NewChecksum: r.servers.checksum,
 	})
-
-	r.servers.Unlock()
 }
 
 func (r *HashRing) AddServer(address string) {
@@ -126,14 +116,13 @@ func (r *HashRing) AddServer(address string) {
 // inserts server replicas into ring
 func (r *HashRing) addReplicas(server string) {
 	r.servers.Lock()
-	r.servers.byAddress[server] = true
+	defer r.servers.Unlock()
 
+	r.servers.byAddress[server] = true
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
-		r.servers.tree.Insert(int(r.hashfunc([]byte(address))), server)
+		r.servers.tree.Insert(r.hashfunc(address), server)
 	}
-
-	r.servers.Unlock()
 }
 
 func (r *HashRing) RemoveServer(address string) {
@@ -141,22 +130,20 @@ func (r *HashRing) RemoveServer(address string) {
 		return
 	}
 
-	r.RemoveReplicas(address)
+	r.removeReplicas(address)
 	r.emit(events.RingChangedEvent{ServersRemoved: []string{address}})
 	r.computeChecksum()
 }
 
-func (r *HashRing) RemoveReplicas(server string) {
+func (r *HashRing) removeReplicas(server string) {
 	r.servers.Lock()
+	defer r.servers.Unlock()
 
 	delete(r.servers.byAddress, server)
-
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
-		r.servers.tree.Delete(int(r.hashfunc([]byte(address))))
+		r.servers.tree.Delete(r.hashfunc(address))
 	}
-
-	r.servers.Unlock()
 }
 
 // adds and removes servers in a batch with a single checksum computation at the end
@@ -172,13 +159,12 @@ func (r *HashRing) AddRemoveServers(add []string, remove []string) bool {
 
 	for _, server := range remove {
 		if r.HasServer(server) {
-			r.RemoveReplicas(server)
+			r.removeReplicas(server)
 			removed = true
 		}
 	}
 
 	changed = added || removed
-
 	if changed {
 		r.emit(events.RingChangedEvent{add, remove})
 		r.computeChecksum()
@@ -190,32 +176,29 @@ func (r *HashRing) AddRemoveServers(add []string, remove []string) bool {
 // hasServer returns true if the server exists in the ring, false otherwise
 func (r *HashRing) HasServer(address string) bool {
 	r.servers.RLock()
-	server := r.servers.byAddress[address]
-	r.servers.RUnlock()
-
-	return server
+	defer r.servers.RUnlock()
+	return r.servers.byAddress[address]
 }
 
-func (r *HashRing) GetServers() (servers []string) {
+func (r *HashRing) GetServers() []string {
 	r.servers.RLock()
+	defer r.servers.RUnlock()
+
+	var servers []string
 	for server := range r.servers.byAddress {
 		servers = append(servers, server)
 	}
-	r.servers.RUnlock()
-
 	return servers
 }
 
 // ServerCount returns the number of servers in the ring
 func (r *HashRing) ServerCount() int {
 	r.servers.RLock()
-	count := len(r.servers.byAddress)
-	r.servers.RUnlock()
-
-	return count
+	defer r.servers.RUnlock()
+	return len(r.servers.byAddress)
 }
 
-func (r *hashRing) Lookup(key string) (string, bool) {
+func (r *HashRing) Lookup(key string) (string, bool) {
 	strs := r.LookupN(key, 1)
 	if len(strs) == 0 {
 		return "", false
@@ -223,37 +206,34 @@ func (r *hashRing) Lookup(key string) (string, bool) {
 	return strs[0], true
 }
 
+// LookupN returns the N servers that own the given key. Duplicates in the form
+// of virtual nodes are skipped to maintain a list of unique servers. If there
+// are less servers then N, we simply return all existing servers.
 func (r *HashRing) LookupN(key string, n int) []string {
-	serverCount := r.ServerCount()
-	if n > serverCount {
-		n = serverCount
-	}
-
-	if n == 0 {
-		return nil
-	}
-
-	var unique = make(map[string]bool)
-
 	r.servers.RLock()
 	defer r.servers.RUnlock()
 
-	hash := int(r.hashfunc([]byte(key)))
-	iter := rbtree.NewIteratorAt(r.servers.tree, hash)
+	if n >= r.ServerCount() {
+		return r.GetServers()
+	}
 
+	// Iterate over RB-tree and collect unique servers
+	var unique = make(map[string]bool)
+	hash := r.hashfunc(key)
+	iter := NewIteratorAt(r.servers.tree, hash)
 	for node := iter.Next(); len(unique) < n; node = iter.Next() {
 		if node == nil {
 			// reached end of rb-tree, loop around
-			iter = rbtree.NewIterator(r.servers.tree)
+			iter = NewIterator(r.servers.tree)
 			node = iter.Next()
 		}
 		unique[node.Str()] = true
 	}
 
+	// Collect results
 	var servers []string
 	for server := range unique {
 		servers = append(servers, server)
 	}
-
 	return servers
 }
