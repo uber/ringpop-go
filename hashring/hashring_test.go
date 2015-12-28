@@ -130,7 +130,6 @@ func TestLookupNOverflow(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	addresses := genAddresses(1, 1, 10)
 	ring.AddRemoveServers(addresses, nil)
-	fmt.Println(ring.LookupN("a random key", 20))
 	assert.Len(t, ring.LookupN("a random key", 20), 10, "expected that LookupN caps results when n is larger than number of servers")
 }
 

@@ -20,17 +20,22 @@
 
 package hashring
 
-// Iterator is used to perform an in-order traversal of the Red-Black Tree
+// Iterator is used to perform an in-order traversal of the Red-Black Tree.
+// Repedetly call Next() on this to receive new
 type Iterator struct {
 	itFunc iteratorFunc
 }
 
-func NewIterator(tree *RBTree) *Iterator {
+// NewIterator instantiates and returns a new Iterator that iterates over
+// a red black from the first node to the last.
+func NewIterator(tree *RedBlackTree) *Iterator {
 	return &Iterator{iterate(tree.root)}
 }
 
-func NewIteratorAt(tree *RBTree, x int) *Iterator {
-	return &Iterator{iterateAt(tree.root, x)}
+// NewIteratorAt instantiates and returns a new Iterator that iterates over
+// a red black from the node that owns the given value v to the last.
+func NewIteratorAt(tree *RedBlackTree, v int) *Iterator {
+	return &Iterator{iterateAt(tree.root, v)}
 }
 
 // Next returns the next value of the iteration. Yielding nil indicates that
@@ -55,7 +60,7 @@ func iterate(n *Node) iteratorFunc {
 	leftIt := iterate(n.left)
 	rightIt := iterate(n.right)
 
-	// in-order traversal is: first left, then node itself, then right
+	// in-order traversal is: first left, then Node itself, then right
 	return compose(leftIt, prepend(n, rightIt))
 }
 
@@ -67,7 +72,7 @@ func iterateAt(n *Node, v int) iteratorFunc {
 	// find value, then iterate through all the values right from it
 	rightIt := iterate(n.right)
 	if v == n.val {
-		// if we find the value, the iteration starts at this node
+		// if we find the value, the iteration starts at this Node
 		return prepend(n, rightIt)
 	} else if v > n.val {
 		// search right, all the values to the left will not be iterated over

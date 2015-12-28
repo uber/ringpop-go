@@ -20,11 +20,13 @@
 
 package hashring
 
-type RBTree struct {
+// RedBlackTree is an implemantation of a Red Black Tree
+type RedBlackTree struct {
 	root *Node
 	size int
 }
 
+// Node is a node of the RedBlackTree
 type Node struct {
 	val   int
 	str   string
@@ -33,12 +35,12 @@ type Node struct {
 	red   bool
 }
 
-// Size returns the number of nodes in the RBTree
-func (t *RBTree) Size() int {
+// Size returns the number of nodes in the RedBlackTree
+func (t *RedBlackTree) Size() int {
 	return t.size
 }
 
-// Child returns the left or right node of the RBTree
+// Child returns the left or right node of the RedBlackTree
 func (n *Node) Child(right bool) *Node {
 	if right {
 		return n.right
@@ -88,7 +90,7 @@ func doubleRotate(root *Node, dir bool) *Node {
 
 // Insert inserts a value and string into the tree
 // Returns true on succesful insertion, false if duplicate exists
-func (t *RBTree) Insert(val int, str string) (ret bool) {
+func (t *RedBlackTree) Insert(val int, str string) (ret bool) {
 	if t.root == nil {
 		t.root = &Node{val: val, str: str}
 		ret = true
@@ -160,9 +162,9 @@ func (t *RBTree) Insert(val int, str string) (ret bool) {
 	return ret
 }
 
-// Delete removes a value from the RBTree
+// Delete removes a value from the RedBlackTree
 // Returns true on succesful deletion, false if val is not in tree
-func (t *RBTree) Delete(val int) bool {
+func (t *RedBlackTree) Delete(val int) bool {
 	if t.root == nil {
 		return false
 	}
@@ -255,9 +257,9 @@ func (n *Node) search(val int) (string, bool) {
 	return "", false
 }
 
-// Search searches for a value in the RBTree, returns the string and true if found,
+// Search searches for a value in the RedBlackTree, returns the string and true if found,
 // or the empty string and false if val is not in the tree
-func (t *RBTree) Search(val int) (string, bool) {
+func (t *RedBlackTree) Search(val int) (string, bool) {
 	if t.root == nil {
 		return "", false
 	}

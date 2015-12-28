@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func iterTree() *RBTree {
-	tree := new(RBTree)
+func iterTree() *RedBlackTree {
+	tree := new(RedBlackTree)
 
 	tree.Insert(40, "fourty")
 	tree.Insert(20, "twenty")
@@ -42,7 +42,7 @@ func iterTree() *RBTree {
 
 func TestIterNil(t *testing.T) {
 	// empty tree
-	tree := new(RBTree)
+	tree := new(RedBlackTree)
 	iter := NewIterator(tree)
 
 	n := iter.Next()
