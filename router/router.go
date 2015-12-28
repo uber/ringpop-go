@@ -100,7 +100,9 @@ func (r *router) GetClient(key string) (interface{}, error) {
 
 	// no match so far, get a complete lock for creation
 	r.rw.Lock()
-	defer r.rw.Unlock()
+	defer func() {
+		r.rw.Unlock()
+	}()
 
 	// double check it is not created between read and complete lock
 	client, ok = r.clientCache[dest]
