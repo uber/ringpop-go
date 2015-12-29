@@ -103,17 +103,21 @@ func (s *SuspicionTestSuite) TestSuspectBecomesFaulty() {
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 }
 
-func (s *SuspicionTestSuite) TestTimerChanges() {
+// TestTimerCreated tests that starting suspicion for a node creates a
+// countdown timer that is responsible for marking a node as faulty at the end
+// of the timeout.
+func (s *SuspicionTestSuite) TestTimerCreated() {
 	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
 	s.Require().NotNil(member, "expected cannot be nil")
 
-	s.s.Start(*member)
 	old := s.s.Timer(member.Address)
+	s.Require().Nil(old, "expected timer to be nil")
 
+	// Start suspcision, which should create a timer
 	s.s.Start(*member)
 
-	s.NotEqual(old, s.s.Timer(member.Address), "expected timer to changed")
+	s.NotEqual(old, s.s.Timer(member.Address), "expected timer to change")
 }
 
 func (s *SuspicionTestSuite) TestSuspicionDisableStopsTimers() {

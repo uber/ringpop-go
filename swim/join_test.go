@@ -39,7 +39,11 @@ type JoinSenderTestSuite struct {
 }
 
 func (s *JoinSenderTestSuite) SetupTest() {
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	// Explicitly set up a node with a fake address in the TEST-NET-1 range for
+	// join tests where we are expecting certain hostport combinations given
+	// a set of test data in the 192.0.2.1-255 range. TEST-NET-1 is defined
+	// in http://tools.ietf.org/html/rfc5737.
+	s.tnode = newChannelNodeWithHostPort(s.T(), "192.0.2.1:1")
 	s.node = s.tnode.node
 }
 
@@ -61,7 +65,10 @@ func (s *JoinSenderTestSuite) TestJoinNoBootstrapHosts() {
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroup() {
-	seedBootstrapHosts(s.node, genAddresses(1, 1, 3))
+	fakeHosts := fakeHostPorts(1, 1, 2, 3)
+	bootstrapHosts := append(fakeHosts, s.node.Address())
+
+	seedBootstrapHosts(s.node, bootstrapHosts)
 
 	joiner, err := newJoinSender(s.node, nil)
 	s.Require().NoError(err, "cannot have an error")
@@ -70,12 +77,12 @@ func (s *JoinSenderTestSuite) TestSelectGroup() {
 	group := sort.StringSlice(joiner.SelectGroup([]string{}))
 	group.Sort()
 
-	s.EqualValues([]string{"127.0.0.1:3002", "127.0.0.1:3003"}, group)
+	s.EqualValues([]string{fakeHosts[0], fakeHosts[1]}, group)
 }
 
 func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
-	seedBootstrapHosts(s.node, genAddresses(1, 1, 3))
-	expected := genAddresses(1, 2, 3)
+	seedBootstrapHosts(s.node, append(fakeHostPorts(1, 1, 2, 3), s.node.Address()))
+	expected := fakeHostPorts(1, 1, 2, 3)
 
 	joiner, err := newJoinSender(s.node, nil)
 	s.Require().NoError(err, "cannot have an error")
@@ -92,20 +99,22 @@ func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroupExcludes() {
-	seedBootstrapHosts(s.node, genAddresses(1, 1, 5))
+	seedBootstrapHosts(s.node, fakeHostPorts(1, 1, 1, 5))
 
 	joiner, err := newJoinSender(s.node, nil)
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
-	group := sort.StringSlice(joiner.SelectGroup([]string{"127.0.0.1:3003", "127.0.0.1:3005"}))
+	// fake hostports generated are in the 192.0.2.0/24 range. See
+	// fakeHostPorts for more information.
+	group := sort.StringSlice(joiner.SelectGroup([]string{"192.0.2.1:3", "192.0.2.1:5"}))
 	group.Sort()
 
-	s.EqualValues([]string{"127.0.0.1:3002", "127.0.0.1:3004"}, group)
+	s.EqualValues([]string{"192.0.2.1:2", "192.0.2.1:4"}, group)
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
-	seedBootstrapHosts(s.node, append(genAddressesDiffHosts(1, 4), genAddresses(1, 2, 4)...))
+	seedBootstrapHosts(s.node, append(fakeHostPorts(1, 4, 1, 1), fakeHostPorts(1, 1, 2, 4)...))
 
 	joiner, err := newJoinSender(s.node, &joinOpts{parallelismFactor: 1})
 	s.Require().NoError(err, "cannot have an error")
@@ -114,11 +123,11 @@ func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
 	group := sort.StringSlice(joiner.SelectGroup(nil))
 	group.Sort()
 
-	s.EqualValues(genAddressesDiffHosts(2, 4), group)
+	s.EqualValues(fakeHostPorts(2, 4, 1, 1), group)
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroupMixes() {
-	seedBootstrapHosts(s.node, append(genAddressesDiffHosts(1, 2), genAddresses(1, 2, 3)...))
+	seedBootstrapHosts(s.node, append(fakeHostPorts(1, 2, 1, 1), fakeHostPorts(1, 1, 2, 3)...))
 
 	joiner, err := newJoinSender(s.node, &joinOpts{parallelismFactor: 1})
 	s.Require().NoError(err, "cannot have an error")
@@ -127,11 +136,11 @@ func (s *JoinSenderTestSuite) TestSelectGroupMixes() {
 	group := sort.StringSlice(joiner.SelectGroup(nil))
 	group.Sort()
 
-	s.EqualValues(append(genAddresses(1, 2, 3), genAddressesDiffHosts(2, 2)...), group)
+	s.EqualValues(append(fakeHostPorts(1, 1, 2, 3), fakeHostPorts(2, 2, 1, 1)...), group)
 }
 
 func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
-	peer := newChannelNode(s.T(), "127.0.0.1:3002")
+	peer := newChannelNode(s.T())
 	peer.node.app = "different"
 	defer peer.Destroy()
 
@@ -155,6 +164,11 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 }
 
 func (s *JoinSenderTestSuite) TestJoinSelf() {
+	// Set up a real listening channel
+	s.tnode = newChannelNode(s.T())
+	s.node = s.tnode.node
+	defer s.tnode.Destroy()
+
 	bootstrapNodes(s.T(), s.tnode)
 
 	joiner, err := newJoinSender(s.node, nil)
