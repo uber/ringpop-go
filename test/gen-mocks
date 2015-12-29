@@ -31,3 +31,6 @@ mockery -case=underscore -dir router -recursive -output "$mock_directory" -name 
 mockery -name EventListener -dir events -recursive -print \
     |sed 's/package mocks/package forward/g' \
     > "${0%/*}/../forward/mock_event_listener_test.go"
+
+# mocks used in forward cannot go into test/mocks because circular dependency
+mockery -name Sender -dir forward -recursive -testonly -case=underscore -inpkg
