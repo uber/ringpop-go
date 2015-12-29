@@ -139,6 +139,7 @@ func (f *Forwarder) incrementInflight() {
 
 func (f *Forwarder) decrementInflight() {
 	f.inflightLock.Lock()
+	pre := f.inflight
 	f.inflight--
 
 	// make sure that we do not decrement below 0
@@ -150,7 +151,10 @@ func (f *Forwarder) decrementInflight() {
 	inflight := f.inflight
 	f.inflightLock.Unlock()
 
-	f.emit(InflightRequestsChangedEvent{inflight})
+	if pre != inflight {
+		// emit a change
+		f.emit(InflightRequestsChangedEvent{inflight})
+	}
 }
 
 // ForwardRequest forwards a request to the given service and endpoint returns the response.

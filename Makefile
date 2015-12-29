@@ -8,7 +8,7 @@ clean:
 	rm -f testpop
 
 clean-mocks:
-	rm -f test/mocks/*.go
+	rm -f test/mocks/*.go forward/mock_*.go
 
 mocks:
 	test/gen-mocks

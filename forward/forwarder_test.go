@@ -22,9 +22,11 @@ package forward
 
 import (
 	json2 "encoding/json"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
@@ -186,6 +188,85 @@ func (s *ForwarderTestSuite) TestRequestNoReroutes() {
 		})
 
 	s.Error(err)
+}
+
+func (s *ForwarderTestSuite) TestRegisterListener() {
+	listener := &EventListener{}
+	listener.On("HandleEvent").Return()
+
+	s.forwarder.RegisterListener(listener)
+	s.Assertions.Equal(1, len(s.forwarder.listeners), "Expected 1 listener to be registered")
+
+	// remove all listeners
+	s.forwarder.listeners = nil
+}
+
+func (s *ForwarderTestSuite) TestEmit() {
+	// wait for HandleEvent being called
+	var wg sync.WaitGroup
+	wg.Add(1) // expect 1 call to HandleEvent
+
+	listener := &EventListener{}
+	listener.On("HandleEvent", mock.Anything).Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return()
+
+	s.forwarder.RegisterListener(listener)
+
+	// emit an empty struct
+	s.forwarder.emit(struct{}{})
+
+	wg.Wait()
+
+	// remove all listeners
+	s.forwarder.listeners = nil
+}
+
+func (s *ForwarderTestSuite) TestEmit2() {
+	// wait for HandleEvent being called
+	var wg sync.WaitGroup
+	wg.Add(2) // expect 2 calls to HandleEvent
+
+	listener1 := &EventListener{}
+	listener1.On("HandleEvent", mock.Anything).Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return()
+
+	listener2 := &EventListener{}
+	listener2.On("HandleEvent", mock.Anything).Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return()
+
+	s.forwarder.RegisterListener(listener1)
+	s.forwarder.RegisterListener(listener2)
+
+	// emit an empty struct
+	s.forwarder.emit(struct{}{})
+
+	wg.Wait()
+
+	// remove all listeners
+	s.forwarder.listeners = nil
+}
+
+func (s *ForwarderTestSuite) TestInvalidInflightDecrement() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	listener := &EventListener{}
+	listener.On("HandleEvent", mock.AnythingOfTypeArgument("forward.InflightRequestsMiscountEvent")).Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return()
+
+	s.forwarder.inflight = 0
+	s.forwarder.RegisterListener(listener)
+	s.forwarder.decrementInflight()
+
+	s.Assertions.Equal(int64(0), s.forwarder.inflight, "Expected inflight to stay at 0 when decremented at 0")
+
+	// wait for HandleEvent with forward.InflightRequestsMiscountEvent being called
+	wg.Wait()
+	s.forwarder.listeners = nil
 }
 
 func TestForwarderTestSuite(t *testing.T) {
