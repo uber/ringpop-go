@@ -140,15 +140,6 @@ func (s *ForwarderTestSuite) TestForwardJSONInvalidEndpoint() {
 	s.EqualError(err, "max retries exceeded")
 }
 
-func (s *ForwarderTestSuite) TestForwardThrift() {
-	dest, err := s.sender.Lookup("other 1")
-	s.NoError(err)
-
-	_, err = s.forwarder.ForwardRequest([]byte{}, dest, "test", "Ping::Ping", []string{"other 1"},
-		tchannel.Thrift, nil)
-	s.NoError(err, "expected request to be forwarded")
-}
-
 func (s *ForwarderTestSuite) TestMaxRetries() {
 	var ping Ping
 
