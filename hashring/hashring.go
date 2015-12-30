@@ -79,7 +79,7 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 	}
 
 	ring.servers.byAddress = make(map[string]bool)
-	ring.servers.tree = new(RedBlackTree)
+	ring.servers.tree = &RedBlackTree{}
 	return ring
 }
 

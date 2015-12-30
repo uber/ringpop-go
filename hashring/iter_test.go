@@ -27,7 +27,7 @@ import (
 )
 
 func iterTree() *RedBlackTree {
-	tree := new(RedBlackTree)
+	tree := &RedBlackTree{}
 
 	tree.Insert(40, "fourty")
 	tree.Insert(20, "twenty")
@@ -42,7 +42,7 @@ func iterTree() *RedBlackTree {
 
 func TestIterNil(t *testing.T) {
 	// empty tree
-	tree := new(RedBlackTree)
+	tree := &RedBlackTree{}
 	iter := NewIterator(tree)
 
 	n := iter.Next()
