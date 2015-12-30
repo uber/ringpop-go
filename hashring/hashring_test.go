@@ -30,69 +30,66 @@ import (
 )
 
 func TestAddServer(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring := New(farm.Fingerprint32, 10)
+	ring.addServer("server1")
+	ring.addServer("server2")
 
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 
-	ring.AddServer("server1")
+	ring.addServer("server1")
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 }
 
 func TestRemoveServer(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring := New(farm.Fingerprint32, 10)
+	ring.addServer("server1")
+	ring.addServer("server2")
 
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 
-	ring.RemoveServer("server1")
+	ring.removeServer("server1")
 
 	assert.False(t, ring.HasServer("server1"), "expected server to not be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 
-	ring.RemoveServer("server3")
+	ring.removeServer("server3")
 
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 }
 
 func TestChecksumChanges(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
+	ring := New(farm.Fingerprint32, 10)
 	checksum := ring.Checksum()
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
-
+	ring.AddRemoveServers([]string{"server1", "server2"}, nil)
 	assert.NotEqual(t, checksum, ring.Checksum(), "expected checksum to have changed on server add")
 
 	checksum = ring.Checksum()
-
-	ring.RemoveServer("server1")
+	ring.AddRemoveServers(nil, []string{"server1"})
 
 	assert.NotEqual(t, checksum, ring.Checksum(), "expected checksum to have changed on server remove")
 }
 
 func TestServerCount(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
+	ring := New(farm.Fingerprint32, 10)
 	assert.Equal(t, 0, ring.ServerCount(), "expected one server to be in ring")
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
-	ring.AddServer("server3")
+	ring.addServer("server1")
+	ring.addServer("server2")
+	ring.addServer("server3")
 
 	assert.Equal(t, 3, ring.ServerCount(), "expected three servers to be in ring")
 
-	ring.RemoveServer("server1")
+	ring.removeServer("server1")
 
 	assert.Equal(t, 2, ring.ServerCount(), "expected two servers to be in ring")
 }
 
 func TestAddRemoveServers(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
+	ring := New(farm.Fingerprint32, 10)
 	add := []string{"server1", "server2"}
 	remove := []string{"server3", "server4"}
 
@@ -110,24 +107,45 @@ func TestAddRemoveServers(t *testing.T) {
 }
 
 func TestLookup(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring := New(farm.Fingerprint32, 10)
+	ring.addServer("server1")
+	ring.addServer("server2")
 
 	_, ok := ring.Lookup("key")
 
 	assert.True(t, ok, "expected Lookup to hash key to a server")
 
-	ring.RemoveServer("server1")
-	ring.RemoveServer("server2")
+	ring.removeServer("server1")
+	ring.removeServer("server2")
 
 	_, ok = ring.Lookup("key")
 
 	assert.False(t, ok, "expected Lookup to find no server for key to hash to")
 }
 
+func TestLookupNOverflow(t *testing.T) {
+	ring := New(farm.Fingerprint32, 10)
+	addresses := genAddresses(1, 1, 10)
+	ring.AddRemoveServers(addresses, nil)
+	assert.Len(t, ring.LookupN("a random key", 20), 10, "expected that LookupN caps results when n is larger than number of servers")
+}
+
+func TestLookupNLoopAround(t *testing.T) {
+	ring := New(farm.Fingerprint32, 1)
+	addresses := genAddresses(1, 1, 10)
+	ring.AddRemoveServers(addresses, nil)
+
+	firstInTree := NewIterator(ring.tree).Next().Str()
+	firstResult, ok := ring.Lookup("a random key")
+	assert.True(t, ok, "expected to obtain server that owns key")
+	assert.NotEqual(t, firstResult, firstInTree, "expected to test case where the key doesn't land at the first tree node")
+
+	result := ring.LookupN("a random key", 9)
+	assert.Contains(t, result, firstResult, "expected to have looped around the ring")
+}
+
 func TestLookupN(t *testing.T) {
-	ring := NewHashRing(farm.Fingerprint32, 1)
+	ring := New(farm.Fingerprint32, 10)
 	servers := ring.LookupN("nil", 5)
 	assert.Len(t, servers, 0, "expected no servers")
 
@@ -154,7 +172,7 @@ func TestLookupN(t *testing.T) {
 
 	unique = make(map[string]bool)
 
-	ring.RemoveServer(addresses[0])
+	ring.removeServer(addresses[0])
 	servers = ring.LookupN("yet another key", 10)
 	assert.Len(t, servers, 9, "expected to get nine servers")
 	for _, server := range servers {
