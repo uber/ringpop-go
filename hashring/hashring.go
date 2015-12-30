@@ -50,9 +50,9 @@ type HashRing struct {
 	hashfunc      func(string) int
 	replicaPoints int
 
-	hasServer map[string]bool
-	tree      *RedBlackTree
-	checksum  uint32
+	servers  map[string]struct{}
+	tree     *RedBlackTree
+	checksum uint32
 
 	listeners []events.EventListener
 }
@@ -77,7 +77,7 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		},
 	}
 
-	r.hasServer = make(map[string]bool)
+	r.servers = make(map[string]struct{})
 	r.tree = &RedBlackTree{}
 	return r
 }
@@ -144,7 +144,7 @@ func (r *HashRing) AddRemoveServers(add []string, remove []string) bool {
 
 // addServer adds all replicas of a server to the HashRing.
 func (r *HashRing) addServer(address string) bool {
-	if r.hasServer[address] {
+	if _, ok := r.servers[address]; ok {
 		return false
 	}
 
@@ -154,7 +154,7 @@ func (r *HashRing) addServer(address string) bool {
 }
 
 func (r *HashRing) addReplicas(server string) {
-	r.hasServer[server] = true
+	r.servers[server] = struct{}{}
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
 		r.tree.Insert(r.hashfunc(address), server)
@@ -163,7 +163,7 @@ func (r *HashRing) addReplicas(server string) {
 
 // removeServer removes all replicas of a server from the HashRing.
 func (r *HashRing) removeServer(address string) bool {
-	if !r.hasServer[address] {
+	if _, ok := r.servers[address]; !ok {
 		return false
 	}
 
@@ -173,7 +173,7 @@ func (r *HashRing) removeServer(address string) bool {
 }
 
 func (r *HashRing) removeReplicas(server string) {
-	delete(r.hasServer, server)
+	delete(r.servers, server)
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
 		r.tree.Delete(r.hashfunc(address))
@@ -215,7 +215,8 @@ func (r *HashRing) Lookup(key string) (string, bool) {
 func (r *HashRing) HasServer(address string) bool {
 	r.RLock()
 	defer r.RUnlock()
-	return r.hasServer[address]
+	_, ok := r.servers[address]
+	return ok
 }
 
 // Servers returns all servers stored in the HashRing.
@@ -227,7 +228,7 @@ func (r *HashRing) Servers() []string {
 
 func (r *HashRing) serversNoLock() []string {
 	var servers []string
-	for server := range r.hasServer {
+	for server := range r.servers {
 		servers = append(servers, server)
 	}
 	return servers
