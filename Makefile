@@ -9,9 +9,10 @@ clean:
 
 clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
+	rm -rf test/thrift/pingpong/
 
 mocks:
-	test/gen-mocks
+	test/gen-testfiles
 
 test:
 	go generate ./...

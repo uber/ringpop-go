@@ -5,6 +5,11 @@
 set -eo pipefail
 
 mock_directory="${0%/*}/mocks"
+thrift_directory="${0%/*}/thrift"
+
+thrift-gen -generateThrift -inputFile "$thrift_directory"/pingpong.thrift -outputDir "$thrift_directory"
+mockery -case=underscore -dir "$thrift_directory" -recursive -inpkg -name TChanPingPong
+
 
 # Generate mocks for dependencies
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
@@ -17,8 +22,6 @@ mockery -name Interface -print \
     |sed 's/_m \*Interface/_m \*Ringpop/g' \
     |sed 's/type Interface/type Ringpop/g' \
     > "$mock_directory"/ringpop.go
-
-echo
 
 mockery -name NodeInterface -recursive -print \
     |sed 's/_m \*NodeInterface/_m \*SwimNode/g' \

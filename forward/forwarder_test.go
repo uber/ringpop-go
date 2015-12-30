@@ -21,14 +21,17 @@
 package forward
 
 import (
+	"bytes"
 	json2 "encoding/json"
 	"errors"
 	"sync"
 	"testing"
 	"time"
 
+	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/test/thrift/pingpong"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"github.com/uber/tchannel-go/thrift"
@@ -67,6 +70,23 @@ func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Chan
 		},
 	}
 	s.Require().NoError(json.Register(channel, hmap, func(ctx context.Context, err error) {}))
+
+	thriftHandler := &pingpong.MockTChanPingPong{}
+
+	// successful request
+	thriftHandler.On("Ping", mock.Anything, &pingpong.Ping{
+		Key: "success",
+	}).Return(&pingpong.Pong{
+		Source: address,
+	}, nil)
+
+	// error request
+	thriftHandler.On("Ping", mock.Anything, &pingpong.Ping{
+		Key: "error",
+	}).Return(nil, &pingpong.PingError{})
+
+	server := thrift.NewServer(channel)
+	server.Register(pingpong.NewTChanPingPongServer(thriftHandler))
 }
 
 func (s *ForwarderTestSuite) SetupSuite() {
@@ -138,6 +158,54 @@ func (s *ForwarderTestSuite) TestForwardJSONInvalidEndpoint() {
 			},
 		})
 	s.EqualError(err, "max retries exceeded")
+}
+
+func (s *ForwarderTestSuite) TestForwardThrift() {
+	dest, err := s.sender.Lookup("other 1")
+	s.NoError(err)
+
+	request := &pingpong.PingPongPingArgs{
+		Request: &pingpong.Ping{
+			Key: "success",
+		},
+	}
+
+	bytes, err := SerializeThrift(request)
+	s.NoError(err, "expected ping to be serialized")
+
+	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"other 1"},
+		tchannel.Thrift, nil)
+	s.NoError(err, "expected request to be forwarded")
+
+	var response pingpong.PingPongPingResult
+
+	err = DeserializeThrift(res, &response)
+
+	s.Equal("127.0.0.1:3002", response.Success.Source)
+}
+
+func (s *ForwarderTestSuite) TestForwardThriftErrorResponse() {
+	dest, err := s.sender.Lookup("other 1")
+	s.NoError(err)
+
+	request := &pingpong.PingPongPingArgs{
+		Request: &pingpong.Ping{
+			Key: "error",
+		},
+	}
+
+	bytes, err := SerializeThrift(request)
+	s.NoError(err, "expected ping to be serialized")
+
+	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"other 1"},
+		tchannel.Thrift, nil)
+	s.NoError(err, "expected request to be forwarded")
+
+	var response pingpong.PingPongPingResult
+
+	err = DeserializeThrift(res, &response)
+
+	s.NotNil(response.PingError, "expected a pingerror")
 }
 
 func (s *ForwarderTestSuite) TestMaxRetries() {
@@ -350,4 +418,33 @@ func TestHasForwardedHeader(t *testing.T) {
 	if !HasForwardedHeader(ctx) {
 		t.Errorf("ringpop was not able to identify that the forwarded header was set in the case of alread present headers")
 	}
+}
+
+// SerializeThrift takes a thrift struct and returns the serialized bytes
+// of that struct using the thrift binary protocol. This is a temporary
+// measure before frames can forwarded directly past the endpoint to the proper
+// destinaiton.
+func SerializeThrift(s athrift.TStruct) ([]byte, error) {
+	var b []byte
+	var buffer = bytes.NewBuffer(b)
+
+	transport := athrift.NewStreamTransportW(buffer)
+	if err := s.Write(athrift.NewTBinaryProtocolTransport(transport)); err != nil {
+		return nil, err
+	}
+
+	if err := transport.Flush(); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+// DeserializeThrift takes a byte slice and attempts to write it into the
+// given thrift struct using the thrift binary protocol. This is a temporary
+// measure before frames can forwarded directly past the endpoint to the proper
+// destinaiton.
+func DeserializeThrift(b []byte, s athrift.TStruct) error {
+	reader := bytes.NewReader(b)
+	transport := athrift.NewStreamTransportR(reader)
+	return s.Read(athrift.NewTBinaryProtocolTransport(transport))
 }
