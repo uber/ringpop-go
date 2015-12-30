@@ -43,7 +43,7 @@ type Configuration struct {
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
-// a Red-Black Tree to achieve O(log N) lookup and insertion time
+// a Red-Black Tree to achieve O(log N) lookup and insertion time.
 type HashRing struct {
 	hashfunc      func(string) int
 	replicaPoints int
@@ -69,7 +69,7 @@ func (r *HashRing) RegisterListener(l events.EventListener) {
 	r.listeners = append(r.listeners, l)
 }
 
-// New instantiates and returns a new HashRing,
+// New instantiates and returns a new HashRing.
 func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 	ring := &HashRing{
 		replicaPoints: replicaPoints,
@@ -108,7 +108,7 @@ func (r *HashRing) computeChecksum() {
 	})
 }
 
-// AddServer adds all replicas of a server to the HashRing
+// AddServer adds all replicas of a server to the HashRing.
 func (r *HashRing) AddServer(address string) {
 	if r.HasServer(address) {
 		return
@@ -130,7 +130,7 @@ func (r *HashRing) addReplicas(server string) {
 	}
 }
 
-// RemoveServer removes all replicas of a server from the HashRing
+// RemoveServer removes all replicas of a server from the HashRing.
 func (r *HashRing) RemoveServer(address string) {
 	if !r.HasServer(address) {
 		return
@@ -154,7 +154,7 @@ func (r *HashRing) removeReplicas(server string) {
 
 // AddRemoveServers adds and removes all replicas of the given servers to the
 // HashRing. This function only computes the new checksum once, and thus is an
-// optimalization of AddServer and RemoveServer.
+// optimazation of AddServer and RemoveServer.
 func (r *HashRing) AddRemoveServers(add []string, remove []string) bool {
 	var changed, added, removed bool
 
@@ -181,14 +181,14 @@ func (r *HashRing) AddRemoveServers(add []string, remove []string) bool {
 	return changed
 }
 
-// HasServer returns true if the server exists in the ring, false otherwise
+// HasServer returns wether or not the server exists in the ring.
 func (r *HashRing) HasServer(address string) bool {
 	r.servers.RLock()
 	defer r.servers.RUnlock()
 	return r.servers.byAddress[address]
 }
 
-// GetServers returns all servers stored in the HashRing
+// GetServers returns all servers stored in the HashRing.
 func (r *HashRing) GetServers() []string {
 	r.servers.RLock()
 	defer r.servers.RUnlock()
@@ -203,14 +203,14 @@ func (r *HashRing) getServersNoLock() []string {
 	return servers
 }
 
-// ServerCount returns the number of servers in the ring
+// ServerCount returns the number of servers in the ring.
 func (r *HashRing) ServerCount() int {
 	r.servers.RLock()
 	defer r.servers.RUnlock()
 	return len(r.servers.byAddress)
 }
 
-// Lookup return the owner of the given key
+// Lookup returns the owner of the given key.
 func (r *HashRing) Lookup(key string) (string, bool) {
 	strs := r.LookupN(key, 1)
 	if len(strs) == 0 {
