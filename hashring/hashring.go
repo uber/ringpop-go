@@ -93,12 +93,12 @@ func (r *HashRing) Checksum() uint32 {
 
 // computeChecksum computes checksum of all servers in the ring.
 func (r *HashRing) computeChecksum() {
-	addresses := r.GetServers()
-	sort.Strings(addresses)
-	bytes := []byte(strings.Join(addresses, ";"))
-
 	r.servers.Lock()
 	defer r.servers.Unlock()
+
+	addresses := r.getServersNoLock()
+	sort.Strings(addresses)
+	bytes := []byte(strings.Join(addresses, ";"))
 	old := r.servers.checksum
 	r.servers.checksum = farm.Fingerprint32(bytes)
 
@@ -192,7 +192,10 @@ func (r *HashRing) HasServer(address string) bool {
 func (r *HashRing) GetServers() []string {
 	r.servers.RLock()
 	defer r.servers.RUnlock()
+	return r.getServersNoLock()
+}
 
+func (r *HashRing) getServersNoLock() []string {
 	var servers []string
 	for server := range r.servers.byAddress {
 		servers = append(servers, server)
@@ -224,7 +227,7 @@ func (r *HashRing) LookupN(key string, n int) []string {
 	defer r.servers.RUnlock()
 
 	if n >= r.ServerCount() {
-		return r.GetServers()
+		return r.getServersNoLock()
 	}
 
 	// Iterate over RB-tree and collect unique servers
