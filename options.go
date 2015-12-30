@@ -26,6 +26,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/shared"
 )
 
@@ -107,7 +108,7 @@ func Channel(ch shared.TChannel) Option {
 //
 // See documentation on the `HashRingConfiguration` struct for more information
 // about what options are available.
-func HashRingConfig(c *HashRingConfiguration) Option {
+func HashRingConfig(c *hashring.Configuration) Option {
 	return func(r *Ringpop) error {
 		r.configHashRing = c
 		return nil
@@ -203,6 +204,6 @@ var defaultOptions = []Option{
 	defaultHashRingOptions,
 }
 
-var defaultHashRingConfiguration = &HashRingConfiguration{
+var defaultHashRingConfiguration = &hashring.Configuration{
 	ReplicaPoints: 100,
 }
