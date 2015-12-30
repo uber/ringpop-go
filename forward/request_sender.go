@@ -21,6 +21,7 @@
 package forward
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -83,9 +84,15 @@ func (s *requestSender) Send() (res []byte, err error) {
 	ctx, cancel := shared.NewTChannelContext(s.timeout)
 	defer cancel()
 
+	var forwardError, applicationError error
+
 	select {
-	case err := <-s.MakeCall(ctx, &res):
-		if err == nil {
+	case <-s.MakeCall(ctx, &res, &forwardError, &applicationError):
+		if applicationError != nil {
+			return nil, applicationError
+		}
+
+		if forwardError == nil {
 			if s.retries > 0 {
 				// forwarding succeeded after retries
 				s.emitter.emit(RetrySuccessEvent{s.retries})
@@ -109,7 +116,6 @@ func (s *requestSender) Send() (res []byte, err error) {
 		s.emitter.emit(MaxRetriesEvent{s.maxRetries})
 
 		return nil, errors.New("max retries exceeded")
-
 	case <-ctx.Done(): // request timed out
 
 		identity, _ := s.sender.WhoAmI()
@@ -126,10 +132,10 @@ func (s *requestSender) Send() (res []byte, err error) {
 }
 
 // calls remote service and writes response to s.response
-func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error {
-	errC := make(chan error)
+func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *error, appError *error) <-chan bool {
+	done := make(chan bool)
 	go func() {
-		defer close(errC)
+		defer close(done)
 
 		peer := s.channel.Peers().GetOrAdd(s.destination)
 
@@ -137,7 +143,8 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error 
 			Format: s.format,
 		})
 		if err != nil {
-			errC <- err
+			*fwdError = err
+			done <- true
 			return
 		}
 
@@ -145,18 +152,38 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error 
 		if s.format == tchannel.Thrift {
 			_, arg3, _, err = raw.WriteArgs(call, []byte{0, 0}, s.request)
 		} else {
-			_, arg3, _, err = raw.WriteArgs(call, nil, s.request)
+			var resp *tchannel.OutboundCallResponse
+			_, arg3, resp, err = raw.WriteArgs(call, nil, s.request)
+
+			// check if the response is an application level error
+			if err == nil && resp.ApplicationError() {
+				// parse the json from the application level error
+				errResp := struct {
+					Type    string `json:"type"`
+					Message string `json:"message"`
+				}{}
+
+				err = json.Unmarshal(arg3, &errResp)
+
+				// if parsing worked return the application level error over the application error channel
+				if err == nil {
+					*appError = errors.New(errResp.Message)
+					done <- true
+					return
+				}
+			}
 		}
 		if err != nil {
-			errC <- err
+			*fwdError = err
+			done <- true
 			return
 		}
 
 		*res = arg3
-		errC <- nil
+		done <- true
 	}()
 
-	return errC
+	return done
 }
 
 func (s *requestSender) ScheduleRetry() ([]byte, error) {

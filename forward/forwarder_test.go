@@ -58,13 +58,15 @@ type Pong struct {
 }
 
 func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Channel) {
-	handler := func(ctx json.Context, ping *Ping) (*Pong, error) {
-		return &Pong{"Hello, world!", address}, nil
+	hmap := map[string]interface{}{
+		"/ping": func(ctx json.Context, ping *Ping) (*Pong, error) {
+			return &Pong{"Hello, world!", address}, nil
+		},
+		"/error": func(ctx json.Context, ping *Ping) (*Pong, error) {
+			return nil, errors.New("remote error")
+		},
 	}
-	hmap := map[string]interface{}{"/ping": handler}
-
-	s.Require().NoError(json.Register(channel, hmap,
-		func(ctx context.Context, err error) {}))
+	s.Require().NoError(json.Register(channel, hmap, func(ctx context.Context, err error) {}))
 }
 
 func (s *ForwarderTestSuite) SetupSuite() {
@@ -95,7 +97,7 @@ func (s *ForwarderTestSuite) TearDownSuite() {
 	s.peer.Close()
 }
 
-func (s *ForwarderTestSuite) TestForward() {
+func (s *ForwarderTestSuite) TestForwardJSON() {
 	var ping Ping
 	var pong Pong
 
@@ -109,6 +111,26 @@ func (s *ForwarderTestSuite) TestForward() {
 	s.NoError(json2.Unmarshal(res, &pong))
 	s.Equal("127.0.0.1:3002", pong.From)
 	s.Equal("Hello, world!", pong.Message)
+}
+
+func (s *ForwarderTestSuite) TestForwardJSONErrorResponse() {
+	var ping Ping
+
+	dest, err := s.sender.Lookup("other 1")
+	s.NoError(err)
+
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/error", []string{"other 1"},
+		tchannel.JSON, nil)
+	s.EqualError(err, "remote error")
+}
+
+func (s *ForwarderTestSuite) TestForwardThrift() {
+	dest, err := s.sender.Lookup("other 1")
+	s.NoError(err)
+
+	_, err = s.forwarder.ForwardRequest([]byte{}, dest, "test", "Ping::Ping", []string{"other 1"},
+		tchannel.Thrift, nil)
+	s.NoError(err, "expected request to be forwarded")
 }
 
 func (s *ForwarderTestSuite) TestMaxRetries() {
