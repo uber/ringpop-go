@@ -124,6 +124,22 @@ func (s *ForwarderTestSuite) TestForwardJSONErrorResponse() {
 	s.EqualError(err, "remote error")
 }
 
+func (s *ForwarderTestSuite) TestForwardJSONInvalidEndpoint() {
+	var ping Ping
+
+	dest, err := s.sender.Lookup("other 1")
+	s.NoError(err)
+
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/invalid", []string{"other 1"},
+		tchannel.JSON, &Options{
+			MaxRetries: 1,
+			RetrySchedule: []time.Duration{
+				100 * time.Millisecond,
+			},
+		})
+	s.EqualError(err, "max retries exceeded")
+}
+
 func (s *ForwarderTestSuite) TestForwardThrift() {
 	dest, err := s.sender.Lookup("other 1")
 	s.NoError(err)

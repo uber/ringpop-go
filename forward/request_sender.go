@@ -165,7 +165,7 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *err
 
 				err = json.Unmarshal(arg3, &errResp)
 
-				// if parsing worked return the application level error over the application error channel
+				// if parsing succeeded return the error as an application error
 				if err == nil {
 					*appError = errors.New(errResp.Message)
 					done <- true
