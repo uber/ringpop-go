@@ -22,6 +22,7 @@ package forward
 
 import (
 	json2 "encoding/json"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -72,6 +73,7 @@ func (s *ForwarderTestSuite) SetupSuite() {
 	sender.On("Lookup", "other 1").Return("127.0.0.1:3002", nil)
 	sender.On("Lookup", "other 2").Return("127.0.0.1:3003", nil)
 	sender.On("Lookup", "unreachable").Return("127.0.0.2:3001", nil)
+	sender.On("Lookup", "error").Return("", errors.New("lookup error"))
 	sender.On("WhoAmI").Return("127.0.0.1:3001", nil)
 	s.sender = sender
 
@@ -122,6 +124,22 @@ func (s *ForwarderTestSuite) TestMaxRetries() {
 		})
 
 	s.EqualError(err, "max retries exceeded")
+}
+
+func (s *ForwarderTestSuite) TestLookupErrorInRetry() {
+	var ping Ping
+
+	dest, err := s.sender.Lookup("other 2")
+	s.NoError(err)
+
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"error"},
+		tchannel.JSON, &Options{
+			MaxRetries:    2,
+			RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond},
+		})
+
+	// lookup errors are swallowed and result in the key missing in the dests list, so a diverged error is expected
+	s.EqualError(err, "key destinations have diverged")
 }
 
 func (s *ForwarderTestSuite) TestKeysDiverged() {
