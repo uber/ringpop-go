@@ -39,8 +39,6 @@ import (
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
-
-	"github.com/uber/ringpop-go/hashring"
 )
 
 // Interface specifies the public facing methods a user of ringpop is able to
@@ -66,7 +64,7 @@ type Interface interface {
 // changes around the ring.
 type Ringpop struct {
 	config         *configuration
-	configHashRing *hashring.HashRingConfiguration
+	configHashRing *hashring.Configuration
 
 	identityResolver IdentityResolver
 

@@ -38,16 +38,6 @@ type configuration struct {
 	App string
 }
 
-// HashRingConfiguration is a configuration struct that can be passed to the
-// Ringpop constructor to customize hash ring options.
-type HashRingConfiguration struct {
-	// ReplicaPoints is the number of positions a node will be assigned on the
-	// ring. A bigger number will provide better key distribution, but require
-	// more computation when building or traversing the ring (typically on
-	// lookups or membership changes).
-	ReplicaPoints int
-}
-
 // An Option is a modifier functions that configure/modify a real Ringpop
 // object.
 //
@@ -118,7 +108,7 @@ func Channel(ch shared.TChannel) Option {
 //
 // See documentation on the `HashRingConfiguration` struct for more information
 // about what options are available.
-func HashRingConfig(c *hashring.HashRingConfiguration) Option {
+func HashRingConfig(c *hashring.Configuration) Option {
 	return func(r *Ringpop) error {
 		r.configHashRing = c
 		return nil
@@ -214,6 +204,6 @@ var defaultOptions = []Option{
 	defaultHashRingOptions,
 }
 
-var defaultHashRingConfiguration = &hashring.HashRingConfiguration{
+var defaultHashRingConfiguration = &hashring.Configuration{
 	ReplicaPoints: 100,
 }

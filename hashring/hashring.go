@@ -45,7 +45,7 @@ type Configuration struct {
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
 // a Red-Black Tree to achieve O(log N) lookup and insertion time
 type HashRing struct {
-	hashfunc      func([]byte) uint32
+	hashfunc      func(string) int
 	replicaPoints int
 
 	servers struct {
