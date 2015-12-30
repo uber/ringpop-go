@@ -47,7 +47,7 @@ type HashRing struct {
 
 	servers struct {
 		byAddress map[string]bool
-		tree      *RBTree
+		tree      *RedBlackTree
 		checksum  uint32
 		sync.RWMutex
 	}
@@ -73,7 +73,7 @@ func NewHashRing(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 	}
 
 	ring.servers.byAddress = make(map[string]bool)
-	ring.servers.tree = &RBTree{}
+	ring.servers.tree = &RedBlackTree{}
 
 	return ring
 }
@@ -215,20 +215,13 @@ func (r *HashRing) ServerCount() int {
 	return count
 }
 
+// Lookup returns the owner of the given key.
 func (r *HashRing) Lookup(key string) (string, bool) {
-	r.servers.RLock()
-
-	iter := r.servers.tree.IterAt(int(r.hashfunc([]byte(key))))
-	if iter.Nil() {
-		r.servers.RUnlock()
+	strs := r.LookupN(key, 1)
+	if len(strs) == 0 {
 		return "", false
 	}
-
-	server := iter.Str()
-
-	r.servers.RUnlock()
-
-	return server, true
+	return strs[0], true
 }
 
 func (r *HashRing) LookupN(key string, n int) []string {
@@ -238,27 +231,24 @@ func (r *HashRing) LookupN(key string, n int) []string {
 	}
 
 	r.servers.RLock()
-	var servers []string
-	var unique = make(map[string]bool)
 
-	iter := r.servers.tree.IterAt(int(r.hashfunc([]byte(key))))
-	if iter.Nil() {
-		r.servers.RUnlock()
-		return servers
+	// Iterate over RB-tree and collect unique servers
+	var unique = make(map[string]bool)
+	hash := r.hashfunc([]byte(key))
+	iter := NewIteratorAt(r.servers.tree, int(hash))
+	for node := iter.Next(); len(unique) < n; node = iter.Next() {
+		if node == nil {
+			// Reached end of rb-tree, loop around
+			iter = NewIterator(r.servers.tree)
+			node = iter.Next()
+		}
+		unique[node.Str()] = true
 	}
 
-	firstVal := iter.Val()
-	for {
-		res := iter.Str()
-		if !unique[res] {
-			servers = append(servers, res)
-			unique[res] = true
-		}
-		iter.Next()
-
-		if len(servers) == n || iter.Val() == firstVal {
-			break
-		}
+	// Collect results
+	var servers []string
+	for server := range unique {
+		servers = append(servers, server)
 	}
 
 	r.servers.RUnlock()
