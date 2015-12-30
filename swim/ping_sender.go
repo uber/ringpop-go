@@ -64,7 +64,10 @@ func (p *pingSender) SendPing() (*ping, error) {
 	var res ping
 	select {
 	case err := <-p.MakeCall(ctx, &res):
-		return &res, err
+		if err != nil {
+			return nil, err
+		}
+		return &res, nil
 
 	case <-ctx.Done(): // ping timed out
 		return nil, errors.New("ping timed out")

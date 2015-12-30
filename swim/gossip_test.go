@@ -36,7 +36,7 @@ type GossipTestSuite struct {
 }
 
 func (s *GossipTestSuite) SetupTest() {
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
 
 	s.g = s.node.gossip
@@ -75,7 +75,7 @@ func (s *GossipTestSuite) StopWhileStopped() {
 }
 
 func (s *GossipTestSuite) TestUpdatesArePropogated() {
-	peer := newChannelNode(s.T(), "127.0.0.1:3002")
+	peer := newChannelNode(s.T())
 	defer peer.Destroy()
 	defer peer.channel.Close()
 
@@ -107,7 +107,7 @@ func (s *GossipTestSuite) TestUpdatesArePropogated() {
 
 // TODO: move this test to node_test?
 func (s *GossipTestSuite) TestSuspicionStarted() {
-	peers := genChannelNodes(s.T(), genAddresses(1, 2, 4))
+	peers := genChannelNodes(s.T(), 3)
 	defer destroyNodes(peers...)
 
 	bootstrapNodes(s.T(), append(peers, s.tnode)...)

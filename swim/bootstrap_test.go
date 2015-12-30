@@ -37,7 +37,7 @@ type BootstrapTestSuite struct {
 }
 
 func (s *BootstrapTestSuite) SetupTest() {
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
 }
 
@@ -46,14 +46,14 @@ func (s *BootstrapTestSuite) TearDownTest() {
 }
 
 func (s *BootstrapTestSuite) TestBootstrapOk() {
-	s.peers = genChannelNodes(s.T(), genAddresses(1, 2, 6))
+	s.peers = genChannelNodes(s.T(), 5)
 
 	bootstrapNodes(s.T(), append(s.peers, s.tnode)...)
 }
 
 func (s *BootstrapTestSuite) TestBootstrapTimesOut() {
 	_, err := s.node.Bootstrap(&BootstrapOptions{
-		Hosts:           genAddresses(1, 1, 10),
+		Hosts:           fakeHostPorts(1, 1, 1, 0),
 		MaxJoinDuration: time.Millisecond,
 	})
 
@@ -62,7 +62,7 @@ func (s *BootstrapTestSuite) TestBootstrapTimesOut() {
 
 func (s *BootstrapTestSuite) TestBootstrapJoinsTimeOut() {
 	_, err := s.node.Bootstrap(&BootstrapOptions{
-		Hosts:           append(genAddresses(2, 1, 5), s.node.Address()),
+		Hosts:           append(fakeHostPorts(2, 2, 1, 5), s.node.Address()),
 		MaxJoinDuration: time.Millisecond,
 		JoinTimeout:     time.Millisecond / 2,
 	})
@@ -75,7 +75,7 @@ func (s *BootstrapTestSuite) TestBootstrapDestroy() {
 
 	go func() {
 		_, err := s.node.Bootstrap(&BootstrapOptions{
-			Hosts:       genAddresses(1, 1, 10),
+			Hosts:       fakeHostPorts(1, 1, 1, 0),
 			JoinTimeout: time.Millisecond,
 		})
 		lerr.Set(err)
