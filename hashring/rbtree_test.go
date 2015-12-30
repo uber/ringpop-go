@@ -23,7 +23,6 @@ package hashring
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -37,8 +36,8 @@ import (
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func makeTree() RBTree {
-	tree := RBTree{}
+func makeTree() redBlackTree {
+	tree := redBlackTree{}
 
 	tree.Insert(1, "one")
 	tree.Insert(2, "two")
@@ -61,47 +60,47 @@ func makeTree() RBTree {
 }
 
 func TestEmptyTree(t *testing.T) {
-	tree := RBTree{}
+	tree := redBlackTree{}
 
 	assert.Nil(t, tree.root, "tree root is nil")
 	assert.Equal(t, 0, tree.Size(), "tree has 0 nodes")
 }
 
 // counts the black height of the tree and validates it along the way
-func validateRBTree(node *RBNode) (int, error) {
-	if node == nil {
+func validateRedBlackTree(n *redBlackNode) (int, error) {
+	if n == nil {
 		return 1, nil
 	}
 
 	var err error
 
-	if isRed(node) && (isRed(node.left) || isRed(node.right)) {
-		err = errors.New(fmt.Sprint("red violation at node val ", node.val))
+	if isRed(n) && (isRed(n.left) || isRed(n.right)) {
+		err = errors.New(fmt.Sprint("red violation at node val ", n.val))
 		return 0, err
 	}
 
-	leftHeight, err := validateRBTree(node.left)
+	leftHeight, err := validateRedBlackTree(n.left)
 	if err != nil {
 		return 0, err
 	}
-	rightHeight, err := validateRBTree(node.right)
+	rightHeight, err := validateRedBlackTree(n.right)
 	if err != nil {
 		return 0, err
 	}
 
-	if node.left != nil && node.left.val >= node.val ||
-		node.right != nil && node.right.val <= node.val {
-		err = errors.New(fmt.Sprint("binary tree violation at node val ", node.val))
+	if n.left != nil && n.left.val >= n.val ||
+		n.right != nil && n.right.val <= n.val {
+		err = errors.New(fmt.Sprint("binary tree violation at node val ", n.val))
 		return 0, err
 	}
 
 	if leftHeight != 0 && rightHeight != 0 {
 		if leftHeight != rightHeight {
-			err = errors.New(fmt.Sprint("black height violation at node val ", node.val))
+			err = errors.New(fmt.Sprint("black height violation at node val ", n.val))
 			return 0, err
 		}
 
-		if isRed(node) {
+		if isRed(n) {
 			return leftHeight, nil
 		}
 		return leftHeight + 1, nil
@@ -109,27 +108,10 @@ func validateRBTree(node *RBNode) (int, error) {
 	return 0, nil
 }
 
-func Walk(node *RBNode, bh int) {
-	if node == nil {
-		println("--", bh)
-		return
-	}
-	println(node.val, node.red)
-
-	var nbh int
-	if node.red == false {
-		nbh = bh + 1
-	} else {
-		nbh = bh
-	}
-	Walk(node.left, nbh)
-	Walk(node.right, nbh)
-}
-
 func TestInsert(t *testing.T) {
 	tree := makeTree()
 
-	height, err := validateRBTree(tree.root)
+	height, err := validateRedBlackTree(tree.root)
 
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
@@ -231,13 +213,13 @@ func TestRemoveInsert(t *testing.T) {
 	assert.Equal(t, 6, tree.Size(), "expected tree to have 6 nodes")
 
 	assert.True(t, tree.Insert(2, "two"), "failed, expected insertions success")
-	_, err := validateRBTree(tree.root)
+	_, err := validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 
 	assert.Equal(t, 7, tree.Size(), "expected tree to have 7 nodes")
 
 	assert.True(t, tree.Insert(4, "four"), "failed, expected insertion success")
-	_, err = validateRBTree(tree.root)
+	_, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 
 	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
@@ -246,7 +228,7 @@ func TestRemoveInsert(t *testing.T) {
 func TestDelete(t *testing.T) {
 	tree := makeTree()
 
-	height, err := validateRBTree(tree.root)
+	height, err := validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
 	assert.Equal(t, 8, tree.Size(), "expected tree to have 8 nodes")
@@ -262,7 +244,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 1
 	assert.True(t, tree.Delete(1), "expected node to be found and removed from tree")
 	assert.Equal(t, 7, tree.Size(), "expected tree to have 7 nodes")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
 
@@ -334,7 +316,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 2
 	assert.True(t, tree.Delete(2), "expected node to be found and removed from tree")
 	assert.Equal(t, 6, tree.Size(), "expected tree to have 6 nodes")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
 
@@ -396,7 +378,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 3
 	assert.True(t, tree.Delete(3), "expected node to be found and removed from tree")
 	assert.Equal(t, 5, tree.Size(), "expected tree to have 5 nodes")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
 
@@ -450,7 +432,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 4
 	assert.True(t, tree.Delete(4), "expected node to be found and removed from tree")
 	assert.Equal(t, 4, tree.Size(), "expected tree to have 4 nodes")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
 
@@ -496,7 +478,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 5
 	assert.True(t, tree.Delete(5), "expected node to be found and removed from tree")
 	assert.Equal(t, 3, tree.Size(), "expected tree to have 3 nodes")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 3, height, "expected tree to have black height of 3")
 
@@ -532,7 +514,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 5
 	assert.True(t, tree.Delete(6), "expected node to be found and removed from tree")
 	assert.Equal(t, 2, tree.Size(), "expected tree to have 2 nodes")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 2, height, "expected tree to have black height of 2")
 
@@ -560,7 +542,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 7
 	assert.True(t, tree.Delete(7), "expected node to be found and removed from tree")
 	assert.Equal(t, 1, tree.Size(), "expected tree to have 1 node")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 2, height, "expected tree to have black height of 2")
 
@@ -578,7 +560,7 @@ func TestDelete(t *testing.T) {
 	// REMOVE 7
 	assert.True(t, tree.Delete(8), "expected node to be found and removed from tree")
 	assert.Equal(t, 0, tree.Size(), "expected tree to be empty")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 1, height, "expected tree to have black height of 2")
 
@@ -587,13 +569,13 @@ func TestDelete(t *testing.T) {
 
 	assert.False(t, tree.Delete(1), "success, expected deletion to fail with empty tree")
 	assert.Equal(t, 0, tree.Size(), "expected tree to be empty")
-	height, err = validateRBTree(tree.root)
+	height, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 	assert.Equal(t, 1, height, "expected tree to have black height of 1")
 }
 
 func TestSearchEmpty(t *testing.T) {
-	tree := RBTree{}
+	tree := redBlackTree{}
 
 	str, ok := tree.Search(5)
 	assert.False(t, ok, "expected node to not be found")
@@ -629,7 +611,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestBig(t *testing.T) {
-	tree := RBTree{}
+	tree := redBlackTree{}
 	random := rand.New(rand.NewSource(1337))
 
 	for i := 0; i < 2000; i++ {
@@ -637,7 +619,7 @@ func TestBig(t *testing.T) {
 		tree.Insert(n, strconv.Itoa(n))
 	}
 
-	_, err := validateRBTree(tree.root)
+	_, err := validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 
 	for i := 0; i < 1000; i++ {
@@ -645,7 +627,7 @@ func TestBig(t *testing.T) {
 		tree.Delete(n)
 	}
 
-	_, err = validateRBTree(tree.root)
+	_, err = validateRedBlackTree(tree.root)
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 }
 
@@ -655,20 +637,20 @@ func TestBig(t *testing.T) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-func benchmarkRBTreeInsert(b *testing.B) {
+func BenchmarkRedBlackTreeInsert(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		tree := RBTree{}
+		tree := redBlackTree{}
 		for i := 0; i < 1000000; i++ {
 			tree.Insert(i, "something")
 		}
 	}
 }
 
-func benchmarkRBTreeDelete(b *testing.B) {
+func BenchmarkRedBlackTreeDelete(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		b.StopTimer()
 		// stop timer while tree is created
-		tree := RBTree{}
+		tree := redBlackTree{}
 		for i := 0; i < 1000000; i++ {
 			tree.Insert(i, "something")
 		}
@@ -680,9 +662,9 @@ func benchmarkRBTreeDelete(b *testing.B) {
 	}
 }
 
-func benchmarkRBTreeSearch(b *testing.B) {
+func BenchmarkRedBlackTreeSearch(b *testing.B) {
 	b.StopTimer()
-	tree := RBTree{}
+	tree := redBlackTree{}
 	for i := 0; i < 1000000; i++ {
 		tree.Insert(i, "something")
 	}
@@ -693,26 +675,3 @@ func benchmarkRBTreeSearch(b *testing.B) {
 		}
 	}
 }
-
-func opsPerSec(nspop int64) int64 {
-	return int64(math.Floor(float64(1000000 * float64(1e9) / float64(nspop))))
-}
-
-// func TestRunBenchmarks(t *testing.T) {
-// 	bmres := testing.Benchmark(benchmarkRBTreeInsert)
-//
-// 	fmt.Print("BenchmarkRBTreeInsert - Inserting 1 000 000 items into tree		")
-// 	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
-//
-// 	bmres = testing.Benchmark(benchmarkRBTreeDelete)
-//
-// 	fmt.Print("BenchmarkRBTreeDelete - Deleting 1 000 000 items from tree		")
-// 	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
-//
-// 	bmres = testing.Benchmark(benchmarkRBTreeSearch)
-//
-// 	fmt.Print("BenchmarkRBTreeSearch - Searching for each item in tree			")
-// 	fmt.Println("Ops per second: ", opsPerSec(bmres.NsPerOp()))
-//
-// 	fmt.Println()
-// }
