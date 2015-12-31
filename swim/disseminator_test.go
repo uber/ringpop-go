@@ -37,7 +37,10 @@ type DisseminatorTestSuite struct {
 
 func (s *DisseminatorTestSuite) SetupTest() {
 	s.incarnation = util.TimeNowMS()
-	s.node = NewNode("test", "127.0.0.1:3001", nil, nil)
+
+	fakeAddress := fakeHostPorts(1, 1, 1, 1)[0]
+	s.node = NewNode("test", fakeAddress, nil, nil)
+
 	s.node.memberlist.MakeAlive(s.node.Address(), s.incarnation)
 	s.d = s.node.disseminator
 	s.m = s.node.memberlist
@@ -48,7 +51,7 @@ func (s *DisseminatorTestSuite) TearDownTest() {
 }
 
 func (s *DisseminatorTestSuite) TestChangesAreRecorded() {
-	addresses := genAddresses(1, 2, 4)
+	addresses := fakeHostPorts(1, 1, 2, 4)
 
 	for _, address := range addresses {
 		s.m.MakeAlive(address, s.incarnation)
@@ -58,7 +61,7 @@ func (s *DisseminatorTestSuite) TestChangesAreRecorded() {
 }
 
 func (s *DisseminatorTestSuite) TestFullSync() {
-	addresses := genAddresses(1, 2, 4)
+	addresses := fakeHostPorts(1, 1, 2, 4)
 
 	for _, address := range addresses {
 		s.m.MakeAlive(address, s.incarnation)

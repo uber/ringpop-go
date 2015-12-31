@@ -88,20 +88,37 @@ func (n *testNode) Destroy() {
 	}
 }
 
-func newChannelNode(t *testing.T, address string) *testNode {
+// newChannelNode creates a testNode with a listening channel and associated
+// SWIM node. The channel listens on a random port assigned by the OS.
+func newChannelNode(t *testing.T) *testNode {
 	ch, err := tchannel.NewChannel("test", nil)
 	require.NoError(t, err, "channel must create successfully")
 
-	node := NewNode("test", address, ch.GetSubChannel("test"), nil)
+	// Set the channel listening so it binds to the socket and we get a port
+	// allocated by the OS
+	err = ch.ListenAndServe("127.0.0.1:0")
+	require.NoError(t, err, "channel must listen")
 
-	require.NoError(t, ch.ListenAndServe(node.Address()), "channel must listen")
+	hostport := ch.PeerInfo().HostPort
+	node := NewNode("test", hostport, ch.GetSubChannel("test"), nil)
 
 	return &testNode{node, ch}
 }
 
-func genChannelNodes(t *testing.T, hostports []string) (nodes []*testNode) {
-	for _, hostport := range hostports {
-		node := newChannelNode(t, hostport)
+// newChannelNodeWithHostPort creates a testNode with the address specified by
+// the hostport parameter.
+func newChannelNodeWithHostPort(t *testing.T, hostport string) *testNode {
+	ch, err := tchannel.NewChannel("test", nil)
+	require.NoError(t, err, "channel must create successfully")
+
+	node := NewNode("test", hostport, ch.GetSubChannel("test"), nil)
+
+	return &testNode{node, ch}
+}
+
+func genChannelNodes(t *testing.T, n int) (nodes []*testNode) {
+	for i := 0; i < n; i++ {
+		node := newChannelNode(t)
 		nodes = append(nodes, node)
 	}
 
@@ -137,21 +154,24 @@ func destroyNodes(tnodes ...*testNode) {
 	}
 }
 
-func genAddresses(host, fromPort, toPort int) []string {
-	var addresses []string
-
-	for i := fromPort; i <= toPort; i++ {
-		addresses = append(addresses, fmt.Sprintf("127.0.0.%v:%v", host, 3000+i))
+// fakeAddresses returns a slice of fake IP address/port combinations that can
+// be used during testing. Note that these addresses cannot be used in tests
+// which require real communication or binding to a socket.
+//
+// The IP addresses returned are from the TEST-NET-1 block which are defined in
+// RFC 5737 as to be used for documentation and recommended to be unrouteable.
+// In practice, these addresses may also just time out.
+//
+// See:
+// http://tools.ietf.org/html/rfc5737
+// http://stackoverflow.com/questions/10456044/what-is-a-good-invalid-ip-address-to-use-for-unit-tests
+//
+func fakeHostPorts(fromHost, toHost, fromPort, toPort int) []string {
+	var hostports []string
+	for h := fromHost; h <= toHost; h++ {
+		for p := fromPort; p <= toPort; p++ {
+			hostports = append(hostports, fmt.Sprintf("192.0.2.%v:%v", h, p))
+		}
 	}
-
-	return addresses
-}
-
-func genAddressesDiffHosts(fromPort, toPort int) []string {
-	var hosts []string
-	for i := fromPort; i <= toPort; i++ {
-		hosts = append(hosts, fmt.Sprintf("127.0.0.%v:3001", i))
-	}
-
-	return hosts
+	return hostports
 }

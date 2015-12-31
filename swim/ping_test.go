@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/tchannel-go"
 )
 
 type PingTestSuite struct {
@@ -34,9 +35,9 @@ type PingTestSuite struct {
 }
 
 func (s *PingTestSuite) SetupSuite() {
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
-	s.tpeer = newChannelNode(s.T(), "127.0.0.1:3002")
+	s.tpeer = newChannelNode(s.T())
 	s.peer = s.tpeer.node
 
 	bootstrapNodes(s.T(), s.tnode, s.tpeer)
@@ -53,14 +54,22 @@ func (s *PingTestSuite) TestPing() {
 }
 
 func (s *PingTestSuite) TestPingFails() {
-	res, err := sendPing(s.node, "127.0.0.1:3003", time.Second)
-	s.Error(err, "expected ping to pail")
+	// Create a channel with no handlers registered. Any requests to this
+	// channel should result in an error being returned immediately.
+	ch, err := tchannel.NewChannel("test", nil)
+	ch.ListenAndServe("127.0.0.1:0")
+	s.Require().NoError(err, "channel must create successfully")
+
+	res, err := sendPing(s.node, ch.PeerInfo().HostPort, time.Second)
+	s.Error(err, "expected ping to fail")
 	s.Nil(res, "expected response to be nil")
 }
 
 func (s *PingTestSuite) TestPingTimesOut() {
-	res, err := sendPing(s.node, "127.0.0.2:3001", time.Millisecond)
-	s.Error(err, "expected ping to pail")
+	// Set the timeout so low that a ping response could never come back before
+	// the timeout is reached.
+	res, err := sendPing(s.node, s.peer.Address(), time.Nanosecond)
+	s.Error(err, "expected ping to fail")
 	s.Nil(res, "expected response to be nil")
 }
 

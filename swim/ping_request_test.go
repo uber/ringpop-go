@@ -38,9 +38,9 @@ type PingRequestTestSuite struct {
 
 func (s *PingRequestTestSuite) SetupTest() {
 	s.incarnation = util.TimeNowMS()
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
-	s.peers = genChannelNodes(s.T(), genAddresses(1, 2, 3))
+	s.peers = genChannelNodes(s.T(), 2)
 }
 
 func (s *PingRequestTestSuite) TearDownTest() {

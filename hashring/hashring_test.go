@@ -126,6 +126,33 @@ func TestLookup(t *testing.T) {
 	assert.False(t, ok, "expected Lookup to find no server for key to hash to")
 }
 
+func TestLookupNOverflow(t *testing.T) {
+	ring := NewHashRing(farm.Fingerprint32, 10)
+	addresses := genAddresses(1, 1, 10)
+	ring.AddRemoveServers(addresses, nil)
+	assert.Len(t, ring.LookupN("a random key", 20), 10, "expected that LookupN caps results when n is larger than number of servers")
+}
+
+func TestLookupNLoopAround(t *testing.T) {
+	ring := NewHashRing(farm.Fingerprint32, 1)
+	addresses := genAddresses(1, 1, 10)
+	ring.AddRemoveServers(addresses, nil)
+
+	unique := make(map[string]bool)
+	ring.servers.tree.LookupNAt(1, 0, unique)
+	var firstInTree string
+	for server := range unique {
+		firstInTree = server
+		break
+	}
+	firstResult, ok := ring.Lookup("a random key")
+	assert.True(t, ok, "expected to obtain server that owns key")
+	assert.NotEqual(t, firstResult, firstInTree, "expected to test case where the key doesn't land at the first tree node")
+
+	result := ring.LookupN("a random key", 9)
+	assert.Contains(t, result, firstResult, "expected to have looped around the ring")
+}
+
 func TestLookupN(t *testing.T) {
 	ring := NewHashRing(farm.Fingerprint32, 1)
 	servers := ring.LookupN("nil", 5)
