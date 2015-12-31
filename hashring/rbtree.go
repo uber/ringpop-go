@@ -48,16 +48,6 @@ func (n *Node) Child(right bool) *Node {
 	return n.left
 }
 
-// Val returns the val contained in the node
-func (n *Node) Val() int {
-	return n.val
-}
-
-// Str returns the str contained in the node
-func (n *Node) Str() string {
-	return n.str
-}
-
 func (n *Node) setChild(right bool, node *Node) {
 	if right {
 		n.right = node
@@ -257,11 +247,42 @@ func (n *Node) search(val int) (string, bool) {
 	return "", false
 }
 
-// Search searches for a value in the RedBlackTree, returns the string and true if found,
-// or the empty string and false if val is not in the tree
+// Search searches for a value in the RedBlackTree, returns the string and true
+// if found or the empty string and false if val is not in the tree.
 func (t *RedBlackTree) Search(val int) (string, bool) {
 	if t.root == nil {
 		return "", false
 	}
 	return t.root.search(val)
+}
+
+// LookupNAt iterates through the tree from the node with value val, and
+// returns the next n unique strings. This function is not guaranteed to
+// return n strings.
+func (t *RedBlackTree) LookupNAt(n int, val int, unique map[string]bool) {
+	dfs(t.root, n, val, unique)
+}
+
+// dfs is a depth-first-search that finds n unique strings
+// with a value bigger or equal than val
+func dfs(node *Node, n int, val int, unique map[string]bool) {
+	if len(unique) >= n || node == nil {
+		return
+	}
+
+	// don't ivestigate left branch when all values there are smaller than the
+	// target value
+	if node.val < val {
+		dfs(node.right, n, val, unique)
+		return
+	}
+
+	dfs(node.left, n, val, unique)
+	// The line above can add to unique. Make sure we only add this
+	// node if we are not done yet.
+	if len(unique) >= n {
+		return
+	}
+	unique[node.str] = true
+	dfs(node.right, n, val, unique)
 }

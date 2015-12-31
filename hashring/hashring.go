@@ -224,34 +224,34 @@ func (r *HashRing) Lookup(key string) (string, bool) {
 	return strs[0], true
 }
 
+// LookupN returns the N servers that own the given key. Duplicates in the form
+// of virtual nodes are skipped to maintain a list of unique servers. If there
+// are less servers then N, we simply return all existing servers.
 func (r *HashRing) LookupN(key string, n int) []string {
-	serverCount := r.ServerCount()
-	if n > serverCount {
-		n = serverCount
-	}
-
 	r.servers.RLock()
+	defer r.servers.RUnlock()
 
-	// Iterate over RB-tree and collect unique servers
-	var unique = make(map[string]bool)
-	hash := r.hashfunc([]byte(key))
-	iter := NewIteratorAt(r.servers.tree, int(hash))
-	for node := iter.Next(); len(unique) < n; node = iter.Next() {
-		if node == nil {
-			// Reached end of rb-tree, loop around
-			iter = NewIterator(r.servers.tree)
-			node = iter.Next()
+	if n >= r.ServerCount() {
+		var servers []string
+		for server := range r.servers.byAddress {
+			servers = append(servers, server)
 		}
-		unique[node.Str()] = true
+		return servers
 	}
 
-	// Collect results
+	hash := int(r.hashfunc([]byte(key)))
+	unique := make(map[string]bool)
+	r.servers.tree.LookupNAt(n, hash, unique)
+
+	// if we have not collected all the servers we want, we have reached the
+	// end of the red-black tree and we need to loop around.
+	if len(unique) < n {
+		r.servers.tree.LookupNAt(n-len(unique), 0, unique)
+	}
+
 	var servers []string
 	for server := range unique {
 		servers = append(servers, server)
 	}
-
-	r.servers.RUnlock()
-
 	return servers
 }
