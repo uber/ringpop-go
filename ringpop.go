@@ -38,6 +38,8 @@ import (
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
+
+	"github.com/uber/ringpop-go/hashring"
 )
 
 // Interface specifies the public facing methods a user of ringpop is able to
@@ -63,7 +65,7 @@ type Interface interface {
 // changes around the ring.
 type Ringpop struct {
 	config         *configuration
-	configHashRing *HashRingConfiguration
+	configHashRing *hashring.HashRingConfiguration
 
 	identityResolver IdentityResolver
 
@@ -73,7 +75,7 @@ type Ringpop struct {
 	channel    shared.TChannel
 	subChannel shared.SubChannel
 	node       swim.NodeInterface
-	ring       HashRing
+	ring       *hashring.HashRing
 	forwarder  *forward.Forwarder
 
 	listeners []events.EventListener
@@ -162,7 +164,8 @@ func (rp *Ringpop) init() error {
 	})
 	rp.node.RegisterListener(rp)
 
-	rp.ring = newHashRing(rp, farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	rp.ring = hashring.NewHashRing(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	rp.ring.RegisterListener(rp)
 
 	rp.stats.hostport = genStatsHostport(address)
 	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
