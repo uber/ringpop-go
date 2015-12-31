@@ -108,7 +108,7 @@ func Channel(ch shared.TChannel) Option {
 //
 // See documentation on the `HashRingConfiguration` struct for more information
 // about what options are available.
-func HashRingConfig(c *hashring.HashRingConfiguration) Option {
+func HashRingConfig(c *hashring.Configuration) Option {
 	return func(r *Ringpop) error {
 		r.configHashRing = c
 		return nil
@@ -204,6 +204,6 @@ var defaultOptions = []Option{
 	defaultHashRingOptions,
 }
 
-var defaultHashRingConfiguration = &hashring.HashRingConfiguration{
+var defaultHashRingConfiguration = &hashring.Configuration{
 	ReplicaPoints: 100,
 }

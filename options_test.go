@@ -124,7 +124,7 @@ func (s *RingpopOptionsTestSuite) TestStatter() {
 // applied and used correctly.
 func (s *RingpopOptionsTestSuite) TestHashRingConfig() {
 	rp, err := New("test", Channel(s.channel), HashRingConfig(
-		&hashring.HashRingConfiguration{
+		&hashring.Configuration{
 			ReplicaPoints: 42,
 		}),
 	)
