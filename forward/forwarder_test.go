@@ -94,7 +94,7 @@ func (s *ForwarderTestSuite) SetupSuite() {
 	sender.On("Lookup", "me").Return("127.0.0.1:3001", nil)
 	sender.On("Lookup", "other 1").Return("127.0.0.1:3002", nil)
 	sender.On("Lookup", "other 2").Return("127.0.0.1:3003", nil)
-	sender.On("Lookup", "unreachable").Return("127.0.0.2:3001", nil)
+	sender.On("Lookup", "unreachable").Return("192.0.2.128:1", nil)
 	sender.On("Lookup", "error").Return("", errors.New("lookup error"))
 	sender.On("WhoAmI").Return("127.0.0.1:3001", nil)
 	s.sender = sender
