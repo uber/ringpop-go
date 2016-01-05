@@ -29,7 +29,7 @@ import (
 
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -65,6 +65,10 @@ type joinOpts struct {
 	size              int
 	maxJoinDuration   time.Duration
 	parallelismFactor int
+
+	// discoverProvider is the DiscoverProvider that this joinSender will use to
+	// enumerate bootstrap hosts.
+	discoverProvider DiscoverProvider
 }
 
 // A joinSender is used to join an existing cluster of nodes defined in a node's
@@ -72,6 +76,10 @@ type joinOpts struct {
 type joinSender struct {
 	node    *Node
 	timeout time.Duration
+
+	// bootstrapHostsMap is a map of unique hosts each containing a slice of
+	// the instances (hostsports) on that particular host.
+	bootstrapHostsMap map[string][]string
 
 	// This is used as a multiple of the required nodes left to satisfy
 	// `joinSize`. Additional parallelism can be applied in order for
@@ -104,13 +112,26 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 		opts = &joinOpts{}
 	}
 
-	if len(node.bootstrapHosts) == 0 {
+	if opts.discoverProvider == nil {
+		return nil, errors.New("missing host provider in join options")
+	}
+
+	// Resolve/retrieve bootstrap hosts from the provider specified in the
+	// join options.
+	bootstrapHosts, err := opts.discoverProvider.Hosts()
+	if err != nil {
+		return nil, err
+	}
+	if len(bootstrapHosts) == 0 {
 		return nil, errors.New("bootstrap hosts cannot be empty")
 	}
 
 	js := &joinSender{
 		node: node,
 	}
+
+	// Parse bootstrap hosts into a map
+	js.parseHosts(bootstrapHosts)
 
 	js.potentialNodes = js.CollectPotentialNodes(nil)
 
@@ -123,6 +144,24 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 	return js, nil
 }
 
+// parseHosts populates the bootstrap hosts map from the provided slice of
+// hostports.
+func (j *joinSender) parseHosts(hostports []string) {
+	// Parse bootstrap hosts into a map
+	j.bootstrapHostsMap = util.HostPortsByHost(hostports)
+
+	// Perform some sanity checks on the bootstrap hosts
+	err := util.CheckLocalMissing(j.node.address, j.bootstrapHostsMap[util.CaptureHost(j.node.address)])
+	if err != nil {
+		j.node.log.Warn(err.Error())
+	}
+
+	mismatched, err := util.CheckHostnameIPMismatch(j.node.address, j.bootstrapHostsMap)
+	if err != nil {
+		j.node.log.WithField("mismatched", mismatched).Warn(err.Error())
+	}
+}
+
 // potential nodes are nodes that can be joined that are not the local node
 func (j *joinSender) CollectPotentialNodes(nodesJoined []string) []string {
 	if nodesJoined == nil {
@@ -131,9 +170,9 @@ func (j *joinSender) CollectPotentialNodes(nodesJoined []string) []string {
 
 	var potentialNodes []string
 
-	for _, hostports := range j.node.bootstrapHosts {
+	for _, hostports := range j.bootstrapHostsMap {
 		for _, hostport := range hostports {
-			if j.node.address != hostport && util.IndexOf(nodesJoined, hostport) == -1 {
+			if j.node.address != hostport && !util.StringInSlice(nodesJoined, hostport) {
 				potentialNodes = append(potentialNodes, hostport)
 			}
 		}
@@ -146,7 +185,7 @@ func (j *joinSender) CollectPotentialNodes(nodesJoined []string) []string {
 func (j *joinSender) CollectPreferredNodes() []string {
 	var preferredNodes []string
 
-	for host, hostports := range j.node.bootstrapHosts {
+	for host, hostports := range j.bootstrapHostsMap {
 		if host != util.CaptureHost(j.node.address) {
 			preferredNodes = append(preferredNodes, hostports...)
 		}
@@ -163,7 +202,7 @@ func (j *joinSender) CollectNonPreferredNodes() []string {
 
 	var nonPreferredNodes []string
 
-	for _, host := range j.node.bootstrapHosts[util.CaptureHost(j.node.address)] {
+	for _, host := range j.bootstrapHostsMap[util.CaptureHost(j.node.address)] {
 		if host != j.node.address {
 			nonPreferredNodes = append(nonPreferredNodes, host)
 		}
@@ -224,7 +263,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 	var numFailed = 0
 	var startTime = time.Now()
 
-	if util.SingleNodeCluster(j.node.address, j.node.bootstrapHosts) {
+	if util.SingleNodeCluster(j.node.address, j.bootstrapHostsMap) {
 		j.node.log.Info("got single node cluster to join")
 		return nodesJoined, nil
 	}

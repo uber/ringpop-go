@@ -74,7 +74,7 @@ func (s *GossipTestSuite) StopWhileStopped() {
 	s.True(s.g.Stopped(), "expected gossip to still be stopped")
 }
 
-func (s *GossipTestSuite) TestUpdatesArePropogated() {
+func (s *GossipTestSuite) TestUpdatesArePropagated() {
 	peer := newChannelNode(s.T())
 	defer peer.Destroy()
 	defer peer.channel.Close()

@@ -30,7 +30,7 @@ import (
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 	ErrNodeNotReady = errors.New("node is not ready to handle requests")
 )
 
-// Options to create a SWIM with
+// Options is a configuration struct passed the NewNode constructor.
 type Options struct {
 	SuspicionTimeout  time.Duration
 	MinProtocolPeriod time.Duration
@@ -50,16 +50,11 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
-	BootstrapFile  string
-	BootstrapHosts []string
-
 	Logger log.Logger
 }
 
 func defaultOptions() *Options {
 	opts := &Options{
-		BootstrapFile: "./hosts.json",
-
 		SuspicionTimeout:  5000 * time.Millisecond,
 		MinProtocolPeriod: 200 * time.Millisecond,
 
@@ -113,6 +108,8 @@ func mergeDefaultOptions(opts *Options) *Options {
 	return opts
 }
 
+// NodeInterface specifies the public-facing methods that a SWIM Node
+// implements.
 type NodeInterface interface {
 	Bootstrap(opts *BootstrapOptions) ([]string, error)
 	CountReachableMembers() int
@@ -134,9 +131,6 @@ type Node struct {
 		stopped, destroyed, pinging, ready bool
 		sync.RWMutex
 	}
-
-	bootstrapFile  string
-	bootstrapHosts map[string][]string
 
 	channel      shared.SubChannel
 	memberlist   *memberlist
@@ -162,7 +156,7 @@ type Node struct {
 	log    log.Logger // wraps the provided logger with a 'local: address' field
 }
 
-// NewNode returns a new SWIM node
+// NewNode returns a new SWIM Node.
 func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Node {
 	// use defaults for options that are unspecified
 	opts = mergeDefaultOptions(opts)
@@ -201,17 +195,17 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	return node
 }
 
-// Address returns the address of the SWIM node
+// Address returns the address of the SWIM node.
 func (n *Node) Address() string {
 	return n.address
 }
 
-// App returns the node's app
+// App returns the Node's application name.
 func (n *Node) App() string {
 	return n.app
 }
 
-// Incarnation returns the incarnation number of the local node
+// Incarnation returns the incarnation number of the Node.
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
 		n.memberlist.local.RLock()
@@ -228,12 +222,12 @@ func (n *Node) emit(event interface{}) {
 	}
 }
 
-// RegisterListener adds a listener that will be sent swim events
+// RegisterListener adds a listener that will receive swim events.
 func (n *Node) RegisterListener(l EventListener) {
 	n.listeners = append(n.listeners, l)
 }
 
-// Start starts the SWIM protocol and all sub-protocols
+// Start starts the SWIM protocol and all sub-protocols.
 func (n *Node) Start() {
 	n.gossip.Start()
 	n.suspicion.Reenable()
@@ -243,7 +237,7 @@ func (n *Node) Start() {
 	n.state.Unlock()
 }
 
-// Stop stops the SWIM protocol and all sub-protocols
+// Stop stops the SWIM protocol and all sub-protocols.
 func (n *Node) Stop() {
 	n.gossip.Stop()
 	n.suspicion.Disable()
@@ -253,7 +247,7 @@ func (n *Node) Stop() {
 	n.state.Unlock()
 }
 
-// Stopped returns whether or not the SWIM protocol is currently running
+// Stopped returns whether or not the SWIM protocol is currently running.
 func (n *Node) Stopped() bool {
 	n.state.RLock()
 	stopped := n.state.stopped
@@ -262,7 +256,7 @@ func (n *Node) Stopped() bool {
 	return stopped
 }
 
-// Destroy stops the SWIM protocol and all sub-protocols
+// Destroy stops the SWIM protocol and all sub-protocols.
 func (n *Node) Destroy() {
 	n.Stop()
 	n.rollup.Destroy()
@@ -272,7 +266,7 @@ func (n *Node) Destroy() {
 	n.state.Unlock()
 }
 
-// Destroyed returns whether or not the node has been destroyed or node
+// Destroyed returns whether or not the node has been destroyed.
 func (n *Node) Destroyed() bool {
 	n.state.RLock()
 	destroyed := n.state.destroyed
@@ -281,7 +275,7 @@ func (n *Node) Destroyed() bool {
 	return destroyed
 }
 
-// Ready returns whether or not the node has bootstrapped fully and is ready for use
+// Ready returns whether or not the node has bootstrapped and is ready for use.
 func (n *Node) Ready() bool {
 	n.state.RLock()
 	ready := n.state.ready
@@ -296,27 +290,39 @@ func (n *Node) Ready() bool {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// BootstrapOptions provides options to bootstrap the node with
+// BootstrapOptions is a configuration struct passed to Node.Bootstrap.
 type BootstrapOptions struct {
-	// Slice of hosts to bootstrap with, prioritized over provided file
+	// The DiscoverProvider resolves a list of bootstrap hosts. If this is
+	// specified, it takes priority over the legacy Hosts and File options
+	// below.
+	DiscoverProvider DiscoverProvider
+
+	// Slice of hosts to bootstrap with, prioritized over provided file.
+	// TODO: Deprecate this option in favour of accepting only a DiscoverProvider.
 	Hosts []string
 
-	// File containing a JSON array of hosts to bootstrap with
+	// File containing a JSON array of hosts to bootstrap with.
+	// TODO: Deprecate this option in favour of accepting only a DiscoverProvider.
 	File string
 
-	// Whether or not gossip should start
+	// Whether or not gossip should be started immediately after a successful
+	// bootstrap.
 	Stopped bool
 
-	// Amount of time before join requests time out
+	// Amount of time before individual join requests time out.
 	JoinTimeout time.Duration
 
-	// Minimum number of nodes to join
+	// Minimum number of nodes to join to satisfy a bootstrap.
 	JoinSize int
 
-	// Maximum time to attempt joins before joining cluster times out
+	// Maximum time to attempt joins before the entire boostrap process times
+	// out.
 	MaxJoinDuration time.Duration
 
-	// number of nodes to attempt to join
+	// A higher ParallelismFactor increases the number of nodes that a
+	// bootstrapping node will attempt to reach out to in order to satisfy
+	// `JoinSize` (the number of nodes that will be contacted at a time is
+	// `ParallelismFactor * JoinSize`).
 	ParallelismFactor int
 }
 
@@ -331,22 +337,11 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		opts = &BootstrapOptions{}
 	}
 
-	if err := n.seedBootstrapHosts(opts); err != nil {
+	// This exists to resolve the bootstrap hosts provider implementation from
+	// the deprecated "File" and "Hosts" options in BootstrapOptions.
+	discoverProvider, err := resolveDiscoverProvider(opts)
+	if err != nil {
 		return nil, err
-	}
-
-	if len(n.bootstrapHosts) == 0 {
-		return nil, errors.New("bootstrap hosts required, but none found")
-	}
-
-	err := util.CheckLocalMissing(n.address, n.bootstrapHosts[util.CaptureHost(n.address)])
-	if err != nil {
-		n.log.Warn(err.Error())
-	}
-
-	mismatched, err := util.CheckHostnameIPMismatch(n.address, n.bootstrapHosts)
-	if err != nil {
-		n.log.WithField("mismatched", mismatched).Warn(err.Error())
 	}
 
 	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
@@ -356,6 +351,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		size:              opts.JoinSize,
 		maxJoinDuration:   opts.MaxJoinDuration,
 		parallelismFactor: opts.ParallelismFactor,
+		discoverProvider:  discoverProvider,
 	}
 
 	joined, err := sendJoin(n, joinOpts)
@@ -364,11 +360,6 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 			"err": err.Error(),
 		}).Error("bootstrap failed")
 		return nil, err
-	}
-
-	if n.Destroyed() {
-		n.log.Error("destroyed during bootstrap process")
-		return nil, errors.New("destroyed during bootstrap process")
 	}
 
 	if !opts.Stopped {
@@ -384,53 +375,6 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	return joined, nil
 }
 
-func (n *Node) seedBootstrapHosts(opts *BootstrapOptions) (err error) {
-	var hostports []string
-
-	n.bootstrapHosts = make(map[string][]string)
-
-	if opts.Hosts != nil {
-		hostports = opts.Hosts
-	} else {
-		switch true {
-		case true:
-			if opts.File != "" {
-				hostports, err = util.ReadHostsFile(opts.File)
-				if err == nil {
-					break
-				}
-				n.log.WithField("file", opts.File).Warnf("could not read host file: %v", err)
-			}
-			fallthrough
-		case true:
-			if n.bootstrapFile != "" {
-				hostports, err = util.ReadHostsFile(n.bootstrapFile)
-				if err == nil {
-					break
-				}
-				n.log.WithField("file", n.bootstrapFile).Warnf("could not read host file: %v", err)
-			}
-			fallthrough
-		case true:
-			hostports, err = util.ReadHostsFile("./hosts.json")
-			if err == nil {
-				break
-			}
-			n.log.WithField("file", "./hosts.json").Warnf("could not read host file: %v", err)
-			return errors.New("unable to read hosts file")
-		}
-	}
-
-	for _, hostport := range hostports {
-		host := util.CaptureHost(hostport)
-		if host != "" {
-			n.bootstrapHosts[host] = append(n.bootstrapHosts[host], hostport)
-		}
-	}
-
-	return
-}
-
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 //	Change Handling
@@ -444,18 +388,18 @@ func (n *Node) handleChanges(changes []Change) {
 		switch change.Status {
 		case Alive:
 			n.suspicion.Stop(change)
-			n.disseminator.AdjustMaxPropogations()
+			n.disseminator.AdjustMaxPropagations()
 
 		case Faulty:
 			n.suspicion.Stop(change)
 
 		case Suspect:
 			n.suspicion.Start(change)
-			n.disseminator.AdjustMaxPropogations()
+			n.disseminator.AdjustMaxPropagations()
 
 		case Leave:
 			n.suspicion.Stop(change)
-			n.disseminator.AdjustMaxPropogations()
+			n.disseminator.AdjustMaxPropagations()
 		}
 	}
 }
@@ -530,10 +474,14 @@ func (n *Node) pingNextMember() {
 	}).Warn("ping request inconclusive due to errors")
 }
 
+// GetReachableMembers returns a slice of members currently in this node's
+// membership list that aren't faulty.
 func (n *Node) GetReachableMembers() []string {
 	return n.memberlist.GetReachableMembers()
 }
 
+// CountReachableMembers returns the number of members currently in this node's
+// membership list that aren't faulty.
 func (n *Node) CountReachableMembers() int {
 	return n.memberlist.CountReachableMembers()
 }

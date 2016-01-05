@@ -29,7 +29,7 @@ import (
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/swim"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 // fake stats

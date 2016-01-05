@@ -28,10 +28,6 @@ import (
 	"github.com/uber/tchannel-go/json"
 )
 
-func seedBootstrapHosts(node *Node, addresses []string) {
-	node.seedBootstrapHosts(&BootstrapOptions{Hosts: addresses})
-}
-
 type JoinSenderTestSuite struct {
 	suite.Suite
 	tnode *testNode
@@ -59,7 +55,9 @@ func (s *JoinSenderTestSuite) TestSendJoinNoBoostrapHosts() {
 }
 
 func (s *JoinSenderTestSuite) TestJoinNoBootstrapHosts() {
-	joiner, err := newJoinSender(s.node, nil)
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider: &StaticHostList{},
+	})
 	s.Error(err, "expected error for no bootstrap hosts")
 	s.Nil(joiner, "expected joiner to be nil")
 }
@@ -68,9 +66,9 @@ func (s *JoinSenderTestSuite) TestSelectGroup() {
 	fakeHosts := fakeHostPorts(1, 1, 2, 3)
 	bootstrapHosts := append(fakeHosts, s.node.Address())
 
-	seedBootstrapHosts(s.node, bootstrapHosts)
-
-	joiner, err := newJoinSender(s.node, nil)
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider: &StaticHostList{bootstrapHosts},
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -81,10 +79,12 @@ func (s *JoinSenderTestSuite) TestSelectGroup() {
 }
 
 func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
-	seedBootstrapHosts(s.node, append(fakeHostPorts(1, 1, 2, 3), s.node.Address()))
+	bootstrapHosts := append(fakeHostPorts(1, 1, 2, 3), s.node.Address())
 	expected := fakeHostPorts(1, 1, 2, 3)
 
-	joiner, err := newJoinSender(s.node, nil)
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider: &StaticHostList{bootstrapHosts},
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -99,9 +99,11 @@ func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroupExcludes() {
-	seedBootstrapHosts(s.node, fakeHostPorts(1, 1, 1, 5))
+	bootstrapHosts := fakeHostPorts(1, 1, 1, 5)
 
-	joiner, err := newJoinSender(s.node, nil)
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider: &StaticHostList{bootstrapHosts},
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -114,9 +116,12 @@ func (s *JoinSenderTestSuite) TestSelectGroupExcludes() {
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
-	seedBootstrapHosts(s.node, append(fakeHostPorts(1, 4, 1, 1), fakeHostPorts(1, 1, 2, 4)...))
+	bootstrapHosts := append(fakeHostPorts(1, 4, 1, 1), fakeHostPorts(1, 1, 2, 4)...)
 
-	joiner, err := newJoinSender(s.node, &joinOpts{parallelismFactor: 1})
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider:  &StaticHostList{bootstrapHosts},
+		parallelismFactor: 1,
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -127,9 +132,12 @@ func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
 }
 
 func (s *JoinSenderTestSuite) TestSelectGroupMixes() {
-	seedBootstrapHosts(s.node, append(fakeHostPorts(1, 2, 1, 1), fakeHostPorts(1, 1, 2, 3)...))
+	bootstrapHosts := append(fakeHostPorts(1, 2, 1, 1), fakeHostPorts(1, 1, 2, 3)...)
 
-	joiner, err := newJoinSender(s.node, &joinOpts{parallelismFactor: 1})
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider:  &StaticHostList{bootstrapHosts},
+		parallelismFactor: 1,
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -147,7 +155,9 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 	bootstrapNodes(s.T(), s.tnode)
 	bootstrapNodes(s.T(), peer)
 
-	joiner, err := newJoinSender(s.node, nil)
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -171,7 +181,9 @@ func (s *JoinSenderTestSuite) TestJoinSelf() {
 
 	bootstrapNodes(s.T(), s.tnode)
 
-	joiner, err := newJoinSender(s.node, nil)
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
+	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 

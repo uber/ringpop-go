@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"github.com/dgryski/go-farm"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 // A memberlist contains the membership for a node

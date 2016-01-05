@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 type PingRequestTestSuite struct {

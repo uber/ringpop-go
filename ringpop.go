@@ -38,6 +38,7 @@ import (
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -297,7 +298,7 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 	// there. If the host list is empty, this will create a single-node
 	// cluster.
 	bootstrapOpts := *userBootstrapOpts
-	if len(bootstrapOpts.File) == 0 && !stringInSlice(bootstrapOpts.Hosts, identity) {
+	if len(bootstrapOpts.File) == 0 && !util.StringInSlice(bootstrapOpts.Hosts, identity) {
 		bootstrapOpts.Hosts = append(bootstrapOpts.Hosts, identity)
 	}
 

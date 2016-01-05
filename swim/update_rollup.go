@@ -25,7 +25,7 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 var timeZero = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)

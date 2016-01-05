@@ -1,0 +1,5 @@
+This is a malformed JSON file for testing
+
+    "192.0.2.2:1",
+    "192.0.2.2:2",
+]

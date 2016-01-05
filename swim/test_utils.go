@@ -22,14 +22,13 @@ package swim
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -81,11 +80,6 @@ type testNode struct {
 func (n *testNode) Destroy() {
 	n.node.Destroy()
 	n.channel.Close()
-
-	for n.channel.State() != tchannel.ChannelClosed {
-		time.Sleep(500 * time.Millisecond)
-		log.Print("STATE: ", n.channel.State().String())
-	}
 }
 
 // newChannelNode creates a testNode with a listening channel and associated
@@ -174,4 +168,71 @@ func fakeHostPorts(fromHost, toHost, fromPort, toPort int) []string {
 		}
 	}
 	return hostports
+}
+
+// swimCluster is a group of real swim nodes listening on randomly-assigned
+// ports.
+type swimCluster struct {
+	nodes []*Node
+}
+
+// newSwimCluster creates a new swimCluster with the number of nodes specified
+// by size. These nodes are not joined together at creation. Use Bootstrap if you
+// need a bootstrapped cluster.
+func newSwimCluster(size int) *swimCluster {
+	var nodes []*Node
+	for i := 0; i < size; i++ {
+		ch, err := tchannel.NewChannel("test", nil)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := ch.ListenAndServe("127.0.0.1:0"); err != nil {
+			panic(err)
+		}
+
+		hostport := ch.PeerInfo().HostPort
+		node := NewNode("test", hostport, ch.GetSubChannel("test"), nil)
+
+		nodes = append(nodes, node)
+	}
+	return &swimCluster{nodes}
+}
+
+// Add adds the specified node to the cluster and bootstraps it so that it is
+// joined to the existing nodes.
+func (c *swimCluster) Add(n *Node) {
+	n.Bootstrap(&BootstrapOptions{
+		DiscoverProvider: &StaticHostList{c.Addresses()},
+	})
+	c.nodes = append(c.nodes, n)
+}
+
+// Addresses returns a slice of addresses of all nodes in the cluster.
+func (c *swimCluster) Addresses() (hostports []string) {
+	for _, node := range c.nodes {
+		hostports = append(hostports, node.Address())
+	}
+	return
+}
+
+// Bootstrap joins all the nodes in this cluster together using Bootstrap calls.
+func (c *swimCluster) Bootstrap() {
+	for _, node := range c.nodes {
+		node.Bootstrap(&BootstrapOptions{
+			DiscoverProvider: &StaticHostList{c.Addresses()},
+		})
+	}
+}
+
+// Destroy destroys all nodes in this cluster.
+func (c *swimCluster) Destroy() {
+	for _, node := range c.nodes {
+		node.Destroy()
+	}
+}
+
+// Nodes returns a slice of all nodes in the cluster.
+func (c *swimCluster) Nodes() []*Node {
+	return c.nodes
 }

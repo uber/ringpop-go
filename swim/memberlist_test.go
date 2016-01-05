@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 type MemberlistTestSuite struct {
@@ -226,7 +226,7 @@ func (s *MemberlistTestSuite) TestGetReachableMembers() {
 	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
 	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
 
-	activeMembers := nodeA.memberlist.GetReachableMembers()
+	activeMembers := nodeA.GetReachableMembers()
 	sort.Strings(activeMembers)
 
 	s.Equal([]string{
@@ -245,7 +245,7 @@ func (s *MemberlistTestSuite) TestCountReachableMembers() {
 	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
 	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
 
-	reachableMemberCount := nodeA.memberlist.CountReachableMembers()
+	reachableMemberCount := nodeA.CountReachableMembers()
 
 	s.Equal(3, reachableMemberCount, "expected 3 reachable members")
 }

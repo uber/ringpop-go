@@ -31,7 +31,7 @@ type EventListener interface {
 	HandleEvent(events.Event)
 }
 
-// A MaxPAdjustedEvent occurs when the disseminator adjusts the max propogation
+// A MaxPAdjustedEvent occurs when the disseminator adjusts the max propagation
 // count for changes
 type MaxPAdjustedEvent struct {
 	OldPCount int `json:"oldPCount"`

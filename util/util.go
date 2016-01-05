@@ -21,14 +21,12 @@
 package util
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"net"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -37,28 +35,11 @@ var HostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 
 // CaptureHost takes a host:port and returns the host.
 func CaptureHost(hostport string) string {
-	if HostportPattern.Match([]byte(hostport)) {
-		parts := strings.Split(hostport, ":")
-		return parts[0]
-	}
-	return ""
-}
-
-// ReadHostsFile reads a file containing a JSON array of hosts
-func ReadHostsFile(file string) ([]string, error) {
-	var hosts []string
-
-	data, err := ioutil.ReadFile(file)
+	host, _, err := net.SplitHostPort(hostport)
 	if err != nil {
-		return nil, err
+		return ""
 	}
-
-	err = json.Unmarshal(data, &hosts)
-	if err != nil {
-		return nil, err
-	}
-
-	return hosts, nil
+	return host
 }
 
 // CheckHostnameIPMismatch checks for a hostname/IP mismatch in a map of hosts to
@@ -106,23 +87,58 @@ func CheckHostnameIPMismatch(local string, hostsMap map[string][]string) ([]stri
 // CheckLocalMissing checks a slice of host:ports for the given local host:port, return
 // an error if not found, otherwise nil.
 func CheckLocalMissing(local string, hostports []string) error {
-	if IndexOf(hostports, local) == -1 {
+	if !StringInSlice(hostports, local) {
 		return errors.New("local node missing from hosts")
 	}
 
 	return nil
 }
 
-// SingleNodeCluster determines if local is the only host:port contained within
-// the hostsMap
-func SingleNodeCluster(local string, hostsMap map[string][]string) bool {
-	_, ok := hostsMap[CaptureHost(local)]
-
-	var n int
-	for _, hostports := range hostsMap {
-		n += len(hostports)
+// SingleNodeCluster determines if hostport is the only host:port contained within
+// the hostMap.
+func SingleNodeCluster(hostport string, hostMap map[string][]string) bool {
+	// If the map contains more than one host then clearly there is more than
+	// one address so we can't be a single node cluster.
+	if len(hostMap) > 1 {
+		return false
 	}
-	return ok && n == 1
+
+	host := CaptureHost(hostport)
+
+	// If hostport is not even in the map at all then it's not possible for
+	// us to be a single node cluster.
+	_, ok := hostMap[host]
+	if !ok {
+		return false
+	}
+
+	// Same as above; there is most than one host
+	if len(hostMap[host]) > 1 {
+		return false
+	}
+
+	// There is a single hostport in the map; check that it matches
+	if hostMap[host][0] == hostport {
+		return true
+	}
+
+	// There is a single hostport in the map but it doesn't match the given
+	// hostport.
+	return false
+}
+
+// HostPortsByHost parses a list of host/port conbinations and creates a map
+// of unique hosts each containing a slice of the hostsport instances for each
+// host.
+func HostPortsByHost(hostports []string) (hostMap map[string][]string) {
+	hostMap = make(map[string][]string)
+	for _, hostport := range hostports {
+		host := CaptureHost(hostport)
+		if host != "" {
+			hostMap[host] = append(hostMap[host], hostport)
+		}
+	}
+	return
 }
 
 // TimeZero returns a time such that time.IsZero() is true
@@ -145,15 +161,27 @@ func UnixMS(t time.Time) int64 {
 	return t.UnixNano() / 1000000
 }
 
-// IndexOf returns the index of element in slice, or -1 if the element is not in slice
-func IndexOf(slice []string, element string) int {
-	for i, e := range slice {
-		if e == element {
-			return i
+// StringInSlice returns whether the string is contained within the slice.
+func StringInSlice(slice []string, str string) bool {
+	for _, b := range slice {
+		if str == b {
+			return true
 		}
 	}
+	return false
+}
 
-	return -1
+// ShuffleStrings takes a slice of strings and returns a new slice containing
+// the same strings in a random order.
+func ShuffleStrings(strings []string) []string {
+	newStrings := make([]string, len(strings))
+	newIndexes := rand.Perm(len(strings))
+
+	for o, n := range newIndexes {
+		newStrings[n] = strings[o]
+	}
+
+	return newStrings
 }
 
 // TakeNode takes an element from nodes at the given index, or at a random index if
@@ -206,9 +234,11 @@ func Min(a, b int) int {
 	return b
 }
 
-// Bi-directional binding of Time to interger Unix timestamp in JSON
+// Timestamp is a bi-directional binding of Time to interger Unix timestamp in
+// JSON.
 type Timestamp time.Time
 
+// MarshalJSON returns the JSON encoding of the timestamp.
 func (t *Timestamp) MarshalJSON() ([]byte, error) {
 	ts := time.Time(*t).Unix()
 	stamp := fmt.Sprint(ts)
@@ -216,6 +246,7 @@ func (t *Timestamp) MarshalJSON() ([]byte, error) {
 	return []byte(stamp), nil
 }
 
+// UnmarshalJSON sets the timestamp to the value in the specified JSON.
 func (t *Timestamp) UnmarshalJSON(b []byte) error {
 	ts, err := strconv.Atoi(string(b))
 	if err != nil {

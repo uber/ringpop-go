@@ -37,3 +37,6 @@ mockery -name EventListener -dir events -recursive -print \
 
 # mocks used in forward cannot go into test/mocks because circular dependency
 mockery -name Sender -dir forward -recursive -testonly -case=underscore -inpkg
+
+# Mocks for events need to go in the events package to avoid circular deps
+mockery -case=underscore -dir events -output "${0%/*}/../events/test/mocks" -name EventListener

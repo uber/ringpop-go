@@ -24,7 +24,7 @@ Run the tests by doing:
 make
 ```
 
-To run the test you need both `thirft` and `thrift-gen` on your path. On OSX you
+To run the test you need both `thrift` and `thrift-gen` on your path. On OSX you
 can install them with the following commands:
 
 ```bash
