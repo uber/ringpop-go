@@ -115,6 +115,11 @@ func (s *ForwarderTestSuite) SetupSuite() {
 	s.forwarder = NewForwarder(s.sender, s.channel.GetSubChannel("forwarder"), nil)
 }
 
+func (s *ForwarderTestSuite) SetupTest() {
+	//make sure there are no listeners
+	s.forwarder.listeners = nil
+}
+
 func (s *ForwarderTestSuite) TearDownSuite() {
 	s.channel.Close()
 	s.peer.Close()
@@ -310,9 +315,6 @@ func (s *ForwarderTestSuite) TestRegisterListener() {
 
 	s.forwarder.RegisterListener(listener)
 	s.Assertions.Equal(1, len(s.forwarder.listeners), "Expected 1 listener to be registered")
-
-	// remove all listeners
-	s.forwarder.listeners = nil
 }
 
 func (s *ForwarderTestSuite) TestEmit() {
@@ -331,9 +333,6 @@ func (s *ForwarderTestSuite) TestEmit() {
 	s.forwarder.emit(struct{}{})
 
 	wg.Wait()
-
-	// remove all listeners
-	s.forwarder.listeners = nil
 }
 
 func (s *ForwarderTestSuite) TestEmit2() {
@@ -358,9 +357,6 @@ func (s *ForwarderTestSuite) TestEmit2() {
 	s.forwarder.emit(struct{}{})
 
 	wg.Wait()
-
-	// remove all listeners
-	s.forwarder.listeners = nil
 }
 
 func (s *ForwarderTestSuite) TestInvalidInflightDecrement() {
@@ -380,7 +376,6 @@ func (s *ForwarderTestSuite) TestInvalidInflightDecrement() {
 
 	// wait for HandleEvent with forward.InflightRequestsMiscountEvent being called
 	wg.Wait()
-	s.forwarder.listeners = nil
 }
 
 func TestForwarderTestSuite(t *testing.T) {
