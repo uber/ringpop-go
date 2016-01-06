@@ -90,14 +90,6 @@ func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Chan
 }
 
 func (s *ForwarderTestSuite) SetupSuite() {
-	sender := &MockSender{}
-	sender.On("Lookup", "me").Return("127.0.0.1:3001", nil)
-	sender.On("Lookup", "other 1").Return("127.0.0.1:3002", nil)
-	sender.On("Lookup", "other 2").Return("127.0.0.1:3003", nil)
-	sender.On("Lookup", "unreachable").Return("192.0.2.128:1", nil)
-	sender.On("Lookup", "error").Return("", errors.New("lookup error"))
-	sender.On("WhoAmI").Return("127.0.0.1:3001", nil)
-	s.sender = sender
 
 	channel, err := tchannel.NewChannel("test", nil)
 	s.Require().NoError(err, "channel must be created successfully")
@@ -105,8 +97,19 @@ func (s *ForwarderTestSuite) SetupSuite() {
 
 	peer, err := tchannel.NewChannel("test", nil)
 	s.Require().NoError(err, "channel must be created successfully")
-	s.registerPong("127.0.0.1:3002", peer)
-	s.Require().NoError(peer.ListenAndServe("127.0.0.1:3002"), "channel must listen")
+	s.registerPong("correct pinging host", peer)
+	s.Require().NoError(peer.ListenAndServe("127.0.0.1:0"), "channel must listen")
+
+	sender := &MockSender{}
+	sender.On("Lookup", "me").Return("192.0.2.1:1", nil)
+	sender.On("WhoAmI").Return("192.0.2.1:1", nil)
+
+	// processes can not listen on port 0 so it is safe to assume that this address is failing immediatly, preventing the timeout path to kick in.
+	sender.On("Lookup", "immediate fail").Return("127.0.0.1:0", nil)
+	sender.On("Lookup", "reachable").Return(peer.PeerInfo().HostPort, nil)
+	sender.On("Lookup", "unreachable").Return("192.0.2.128:1", nil)
+	sender.On("Lookup", "error").Return("", errors.New("lookup error"))
+	s.sender = sender
 	s.peer = peer
 
 	s.forwarder = NewForwarder(s.sender, s.channel.GetSubChannel("forwarder"), nil)
@@ -121,25 +124,25 @@ func (s *ForwarderTestSuite) TestForwardJSON() {
 	var ping Ping
 	var pong Pong
 
-	dest, err := s.sender.Lookup("other 1")
+	dest, err := s.sender.Lookup("reachable")
 	s.NoError(err)
 
-	res, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"other 1"},
+	res, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"reachable"},
 		tchannel.JSON, nil)
 	s.NoError(err, "expected request to be forwarded")
 
 	s.NoError(json2.Unmarshal(res, &pong))
-	s.Equal("127.0.0.1:3002", pong.From)
+	s.Equal("correct pinging host", pong.From)
 	s.Equal("Hello, world!", pong.Message)
 }
 
 func (s *ForwarderTestSuite) TestForwardJSONErrorResponse() {
 	var ping Ping
 
-	dest, err := s.sender.Lookup("other 1")
+	dest, err := s.sender.Lookup("reachable")
 	s.NoError(err)
 
-	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/error", []string{"other 1"},
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/error", []string{"reachable"},
 		tchannel.JSON, nil)
 	s.EqualError(err, "remote error")
 }
@@ -147,10 +150,10 @@ func (s *ForwarderTestSuite) TestForwardJSONErrorResponse() {
 func (s *ForwarderTestSuite) TestForwardJSONInvalidEndpoint() {
 	var ping Ping
 
-	dest, err := s.sender.Lookup("other 1")
+	dest, err := s.sender.Lookup("reachable")
 	s.NoError(err)
 
-	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/invalid", []string{"other 1"},
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/invalid", []string{"reachable"},
 		tchannel.JSON, &Options{
 			MaxRetries: 1,
 			RetrySchedule: []time.Duration{
@@ -161,7 +164,7 @@ func (s *ForwarderTestSuite) TestForwardJSONInvalidEndpoint() {
 }
 
 func (s *ForwarderTestSuite) TestForwardThrift() {
-	dest, err := s.sender.Lookup("other 1")
+	dest, err := s.sender.Lookup("reachable")
 	s.NoError(err)
 
 	request := &pingpong.PingPongPingArgs{
@@ -173,7 +176,7 @@ func (s *ForwarderTestSuite) TestForwardThrift() {
 	bytes, err := SerializeThrift(request)
 	s.NoError(err, "expected ping to be serialized")
 
-	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"other 1"},
+	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"reachable"},
 		tchannel.Thrift, nil)
 	s.NoError(err, "expected request to be forwarded")
 
@@ -181,11 +184,11 @@ func (s *ForwarderTestSuite) TestForwardThrift() {
 
 	err = DeserializeThrift(res, &response)
 
-	s.Equal("127.0.0.1:3002", response.Success.Source)
+	s.Equal("correct pinging host", response.Success.Source)
 }
 
 func (s *ForwarderTestSuite) TestForwardThriftErrorResponse() {
-	dest, err := s.sender.Lookup("other 1")
+	dest, err := s.sender.Lookup("reachable")
 	s.NoError(err)
 
 	request := &pingpong.PingPongPingArgs{
@@ -197,7 +200,7 @@ func (s *ForwarderTestSuite) TestForwardThriftErrorResponse() {
 	bytes, err := SerializeThrift(request)
 	s.NoError(err, "expected ping to be serialized")
 
-	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"other 1"},
+	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"reachable"},
 		tchannel.Thrift, nil)
 	s.NoError(err, "expected request to be forwarded")
 
@@ -211,10 +214,10 @@ func (s *ForwarderTestSuite) TestForwardThriftErrorResponse() {
 func (s *ForwarderTestSuite) TestMaxRetries() {
 	var ping Ping
 
-	dest, err := s.sender.Lookup("other 2")
+	dest, err := s.sender.Lookup("immediate fail")
 	s.NoError(err)
 
-	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"other 2"},
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"immediate fail"},
 		tchannel.JSON, &Options{
 			MaxRetries:    2,
 			RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond},
@@ -226,7 +229,7 @@ func (s *ForwarderTestSuite) TestMaxRetries() {
 func (s *ForwarderTestSuite) TestLookupErrorInRetry() {
 	var ping Ping
 
-	dest, err := s.sender.Lookup("other 2")
+	dest, err := s.sender.Lookup("immediate fail")
 	s.NoError(err)
 
 	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"error"},
@@ -242,12 +245,14 @@ func (s *ForwarderTestSuite) TestLookupErrorInRetry() {
 func (s *ForwarderTestSuite) TestKeysDiverged() {
 	var ping Ping
 
-	dest, err := s.sender.Lookup("other 2")
+	dest, err := s.sender.Lookup("immediate fail")
 	s.NoError(err)
 
 	// no keys should result in destinations length of 0 during retry, causing abortion of request
-	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
-		&Options{MaxRetries: 2, RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond}})
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON, &Options{
+		MaxRetries:    2,
+		RetrySchedule: []time.Duration{time.Millisecond, time.Millisecond},
+	})
 
 	s.EqualError(err, "key destinations have diverged")
 }
@@ -268,7 +273,10 @@ func (s *ForwarderTestSuite) TestRequestRerouted() {
 	var ping Ping
 	var pong Pong
 
-	res, err := s.forwarder.ForwardRequest(ping.Bytes(), "127.0.0.1:3003", "test", "/ping", []string{"other 1"},
+	dest, err := s.sender.Lookup("immediate fail")
+	s.NoError(err)
+
+	res, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"reachable"},
 		tchannel.JSON, &Options{
 			MaxRetries:     1,
 			RerouteRetries: true,
@@ -277,20 +285,23 @@ func (s *ForwarderTestSuite) TestRequestRerouted() {
 	s.NoError(err, "expected request to be rerouted")
 
 	s.NoError(json2.Unmarshal(res, &pong))
-	s.Equal("127.0.0.1:3002", pong.From)
+	s.Equal("correct pinging host", pong.From)
 	s.Equal("Hello, world!", pong.Message)
 }
 
 func (s *ForwarderTestSuite) TestRequestNoReroutes() {
 	var ping Ping
 
-	_, err := s.forwarder.ForwardRequest(ping.Bytes(), "127.0.0.1:3003", "test", "/ping", []string{"other 1"},
+	dest, err := s.sender.Lookup("immediate fail")
+	s.NoError(err)
+
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"reachable"},
 		tchannel.JSON, &Options{
 			MaxRetries:    1,
 			RetrySchedule: []time.Duration{time.Millisecond},
 		})
 
-	s.Error(err)
+	s.EqualError(err, "max retries exceeded")
 }
 
 func (s *ForwarderTestSuite) TestRegisterListener() {

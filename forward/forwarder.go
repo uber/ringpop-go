@@ -152,7 +152,6 @@ func (f *Forwarder) decrementInflight() {
 	f.inflightLock.Unlock()
 
 	if pre != inflight {
-		// emit a change
 		f.emit(InflightRequestsChangedEvent{inflight})
 	}
 }
