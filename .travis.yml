@@ -1,9 +1,25 @@
 language: go
 go:
   - 1.5
+
+before_install:
+  - go get -u github.com/axw/gocov/gocov
+  - go get -u github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
+
 before_script:
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
   - go get github.com/vektra/mockery/.../
+
+env:
+  - RUN="make test_ci"
+  - RUN="test/update-coveralls"
+
+matrix:
+  allow_failures:
+    - env: RUN="test/update-coveralls"
+  fast_finish: true
+
 script:
-  - make test_ci
+  - test/travis

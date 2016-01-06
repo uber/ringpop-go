@@ -1,4 +1,4 @@
-ringpop-go [![Build Status](https://travis-ci.org/uber/ringpop-go.svg?branch=master)](https://travis-ci.org/uber/ringpop-go)
+ringpop-go [![Build Status](https://travis-ci.org/uber/ringpop-go.svg?branch=master)](https://travis-ci.org/uber/ringpop-go) [![Coverage Status](https://coveralls.io/repos/uber/ringpop-go/badge.svg?branch=master&service=github)](https://coveralls.io/github/uber/ringpop-go?branch=master)
 ==========
 
 Ringpop is a library that brings cooperation and coordination to distributed
