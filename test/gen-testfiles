@@ -5,6 +5,11 @@
 set -eo pipefail
 
 mock_directory="${0%/*}/mocks"
+thrift_directory="${0%/*}/thrift"
+
+thrift-gen -generateThrift -inputFile "$thrift_directory"/pingpong.thrift -outputDir "$thrift_directory"
+mockery -case=underscore -dir "$thrift_directory" -recursive -inpkg -name TChanPingPong
+
 
 # Generate mocks for dependencies
 mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
@@ -18,11 +23,17 @@ mockery -name Interface -print \
     |sed 's/type Interface/type Ringpop/g' \
     > "$mock_directory"/ringpop.go
 
-echo
-
 mockery -name NodeInterface -recursive -print \
     |sed 's/_m \*NodeInterface/_m \*SwimNode/g' \
     |sed 's/type NodeInterface/type SwimNode/g' \
     > "$mock_directory"/swim_node.go
 
 mockery -case=underscore -dir router -recursive -output "$mock_directory" -name ClientFactory
+
+# make a EventListenerMock for forward (can't use on from $mock_directory because of circular dependency)
+mockery -name EventListener -dir events -recursive -print \
+    |sed 's/package mocks/package forward/g' \
+    > "${0%/*}/../forward/mock_event_listener_test.go"
+
+# mocks used in forward cannot go into test/mocks because circular dependency
+mockery -name Sender -dir forward -recursive -testonly -case=underscore -inpkg

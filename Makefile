@@ -9,10 +9,11 @@ clean:
 	rm -f testpop
 
 clean-mocks:
-	rm -f test/mocks/*.go
+	rm -f test/mocks/*.go forward/mock_*.go
+	rm -rf test/thrift/pingpong/
 
 mocks:
-	test/gen-mocks
+	test/gen-testfiles
 
 test:
 	godep go generate ./...
