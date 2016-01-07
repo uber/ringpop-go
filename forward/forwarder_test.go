@@ -428,7 +428,7 @@ func TestHasForwardedHeader(t *testing.T) {
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes
 // of that struct using the thrift binary protocol. This is a temporary
-// measure before frames can forwarded directly past the endpoint to the proper
+// measure before frames can be forwarded directly past the endpoint to the proper
 // destinaiton.
 func SerializeThrift(s athrift.TStruct) ([]byte, error) {
 	var b []byte
@@ -447,7 +447,7 @@ func SerializeThrift(s athrift.TStruct) ([]byte, error) {
 
 // DeserializeThrift takes a byte slice and attempts to write it into the
 // given thrift struct using the thrift binary protocol. This is a temporary
-// measure before frames can forwarded directly past the endpoint to the proper
+// measure before frames can be forwarded directly past the endpoint to the proper
 // destinaiton.
 func DeserializeThrift(b []byte, s athrift.TStruct) error {
 	reader := bytes.NewReader(b)
