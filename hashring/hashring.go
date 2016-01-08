@@ -47,7 +47,7 @@ type HashRing struct {
 
 	servers struct {
 		byAddress map[string]bool
-		tree      *RBTree
+		tree      *redBlackTree
 		checksum  uint32
 		sync.RWMutex
 	}
@@ -73,7 +73,7 @@ func NewHashRing(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 	}
 
 	ring.servers.byAddress = make(map[string]bool)
-	ring.servers.tree = &RBTree{}
+	ring.servers.tree = &redBlackTree{}
 
 	return ring
 }
@@ -215,53 +215,44 @@ func (r *HashRing) ServerCount() int {
 	return count
 }
 
+// Lookup returns the owner of the given key.
 func (r *HashRing) Lookup(key string) (string, bool) {
-	r.servers.RLock()
-
-	iter := r.servers.tree.IterAt(int(r.hashfunc([]byte(key))))
-	if iter.Nil() {
-		r.servers.RUnlock()
+	strs := r.LookupN(key, 1)
+	if len(strs) == 0 {
 		return "", false
 	}
-
-	server := iter.Str()
-
-	r.servers.RUnlock()
-
-	return server, true
+	return strs[0], true
 }
 
+// LookupN returns the N servers that own the given key. Duplicates in the form
+// of virtual nodes are skipped to maintain a list of unique servers. If there
+// are less servers than N, we simply return all existing servers.
 func (r *HashRing) LookupN(key string, n int) []string {
-	serverCount := r.ServerCount()
-	if n > serverCount {
-		n = serverCount
-	}
-
 	r.servers.RLock()
-	var servers []string
-	var unique = make(map[string]bool)
 
-	iter := r.servers.tree.IterAt(int(r.hashfunc([]byte(key))))
-	if iter.Nil() {
+	if n >= r.ServerCount() {
+		var servers []string
+		for server := range r.servers.byAddress {
+			servers = append(servers, server)
+		}
 		r.servers.RUnlock()
 		return servers
 	}
 
-	firstVal := iter.Val()
-	for {
-		res := iter.Str()
-		if !unique[res] {
-			servers = append(servers, res)
-			unique[res] = true
-		}
-		iter.Next()
+	hash := int(r.hashfunc([]byte(key)))
+	unique := make(map[string]struct{})
+	r.servers.tree.LookupNUniqueAt(n, hash, unique)
 
-		if len(servers) == n || iter.Val() == firstVal {
-			break
-		}
+	// if we have not collected all the servers we want, we have reached the
+	// end of the red-black tree and we need to loop around.
+	if len(unique) < n {
+		r.servers.tree.LookupNUniqueAt(n, 0, unique)
 	}
 
+	var servers []string
+	for server := range unique {
+		servers = append(servers, server)
+	}
 	r.servers.RUnlock()
-
 	return servers
 }
