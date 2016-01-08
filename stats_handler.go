@@ -33,7 +33,7 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	servers := rp.ring.GetServers()
+	servers := rp.ring.Servers()
 
 	type stats map[string]interface{}
 

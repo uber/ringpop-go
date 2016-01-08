@@ -87,14 +87,14 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
 	})
 
-	s.Len(s.ringpop.ring.GetServers(), 10)
+	s.Equal(s.ringpop.ring.ServerCount(), 10)
 
 	alive, faulty := genAddresses(1, 11, 15), genAddresses(1, 1, 5)
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: append(genChanges(alive, swim.Alive), genChanges(faulty, swim.Faulty)...),
 	})
 
-	s.Len(s.ringpop.ring.GetServers(), 10)
+	s.Equal(s.ringpop.ring.ServerCount(), 10)
 	for _, address := range alive {
 		s.True(s.ringpop.ring.HasServer(address))
 	}
