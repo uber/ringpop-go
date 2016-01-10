@@ -52,42 +52,45 @@ func (d *dummyListener) HandleEvent(event events.Event) {
 	d.l.Unlock()
 }
 
-func TestEvents(t *testing.T) {
+func TestAddServer(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	l := &dummyListener{}
 	ring.RegisterListener(l)
-	ring.emit(struct{}{})
-	assert.Equal(t, 1, l.events, "expected one event to be emitted")
-}
 
-func TestAddServer(t *testing.T) {
-	ring := New(farm.Fingerprint32, 10)
 	ring.AddServer("server1")
 	ring.AddServer("server2")
-
+	assert.Equal(t, 4, l.EventCount())
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 
 	ring.AddServer("server1")
+	assert.Equal(t, 4, l.EventCount())
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 }
 
 func TestRemoveServer(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
+	l := &dummyListener{}
+	ring.RegisterListener(l)
+
 	ring.AddServer("server1")
 	ring.AddServer("server2")
-
+	assert.Equal(t, 4, l.EventCount())
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 
 	ring.RemoveServer("server1")
-
+	assert.Equal(t, 6, l.EventCount())
 	assert.False(t, ring.HasServer("server1"), "expected server to not be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 
 	ring.RemoveServer("server3")
+	assert.Equal(t, 6, l.EventCount())
+	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 
+	ring.RemoveServer("server1")
+	assert.Equal(t, 6, l.EventCount())
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 }
 
@@ -139,17 +142,19 @@ func TestServers(t *testing.T) {
 
 func TestAddRemoveServers(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
+	l := &dummyListener{}
+	ring.RegisterListener(l)
 	add := []string{"server1", "server2"}
 	remove := []string{"server3", "server4"}
 
 	ring.AddRemoveServers(remove, nil)
-
+	assert.Equal(t, 2, l.EventCount())
 	assert.Equal(t, 2, ring.ServerCount(), "expected two servers to be in ring")
 
 	oldChecksum := ring.Checksum()
 
 	ring.AddRemoveServers(add, remove)
-
+	assert.Equal(t, 4, l.EventCount())
 	assert.Equal(t, 2, ring.ServerCount(), "expected two servers to be in ring")
 
 	assert.NotEqual(t, oldChecksum, ring.Checksum(), "expected checksum to change")
