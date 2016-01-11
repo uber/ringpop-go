@@ -64,7 +64,7 @@ func (r *HashRing) emit(event interface{}) {
 	}
 }
 
-// RegisterListener adds a listener that will be sent swim events.
+// RegisterListener adds a listener that will listen for hashring events.
 func (r *HashRing) RegisterListener(l events.EventListener) {
 	r.listeners = append(r.listeners, l)
 }
@@ -110,12 +110,11 @@ func (r *HashRing) computeChecksumNoLock() {
 // AddServer adds a server and its replicas onto the HashRing.
 func (r *HashRing) AddServer(address string) bool {
 	r.Lock()
-
 	ok := r.addServerNoLock(address)
 	if ok {
 		r.computeChecksumNoLock()
+		r.emit(events.RingChangedEvent{[]string{address}, nil})
 	}
-
 	r.Unlock()
 	return ok
 }
@@ -142,12 +141,11 @@ func (r *HashRing) addReplicasNoLock(server string) {
 // RemoveServer removes a server and its replicas from the HashRing.
 func (r *HashRing) RemoveServer(address string) bool {
 	r.Lock()
-
 	ok := r.removeServerNoLock(address)
 	if ok {
 		r.computeChecksumNoLock()
+		r.emit(events.RingChangedEvent{nil, []string{address}})
 	}
-
 	r.Unlock()
 	return ok
 }
@@ -197,8 +195,8 @@ func (r *HashRing) addRemoveServersNoLock(add []string, remove []string) bool {
 	}
 
 	if changed {
-		r.emit(events.RingChangedEvent{add, remove})
 		r.computeChecksumNoLock()
+		r.emit(events.RingChangedEvent{add, remove})
 	}
 	return changed
 }
