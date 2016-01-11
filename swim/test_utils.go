@@ -110,7 +110,7 @@ func memberlistHasMembers(t *testing.T, m *memberlist, members []Member) {
 	}
 }
 
-func bootstrapNodes(t *testing.T, waitForConvergence bool, testNodes ...*testNode) {
+func bootstrapNodes(t *testing.T, waitForConvergence bool, testNodes ...*testNode) []string {
 	var hostports []string
 
 	for _, tn := range testNodes {
@@ -138,6 +138,7 @@ func bootstrapNodes(t *testing.T, waitForConvergence bool, testNodes ...*testNod
 		wg.Wait()
 	}
 
+	return hostports
 }
 
 func destroyNodes(tnodes ...*testNode) {

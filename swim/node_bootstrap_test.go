@@ -94,6 +94,22 @@ func (s *BootstrapTestSuite) TestBootstrapDestroy() {
 	s.EqualError(chanErr, "node destroyed while attempting to join cluster")
 }
 
+func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {
+	// get a bootstrapped cluster
+	s.peers = genChannelNodes(s.T(), 3)
+	bootstrapList := bootstrapNodes(s.T(), true, s.peers...)
+
+	s.tnode.node.Bootstrap(&BootstrapOptions{
+		Hosts: bootstrapList,
+	})
+
+	// test that there are no changes to disseminate after the bootrstrapping of a host
+	for _, peer := range s.peers {
+		s.Len(peer.node.disseminator.changes, 0)
+	}
+
+}
+
 func (s *BootstrapTestSuite) TestBootstrapFailsWithNoChannel() {
 	n := &Node{}
 	_, err := n.Bootstrap(nil)
