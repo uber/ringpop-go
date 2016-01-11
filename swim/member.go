@@ -24,7 +24,7 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 	// Leave is the member "leave" state
 	Leave = "leave"
 
-	// Suspect is the memeber "suspect" state
+	// Suspect is the member "suspect" state
 	Suspect = "suspect"
 )
 

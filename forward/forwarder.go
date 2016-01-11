@@ -30,7 +30,7 @@ import (
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 )

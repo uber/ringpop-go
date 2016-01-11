@@ -24,7 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/tchannel-go"
 )
 
@@ -71,6 +73,28 @@ func (s *PingTestSuite) TestPingTimesOut() {
 	res, err := sendPing(s.node, s.peer.Address(), time.Nanosecond)
 	s.Error(err, "expected ping to fail")
 	s.Nil(res, "expected response to be nil")
+}
+
+func (s *PingTestSuite) TestPingBeforeReady() {
+	testNode1 := newChannelNode(s.T())
+	defer testNode1.Destroy()
+
+	testNode2 := newChannelNode(s.T())
+	defer testNode2.Destroy()
+
+	// Register listener that should be fired with the correct event type
+	listener := &mocks.EventListener{}
+	listener.On("HandleEvent", mock.AnythingOfType("RequestBeforeReadyEvent"))
+	testNode2.node.RegisterListener(listener)
+
+	res, err := sendPing(testNode1.node, testNode2.node.Address(), 500*time.Millisecond)
+	s.Error(err)
+	s.Nil(res)
+
+	// Assert the event was fired, but after a brief sleep, because the events
+	// are fired in goroutines
+	time.Sleep(10 * time.Millisecond)
+	listener.AssertExpectations(s.T())
 }
 
 func TestPingTestSuite(t *testing.T) {

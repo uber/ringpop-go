@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 type SuspicionTestSuite struct {
@@ -99,7 +99,7 @@ func (s *SuspicionTestSuite) TestSuspectBecomesFaulty() {
 	s.s.Start(*member)
 	s.NotNil(s.s.Timer(member.Address), "expected suspicion timer to be set")
 
-	time.Sleep(2 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 }
 

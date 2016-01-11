@@ -30,13 +30,13 @@ import (
 var log10 = math.Log(10)
 
 // A pChange is a change with a p count representing the number of times the
-// change has been propogated to other nodes.
+// change has been propagated to other nodes.
 type pChange struct {
 	Change
 	p int
 }
 
-// A Disseminator propogates changes to other nodes
+// A disseminator propagates changes to other nodes.
 type disseminator struct {
 	node    *Node
 	changes map[string]*pChange
@@ -46,7 +46,7 @@ type disseminator struct {
 	sync.RWMutex
 }
 
-// NewDisseminator returns a new Disseminator instance
+// newDisseminator returns a new Disseminator instance.
 func newDisseminator(n *Node) *disseminator {
 	d := &disseminator{
 		node:    n,
@@ -58,7 +58,7 @@ func newDisseminator(n *Node) *disseminator {
 	return d
 }
 
-func (d *disseminator) AdjustMaxPropogations() {
+func (d *disseminator) AdjustMaxPropagations() {
 	if !d.node.Ready() {
 		return
 	}
@@ -78,9 +78,9 @@ func (d *disseminator) AdjustMaxPropogations() {
 		d.node.log.WithFields(log.Fields{
 			"newMax":            newMaxP,
 			"prevMax":           prevMaxP,
-			"propogationFactor": d.pFactor,
+			"propagationFactor": d.pFactor,
 			"numPingable":       numPingable,
-		}).Debug("adjusted max propogation count")
+		}).Debug("adjusted max propagation count")
 	}
 
 	d.Unlock()

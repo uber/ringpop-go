@@ -30,8 +30,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
-	"github.com/uber/ringpop-go/replica/util"
 	"github.com/uber/ringpop-go/shared"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -88,7 +88,7 @@ type callOptions struct {
 	Request    []byte
 	KeysByDest map[string][]string
 	Operation  string
-	Format tchannel.Format
+	Format     tchannel.Format
 }
 
 // A Replicator is used to replicate a request across nodes such that they share
@@ -301,7 +301,7 @@ func (r *Replicator) serial(rwValue int, copts *callOptions,
 	var errors []error
 
 	if opts.FanoutMode == SerialBalanced {
-		copts.Dests = util.Shuffle(copts.Dests)
+		copts.Dests = util.ShuffleStrings(copts.Dests)
 	}
 
 	for _, dest := range copts.Dests {

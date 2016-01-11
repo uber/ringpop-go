@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 type DisseminatorTestSuite struct {
@@ -105,7 +105,7 @@ func (s *DisseminatorTestSuite) TestIssueChangesAsReceiver() {
 	s.False(fs, "expected changes to not be a full sync")
 
 	changes, fs = s.d.IssueAsReceiver("127.0.0.1:3002", s.incarnation, s.m.Checksum()+1)
-	s.Len(changes, 4, "expected change to be issued for each memeber in membership")
+	s.Len(changes, 4, "expected change to be issued for each member in membership")
 	s.True(fs, "expected changes to be a full sync")
 }
 
@@ -118,15 +118,15 @@ func (s *DisseminatorTestSuite) TestChangesDeleted() {
 
 	s.m.MakeAlive(address, s.incarnation)
 
-	s.Equal(0, s.d.changes[address].p, "expected propogations for change to be 0")
+	s.Equal(0, s.d.changes[address].p, "expected propagations for change to be 0")
 
 	changes := s.d.IssueAsSender()
 	s.Len(changes, 1, "expected one change to be issued")
-	s.Equal(1, s.d.changes[address].p, "expected propogations for change to be 1")
+	s.Equal(1, s.d.changes[address].p, "expected propagations for change to be 1")
 
 	changes = s.d.IssueAsSender()
 	s.Len(changes, 1, "expected one change to be issued")
-	s.Equal(2, s.d.changes[address].p, "expected propogations for change to be 2")
+	s.Equal(2, s.d.changes[address].p, "expected propagations for change to be 2")
 
 	changes = s.d.IssueAsSender()
 	s.Empty(changes, "expected no changes to be issued")
