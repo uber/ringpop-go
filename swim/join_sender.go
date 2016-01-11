@@ -69,6 +69,9 @@ type joinOpts struct {
 	// discoverProvider is the DiscoverProvider that this joinSender will use to
 	// enumerate bootstrap hosts.
 	discoverProvider DiscoverProvider
+
+	// delayer delays repeated join attempts.
+	delayer joinDelayer
 }
 
 // A joinSender is used to join an existing cluster of nodes defined in a node's
@@ -104,6 +107,9 @@ type joinSender struct {
 	roundNonPreferredNodes []string
 
 	numTries int
+
+	// delayer delays repeated join attempts.
+	delayer joinDelayer
 }
 
 // newJoinSender returns a new JoinSender to join a cluster with
@@ -140,6 +146,16 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 	js.parallelismFactor = util.SelectInt(opts.parallelismFactor, defaultParallelismFactor)
 	js.size = util.SelectInt(opts.size, defaultJoinSize)
 	js.size = util.Min(js.size, len(js.potentialNodes))
+	js.delayer = opts.delayer
+
+	if js.delayer == nil {
+		// Create and use exponential delayer as the delay mechanism. Create it
+		// with nil opts which uses default delayOpts.
+		js.delayer, err = newExponentialDelayer(js.node.address, js.node.log, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return js, nil
 }
@@ -323,6 +339,8 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 			"numFailed": numFailed,
 			"startTime": startTime,
 		}).Debug("join not yet complete")
+
+		j.delayer.delay()
 	}
 
 	j.node.emit(JoinCompleteEvent{

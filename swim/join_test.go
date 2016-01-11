@@ -199,6 +199,16 @@ func (s *JoinSenderTestSuite) TestJoinSelf() {
 	}
 }
 
+func (s *JoinSenderTestSuite) TestCustomDelayer() {
+	delayer := &nullDelayer{}
+	joiner, err := newJoinSender(s.node, &joinOpts{
+		delayer:          delayer,
+		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
+	})
+	s.NoError(err, "expected valid joiner")
+	s.Equal(delayer, joiner.delayer, "custom delayer was set")
+}
+
 func TestJoinSenderTestSuite(t *testing.T) {
 	suite.Run(t, new(JoinSenderTestSuite))
 }
