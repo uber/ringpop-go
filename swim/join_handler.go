@@ -66,8 +66,6 @@ func handleJoin(node *Node, req *joinRequest) (*joinResponse, error) {
 		return nil, err
 	}
 
-	node.memberlist.MakeAlive(req.Source, req.Incarnation)
-
 	res := &joinResponse{
 		App:         node.app,
 		Coordinator: node.address,
