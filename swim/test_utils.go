@@ -22,6 +22,7 @@ package swim
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -109,7 +110,7 @@ func memberlistHasMembers(t *testing.T, m *memberlist, members []Member) {
 	}
 }
 
-func bootstrapNodes(t *testing.T, testNodes ...*testNode) {
+func bootstrapNodes(t *testing.T, waitForConvergence bool, testNodes ...*testNode) {
 	var hostports []string
 
 	for _, tn := range testNodes {
@@ -121,6 +122,22 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) {
 		})
 		require.NoError(t, err, "node must bootstrap successfully")
 	}
+
+	if waitForConvergence {
+		var wg sync.WaitGroup
+		for _, tn := range testNodes {
+			wg.Add(1)
+			// execute the Protocol period on all nodes until the dissemination list is exhausted
+			go func(tn *testNode) {
+				for len(tn.node.disseminator.changes) > 0 {
+					tn.node.gossip.ProtocolPeriod()
+				}
+				wg.Done()
+			}(tn)
+		}
+		wg.Wait()
+	}
+
 }
 
 func destroyNodes(tnodes ...*testNode) {

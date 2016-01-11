@@ -152,8 +152,8 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 	peer.node.app = "different"
 	defer peer.Destroy()
 
-	bootstrapNodes(s.T(), s.tnode)
-	bootstrapNodes(s.T(), peer)
+	bootstrapNodes(s.T(), false, s.tnode)
+	bootstrapNodes(s.T(), false, peer)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
 		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
@@ -179,7 +179,7 @@ func (s *JoinSenderTestSuite) TestJoinSelf() {
 	s.node = s.tnode.node
 	defer s.tnode.Destroy()
 
-	bootstrapNodes(s.T(), s.tnode)
+	bootstrapNodes(s.T(), false, s.tnode)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
 		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},

@@ -49,7 +49,7 @@ func (s *BootstrapTestSuite) TearDownTest() {
 
 func (s *BootstrapTestSuite) TestBootstrapOk() {
 	s.peers = genChannelNodes(s.T(), 5)
-	bootstrapNodes(s.T(), append(s.peers, s.tnode)...)
+	bootstrapNodes(s.T(), false, append(s.peers, s.tnode)...)
 	// Reachable members should be s.node + s.peers
 	s.Equal(6, s.node.CountReachableMembers())
 }

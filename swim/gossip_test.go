@@ -79,7 +79,7 @@ func (s *GossipTestSuite) TestUpdatesArePropagated() {
 	defer peer.Destroy()
 	defer peer.channel.Close()
 
-	bootstrapNodes(s.T(), s.tnode, peer)
+	bootstrapNodes(s.T(), true, s.tnode, peer)
 	s.True(s.g.Stopped())
 	s.True(peer.node.gossip.Stopped())
 
@@ -110,7 +110,7 @@ func (s *GossipTestSuite) TestSuspicionStarted() {
 	peers := genChannelNodes(s.T(), 3)
 	defer destroyNodes(peers...)
 
-	bootstrapNodes(s.T(), append(peers, s.tnode)...)
+	bootstrapNodes(s.T(), false, append(peers, s.tnode)...)
 
 	s.node.memberiter = new(dummyIter) // always returns a member at 127.0.0.1:3010
 
