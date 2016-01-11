@@ -133,7 +133,7 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 // calls remote service and writes response to s.response
 func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *error, appError *error) <-chan bool {
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	go func() {
 		defer close(done)
 
