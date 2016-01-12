@@ -177,6 +177,85 @@ func TestLookup(t *testing.T) {
 	assert.False(t, ok, "expected Lookup to find no server for key to hash to")
 }
 
+func TestLookupDistribution(t *testing.T) {
+	ring := New(farm.Fingerprint32, 5)
+	addresses := genAddresses(1, 1, 1000)
+	ring.AddRemoveServers(addresses, nil)
+
+	keys := make([]string, 40)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("%d", i)
+	}
+
+	servers := make(map[string]bool)
+	for _, key := range keys {
+		server, ok := ring.Lookup(key)
+		assert.True(t, ok, "expected that the lookup is a success")
+		servers[server] = true
+	}
+
+	// With this specific set of keys we don't expect any collisions
+	assert.Len(t, servers, len(keys), "expected that all keys are owned by a different server")
+}
+
+// TestLookupNNoGaps tests the selected servers from LookupN form a contiguous
+// section of all hashes in the red-black tree.
+func TestLookupNNoGaps(t *testing.T) {
+	ring := New(farm.Fingerprint32, 1)
+	addresses := genAddresses(1, 1, 100)
+	ring.AddRemoveServers(addresses, nil)
+	key := "key with small hash"
+
+	servers := ring.LookupN(key, 20)
+
+	serversSet := make(map[string]struct{})
+	for _, s := range servers {
+		serversSet[s] = struct{}{}
+	}
+
+	// We are reconstructing the values under which the servers are stored in
+	// the red-black tree. This approach is brittle but it gives us deeper
+	// introspection into the internals of the tree. The hashring is configured
+	// to only store one replica per server, if we didn't, it would be
+	// impossible to find out which specific replica has been iterated over
+	// by LookupN.
+	hashes := make([]int, 0, len(servers))
+	for _, s := range servers {
+		// We are appending 0 to get the first (and only) replica of the server.
+		hashes = append(hashes, ring.hashfunc(s+"0"))
+	}
+
+	min := hashes[0]
+	for _, h := range hashes {
+		if h < min {
+			min = h
+		}
+	}
+	max := hashes[0]
+	for _, h := range hashes {
+		if h > max {
+			max = h
+		}
+	}
+
+	// Here we are checking that the nodes that we lookup are part of a
+	// contiguous series of the red-black tree nodes. All servers that
+	// aren't part of the lookup should be stored under a value either smaller,
+	// or larger than the values of the servers that are part of the lookup.
+	allExcluded := true
+	for _, ad := range addresses {
+		if _, ok := serversSet[ad]; ok {
+			continue
+		}
+		adHash := ring.hashfunc(ad + "0")
+		if adHash >= min && adHash <= max {
+			allExcluded = false
+		}
+	}
+
+	assert.True(t, allExcluded, "Expect addresses to be a contiguous section of the ring")
+}
+
 func TestLookupNOverflow(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	addresses := genAddresses(1, 1, 10)

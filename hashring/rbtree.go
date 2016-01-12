@@ -271,7 +271,7 @@ func findNUniqueAbove(node *redBlackNode, n int, val int, result map[string]stru
 	}
 
 	// skip left branch when all its values are smaller than val
-	if node.val > val {
+	if node.val >= val {
 		findNUniqueAbove(node.left, n, val, result)
 	}
 
@@ -280,6 +280,9 @@ func findNUniqueAbove(node *redBlackNode, n int, val int, result map[string]stru
 		return
 	}
 
-	result[node.str] = struct{}{}
+	if node.val >= val {
+		result[node.str] = struct{}{}
+	}
+
 	findNUniqueAbove(node.right, n, val, result)
 }
