@@ -127,7 +127,7 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 // calls remote service and writes response to s.response
 func (s *requestSender) MakeCall(ctx context.Context, res *[]byte) <-chan error {
-	errC := make(chan error)
+	errC := make(chan error, 1)
 	go func() {
 		defer close(errC)
 
