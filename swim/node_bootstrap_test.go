@@ -74,21 +74,24 @@ func (s *BootstrapTestSuite) TestBootstrapJoinsTimeOut() {
 }
 
 func (s *BootstrapTestSuite) TestBootstrapDestroy() {
-	var lerr lError
+	// Destroy node first to ensure there are no races
+	// in how the goroutine below is scheduled.
+	s.node.Destroy()
+
+	errChan := make(chan error)
 
 	go func() {
 		_, err := s.node.Bootstrap(&BootstrapOptions{
 			Hosts:       fakeHostPorts(1, 1, 1, 10),
 			JoinTimeout: time.Millisecond,
 		})
-		lerr.Set(err)
+		errChan <- err
 	}()
 
-	time.Sleep(2 * time.Millisecond)
-	s.node.Destroy()
-	time.Sleep(2 * time.Millisecond)
-
-	s.EqualError(lerr.Err(), "node destroyed while attempting to join cluster")
+	// Block until the error is received from the bootstrap
+	// goroutine above.
+	chanErr := <-errChan
+	s.EqualError(chanErr, "node destroyed while attempting to join cluster")
 }
 
 func (s *BootstrapTestSuite) TestBootstrapFailsWithNoChannel() {
