@@ -22,7 +22,6 @@ package swim
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -52,24 +51,6 @@ func (dummyIter) Next() (*Member, bool) {
 		Status:      Alive,
 		Incarnation: testInc,
 	}, true
-}
-
-type lError struct {
-	err error
-	sync.Mutex
-}
-
-func (e *lError) Set(err error) {
-	e.Lock()
-	e.err = err
-	e.Unlock()
-}
-
-func (e *lError) Err() error {
-	e.Lock()
-	err := e.err
-	e.Unlock()
-	return err
 }
 
 type testNode struct {
