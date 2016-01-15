@@ -181,7 +181,7 @@ const lowestLevel = DebugLevel
 const highestLevel = PanicLevel
 
 // Checking only for greater values is fine as long as Level is unsigned
-var tooHighErr = fmt.Errorf("minLevel must be greater than or equal to %s", highestLevel)
+var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)
 
 func (ml *moduleLogger) SetModuleLevel(name moduleName, minLevel Level) error {
 	if minLevel > highestLevel {
