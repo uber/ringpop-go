@@ -62,7 +62,7 @@ const (
 // level.
 type restrictedLogger struct {
 	log.Logger
-	minLevel Level // by default set to PanicLevel
+	minLevel Level // by default set to DebugLevel
 }
 
 func newRestictedLogger(logger log.Logger, minLevel Level) *restrictedLogger {
