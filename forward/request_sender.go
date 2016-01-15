@@ -33,6 +33,10 @@ import (
 	"github.com/uber/tchannel-go/raw"
 )
 
+// errDestinationsDiverged is an error that is returned from AttemptRetry
+// if keys that previously hashed to the same destination diverge.
+var errDestinationsDiverged = errors.New("key destinations have diverged")
+
 // A requestSender is used to send a request to its destination, as defined by the sender's
 // lookup method
 type requestSender struct {
@@ -196,15 +200,21 @@ func (s *requestSender) ScheduleRetry() ([]byte, error) {
 	return s.AttemptRetry()
 }
 
+// AttemptRetry attempts to resend a request. Before resending it will
+// lookup the keys provided to the requestSender upon construction. If
+// keys that previously hashed to the same destination diverge, an
+// errDestinationsDiverged error will be returned. If keys do not diverge,
+// the will be rerouted to their new destination. Rerouting can be disabled
+// by toggling the rerouteRetries flag.
 func (s *requestSender) AttemptRetry() ([]byte, error) {
 	s.retries++
 
 	s.emitter.emit(RetryAttemptEvent{})
 
 	dests := s.LookupKeys(s.keys)
-	if len(dests) > 1 || len(dests) == 0 {
-		s.emitter.emit(RetryAbortEvent{"key destinations have diverged"})
-		return nil, errors.New("key destinations have diverged")
+	if len(dests) != 1 {
+		s.emitter.emit(RetryAbortEvent{errDestinationsDiverged.Error()})
+		return nil, errDestinationsDiverged
 	}
 
 	if s.rerouteRetries {
@@ -230,14 +240,26 @@ func (s *requestSender) RerouteRetry(destination string) ([]byte, error) {
 	return s.Send()
 }
 
-func (s *requestSender) LookupKeys(keys []string) (dests []string) {
+// LookupKeys looks up the destinations of the keys provided. Returns a slice
+// of destinations. If multiple keys hash to the same destination, they will
+// be deduped.
+func (s *requestSender) LookupKeys(keys []string) []string {
+	// Lookup and dedupe the destinations of the keys.
+	destSet := make(map[string]struct{})
 	for _, key := range keys {
 		dest, err := s.sender.Lookup(key)
 		if err != nil {
+			// TODO Do something better than swallowing these errors.
 			continue
 		}
-		dests = append(dests, dest)
+
+		destSet[dest] = struct{}{}
 	}
 
+	// Return the unique destinations as a slice.
+	dests := make([]string, 0, len(destSet))
+	for dest := range destSet {
+		dests = append(dests, dest)
+	}
 	return dests
 }
