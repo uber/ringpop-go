@@ -8,7 +8,6 @@ import "github.com/uber/ringpop-go/events"
 import "github.com/uber/ringpop-go/forward"
 
 import "github.com/uber/ringpop-go/swim"
-
 import "github.com/uber/tchannel-go"
 
 type Ringpop struct {
