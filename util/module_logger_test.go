@@ -210,11 +210,11 @@ func (suite *ModuleTestSuite) TestWithFields() {
 
 func (suite *ModuleTestSuite) TestPreconditions() {
 	err := suite.ml.SetModuleLevel("test", highestLevel)
-	assert.Nil(suite.T(), err)
+	assert.NoError(suite.T(), err)
 	err = suite.ml.SetModuleLevel("test", highestLevel+1)
-	assert.NotNil(suite.T(), err)
+	assert.Error(suite.T(), err)
 	err = suite.ml.SetModuleLevel("test", lowestLevel)
-	assert.Nil(suite.T(), err)
+	assert.NoError(suite.T(), err)
 }
 
 func TestModuleTestSuite(t *testing.T) {
