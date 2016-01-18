@@ -23,6 +23,8 @@ func (level Level) String() string {
 		return "fatal"
 	case PanicLevel:
 		return "panic"
+	case OffLevel:
+		return "off"
 	}
 
 	return "unknown"
@@ -30,6 +32,8 @@ func (level Level) String() string {
 
 func ParseLevel(lvl string) (Level, error) {
 	switch lvl {
+	case "off":
+		return OffLevel, nil
 	case "panic":
 		return PanicLevel, nil
 	case "fatal":
@@ -56,6 +60,7 @@ const (
 	ErrorLevel
 	FatalLevel
 	PanicLevel
+	OffLevel
 )
 
 // Just like a regular log.Logger, but only emits messages above a certain
@@ -176,7 +181,7 @@ func NewModuleLogger(logger log.Logger) *moduleLogger {
 }
 
 const lowestLevel = DebugLevel
-const highestLevel = PanicLevel
+const highestLevel = OffLevel
 
 // Checking only for greater values is fine as long as Level is unsigned
 var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)

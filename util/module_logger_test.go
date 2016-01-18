@@ -108,6 +108,7 @@ func (suite *ModuleTestSuite) SetupTest() {
 	suite.ml = NewModuleLogger(suite.dl)
 	suite.ml.SetModuleLevel("testdebug", DebugLevel)
 	suite.ml.SetModuleLevel("testpanic", PanicLevel)
+	suite.ml.SetModuleLevel("testoff", OffLevel)
 }
 
 func (suite *ModuleTestSuite) assertMsg(msgLevel Level, args ...interface{}) {
@@ -184,6 +185,12 @@ func (suite *ModuleTestSuite) TestPanic() {
 	suite.assertMsg(PanicLevel, "Panic Msg", 1, 2)
 	l.Panicf("Panic Format", 1, 2)
 	suite.assertMsgf(PanicLevel, "Panic Format", 1, 2)
+}
+
+func (suite *ModuleTestSuite) TestOff() {
+	l := suite.ml.GetLogger("testoff")
+	l.Panic("Panic Msg", 1, 2)
+	suite.assertNoMsg()
 }
 
 func (suite *ModuleTestSuite) TestChangeLogger() {
