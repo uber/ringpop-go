@@ -127,7 +127,6 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 }
 
 func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
-	// TODO implement timeout
 	var wg sync.WaitGroup
 	for _, tn := range testNodes {
 		wg.Add(1)
@@ -139,7 +138,37 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 			wg.Done()
 		}(tn)
 	}
-	wg.Wait()
+
+	finished := make(chan bool, 1)
+	go func() {
+		wg.Wait()
+		finished <- true
+	}()
+
+	select {
+	case <-finished:
+		var checksums []uint32
+		for _, node := range testNodes {
+			checksums = append(checksums, node.node.memberlist.Checksum())
+		}
+
+		if len(checksums) == 0 {
+			// no checksums to validate
+			return
+		}
+
+		first := checksums[0]
+		for i := 1; i < len(checksums); i++ {
+			if checksums[i] != first {
+				t.Errorf("nodes did not converge to 1 checksum")
+			}
+		}
+		return
+	case <-time.After(timeout):
+		t.Errorf("timeout during wait for convergence")
+		return
+	}
+
 }
 
 func destroyNodes(tnodes ...*testNode) {
