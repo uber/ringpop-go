@@ -103,126 +103,126 @@ type ModuleTestSuite struct {
 	ml *moduleLogger
 }
 
-func (suite *ModuleTestSuite) SetupTest() {
-	suite.dl = &dummyLogger{}
-	suite.ml = NewModuleLogger(suite.dl)
-	suite.ml.SetModuleLevel("testdebug", DebugLevel)
-	suite.ml.SetModuleLevel("testpanic", PanicLevel)
-	suite.ml.SetModuleLevel("testoff", OffLevel)
+func (s *ModuleTestSuite) SetupTest() {
+	s.dl = &dummyLogger{}
+	s.ml = NewModuleLogger(s.dl)
+	s.ml.SetModuleLevel("testdebug", DebugLevel)
+	s.ml.SetModuleLevel("testpanic", PanicLevel)
+	s.ml.SetModuleLevel("testoff", OffLevel)
 }
 
-func (suite *ModuleTestSuite) assertMsg(msgLevel Level, args ...interface{}) {
-	suite.dl.assertMsg(suite.T(), msgLevel, args...)
+func (s *ModuleTestSuite) assertMsg(msgLevel Level, args ...interface{}) {
+	s.dl.assertMsg(s.T(), msgLevel, args...)
 }
 
-func (suite *ModuleTestSuite) assertMsgf(msgLevel Level, format string, args ...interface{}) {
-	suite.dl.assertMsgf(suite.T(), msgLevel, format, args...)
+func (s *ModuleTestSuite) assertMsgf(msgLevel Level, format string, args ...interface{}) {
+	s.dl.assertMsgf(s.T(), msgLevel, format, args...)
 }
 
-func (suite *ModuleTestSuite) assertNoMsg() {
-	suite.dl.assertNoMsg(suite.T())
+func (s *ModuleTestSuite) assertNoMsg() {
+	s.dl.assertNoMsg(s.T())
 }
 
-func (suite *ModuleTestSuite) TestOrigLogger() {
-	l := suite.ml.GetLogger("unnamed")
+func (s *ModuleTestSuite) TestOrigLogger() {
+	l := s.ml.GetLogger("unnamed")
 	l.Debug("Debug Msg", 1, 2)
-	suite.assertMsg(DebugLevel, "Debug Msg", 1, 2)
+	s.assertMsg(DebugLevel, "Debug Msg", 1, 2)
 	l.Debugf("Debug Format", 1, 2)
-	suite.assertMsgf(DebugLevel, "Debug Format", 1, 2)
+	s.assertMsgf(DebugLevel, "Debug Format", 1, 2)
 }
 
-func (suite *ModuleTestSuite) TestDebug() {
-	l := suite.ml.GetLogger("testdebug")
+func (s *ModuleTestSuite) TestDebug() {
+	l := s.ml.GetLogger("testdebug")
 	l.Debug("Debug Msg", 1, 2)
-	suite.assertMsg(DebugLevel, "Debug Msg", 1, 2)
+	s.assertMsg(DebugLevel, "Debug Msg", 1, 2)
 	l.Debugf("Debug Format", 1, 2)
-	suite.assertMsgf(DebugLevel, "Debug Format", 1, 2)
+	s.assertMsgf(DebugLevel, "Debug Format", 1, 2)
 	l.Info("Info Msg", 1, 2)
-	suite.assertMsg(InfoLevel, "Info Msg", 1, 2)
+	s.assertMsg(InfoLevel, "Info Msg", 1, 2)
 	l.Infof("Info Format", 1, 2)
-	suite.assertMsgf(InfoLevel, "Info Format", 1, 2)
+	s.assertMsgf(InfoLevel, "Info Format", 1, 2)
 	l.Warn("Warn Msg", 1, 2)
-	suite.assertMsg(WarnLevel, "Warn Msg", 1, 2)
+	s.assertMsg(WarnLevel, "Warn Msg", 1, 2)
 	l.Warnf("Warn Format", 1, 2)
-	suite.assertMsgf(WarnLevel, "Warn Format", 1, 2)
+	s.assertMsgf(WarnLevel, "Warn Format", 1, 2)
 	l.Error("Error Msg", 1, 2)
-	suite.assertMsg(ErrorLevel, "Error Msg", 1, 2)
+	s.assertMsg(ErrorLevel, "Error Msg", 1, 2)
 	l.Errorf("Error Format", 1, 2)
-	suite.assertMsgf(ErrorLevel, "Error Format", 1, 2)
+	s.assertMsgf(ErrorLevel, "Error Format", 1, 2)
 	l.Fatal("Fatal Msg", 1, 2)
-	suite.assertMsg(FatalLevel, "Fatal Msg", 1, 2)
+	s.assertMsg(FatalLevel, "Fatal Msg", 1, 2)
 	l.Fatalf("Fatal Format", 1, 2)
-	suite.assertMsgf(FatalLevel, "Fatal Format", 1, 2)
+	s.assertMsgf(FatalLevel, "Fatal Format", 1, 2)
 	l.Panic("Panic Msg", 1, 2)
-	suite.assertMsg(PanicLevel, "Panic Msg", 1, 2)
+	s.assertMsg(PanicLevel, "Panic Msg", 1, 2)
 	l.Panicf("Panic Format", 1, 2)
-	suite.assertMsgf(PanicLevel, "Panic Format", 1, 2)
+	s.assertMsgf(PanicLevel, "Panic Format", 1, 2)
 }
 
-func (suite *ModuleTestSuite) TestPanic() {
-	l := suite.ml.GetLogger("testpanic")
+func (s *ModuleTestSuite) TestPanic() {
+	l := s.ml.GetLogger("testpanic")
 	l.Debug("Debug Msg", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Debugf("Debug Format", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Info("Info Msg", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Infof("Info Format", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Warn("Warn Msg", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Warnf("Warn Format", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Error("Error Msg", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Errorf("Error Format", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Fatal("Fatal Msg", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Fatalf("Fatal Format", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	l.Panic("Panic Msg", 1, 2)
-	suite.assertMsg(PanicLevel, "Panic Msg", 1, 2)
+	s.assertMsg(PanicLevel, "Panic Msg", 1, 2)
 	l.Panicf("Panic Format", 1, 2)
-	suite.assertMsgf(PanicLevel, "Panic Format", 1, 2)
+	s.assertMsgf(PanicLevel, "Panic Format", 1, 2)
 }
 
-func (suite *ModuleTestSuite) TestOff() {
-	l := suite.ml.GetLogger("testoff")
+func (s *ModuleTestSuite) TestOff() {
+	l := s.ml.GetLogger("testoff")
 	l.Panic("Panic Msg", 1, 2)
-	suite.assertNoMsg()
+	s.assertNoMsg()
 }
 
-func (suite *ModuleTestSuite) TestChangeLogger() {
+func (s *ModuleTestSuite) TestChangeLogger() {
 	newLogger := &dummyLogger{}
-	l := suite.ml.SetLogger(newLogger).GetLogger("testpanic")
+	l := s.ml.SetLogger(newLogger).GetLogger("testpanic")
 	l.Fatal("Fatal Msg", 1, 2)
-	newLogger.assertNoMsg(suite.T())
+	newLogger.assertNoMsg(s.T())
 	l.Panic("Panic Msg", 1, 2)
-	newLogger.assertMsg(suite.T(), PanicLevel, "Panic Msg", 1, 2)
+	newLogger.assertMsg(s.T(), PanicLevel, "Panic Msg", 1, 2)
 }
 
-func (suite *ModuleTestSuite) TestCache() {
-	suite.ml.SetModuleLevel("m1", InfoLevel)
-	suite.ml.SetModuleLevel("m2", InfoLevel)
-	_ = suite.ml.GetLogger("m1")
-	m2 := suite.ml.GetLogger("m2")
+func (s *ModuleTestSuite) TestCache() {
+	s.ml.SetModuleLevel("m1", InfoLevel)
+	s.ml.SetModuleLevel("m2", InfoLevel)
+	_ = s.ml.GetLogger("m1")
+	m2 := s.ml.GetLogger("m2")
 	m2.Debug("m2")
-	suite.assertNoMsg()
+	s.assertNoMsg()
 	m2.Info("m2")
-	suite.assertMsg(InfoLevel, "m2")
+	s.assertMsg(InfoLevel, "m2")
 }
 
 // Make sure the logger returned by WithField is still wrapped.
-func (suite *ModuleTestSuite) TestWithField() {
-	l := suite.ml.GetLogger("testpanic")
-	new_l := l.WithField("field", 1)
-	assert.Equal(suite.T(), suite.dl.fieldKey, "field")
-	assert.Equal(suite.T(), suite.dl.fieldValue, 1)
-	new_l.Fatal("Fatal Msg", 1, 2)
-	suite.assertNoMsg()
-	new_l.Panic("Panic Msg", 1, 2)
-	suite.assertMsg(PanicLevel, "Panic Msg", 1, 2)
+func (s *ModuleTestSuite) TestWithField() {
+	l := s.ml.GetLogger("testpanic")
+	newLogger := l.WithField("field", 1)
+	assert.Equal(s.T(), s.dl.fieldKey, "field")
+	assert.Equal(s.T(), s.dl.fieldValue, 1)
+	newLogger.Fatal("Fatal Msg", 1, 2)
+	s.assertNoMsg()
+	newLogger.Panic("Panic Msg", 1, 2)
+	s.assertMsg(PanicLevel, "Panic Msg", 1, 2)
 }
 
 type dummyLogFields struct{}
@@ -232,24 +232,24 @@ func (dummyLogFields) Fields() map[string]interface{} {
 }
 
 // Make sure the logger returned by WithFields is still wrapped.
-func (suite *ModuleTestSuite) TestWithFields() {
-	l := suite.ml.GetLogger("testpanic")
+func (s *ModuleTestSuite) TestWithFields() {
+	l := s.ml.GetLogger("testpanic")
 	dlf := new(dummyLogFields)
-	new_l := l.WithFields(dlf)
-	assert.Equal(suite.T(), suite.dl.fields, dlf)
-	new_l.Fatal("Fatal Msg", 1, 2)
-	suite.assertNoMsg()
-	new_l.Panic("Panic Msg", 1, 2)
-	suite.assertMsg(PanicLevel, "Panic Msg", 1, 2)
+	newLogger := l.WithFields(dlf)
+	assert.Equal(s.T(), s.dl.fields, dlf)
+	newLogger.Fatal("Fatal Msg", 1, 2)
+	s.assertNoMsg()
+	newLogger.Panic("Panic Msg", 1, 2)
+	s.assertMsg(PanicLevel, "Panic Msg", 1, 2)
 }
 
-func (suite *ModuleTestSuite) TestPreconditions() {
-	assert := assert.New(suite.T())
-	err := suite.ml.SetModuleLevel("test", highestLevel)
+func (s *ModuleTestSuite) TestPreconditions() {
+	assert := assert.New(s.T())
+	err := s.ml.SetModuleLevel("test", highestLevel)
 	assert.NoError(err)
-	err = suite.ml.SetModuleLevel("test", highestLevel+1)
+	err = s.ml.SetModuleLevel("test", highestLevel+1)
 	assert.Error(err)
-	err = suite.ml.SetModuleLevel("test", lowestLevel)
+	err = s.ml.SetModuleLevel("test", lowestLevel)
 	assert.NoError(err)
 }
 
