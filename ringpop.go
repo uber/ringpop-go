@@ -159,7 +159,7 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.moduleLogger,
+		Logger: rp.moduleLogger.GetLogger("swim"),
 	})
 	rp.node.RegisterListener(rp)
 
