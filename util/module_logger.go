@@ -169,7 +169,7 @@ type moduleLogger struct {
 	*restrictedLogger
 }
 
-const defaultModuleLogLevel = WarnLevel
+const defaultModuleLogLevel = DebugLevel
 
 func NewModuleLogger(logger log.Logger) *moduleLogger {
 	return &moduleLogger{

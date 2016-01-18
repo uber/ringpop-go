@@ -112,14 +112,10 @@ func (suite *ModuleTestSuite) assertNoMsg() {
 
 func (suite *ModuleTestSuite) TestDefaultLevel() {
 	l := suite.ml.GetLogger("unnamed")
-	l.Info("Info Msg")
-	suite.assertNoMsg()
-	l.Infof("Info Format", 1, 2)
-	suite.assertNoMsg()
-	l.Warn("Warn Msg", 1, 2)
-	suite.assertMsg(WarnLevel, "Warn Msg", 1, 2)
-	l.Warnf("Warn Format", 1, 2)
-	suite.assertMsgf(WarnLevel, "Warn Format", 1, 2)
+	l.Debug("Debug Msg", 1, 2)
+	suite.assertMsg(DebugLevel, "Debug Msg", 1, 2)
+	l.Debugf("Debug Format", 1, 2)
+	suite.assertMsgf(DebugLevel, "Debug Format", 1, 2)
 }
 
 func (suite *ModuleTestSuite) TestDebug() {
