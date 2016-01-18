@@ -61,6 +61,7 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	testRingpop := &Ringpop{}
 	defaultStatter(testRingpop)
 	defaultLogger(testRingpop)
+	defaultSWIMLevel(testRingpop)
 	defaultHashRingOptions(testRingpop)
 
 	s.Equal(testRingpop.moduleLogger, rp.moduleLogger)

@@ -121,8 +121,22 @@ func HashRingConfig(c *hashring.Configuration) Option {
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		r.moduleLogger = rutil.NewModuleLogger(l)
+		if r.moduleLogger == nil {
+			r.moduleLogger = rutil.NewModuleLogger(l)
+		} else {
+			// preserve configured modules
+			r.moduleLogger = r.moduleLogger.SetLogger(l)
+		}
 		return nil
+	}
+}
+
+// ModuleLogLevel is used to configure different log levels per module. Messages
+// with a level less than minLevel are silenced. By default, an unconfigured
+// module outputs all messages.
+func ModuleLogLevel(name string, minLevel rutil.Level) Option {
+	return func(rp *Ringpop) error {
+		return rp.moduleLogger.SetModuleLevel(name, minLevel)
 	}
 }
 
@@ -195,11 +209,16 @@ func defaultHashRingOptions(r *Ringpop) error {
 	return HashRingConfig(defaultHashRingConfiguration)(r)
 }
 
+func defaultSWIMLevel(r *Ringpop) error {
+	return ModuleLogLevel("swim", rutil.WarnLevel)(r)
+}
+
 // defaultOptions are the default options/values when Ringpop is created. They
 // can be overridden at runtime.
 var defaultOptions = []Option{
 	defaultIdentityResolver,
 	defaultLogger,
+	defaultSWIMLevel,
 	defaultStatter,
 	defaultHashRingOptions,
 }
