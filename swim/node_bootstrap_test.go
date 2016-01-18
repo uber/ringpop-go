@@ -105,6 +105,8 @@ func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {
 
 	// test that there are no changes to disseminate after the bootrstrapping of a host
 	for _, peer := range s.peers {
+		_, hasMember := peer.node.memberlist.Member(s.tnode.node.Address())
+		s.False(hasMember, "didn't expect the bootstapping node to appear in the member list of any peers")
 		s.Len(peer.node.disseminator.changes, 0)
 	}
 
