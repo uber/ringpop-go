@@ -28,6 +28,7 @@ import (
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/shared"
+	rutil "github.com/uber/ringpop-go/util"
 )
 
 type configuration struct {
@@ -120,7 +121,7 @@ func HashRingConfig(c *hashring.Configuration) Option {
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		r.logger = l
+		r.moduleLogger = rutil.NewModuleLogger(l)
 		return nil
 	}
 }

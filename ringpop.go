@@ -89,7 +89,7 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
-	logger log.Logger
+	moduleLogger util.ModuleLogger
 
 	startTime time.Time
 }
@@ -159,7 +159,7 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.logger,
+		Logger: rp.moduleLogger,
 	})
 	rp.node.RegisterListener(rp)
 
@@ -170,7 +170,7 @@ func (rp *Ringpop) init() error {
 	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
 	rp.stats.keys = make(map[string]string)
 
-	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
+	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.moduleLogger)
 	rp.forwarder.RegisterListener(rp)
 
 	rp.setState(initialized)
@@ -303,14 +303,14 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 
 	joined, err := rp.node.Bootstrap(&bootstrapOpts)
 	if err != nil {
-		rp.logger.WithField("error", err).Info("bootstrap failed")
+		rp.moduleLogger.WithField("error", err).Info("bootstrap failed")
 		rp.setState(initialized)
 		return nil, err
 	}
 
 	rp.setState(ready)
 
-	rp.logger.WithField("joined", joined).Info("bootstrap complete")
+	rp.moduleLogger.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
 }
 
@@ -355,7 +355,7 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 		}
 		mc, err := rp.CountReachableMembers()
 		if err != nil {
-			rp.logger.Errorf("unable to count members of the ring for statting: %q", err)
+			rp.moduleLogger.Errorf("unable to count members of the ring for statting: %q", err)
 		} else {
 			rp.statter.UpdateGauge(rp.getStatKey("num-members"), nil, int64(mc))
 		}
@@ -524,7 +524,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	if !success {
 		err := errors.New("could not find destination for key")
-		rp.logger.WithField("key", key).Warn(err)
+		rp.moduleLogger.WithField("key", key).Warn(err)
 		return "", err
 	}
 

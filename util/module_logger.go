@@ -158,23 +158,24 @@ func (rl *restrictedLogger) WithFields(keyValues log.LogFields) log.Logger {
 type moduleName string
 
 type ModuleLogger interface {
-	SetModuleLevel(name moduleName, minLevel Level)
+	SetModuleLevel(name moduleName, minLevel Level) error
 	GetLogger(name moduleName) log.Logger
+	log.Logger
 }
 
 type moduleLogger struct {
-	logger        log.Logger
-	loggers       map[moduleName]*restrictedLogger
-	defaultLogger *restrictedLogger
+	logger  log.Logger
+	loggers map[moduleName]*restrictedLogger
+	*restrictedLogger
 }
 
 const defaultModuleLogLevel = WarnLevel
 
 func NewModuleLogger(logger log.Logger) *moduleLogger {
 	return &moduleLogger{
-		logger:        logger,
-		loggers:       make(map[moduleName]*restrictedLogger),
-		defaultLogger: newRestictedLogger(logger, defaultModuleLogLevel)}
+		logger:           logger,
+		loggers:          make(map[moduleName]*restrictedLogger),
+		restrictedLogger: newRestictedLogger(logger, defaultModuleLogLevel)}
 }
 
 const lowestLevel = DebugLevel
@@ -197,7 +198,7 @@ func (ml *moduleLogger) GetLogger(name moduleName) log.Logger {
 	if logger, ok := ml.loggers[name]; ok {
 		return logger
 	}
-	return ml.defaultLogger
+	return ml
 }
 
 // Move this to options

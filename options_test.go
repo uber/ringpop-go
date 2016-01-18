@@ -51,7 +51,7 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	s.Require().NoError(err)
 
 	// Check that these defaults are not nil
-	s.NotNil(rp.logger)
+	s.NotNil(rp.moduleLogger)
 	s.NotNil(rp.statter)
 	s.Equal(defaultHashRingConfiguration, rp.configHashRing)
 
@@ -63,7 +63,7 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	defaultLogger(testRingpop)
 	defaultHashRingOptions(testRingpop)
 
-	s.Equal(testRingpop.logger, rp.logger)
+	s.Equal(testRingpop.moduleLogger, rp.moduleLogger)
 	s.Equal(testRingpop.statter, rp.statter)
 	s.Equal(testRingpop.configHashRing, rp.configHashRing)
 }
@@ -104,8 +104,6 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 	rp, err := New("test", Channel(s.channel), Logger(mockLogger))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
-
-	s.Exactly(mockLogger, rp.logger)
 }
 
 // TestStatter tests that the statter that's passed in gets applied correctly
