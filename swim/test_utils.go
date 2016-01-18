@@ -21,6 +21,7 @@
 package swim
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -221,6 +222,36 @@ func (c *swimCluster) Bootstrap() {
 		node.Bootstrap(&BootstrapOptions{
 			DiscoverProvider: &StaticHostList{c.Addresses()},
 		})
+	}
+}
+
+func (c *swimCluster) WaitForConvergence(timeout time.Duration) error {
+	timeoutCh := time.After(timeout)
+
+	for {
+		select {
+		case <-time.After(time.Millisecond):
+			// collect all the checksums
+			var checksums []uint32
+			for _, node := range c.nodes {
+				checksums = append(checksums, node.memberlist.Checksum())
+			}
+
+			converged := true
+			for _, checksum := range checksums {
+				if checksum != checksums[0] {
+					converged = false
+					break
+				}
+			}
+
+			if converged {
+				// all checksums are the same, we are converged
+				return nil
+			}
+		case <-timeoutCh:
+			return errors.New("timeout during converging")
+		}
 	}
 }
 

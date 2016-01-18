@@ -101,6 +101,7 @@ func (s *StatsTestSuite) TestProtocolStats() {
 }
 
 func (s *StatsTestSuite) TestMemberStats() {
+	s.NoError(s.cluster.WaitForConvergence(time.Second), "We expect the cluster to converge within a second")
 	stats := s.cluster.Nodes()[0].MemberStats()
 
 	// Extract addresses from the member list
