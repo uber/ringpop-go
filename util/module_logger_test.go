@@ -83,6 +83,20 @@ func (dl *dummyLogger) Fields() log.Fields {
 	return nil
 }
 
+func (dl *dummyLogger) assertMsg(t assert.TestingT, msgLevel Level, args ...interface{}) {
+	assert.Equal(t, dl.msg.level, msgLevel, "Message emitted with wrong level.")
+	assert.Equal(t, dl.msg.args, args, "Message emitted with wrong args.")
+}
+
+func (dl *dummyLogger) assertMsgf(t assert.TestingT, msgLevel Level, format string, args ...interface{}) {
+	dl.assertMsg(t, msgLevel, args...)
+	assert.Equal(t, dl.msg.format, format, "Message emitted with wrong format.")
+}
+
+func (dl *dummyLogger) assertNoMsg(t assert.TestingT) {
+	assert.Nil(t, dl.msg, "Unexpected message emitted.")
+}
+
 type ModuleTestSuite struct {
 	suite.Suite
 	dl *dummyLogger
@@ -97,20 +111,18 @@ func (suite *ModuleTestSuite) SetupTest() {
 }
 
 func (suite *ModuleTestSuite) assertMsg(msgLevel Level, args ...interface{}) {
-	assert.Equal(suite.T(), suite.dl.msg.level, msgLevel, "Message emitted with wrong level.")
-	assert.Equal(suite.T(), suite.dl.msg.args, args, "Message args don't match.")
+	suite.dl.assertMsg(suite.T(), msgLevel, args...)
 }
 
 func (suite *ModuleTestSuite) assertMsgf(msgLevel Level, format string, args ...interface{}) {
-	suite.assertMsg(msgLevel, args...)
-	assert.Equal(suite.T(), suite.dl.msg.format, format, "Message emitted with wrong format.")
+	suite.dl.assertMsgf(suite.T(), msgLevel, format, args...)
 }
 
 func (suite *ModuleTestSuite) assertNoMsg() {
-	assert.Nil(suite.T(), suite.dl.msg, "Unexpected message emitted.")
+	suite.dl.assertNoMsg(suite.T())
 }
 
-func (suite *ModuleTestSuite) TestDefaultLevel() {
+func (suite *ModuleTestSuite) TestOrigLogger() {
 	l := suite.ml.GetLogger("unnamed")
 	l.Debug("Debug Msg", 1, 2)
 	suite.assertMsg(DebugLevel, "Debug Msg", 1, 2)
@@ -172,6 +184,26 @@ func (suite *ModuleTestSuite) TestPanic() {
 	suite.assertMsg(PanicLevel, "Panic Msg", 1, 2)
 	l.Panicf("Panic Format", 1, 2)
 	suite.assertMsgf(PanicLevel, "Panic Format", 1, 2)
+}
+
+func (suite *ModuleTestSuite) TestChangeLogger() {
+	newLogger := &dummyLogger{}
+	l := suite.ml.SetLogger(newLogger).GetLogger("testpanic")
+	l.Fatal("Fatal Msg", 1, 2)
+	newLogger.assertNoMsg(suite.T())
+	l.Panic("Panic Msg", 1, 2)
+	newLogger.assertMsg(suite.T(), PanicLevel, "Panic Msg", 1, 2)
+}
+
+func (suite *ModuleTestSuite) TestCache() {
+	suite.ml.SetModuleLevel("m1", InfoLevel)
+	suite.ml.SetModuleLevel("m2", InfoLevel)
+	_ = suite.ml.GetLogger("m1")
+	m2 := suite.ml.GetLogger("m2")
+	m2.Debug("m2")
+	suite.assertNoMsg()
+	m2.Info("m2")
+	suite.assertMsg(InfoLevel, "m2")
 }
 
 // Make sure the logger returned by WithField is still wrapped

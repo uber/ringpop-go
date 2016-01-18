@@ -65,7 +65,7 @@ type restrictedLogger struct {
 	minLevel Level // by default set to DebugLevel
 }
 
-func newRestictedLogger(logger log.Logger, minLevel Level) *restrictedLogger {
+func newRestrictedLogger(logger log.Logger, minLevel Level) *restrictedLogger {
 	return &restrictedLogger{
 		Logger:   logger,
 		minLevel: minLevel}
@@ -148,34 +148,31 @@ func (rl *restrictedLogger) Panicf(format string, args ...interface{}) {
 }
 
 func (rl *restrictedLogger) WithField(key string, value interface{}) log.Logger {
-	return newRestictedLogger(rl.Logger.WithField(key, value), rl.minLevel)
+	return newRestrictedLogger(rl.Logger.WithField(key, value), rl.minLevel)
 }
 
 func (rl *restrictedLogger) WithFields(keyValues log.LogFields) log.Logger {
-	return newRestictedLogger(rl.Logger.WithFields(keyValues), rl.minLevel)
+	return newRestrictedLogger(rl.Logger.WithFields(keyValues), rl.minLevel)
 }
 
-type moduleName string
-
 type ModuleLogger interface {
-	SetModuleLevel(name moduleName, minLevel Level) error
-	GetLogger(name moduleName) log.Logger
+	SetModuleLevel(name string, minLevel Level) error
+	GetLogger(name string) log.Logger
+	SetLogger(logger log.Logger) ModuleLogger
 	log.Logger
 }
 
 type moduleLogger struct {
-	logger  log.Logger
-	loggers map[moduleName]*restrictedLogger
-	*restrictedLogger
+	log.Logger
+	cache  map[Level]*restrictedLogger
+	levels map[string]Level
 }
-
-const defaultModuleLogLevel = DebugLevel
 
 func NewModuleLogger(logger log.Logger) *moduleLogger {
 	return &moduleLogger{
-		logger:           logger,
-		loggers:          make(map[moduleName]*restrictedLogger),
-		restrictedLogger: newRestictedLogger(logger, defaultModuleLogLevel)}
+		Logger: logger,
+		levels: make(map[string]Level),
+		cache:  make(map[Level]*restrictedLogger)}
 }
 
 const lowestLevel = DebugLevel
@@ -184,27 +181,32 @@ const highestLevel = PanicLevel
 // Checking only for greater values is fine as long as Level is unsigned
 var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)
 
-func (ml *moduleLogger) SetModuleLevel(name moduleName, minLevel Level) error {
+func (ml *moduleLogger) SetModuleLevel(name string, minLevel Level) error {
 	if minLevel > highestLevel {
 		return tooHighErr
 	}
-	ml.loggers[name] = newRestictedLogger(ml.logger, minLevel)
+	ml.levels[name] = minLevel
 	return nil
 }
 
 // Return a logger with the specific module configuration or the default logger
 // if the module is not configured.
-func (ml *moduleLogger) GetLogger(name moduleName) log.Logger {
-	if logger, ok := ml.loggers[name]; ok {
+func (ml *moduleLogger) GetLogger(name string) log.Logger {
+	if minLevel, ok := ml.levels[name]; ok {
+		if logger, ok := ml.cache[minLevel]; ok {
+			return logger
+		}
+		logger := newRestrictedLogger(ml.Logger, minLevel)
+		ml.cache[minLevel] = logger
 		return logger
 	}
 	return ml
 }
 
-// Move this to options
-// func ModuleLogLevel(name moduleName, minLevel Level) Option {
-// 	return func(rp *Ringpop) error {
-// 		rp.mLogger.setModuleLevel(name, minLevel)
-// 		return nil
-// 	}
-// }
+func (ml *moduleLogger) SetLogger(logger log.Logger) ModuleLogger {
+	newModuleLogger := NewModuleLogger(logger)
+	for moduleName, minLevel := range ml.levels {
+		newModuleLogger.SetModuleLevel(moduleName, minLevel)
+	}
+	return newModuleLogger
+}
