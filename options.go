@@ -121,7 +121,6 @@ func HashRingConfig(c *hashring.Configuration) Option {
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
 		r.logger = l
-		r.log = l
 		return nil
 	}
 }

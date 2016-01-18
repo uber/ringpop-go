@@ -90,7 +90,6 @@ type Ringpop struct {
 	}
 
 	logger log.Logger
-	log    log.Logger
 
 	startTime time.Time
 }
@@ -304,14 +303,14 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 
 	joined, err := rp.node.Bootstrap(&bootstrapOpts)
 	if err != nil {
-		rp.log.WithField("error", err).Info("bootstrap failed")
+		rp.logger.WithField("error", err).Info("bootstrap failed")
 		rp.setState(initialized)
 		return nil, err
 	}
 
 	rp.setState(ready)
 
-	rp.log.WithField("joined", joined).Info("bootstrap complete")
+	rp.logger.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
 }
 
@@ -525,7 +524,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	if !success {
 		err := errors.New("could not find destination for key")
-		rp.log.WithField("key", key).Warn(err)
+		rp.logger.WithField("key", key).Warn(err)
 		return "", err
 	}
 
