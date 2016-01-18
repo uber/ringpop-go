@@ -213,7 +213,7 @@ func (suite *ModuleTestSuite) TestCache() {
 	suite.assertMsg(InfoLevel, "m2")
 }
 
-// Make sure the logger returned by WithField is still wrapped
+// Make sure the logger returned by WithField is still wrapped.
 func (suite *ModuleTestSuite) TestWithField() {
 	l := suite.ml.GetLogger("testpanic")
 	new_l := l.WithField("field", 1)
@@ -231,7 +231,7 @@ func (dummyLogFields) Fields() map[string]interface{} {
 	return nil
 }
 
-// Make sure the logger returned by WithFields is still wrapped
+// Make sure the logger returned by WithFields is still wrapped.
 func (suite *ModuleTestSuite) TestWithFields() {
 	l := suite.ml.GetLogger("testpanic")
 	dlf := new(dummyLogFields)

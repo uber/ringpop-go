@@ -5,7 +5,7 @@ import (
 	log "github.com/uber-common/bark"
 )
 
-// The level definition is stolen from logrus
+// The level definition is stolen from logrus.
 
 type Level uint8
 
@@ -52,7 +52,7 @@ func ParseLevel(lvl string) (Level, error) {
 	return l, fmt.Errorf("not a valid logrus Level: %q", lvl)
 }
 
-// The order is reversed compared to logrus for a safer default
+// The order is reversed compared to logrus for a safer default.
 const (
 	DebugLevel Level = iota
 	InfoLevel
@@ -67,7 +67,7 @@ const (
 // level.
 type restrictedLogger struct {
 	log.Logger
-	minLevel Level // by default set to DebugLevel
+	minLevel Level
 }
 
 func newRestrictedLogger(logger log.Logger, minLevel Level) *restrictedLogger {
@@ -183,7 +183,7 @@ func NewModuleLogger(logger log.Logger) *moduleLogger {
 const lowestLevel = DebugLevel
 const highestLevel = OffLevel
 
-// Checking only for greater values is fine as long as Level is unsigned
+// Checking only for greater values is fine as long as Level is unsigned.
 var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)
 
 func (ml *moduleLogger) SetModuleLevel(name string, minLevel Level) error {
