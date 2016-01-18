@@ -111,7 +111,7 @@ func memberlistHasMembers(t *testing.T, m *memberlist, members []Member) {
 	}
 }
 
-func bootstrapNodes(t *testing.T, waitForConvergence bool, testNodes ...*testNode) []string {
+func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 	var hostports []string
 
 	for _, tn := range testNodes {
@@ -123,23 +123,23 @@ func bootstrapNodes(t *testing.T, waitForConvergence bool, testNodes ...*testNod
 		})
 		require.NoError(t, err, "node must bootstrap successfully")
 	}
-
-	if waitForConvergence {
-		var wg sync.WaitGroup
-		for _, tn := range testNodes {
-			wg.Add(1)
-			// execute the Protocol period on all nodes until the dissemination list is exhausted
-			go func(tn *testNode) {
-				for len(tn.node.disseminator.changes) > 0 {
-					tn.node.gossip.ProtocolPeriod()
-				}
-				wg.Done()
-			}(tn)
-		}
-		wg.Wait()
-	}
-
 	return hostports
+}
+
+func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
+	// TODO implement timeout
+	var wg sync.WaitGroup
+	for _, tn := range testNodes {
+		wg.Add(1)
+		// execute the Protocol period on all nodes until the dissemination list is exhausted
+		go func(tn *testNode) {
+			for len(tn.node.disseminator.changes) > 0 {
+				tn.node.gossip.ProtocolPeriod()
+			}
+			wg.Done()
+		}(tn)
+	}
+	wg.Wait()
 }
 
 func destroyNodes(tnodes ...*testNode) {

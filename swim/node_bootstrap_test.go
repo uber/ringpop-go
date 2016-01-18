@@ -49,7 +49,7 @@ func (s *BootstrapTestSuite) TearDownTest() {
 
 func (s *BootstrapTestSuite) TestBootstrapOk() {
 	s.peers = genChannelNodes(s.T(), 5)
-	bootstrapNodes(s.T(), false, append(s.peers, s.tnode)...)
+	bootstrapNodes(s.T(), append(s.peers, s.tnode)...)
 	// Reachable members should be s.node + s.peers
 	s.Equal(6, s.node.CountReachableMembers())
 }
@@ -97,7 +97,8 @@ func (s *BootstrapTestSuite) TestBootstrapDestroy() {
 func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {
 	// get a bootstrapped cluster
 	s.peers = genChannelNodes(s.T(), 3)
-	bootstrapList := bootstrapNodes(s.T(), true, s.peers...)
+	bootstrapList := bootstrapNodes(s.T(), s.peers...)
+	waitForConvergence(s.T(), 500*time.Millisecond, s.peers...)
 
 	s.tnode.node.Bootstrap(&BootstrapOptions{
 		Hosts: bootstrapList,

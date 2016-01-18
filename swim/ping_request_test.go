@@ -48,7 +48,7 @@ func (s *PingRequestTestSuite) TearDownTest() {
 }
 
 func (s *PingRequestTestSuite) TestOk() {
-	bootstrapNodes(s.T(), false, append(s.peers, s.tnode)...)
+	bootstrapNodes(s.T(), append(s.peers, s.tnode)...)
 
 	response := <-sendPingRequests(s.node, s.peers[0].node.Address(), 1, time.Second)
 	switch res := response.(type) {
@@ -60,7 +60,8 @@ func (s *PingRequestTestSuite) TestOk() {
 }
 
 func (s *PingRequestTestSuite) TestRemoteFail() {
-	bootstrapNodes(s.T(), true, s.tnode, s.peers[0])
+	bootstrapNodes(s.T(), s.tnode, s.peers[0])
+	waitForConvergence(s.T(), 500*time.Millisecond, s.tnode, s.peers[0])
 
 	response := <-sendPingRequests(s.node, "127.0.0.1:3005", 1, time.Second)
 	switch res := response.(type) {
@@ -72,7 +73,8 @@ func (s *PingRequestTestSuite) TestRemoteFail() {
 }
 
 func (s *PingRequestTestSuite) TestRemoteTimesOut() {
-	bootstrapNodes(s.T(), true, s.tnode, s.peers[0])
+	bootstrapNodes(s.T(), s.tnode, s.peers[0])
+	waitForConvergence(s.T(), 500*time.Millisecond, s.tnode, s.peers[0])
 
 	s.peers[0].node.pingTimeout = time.Millisecond
 
@@ -86,7 +88,7 @@ func (s *PingRequestTestSuite) TestRemoteTimesOut() {
 }
 
 func (s *PingRequestTestSuite) TestFail() {
-	bootstrapNodes(s.T(), false, s.tnode)
+	bootstrapNodes(s.T(), s.tnode)
 
 	s.node.memberlist.MakeAlive("127.0.0.1:3005", s.incarnation) // peer to use for ping request
 
@@ -100,7 +102,7 @@ func (s *PingRequestTestSuite) TestFail() {
 }
 
 func (s *PingRequestTestSuite) TestTimesOut() {
-	bootstrapNodes(s.T(), false, s.tnode)
+	bootstrapNodes(s.T(), s.tnode)
 
 	s.node.memberlist.MakeAlive("127.0.0.2:3001", s.incarnation) // peer to use for ping request
 

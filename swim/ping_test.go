@@ -42,7 +42,7 @@ func (s *PingTestSuite) SetupSuite() {
 	s.tpeer = newChannelNode(s.T())
 	s.peer = s.tpeer.node
 
-	bootstrapNodes(s.T(), false, s.tnode, s.tpeer)
+	bootstrapNodes(s.T(), s.tnode, s.tpeer)
 }
 
 func (s *PingTestSuite) TearDownSuite() {
