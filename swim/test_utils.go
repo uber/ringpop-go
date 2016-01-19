@@ -23,7 +23,6 @@ package swim
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -127,35 +126,40 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 }
 
 func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
-	var wg sync.WaitGroup
-	for _, tn := range testNodes {
-		wg.Add(1)
-		// execute the Protocol period on all nodes until the node has no changes to disseminate anymore
-		go func(tn *testNode) {
-			for tn.node.HasChanges() {
-				tn.node.gossip.ProtocolPeriod()
+	timeoutCh := time.After(timeout)
+
+	nodes := testNodesToNodes(testNodes)
+
+	for {
+		select {
+		case <-timeoutCh:
+			t.Errorf("timeout during wait for convergence")
+			return
+		default:
+			// tick all the nodes
+			for _, node := range nodes {
+				node.gossip.ProtocolPeriod()
 			}
-			wg.Done()
-		}(tn)
-	}
+			hasChanges := false
+			for _, node := range nodes {
+				hasChanges = hasChanges || node.HasChanges()
+				if hasChanges {
+					break
+				}
+			}
 
-	finished := make(chan bool, 1)
-	go func() {
-		wg.Wait()
-		finished <- true
-	}()
+			if hasChanges {
+				// continue ticking if there is atleast 1 node with changes
+				continue
+			}
 
-	select {
-	case <-finished:
-		if !nodesConverged(testNodesToNodes(testNodes)) {
-			t.Errorf("nodes did not converge to 1 checksum")
+			if !nodesConverged(nodes) {
+				t.Errorf("nodes did not converge to 1 checksum")
+			}
+
+			return
 		}
-		return
-	case <-time.After(timeout):
-		t.Errorf("timeout during wait for convergence")
-		return
 	}
-
 }
 
 func destroyNodes(tnodes ...*testNode) {
