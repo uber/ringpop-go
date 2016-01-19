@@ -130,13 +130,16 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 
 	nodes := testNodesToNodes(testNodes)
 
+	// To get the cluster to a converged state we will let the nodes gossip until
+	// there are no more changes. After the cluster finished gossipping we double
+	// check that all nodes have the same checksum for the memberlist, this means
+	// that the cluster is converged.
 	for {
 		select {
 		case <-timeoutCh:
 			t.Errorf("timeout during wait for convergence")
 			return
 		default:
-			// tick all the nodes
 			for _, node := range nodes {
 				node.gossip.ProtocolPeriod()
 			}
