@@ -1,6 +1,13 @@
 ringpop-go changes
 ==================
 
+v0.2.3
+------
+
+* Fix retry mechanism for forwarded requests. When multiple keys are forwarded
+and a retry is attempted, the retry would fail with a "key destinations have
+diverged" error.
+
 v0.2.2
 ------
 
