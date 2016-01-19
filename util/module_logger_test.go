@@ -100,15 +100,15 @@ func (dl *dummyLogger) assertNoMsg(t assert.TestingT) {
 type ModuleTestSuite struct {
 	suite.Suite
 	dl *dummyLogger
-	ml *moduleLogger
+	ml *ModuleLogger
 }
 
 func (s *ModuleTestSuite) SetupTest() {
 	s.dl = &dummyLogger{}
 	s.ml = NewModuleLogger(s.dl)
-	s.ml.SetModuleLevel("testdebug", DebugLevel)
-	s.ml.SetModuleLevel("testpanic", PanicLevel)
-	s.ml.SetModuleLevel("testoff", OffLevel)
+	s.ml.SetLevel("testdebug", DebugLevel)
+	s.ml.SetLevel("testpanic", PanicLevel)
+	s.ml.SetLevel("testoff", OffLevel)
 }
 
 func (s *ModuleTestSuite) assertMsg(msgLevel Level, args ...interface{}) {
@@ -123,8 +123,31 @@ func (s *ModuleTestSuite) assertNoMsg() {
 	s.dl.assertNoMsg(s.T())
 }
 
+func (s *ModuleTestSuite) TestRootModule() {
+	l := s.ml
+	l.Debug("D", 1, 2)
+	s.assertMsg(DebugLevel, "D", 1, 2)
+	l.Panic("P", 1, 2)
+	s.assertMsg(PanicLevel, "P", 1, 2)
+}
+
+func (s *ModuleTestSuite) TestSubLogger() {
+	l := s.ml.Logger("testpanic")
+	l.Debug("D", 1, 2)
+	s.assertNoMsg()
+	l.Panic("P", 1, 2)
+	s.assertMsg(PanicLevel, "P", 1, 2)
+}
+
+func (s *ModuleTestSuite) TestRuntimeUpdate() {
+	l := s.ml.Logger("testpanic")
+	s.ml.SetLevel("testpanic", OffLevel)
+	l.Panic("P", 1, 2)
+	s.assertNoMsg()
+}
+
 func (s *ModuleTestSuite) TestOrigLogger() {
-	l := s.ml.GetLogger("unnamed")
+	l := s.ml.Logger("unnamed")
 	l.Debug("Debug Msg", 1, 2)
 	s.assertMsg(DebugLevel, "Debug Msg", 1, 2)
 	l.Debugf("Debug Format", 1, 2)
@@ -132,7 +155,7 @@ func (s *ModuleTestSuite) TestOrigLogger() {
 }
 
 func (s *ModuleTestSuite) TestDebug() {
-	l := s.ml.GetLogger("testdebug")
+	l := s.ml.Logger("testdebug")
 	l.Debug("Debug Msg", 1, 2)
 	s.assertMsg(DebugLevel, "Debug Msg", 1, 2)
 	l.Debugf("Debug Format", 1, 2)
@@ -160,7 +183,7 @@ func (s *ModuleTestSuite) TestDebug() {
 }
 
 func (s *ModuleTestSuite) TestPanic() {
-	l := s.ml.GetLogger("testpanic")
+	l := s.ml.Logger("testpanic")
 	l.Debug("Debug Msg", 1, 2)
 	s.assertNoMsg()
 	l.Debugf("Debug Format", 1, 2)
@@ -188,14 +211,15 @@ func (s *ModuleTestSuite) TestPanic() {
 }
 
 func (s *ModuleTestSuite) TestOff() {
-	l := s.ml.GetLogger("testoff")
+	l := s.ml.Logger("testoff")
 	l.Panic("Panic Msg", 1, 2)
 	s.assertNoMsg()
 }
 
 func (s *ModuleTestSuite) TestChangeLogger() {
 	newLogger := &dummyLogger{}
-	l := s.ml.SetLogger(newLogger).GetLogger("testpanic")
+	s.ml.SetLogger("testpanic", newLogger)
+	l := s.ml.Logger("testpanic")
 	l.Fatal("Fatal Msg", 1, 2)
 	newLogger.assertNoMsg(s.T())
 	l.Panic("Panic Msg", 1, 2)
@@ -203,10 +227,10 @@ func (s *ModuleTestSuite) TestChangeLogger() {
 }
 
 func (s *ModuleTestSuite) TestCache() {
-	s.ml.SetModuleLevel("m1", InfoLevel)
-	s.ml.SetModuleLevel("m2", InfoLevel)
-	_ = s.ml.GetLogger("m1")
-	m2 := s.ml.GetLogger("m2")
+	s.ml.SetLevel("m1", InfoLevel)
+	s.ml.SetLevel("m2", InfoLevel)
+	_ = s.ml.Logger("m1")
+	m2 := s.ml.Logger("m2")
 	m2.Debug("m2")
 	s.assertNoMsg()
 	m2.Info("m2")
@@ -215,11 +239,11 @@ func (s *ModuleTestSuite) TestCache() {
 
 // Make sure the logger returned by WithField is still wrapped.
 func (s *ModuleTestSuite) TestWithField() {
-	l := s.ml.GetLogger("testpanic")
+	l := s.ml.Logger("testpanic")
 	newLogger := l.WithField("field", 1)
+	newLogger.Fatal("Fatal Msg", 1, 2)
 	assert.Equal(s.T(), s.dl.fieldKey, "field")
 	assert.Equal(s.T(), s.dl.fieldValue, 1)
-	newLogger.Fatal("Fatal Msg", 1, 2)
 	s.assertNoMsg()
 	newLogger.Panic("Panic Msg", 1, 2)
 	s.assertMsg(PanicLevel, "Panic Msg", 1, 2)
@@ -233,11 +257,11 @@ func (dummyLogFields) Fields() map[string]interface{} {
 
 // Make sure the logger returned by WithFields is still wrapped.
 func (s *ModuleTestSuite) TestWithFields() {
-	l := s.ml.GetLogger("testpanic")
+	l := s.ml.Logger("testpanic")
 	dlf := new(dummyLogFields)
 	newLogger := l.WithFields(dlf)
-	assert.Equal(s.T(), s.dl.fields, dlf)
 	newLogger.Fatal("Fatal Msg", 1, 2)
+	assert.Equal(s.T(), s.dl.fields, dlf)
 	s.assertNoMsg()
 	newLogger.Panic("Panic Msg", 1, 2)
 	s.assertMsg(PanicLevel, "Panic Msg", 1, 2)
@@ -245,11 +269,11 @@ func (s *ModuleTestSuite) TestWithFields() {
 
 func (s *ModuleTestSuite) TestPreconditions() {
 	assert := assert.New(s.T())
-	err := s.ml.SetModuleLevel("test", highestLevel)
+	err := s.ml.SetLevel("test", highestLevel)
 	assert.NoError(err)
-	err = s.ml.SetModuleLevel("test", highestLevel+1)
+	err = s.ml.SetLevel("test", highestLevel+1)
 	assert.Error(err)
-	err = s.ml.SetModuleLevel("test", lowestLevel)
+	err = s.ml.SetLevel("test", lowestLevel)
 	assert.NoError(err)
 }
 
