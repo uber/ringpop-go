@@ -130,9 +130,9 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 	var wg sync.WaitGroup
 	for _, tn := range testNodes {
 		wg.Add(1)
-		// execute the Protocol period on all nodes until the dissemination list is exhausted
+		// execute the Protocol period on all nodes until the node has no changes to disseminate anymore
 		go func(tn *testNode) {
-			for len(tn.node.disseminator.changes) > 0 {
+			for tn.node.HasChanges() {
 				tn.node.gossip.ProtocolPeriod()
 			}
 			wg.Done()
@@ -147,21 +147,8 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 
 	select {
 	case <-finished:
-		var checksums []uint32
-		for _, node := range testNodes {
-			checksums = append(checksums, node.node.memberlist.Checksum())
-		}
-
-		if len(checksums) == 0 {
-			// no checksums to validate
-			return
-		}
-
-		first := checksums[0]
-		for i := 1; i < len(checksums); i++ {
-			if checksums[i] != first {
-				t.Errorf("nodes did not converge to 1 checksum")
-			}
+		if !nodesConverged(testNodesToNodes(testNodes)) {
+			t.Errorf("nodes did not converge to 1 checksum")
 		}
 		return
 	case <-time.After(timeout):
@@ -254,34 +241,43 @@ func (c *swimCluster) Bootstrap() {
 	}
 }
 
+// WaitForConvergence polls the checksums of each node in the cluster and returns when they all match, or until timeout occurs.
 func (c *swimCluster) WaitForConvergence(timeout time.Duration) error {
 	timeoutCh := time.After(timeout)
 
 	for {
 		select {
 		case <-time.After(time.Millisecond):
-			// collect all the checksums
-			var checksums []uint32
-			for _, node := range c.nodes {
-				checksums = append(checksums, node.memberlist.Checksum())
-			}
-
-			converged := true
-			for _, checksum := range checksums {
-				if checksum != checksums[0] {
-					converged = false
-					break
-				}
-			}
-
-			if converged {
-				// all checksums are the same, we are converged
+			if nodesConverged(c.nodes) {
 				return nil
 			}
 		case <-timeoutCh:
 			return errors.New("timeout during converging")
 		}
 	}
+}
+
+func testNodesToNodes(testNodes []*testNode) []*Node {
+	nodes := make([]*Node, len(testNodes))
+	for i, tn := range testNodes {
+		nodes[i] = tn.node
+	}
+	return nodes
+}
+
+func nodesConverged(nodes []*Node) bool {
+	if len(nodes) == 0 {
+		return true
+	}
+
+	first := nodes[0].memberlist.Checksum()
+	for _, node := range nodes {
+		if node.memberlist.Checksum() != first {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Destroy destroys all nodes in this cluster.
