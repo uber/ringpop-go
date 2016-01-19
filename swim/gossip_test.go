@@ -22,6 +22,7 @@ package swim
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -80,6 +81,7 @@ func (s *GossipTestSuite) TestUpdatesArePropagated() {
 	defer peer.channel.Close()
 
 	bootstrapNodes(s.T(), s.tnode, peer)
+	waitForConvergence(s.T(), 500*time.Millisecond, peer)
 	s.True(s.g.Stopped())
 	s.True(peer.node.gossip.Stopped())
 

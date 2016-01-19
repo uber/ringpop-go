@@ -61,6 +61,7 @@ func (s *PingRequestTestSuite) TestOk() {
 
 func (s *PingRequestTestSuite) TestRemoteFail() {
 	bootstrapNodes(s.T(), s.tnode, s.peers[0])
+	waitForConvergence(s.T(), 500*time.Millisecond, s.tnode, s.peers[0])
 
 	response := <-sendPingRequests(s.node, "127.0.0.1:3005", 1, time.Second)
 	switch res := response.(type) {
@@ -73,6 +74,7 @@ func (s *PingRequestTestSuite) TestRemoteFail() {
 
 func (s *PingRequestTestSuite) TestRemoteTimesOut() {
 	bootstrapNodes(s.T(), s.tnode, s.peers[0])
+	waitForConvergence(s.T(), 500*time.Millisecond, s.tnode, s.peers[0])
 
 	s.peers[0].node.pingTimeout = time.Millisecond
 

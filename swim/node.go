@@ -205,6 +205,11 @@ func (n *Node) App() string {
 	return n.app
 }
 
+// HasChanges reports whether Node has changes to disseminate.
+func (n *Node) HasChanges() bool {
+	return n.disseminator.HasChanges()
+}
+
 // Incarnation returns the incarnation number of the Node.
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
