@@ -134,6 +134,7 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 	// there are no more changes. After the cluster finished gossipping we double
 	// check that all nodes have the same checksum for the memberlist, this means
 	// that the cluster is converged.
+Tick:
 	for {
 		select {
 		case <-timeoutCh:
@@ -143,17 +144,10 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 			for _, node := range nodes {
 				node.gossip.ProtocolPeriod()
 			}
-			hasChanges := false
 			for _, node := range nodes {
-				hasChanges = hasChanges || node.HasChanges()
-				if hasChanges {
-					break
+				if node.HasChanges() {
+					continue Tick
 				}
-			}
-
-			if hasChanges {
-				// continue ticking if there is atleast 1 node with changes
-				continue
 			}
 
 			if !nodesConverged(nodes) {
