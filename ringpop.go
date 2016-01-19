@@ -89,7 +89,7 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
-	moduleLogger util.ModuleLogger
+	moduleLogger *util.ModuleLogger
 
 	startTime time.Time
 }
@@ -159,7 +159,7 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.moduleLogger.GetLogger("swim"),
+		Logger: rp.moduleLogger.Logger("swim"),
 	})
 	rp.node.RegisterListener(rp)
 

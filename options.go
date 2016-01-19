@@ -124,19 +124,27 @@ func Logger(l log.Logger) Option {
 		if r.moduleLogger == nil {
 			r.moduleLogger = rutil.NewModuleLogger(l)
 		} else {
-			// preserve configured modules
-			r.moduleLogger = r.moduleLogger.SetLogger(l)
+			r.moduleLogger.SetLogger(rutil.RootModule, l)
 		}
 		return nil
 	}
 }
 
-// ModuleLogLevel is used to configure different log levels per module. Messages
+// ModuleLevel is used to configure different log levels per module. Messages
 // with a level less than minLevel are silenced. By default, an unconfigured
 // module outputs all messages.
-func ModuleLogLevel(name string, minLevel rutil.Level) Option {
+func ModuleLevel(name string, minLevel rutil.Level) Option {
 	return func(rp *Ringpop) error {
-		return rp.moduleLogger.SetModuleLevel(name, minLevel)
+		rp.moduleLogger.SetLevel(name, minLevel)
+		return nil
+	}
+}
+
+// ModuleLogger is used to configure different loggers per module.
+func ModuleLogger(name string, logger log.Logger) Option {
+	return func(rp *Ringpop) error {
+		rp.moduleLogger.SetLogger(name, logger)
+		return nil
 	}
 }
 
@@ -210,7 +218,7 @@ func defaultHashRingOptions(r *Ringpop) error {
 }
 
 func defaultSWIMLevel(r *Ringpop) error {
-	return ModuleLogLevel("swim", rutil.WarnLevel)(r)
+	return ModuleLevel("swim", rutil.WarnLevel)(r)
 }
 
 // defaultOptions are the default options/values when Ringpop is created. They
