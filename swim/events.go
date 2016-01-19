@@ -31,6 +31,15 @@ type EventListener interface {
 	HandleEvent(events.Event)
 }
 
+// The ListenerFunc type is an adapter to allow the use of ordinary functions
+// as EventListeners.
+type ListenerFunc func(events.Event)
+
+// HandleEvent calls f(e).
+func (f ListenerFunc) HandleEvent(e events.Event) {
+	f(e)
+}
+
 // A MaxPAdjustedEvent occurs when the disseminator adjusts the max propagation
 // count for changes
 type MaxPAdjustedEvent struct {
@@ -121,11 +130,20 @@ type PingRequestsSendEvent struct {
 	Peers  []string `json:"peers"`
 }
 
+// A PingRequestSendError is sent when the node can't get a response sending ping requests to remote nodes
+type PingRequestSendErrorEvent struct {
+	Local  string   `json:"local"`
+	Target string   `json:"target"`
+	Peers  []string `json:"peers"`
+	Peer   string   `json:"peer"`
+}
+
 // A PingRequestsSendCompleteEvent is sent when the node finished sending ping requests to remote nodes
 type PingRequestsSendCompleteEvent struct {
 	Local    string        `json:"local"`
 	Target   string        `json:"target"`
 	Peers    []string      `json:"peers"`
+	Peer     string        `json:"peer"`
 	Duration time.Duration `json:"duration"`
 }
 

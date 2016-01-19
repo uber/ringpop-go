@@ -82,6 +82,9 @@ func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
 	var res pingResponse
 	select {
 	case err := <-p.MakeCall(ctx, &res):
+		if err == nil {
+			p.node.memberlist.Update(res.Changes)
+		}
 		return &res, err
 
 	case <-ctx.Done(): // call timed out
@@ -112,6 +115,29 @@ func (p *pingRequestSender) MakeCall(ctx json.Context, res *pingResponse) <-chan
 	return errC
 }
 
+// indirectPing is used to check if a target node can be reached indirectly.
+// The indirectPing is performed by sending a specifiable amount of ping
+// requests nodes in n's membership.
+func indirectPing(n *Node, target string, amount int, timeout time.Duration) (reached bool, errs []error) {
+	resCh := sendPingRequests(n, target, amount, timeout)
+
+	// wait for responses from the ping-reqs
+	for result := range resCh {
+		switch res := result.(type) {
+		case *pingResponse:
+			if res.Ok {
+				return true, errs
+			}
+			// If the ping to the target was not-ok we want to wait for more results.
+
+		case error:
+			errs = append(errs, res)
+		}
+	}
+
+	return false, errs
+}
+
 // sendPingRequests sends ping requests to the target address and returns a channel
 //containing the responses. Responses can be one of type:
 //  (1) error:          if the call to peer failed
@@ -137,6 +163,8 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 		wg.Add(1)
 
 		go func(peer Member) {
+			defer wg.Done()
+
 			p := newPingRequestSender(node, peer.Address, target, timeout)
 
 			p.node.log.WithFields(log.Fields{
@@ -146,19 +174,28 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 
 			var startTime = time.Now()
 			res, err := p.SendPingRequest()
+
 			if err != nil {
-				resC <- err
-			} else {
-				node.emit(PingRequestsSendCompleteEvent{
-					Local:    node.Address(),
-					Target:   target,
-					Peers:    peerAddresses,
-					Duration: time.Now().Sub(startTime),
+				node.emit(PingRequestSendErrorEvent{
+					Local:  node.Address(),
+					Target: target,
+					Peers:  peerAddresses,
+					Peer:   peer.Address,
 				})
-				resC <- res
+
+				resC <- err
+				return
 			}
 
-			wg.Done()
+			node.emit(PingRequestsSendCompleteEvent{
+				Local:    node.Address(),
+				Target:   target,
+				Peers:    peerAddresses,
+				Peer:     peer.Address,
+				Duration: time.Now().Sub(startTime),
+			})
+
+			resC <- res
 		}(*peer)
 	}
 
