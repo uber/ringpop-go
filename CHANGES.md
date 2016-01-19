@@ -1,6 +1,12 @@
 ringpop-go changes
 ==================
 
+v0.2.2
+------
+
+* Fix goroutine leakage on forwarded requests that time out
+
+
 v0.2
 ----
 
@@ -37,6 +43,7 @@ There are a significant number of breaking changes in this release:
     * `RingChecksumEvent`
     * `LookupEvent`
 * The behaviour of creating a single-node cluster has changed. Calling `Bootstrap()` with no bootstrap file or hosts will now cause Ringpop to create a single-node cluster.
+
 
 v0.1
 ----
