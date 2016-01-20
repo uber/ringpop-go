@@ -79,11 +79,13 @@ func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
 	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
+	oldChecksum := m.members.checksum
 	m.members.checksum = checksum
 	m.members.Unlock()
 	m.node.emit(ChecksumComputeEvent{
-		Duration: time.Now().Sub(startTime),
-		Checksum: checksum,
+		Duration:    time.Now().Sub(startTime),
+		Checksum:    checksum,
+		OldChecksum: oldChecksum,
 	})
 }
 
@@ -220,7 +222,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		}
 	}
 
-	return m.Update([]Change{Change{
+	changes := m.Update([]Change{Change{
 		Source:            m.local.Address,
 		SourceIncarnation: m.local.Incarnation,
 		Address:           address,
@@ -228,6 +230,12 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		Status:            status,
 		Timestamp:         util.Timestamp(time.Now()),
 	}})
+
+	if len(changes) > 0 {
+		m.node.emit(ChangeMadeEvent{changes[0]})
+	}
+
+	return changes
 }
 
 // updates the member list with the slice of changes, applying selectively
