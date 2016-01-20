@@ -49,7 +49,7 @@ func ParseLevel(lvl string) (Level, error) {
 	}
 
 	var l Level
-	return l, fmt.Errorf("not a valid logrus Level: %q", lvl)
+	return l, fmt.Errorf("not a valid Level: %q", lvl)
 }
 
 // The order is reversed compared to logrus for a safer default.
