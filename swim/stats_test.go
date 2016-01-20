@@ -32,7 +32,6 @@ type StatsTestSuite struct {
 	suite.Suite
 
 	testNode *testNode
-	peers    []*testNode
 
 	cluster *swimCluster
 }
@@ -41,7 +40,6 @@ func (s *StatsTestSuite) SetupTest() {
 	// Create a test node, on its own. Tests can join this to the cluster for
 	// testing, if they want.
 	s.testNode = newChannelNode(s.T())
-	s.peers = append(s.peers, s.testNode)
 
 	// Create a cluster for testing. Join these guys to each other.
 	s.cluster = newSwimCluster(4)
@@ -49,12 +47,6 @@ func (s *StatsTestSuite) SetupTest() {
 }
 
 func (s *StatsTestSuite) TearDownTest() {
-	// Destroy any nodes added to the peer list during testing
-	for _, node := range s.peers {
-		if node != nil {
-			node.Destroy()
-		}
-	}
 	if s.cluster != nil {
 		s.cluster.Destroy()
 	}

@@ -190,7 +190,8 @@ func fakeHostPorts(fromHost, toHost, fromPort, toPort int) []string {
 // swimCluster is a group of real swim nodes listening on randomly-assigned
 // ports.
 type swimCluster struct {
-	nodes []*Node
+	nodes    []*Node
+	channels []*tchannel.Channel
 }
 
 // newSwimCluster creates a new swimCluster with the number of nodes specified
@@ -198,6 +199,7 @@ type swimCluster struct {
 // need a bootstrapped cluster.
 func newSwimCluster(size int) *swimCluster {
 	var nodes []*Node
+	var channels []*tchannel.Channel
 	for i := 0; i < size; i++ {
 		ch, err := tchannel.NewChannel("test", nil)
 		if err != nil {
@@ -207,13 +209,14 @@ func newSwimCluster(size int) *swimCluster {
 		if err := ch.ListenAndServe("127.0.0.1:0"); err != nil {
 			panic(err)
 		}
+		channels = append(channels, ch)
 
 		hostport := ch.PeerInfo().HostPort
 		node := NewNode("test", hostport, ch.GetSubChannel("test"), nil)
 
 		nodes = append(nodes, node)
 	}
-	return &swimCluster{nodes}
+	return &swimCluster{nodes: nodes, channels: channels}
 }
 
 // Add adds the specified node to the cluster and bootstraps it so that it is
@@ -281,10 +284,14 @@ func nodesConverged(nodes []*Node) bool {
 	return true
 }
 
-// Destroy destroys all nodes in this cluster.
+// Destroy destroys all nodes in this cluster. It also closes channels, but
+// only those that were created as part of newSwimCluster.
 func (c *swimCluster) Destroy() {
 	for _, node := range c.nodes {
 		node.Destroy()
+	}
+	for _, ch := range c.channels {
+		ch.Close()
 	}
 }
 
