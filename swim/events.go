@@ -158,8 +158,9 @@ type ProtocolFrequencyEvent struct {
 
 // A ChecksumComputeEvent is sent when a the rings checksum is computed
 type ChecksumComputeEvent struct {
-	Duration time.Duration `json:"duration"`
-	Checksum uint32        `json:"checksum"`
+	Duration    time.Duration `json:"duration"`
+	Checksum    uint32        `json:"checksum"`
+	OldChecksum uint32        `json:"oldchecksum"`
 }
 
 // A ChangesCalculatedEvent is sent when the disseminator generated the list of changes to send in a ping or its response
@@ -169,6 +170,11 @@ type ChangesCalculatedEvent struct {
 
 // A ChangeFilteredEvent is sent when a change has been filtered from the list to be disseminated
 type ChangeFilteredEvent struct {
+	Change Change
+}
+
+// A ChangeMadeEvent is sent when a node declares a new state for an other node
+type ChangeMadeEvent struct {
 	Change Change
 }
 

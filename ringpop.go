@@ -142,6 +142,11 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 
 	ringpop.setState(created)
 
+	ringpop.RegisterListener(&ringpopLogger{
+		ringpop: ringpop,
+		logger:  ringpop.logger,
+	})
+
 	return ringpop, nil
 }
 
