@@ -65,12 +65,19 @@ const (
 
 const RootModule = "root"
 
+// ModuleLogger is a flat sub-logger configuration and factory. Each sub-logger
+// can be restricted to emit messages above a minimum level or use a different
+// underlying logger. The configuration can be changed on the fly even for
+// existing sub-loggers.
 type ModuleLogger struct {
 	levels map[string]Level
 	logs   map[string]log.Logger
 	*loggerProxy
 }
 
+// NewModuleLogger returns a ModuleLogger instance with a consistent internal
+// state. The logger passed serves as the root logger, and all sub-loggers
+// default to using it unless configured otherwise.
 func NewModuleLogger(logger log.Logger) *ModuleLogger {
 	l := &ModuleLogger{
 		levels: make(map[string]Level),
@@ -94,6 +101,8 @@ func (ml *ModuleLogger) getLogger(moduleName string) *RestrictedLogger {
 		min:    level}
 }
 
+// SetLogger overrides the logger used for a sub-logger.
+// The root logger, can be referenced using the "root" name.
 func (ml *ModuleLogger) SetLogger(moduleName string, logger log.Logger) {
 	ml.logs[moduleName] = logger
 }
@@ -104,6 +113,9 @@ const highestLevel = OffLevel
 // Checking only for greater values is fine as long as Level is unsigned.
 var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)
 
+// SetLevel sets the minimum level for a sub-logger. A logger only emits
+// messages that have a level equal to or greater than the one set.
+// Unless configured, a sub-logger outputs all messages.
 func (ml *ModuleLogger) SetLevel(moduleName string, level Level) error {
 	if level > highestLevel {
 		return tooHighErr
@@ -112,6 +124,7 @@ func (ml *ModuleLogger) SetLevel(moduleName string, level Level) error {
 	return nil
 }
 
+// Logger returns a sub-logger.
 func (ml *ModuleLogger) Logger(moduleName string) *loggerProxy {
 	return newNamedLogger(moduleName, ml)
 }
