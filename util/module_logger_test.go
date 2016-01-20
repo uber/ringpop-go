@@ -91,6 +91,7 @@ func (s *ModuleLoggerSuite) TestLazyFields() {
 	l := s.ml.Logger("test")
 	fields1 := bark.Fields{"a": 1}
 	fields2 := bark.Fields{"b": 2}
+	fields3 := bark.Fields{"c": 3}
 	fieldLogger := l.WithField("key1", "value1")
 	fieldLogger = fieldLogger.WithFields(fields1)
 	fieldLogger = fieldLogger.WithField("key2", "value2")
@@ -106,11 +107,13 @@ func (s *ModuleLoggerSuite) TestLazyFields() {
 	logger3.Logger.On("WithField", "key2", "value2").Return(logger4)
 	logger4.Logger.On("WithFields", fields2).Return(logger5)
 	logger5.On("Debug", "d msg")
+	logger5.Logger.On("Fields").Return(fields3)
 
 	s.ml.SetLogger("test", logger1)
 	fieldLogger.Debug("d msg")
 	s.ml.SetLevel("test", util.OffLevel)
 	fieldLogger.Panic("d msg")
+	s.Exactly(fieldLogger.Fields(), fields3)
 
 	logger1.AssertExpectations(s.T())
 	logger2.AssertExpectations(s.T())
@@ -205,9 +208,44 @@ func (s *ModuleLoggerSuite) TestParseLevels() {
 	s.Error(err)
 }
 
+func (s *ModuleLoggerSuite) TestChangeModuleOnTheFly() {
+	testLogger := newMockLogger()
+	otherLogger1 := newMockLogger()
+	otherLogger2 := newMockLogger()
+	otherLogger3 := newMockLogger()
+	s.ml.SetLogger("test", testLogger)
+	s.ml.SetLogger("other", otherLogger1)
+
+	fields := bark.Fields{"a": 1}
+	otherLogger1.Logger.On("WithField", "key", "value").Return(otherLogger2)
+	otherLogger2.Logger.On("WithFields", fields).Return(otherLogger3)
+	otherLogger3.On("Debug", "d")
+
+	l := s.ml.Logger("test")
+	l = l.WithField("key", "value")
+	l = l.WithFields(fields)
+	l = util.GetModuleLogger(l, "other")
+	l.Debug("d")
+
+	testLogger.AssertExpectations(s.T())
+	otherLogger1.AssertExpectations(s.T())
+	otherLogger2.AssertExpectations(s.T())
+	otherLogger3.AssertExpectations(s.T())
+}
+
 func (s *ModuleLoggerSuite) TestParseInvalidLevel() {
 	_, err := util.ParseLevel("nolevel")
 	s.Error(err)
+}
+
+func (s *ModuleLoggerSuite) TestGetModuleLogger() {
+	s.l.On("Fatal", "f")
+	s.l.On("Panic", "p")
+	l := util.GetModuleLogger(s.ml, "testFatal")
+	l.Fatal("f")
+	l = util.GetModuleLogger(l, "testFatal")
+	l.Panic("p")
+	s.l.AssertExpectations(s.T())
 }
 
 func TestModuleLoggerSuite(t *testing.T) {

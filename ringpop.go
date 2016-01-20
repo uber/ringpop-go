@@ -159,8 +159,7 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.moduleLogger.Logger("swim"),
-	})
+		Logger: rp.moduleLogger})
 	rp.node.RegisterListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)

@@ -65,68 +65,18 @@ const (
 
 const RootModule = "root"
 
-// ModuleLogger is a flat sub-logger configuration and factory. Each sub-logger
-// can be restricted to emit messages above a minimum level or use a different
-// underlying logger. The configuration can be changed on the fly even for
-// existing sub-loggers.
-type ModuleLogger struct {
-	levels map[string]Level
-	logs   map[string]log.Logger
-	*loggerProxy
-}
-
 // NewModuleLogger returns a ModuleLogger instance with a consistent internal
 // state. The logger passed serves as the root logger, and all sub-loggers
 // default to using it unless configured otherwise.
 func NewModuleLogger(logger log.Logger) *ModuleLogger {
-	l := &ModuleLogger{
+	ml := &ModuleLogger{
 		levels: make(map[string]Level),
-		logs:   make(map[string]log.Logger)}
-	l.loggerProxy = newNamedLogger(RootModule, l)
-	l.SetLogger(RootModule, logger)
-	return l
-}
-
-func (ml *ModuleLogger) getLogger(moduleName string) *RestrictedLogger {
-	l := ml.logs[RootModule]
-	if logger, ok := ml.logs[moduleName]; ok {
-		l = logger
-	}
-	level := lowestLevel
-	if l, ok := ml.levels[moduleName]; ok {
-		level = l
-	}
-	return &RestrictedLogger{
-		logger: l,
-		min:    level}
-}
-
-// SetLogger overrides the logger used for a sub-logger.
-// The root logger, can be referenced using the "root" name.
-func (ml *ModuleLogger) SetLogger(moduleName string, logger log.Logger) {
-	ml.logs[moduleName] = logger
-}
-
-const lowestLevel = DebugLevel
-const highestLevel = OffLevel
-
-// Checking only for greater values is fine as long as Level is unsigned.
-var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)
-
-// SetLevel sets the minimum level for a sub-logger. A logger only emits
-// messages that have a level equal to or greater than the one set.
-// Unless configured, a sub-logger outputs all messages.
-func (ml *ModuleLogger) SetLevel(moduleName string, level Level) error {
-	if level > highestLevel {
-		return tooHighErr
-	}
-	ml.levels[moduleName] = level
-	return nil
-}
-
-// Logger returns a sub-logger.
-func (ml *ModuleLogger) Logger(moduleName string) *loggerProxy {
-	return newNamedLogger(moduleName, ml)
+		logs:   make(map[string]log.Logger),
+		l: func(rl *RestrictedLogger) *RestrictedLogger {
+			return rl
+		}}
+	ml.SetLogger(RootModule, logger)
+	return ml.Logger(RootModule).(*ModuleLogger)
 }
 
 type RestrictedLogger struct {
@@ -209,46 +159,102 @@ func (rl *RestrictedLogger) Fields() log.Fields {
 	return rl.logger.Fields()
 }
 
-func newFieldLogger(key string, value interface{}, proxy *loggerProxy) *loggerProxy {
-	return &loggerProxy{
-		l: func() *RestrictedLogger {
-			return proxy.getParentLogger().WithField(key, value)
+// ModuleLogger is a flat sub-logger configuration and factory. Each sub-logger
+// can be restricted to emit messages above a minimum level or use a different
+// underlying logger. The configuration can be changed on the fly even for
+// existing sub-loggers.
+// Method calls that return other loggers return instead a ModuleLogger
+// instance. This simplifies porting existing code unaware of module logging.
+type ModuleLogger struct {
+	l      func(*RestrictedLogger) *RestrictedLogger
+	levels map[string]Level
+	logs   map[string]log.Logger
+}
+
+func (ml *ModuleLogger) getParentLogger(*RestrictedLogger) *RestrictedLogger { return ml.l(nil) }
+func (ml *ModuleLogger) Debug(args ...interface{})                           { ml.l(nil).Debug(args...) }
+func (ml *ModuleLogger) Info(args ...interface{})                            { ml.l(nil).Info(args...) }
+func (ml *ModuleLogger) Warn(args ...interface{})                            { ml.l(nil).Warn(args...) }
+func (ml *ModuleLogger) Error(args ...interface{})                           { ml.l(nil).Error(args...) }
+func (ml *ModuleLogger) Fatal(args ...interface{})                           { ml.l(nil).Fatal(args...) }
+func (ml *ModuleLogger) Panic(args ...interface{})                           { ml.l(nil).Panic(args...) }
+func (ml *ModuleLogger) Debugf(format string, args ...interface{})           { ml.l(nil).Debugf(format, args...) }
+func (ml *ModuleLogger) Infof(format string, args ...interface{})            { ml.l(nil).Infof(format, args...) }
+func (ml *ModuleLogger) Warnf(format string, args ...interface{})            { ml.l(nil).Warnf(format, args...) }
+func (ml *ModuleLogger) Errorf(format string, args ...interface{})           { ml.l(nil).Errorf(format, args...) }
+func (ml *ModuleLogger) Fatalf(format string, args ...interface{})           { ml.l(nil).Fatalf(format, args...) }
+func (ml *ModuleLogger) Panicf(format string, args ...interface{})           { ml.l(nil).Panicf(format, args...) }
+func (ml *ModuleLogger) Fields() log.Fields                                  { return ml.l(nil).Fields() }
+
+// SetLogger overrides the logger used for a sub-logger.
+// The root logger, can be referenced using the "root" name.
+func (ml *ModuleLogger) SetLogger(moduleName string, logger log.Logger) {
+	ml.logs[moduleName] = logger
+}
+
+const lowestLevel = DebugLevel
+const highestLevel = OffLevel
+
+// Checking only for greater values is fine as long as Level is unsigned.
+var tooHighErr = fmt.Errorf("minLevel must be less than or equal to %s", highestLevel)
+
+// SetLevel sets the minimum level for a sub-logger. A logger only emits
+// messages that have a level equal to or greater than the one set.
+// Unless configured, a sub-logger outputs all messages.
+func (ml *ModuleLogger) SetLevel(moduleName string, level Level) error {
+	if level > highestLevel {
+		return tooHighErr
+	}
+	ml.levels[moduleName] = level
+	return nil
+}
+
+// Logger returns a sub-logger.
+func (ml *ModuleLogger) Logger(moduleName string) log.Logger {
+	return &ModuleLogger{
+		levels: ml.levels,
+		logs:   ml.logs,
+		l: func(rl *RestrictedLogger) *RestrictedLogger {
+			if rl == nil {
+				l := ml.logs[RootModule]
+				if logger, ok := ml.logs[moduleName]; ok {
+					l = logger
+				}
+				level := lowestLevel
+				if l, ok := ml.levels[moduleName]; ok {
+					level = l
+				}
+				rl = &RestrictedLogger{
+					logger: l,
+					min:    level}
+			}
+			return ml.l(rl)
 		}}
 }
 
-func newFieldsLogger(fields log.LogFields, proxy *loggerProxy) *loggerProxy {
-	return &loggerProxy{
-		l: func() *RestrictedLogger {
-			return proxy.getParentLogger().WithFields(fields)
+func (ml *ModuleLogger) WithField(key string, value interface{}) log.Logger {
+	return &ModuleLogger{
+		levels: ml.levels,
+		logs:   ml.logs,
+		l: func(rl *RestrictedLogger) *RestrictedLogger {
+			return ml.l(rl).WithField(key, value)
 		}}
 }
 
-func newNamedLogger(moduleName string, ml *ModuleLogger) *loggerProxy {
-	return &loggerProxy{
-		l: func() *RestrictedLogger {
-			return ml.getLogger(moduleName)
+func (ml *ModuleLogger) WithFields(fields log.LogFields) log.Logger {
+	return &ModuleLogger{
+		levels: ml.levels,
+		logs:   ml.logs,
+		l: func(rl *RestrictedLogger) *RestrictedLogger {
+			return ml.l(rl).WithFields(fields)
 		}}
 }
 
-type loggerProxy struct{ l func() *RestrictedLogger }
-
-func (p *loggerProxy) getParentLogger() *RestrictedLogger        { return p.l() }
-func (p *loggerProxy) Debug(args ...interface{})                 { p.l().Debug(args...) }
-func (p *loggerProxy) Info(args ...interface{})                  { p.l().Info(args...) }
-func (p *loggerProxy) Warn(args ...interface{})                  { p.l().Warn(args...) }
-func (p *loggerProxy) Error(args ...interface{})                 { p.l().Error(args...) }
-func (p *loggerProxy) Fatal(args ...interface{})                 { p.l().Fatal(args...) }
-func (p *loggerProxy) Panic(args ...interface{})                 { p.l().Panic(args...) }
-func (p *loggerProxy) Debugf(format string, args ...interface{}) { p.l().Debugf(format, args...) }
-func (p *loggerProxy) Infof(format string, args ...interface{})  { p.l().Infof(format, args...) }
-func (p *loggerProxy) Warnf(format string, args ...interface{})  { p.l().Warnf(format, args...) }
-func (p *loggerProxy) Errorf(format string, args ...interface{}) { p.l().Errorf(format, args...) }
-func (p *loggerProxy) Fatalf(format string, args ...interface{}) { p.l().Fatalf(format, args...) }
-func (p *loggerProxy) Panicf(format string, args ...interface{}) { p.l().Panicf(format, args...) }
-func (p *loggerProxy) Fields() log.Fields                        { return p.l().Fields() }
-func (p *loggerProxy) WithField(key string, value interface{}) log.Logger {
-	return newFieldLogger(key, value, p)
-}
-func (p *loggerProxy) WithFields(fields log.LogFields) log.Logger {
-	return newFieldsLogger(fields, p)
+// If passed a module logger it returns a sub-logger, otherwise return the
+// original logger untouched.
+func GetModuleLogger(logger log.Logger, moduleName string) log.Logger {
+	if moduleLogger, ok := logger.(*ModuleLogger); ok {
+		return moduleLogger.Logger(moduleName)
+	}
+	return logger
 }
