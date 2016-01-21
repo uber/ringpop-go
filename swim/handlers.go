@@ -77,7 +77,7 @@ func (n *Node) registerHandlers() error {
 func (n *Node) joinHandler(ctx json.Context, req *joinRequest) (*joinResponse, error) {
 	res, err := handleJoin(n, req)
 	if err != nil {
-		n.log.WithFields(log.Fields{
+		n.logger.WithFields(log.Fields{
 			"error":       err,
 			"joinRequest": req,
 		}).Debug("invalid join request received")
@@ -133,5 +133,5 @@ func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, erro
 
 // errorHandler is called when one of the handlers returns an error.
 func (n *Node) errorHandler(ctx context.Context, err error) {
-	n.log.WithField("error", err).Info("error occurred")
+	n.logger.WithField("error", err).Info("error occurred")
 }

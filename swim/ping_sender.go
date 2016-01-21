@@ -26,6 +26,7 @@ import (
 
 	log "github.com/uber-common/bark"
 
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
@@ -43,14 +44,17 @@ type pingSender struct {
 	node    *Node
 	target  string
 	timeout time.Duration
+	logger  log.Logger
 }
 
 // NewPingSender returns a new PingSender that can be used to send a ping to target node
 func newPingSender(node *Node, target string, timeout time.Duration) *pingSender {
+	logger := modulelogger.GetModuleLogger(node.logger, "gossip")
 	ps := &pingSender{
 		node:    node,
 		target:  target,
 		timeout: timeout,
+		logger:  logger,
 	}
 
 	return ps
@@ -95,7 +99,7 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 			Changes: req.Changes,
 		})
 
-		p.node.log.WithFields(log.Fields{
+		p.logger.WithFields(log.Fields{
 			"remote":  p.target,
 			"changes": req.Changes,
 		}).Debug("ping send")
@@ -104,7 +108,7 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 
 		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, res)
 		if err != nil {
-			p.node.log.WithFields(log.Fields{
+			p.logger.WithFields(log.Fields{
 				"remote": p.target,
 				"error":  err,
 			}).Debug("ping failed")

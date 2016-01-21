@@ -27,6 +27,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 )
 
@@ -120,8 +121,35 @@ func HashRingConfig(c *hashring.Configuration) Option {
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		r.logger = l
-		r.log = l
+		if r.logger == nil {
+			r.logger = modulelogger.New(l)
+		} else {
+			r.logger.SetLogger(modulelogger.RootModule, l)
+		}
+		return nil
+	}
+}
+
+// ModuleLevel is used to configure different log levels per module. Messages
+// with a level less than minLevel are silenced. By default, an unconfigured
+// module outputs all messages.
+//
+// Example:
+// ringpop.New("my-app", ringpop.ModuleLevel("join", util.WarnLevel)
+//
+// This instructs the "join" logger to emit only warnings, fatal or panic
+// messages.
+func ModuleLevel(name string, minLevel modulelogger.Level) Option {
+	return func(rp *Ringpop) error {
+		rp.logger.SetLevel(name, minLevel)
+		return nil
+	}
+}
+
+// ModuleLogger is used to configure different loggers per module.
+func ModuleLogger(name string, logger log.Logger) Option {
+	return func(rp *Ringpop) error {
+		rp.logger.SetLogger(name, logger)
 		return nil
 	}
 }
@@ -195,11 +223,16 @@ func defaultHashRingOptions(r *Ringpop) error {
 	return HashRingConfig(defaultHashRingConfiguration)(r)
 }
 
+func defaultSWIMLevel(r *Ringpop) error {
+	return ModuleLevel("swim", modulelogger.WarnLevel)(r)
+}
+
 // defaultOptions are the default options/values when Ringpop is created. They
 // can be overridden at runtime.
 var defaultOptions = []Option{
 	defaultIdentityResolver,
 	defaultLogger,
+	defaultSWIMLevel,
 	defaultStatter,
 	defaultHashRingOptions,
 }

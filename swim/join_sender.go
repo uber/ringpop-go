@@ -28,6 +28,7 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go/json"
@@ -104,6 +105,7 @@ type joinSender struct {
 	roundNonPreferredNodes []string
 
 	numTries int
+	logger   log.Logger
 }
 
 // newJoinSender returns a new JoinSender to join a cluster with
@@ -126,8 +128,11 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 		return nil, errors.New("bootstrap hosts cannot be empty")
 	}
 
+	logger := modulelogger.GetModuleLogger(node.logger, "join")
+
 	js := &joinSender{
-		node: node,
+		node:   node,
+		logger: logger,
 	}
 
 	// Parse bootstrap hosts into a map
@@ -153,12 +158,12 @@ func (j *joinSender) parseHosts(hostports []string) {
 	// Perform some sanity checks on the bootstrap hosts
 	err := util.CheckLocalMissing(j.node.address, j.bootstrapHostsMap[util.CaptureHost(j.node.address)])
 	if err != nil {
-		j.node.log.Warn(err.Error())
+		j.node.logger.Warn(err.Error())
 	}
 
 	mismatched, err := util.CheckHostnameIPMismatch(j.node.address, j.bootstrapHostsMap)
 	if err != nil {
-		j.node.log.WithField("mismatched", mismatched).Warn(err.Error())
+		j.node.logger.WithField("mismatched", mismatched).Warn(err.Error())
 	}
 }
 
@@ -264,7 +269,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 	var startTime = time.Now()
 
 	if util.SingleNodeCluster(j.node.address, j.bootstrapHostsMap) {
-		j.node.log.Info("got single node cluster to join")
+		j.node.logger.Info("got single node cluster to join")
 		return nodesJoined, nil
 	}
 
@@ -285,7 +290,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		numGroups++
 
 		if numJoined >= j.size {
-			j.node.log.WithFields(log.Fields{
+			j.logger.WithFields(log.Fields{
 				"joinSize":  j.size,
 				"joinTime":  time.Now().Sub(startTime),
 				"numJoined": numJoined,
@@ -299,7 +304,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		joinDuration := time.Now().Sub(startTime)
 
 		if joinDuration > j.maxJoinDuration {
-			j.node.log.WithFields(log.Fields{
+			j.logger.WithFields(log.Fields{
 				"joinDuration":    joinDuration,
 				"maxJoinDuration": j.maxJoinDuration,
 				"numJoined":       numJoined,
@@ -317,7 +322,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 			return nodesJoined, err
 		}
 
-		j.node.log.WithFields(log.Fields{
+		j.logger.WithFields(log.Fields{
 			"joinSize":  j.size,
 			"numJoined": numJoined,
 			"numFailed": numFailed,
@@ -363,7 +368,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			select {
 			case err := <-j.MakeCall(ctx, n, &res):
 				if err != nil {
-					j.node.log.WithFields(log.Fields{
+					j.logger.WithFields(log.Fields{
 						"remote":  n,
 						"timeout": j.timeout,
 					}).Debug("attempt to join node failed")
@@ -373,7 +378,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 				j.node.memberlist.Update(res.Membership)
 
 			case <-ctx.Done():
-				j.node.log.WithFields(log.Fields{
+				j.logger.WithFields(log.Fields{
 					"remote":  n,
 					"timeout": j.timeout,
 				}).Debug("attempt to join node timed out")
@@ -397,7 +402,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	wg.Wait()
 
 	// don't need to lock successes/failures since we're finished writing to them
-	j.node.log.WithFields(log.Fields{
+	j.logger.WithFields(log.Fields{
 		"groupSize":    len(group),
 		"joinSize":     j.size,
 		"joinTime":     time.Now().Sub(startTime),
@@ -428,7 +433,7 @@ func (j *joinSender) MakeCall(ctx json.Context, node string, res *joinResponse) 
 
 		err := json.CallPeer(ctx, peer, j.node.service, "/protocol/join", req, res)
 		if err != nil {
-			j.node.log.WithFields(log.Fields{
+			j.logger.WithFields(log.Fields{
 				"error": err,
 			}).Debug("could not complete join")
 			errC <- err

@@ -36,6 +36,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/util"
@@ -89,8 +90,7 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
-	logger log.Logger
-	log    log.Logger
+	logger *modulelogger.ModuleLogger
 
 	startTime time.Time
 }
@@ -160,8 +160,7 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.logger,
-	})
+		Logger: rp.logger})
 	rp.node.RegisterListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
@@ -304,14 +303,14 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 
 	joined, err := rp.node.Bootstrap(&bootstrapOpts)
 	if err != nil {
-		rp.log.WithField("error", err).Info("bootstrap failed")
+		rp.logger.WithField("error", err).Info("bootstrap failed")
 		rp.setState(initialized)
 		return nil, err
 	}
 
 	rp.setState(ready)
 
-	rp.log.WithField("joined", joined).Info("bootstrap complete")
+	rp.logger.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
 }
 
@@ -525,7 +524,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	if !success {
 		err := errors.New("could not find destination for key")
-		rp.log.WithField("key", key).Warn(err)
+		rp.logger.WithField("key", key).Warn(err)
 		return "", err
 	}
 

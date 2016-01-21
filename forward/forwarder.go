@@ -29,6 +29,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -108,6 +109,9 @@ func NewForwarder(s Sender, ch shared.SubChannel, logger log.Logger) *Forwarder 
 			Out: ioutil.Discard,
 		})
 	}
+
+	// Try to get a module logger if logger is an instance of ModuleLogger
+	logger = modulelogger.GetModuleLogger(logger, "forwarder")
 
 	return &Forwarder{
 		sender:  s,

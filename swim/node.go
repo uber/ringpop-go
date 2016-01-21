@@ -29,6 +29,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 )
@@ -152,8 +153,7 @@ type Node struct {
 
 	startTime time.Time
 
-	logger log.Logger
-	log    log.Logger // wraps the provided logger with a 'local: address' field
+	logger log.Logger // wraps the provided logger with a 'local: address' field
 }
 
 // NewNode returns a new SWIM Node.
@@ -165,8 +165,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		address: address,
 		app:     app,
 		channel: channel,
-		logger:  opts.Logger,
-		log:     opts.Logger.WithField("local", address),
+		logger:  opts.Logger.WithField("local", address),
 
 		joinTimeout:        opts.JoinTimeout,
 		pingTimeout:        opts.PingTimeout,
@@ -361,7 +360,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	joined, err := sendJoin(n, joinOpts)
 	if err != nil {
-		n.log.WithFields(log.Fields{
+		n.logger.WithFields(log.Fields{
 			"err": err.Error(),
 		}).Error("bootstrap failed")
 		return nil, err
@@ -431,14 +430,15 @@ func (n *Node) setPinging(pinging bool) {
 
 // pingNextMember pings the next member in the memberlist
 func (n *Node) pingNextMember() {
+	logger := modulelogger.GetModuleLogger(n.logger, "gossip")
 	member, ok := n.memberiter.Next()
 	if !ok {
-		n.log.Warn("no pingable members")
+		logger.Warn("no pingable members")
 		return
 	}
 
 	if n.pinging() {
-		n.log.Warn("node already pinging")
+		logger.Warn("node already pinging")
 		return
 	}
 
@@ -458,12 +458,12 @@ func (n *Node) pingNextMember() {
 		switch res := response.(type) {
 		case *pingResponse:
 			if res.Ok {
-				n.log.WithField("target", member.Address).Info("ping request target reachable")
+				logger.WithField("target", member.Address).Info("ping request target reachable")
 				n.memberlist.Update(res.Changes)
 				return
 			}
 
-			n.log.WithField("target", member.Address).Info("ping request target unreachable")
+			logger.WithField("target", member.Address).Info("ping request target unreachable")
 			n.memberlist.MakeSuspect(member.Address, member.Incarnation)
 			return
 
@@ -472,7 +472,7 @@ func (n *Node) pingNextMember() {
 		}
 	}
 
-	n.log.WithFields(log.Fields{
+	logger.WithFields(log.Fields{
 		"target":    member.Address,
 		"errors":    errs,
 		"numErrors": len(errs),
