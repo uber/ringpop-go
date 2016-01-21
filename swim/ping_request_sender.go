@@ -26,6 +26,7 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
@@ -56,22 +57,25 @@ type pingRequestSender struct {
 	peer    string
 	target  string
 	timeout time.Duration
+	logger  log.Logger
 }
 
 // NewPingRequestSender returns a new PingRequestSender
 func newPingRequestSender(node *Node, peer, target string, timeout time.Duration) *pingRequestSender {
+	logger := modulelogger.GetModuleLogger(node.logger, "gossip")
 	p := &pingRequestSender{
 		node:    node,
 		peer:    peer,
 		target:  target,
 		timeout: timeout,
+		logger:  logger,
 	}
 
 	return p
 }
 
 func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
-	p.node.log.WithFields(log.Fields{
+	p.logger.WithFields(log.Fields{
 		"peer":   p.peer,
 		"target": p.target,
 	}).Debug("ping request send")
@@ -133,13 +137,15 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 	var wg sync.WaitGroup
 	resC := make(chan interface{}, size)
 
+	logger := modulelogger.GetModuleLogger(node.logger, "gossip")
+
 	for _, peer := range peers {
 		wg.Add(1)
 
 		go func(peer Member) {
 			p := newPingRequestSender(node, peer.Address, target, timeout)
 
-			p.node.log.WithFields(log.Fields{
+			logger.WithFields(log.Fields{
 				"peer":   peer.Address,
 				"target": p.target,
 			}).Debug("sending ping request")

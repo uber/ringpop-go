@@ -38,7 +38,7 @@ func (rp *Ringpop) registerHandlers() error {
 	}
 
 	return json.Register(rp.subChannel, handlers, func(ctx context.Context, err error) {
-		rp.log.WithField("error", err).Info("error occured")
+		rp.logger.WithField("error", err).Info("error occured")
 	})
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -138,6 +139,8 @@ func NewReplicator(s Sender, channel shared.SubChannel, logger log.Logger,
 	}
 
 	f := forward.NewForwarder(s, channel, logger)
+	// Try to get a module logger if logger is an instance of ModuleLogger
+	logger = modulelogger.GetModuleLogger(logger, "replicator")
 
 	opts = mergeDefaultOptions(opts, &Options{3, 1, 3, Parallel})
 	return &Replicator{s, channel, f, logger, opts}

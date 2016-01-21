@@ -140,14 +140,14 @@ func (s *HandlerTestSuite) TestErrorHandler() {
 	logger.On("WithField", "error", errTest).Return(logger)
 	logger.On("Info", []interface{}{"error occurred"})
 
-	originalLogger := s.testNode.node.log
-	s.testNode.node.log = logger
+	originalLogger := s.testNode.node.logger
+	s.testNode.node.logger = logger
 
 	s.testNode.node.errorHandler(s.ctx, errTest)
 	logger.AssertExpectations(s.T())
 
 	// Restore old logger, as stuff will be logged on teardown
-	s.testNode.node.log = originalLogger
+	s.testNode.node.logger = originalLogger
 }
 
 func (s *HandlerTestSuite) TestTickHandler() {

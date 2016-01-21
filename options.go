@@ -121,10 +121,10 @@ func HashRingConfig(c *hashring.Configuration) Option {
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		if r.log == nil {
-			r.log = modulelogger.New(l)
+		if r.logger == nil {
+			r.logger = modulelogger.New(l)
 		} else {
-			r.log.SetLogger(modulelogger.RootModule, l)
+			r.logger.SetLogger(modulelogger.RootModule, l)
 		}
 		return nil
 	}
@@ -141,7 +141,7 @@ func Logger(l log.Logger) Option {
 // messages.
 func ModuleLevel(name string, minLevel modulelogger.Level) Option {
 	return func(rp *Ringpop) error {
-		rp.log.SetLevel(name, minLevel)
+		rp.logger.SetLevel(name, minLevel)
 		return nil
 	}
 }
@@ -149,7 +149,7 @@ func ModuleLevel(name string, minLevel modulelogger.Level) Option {
 // ModuleLogger is used to configure different loggers per module.
 func ModuleLogger(name string, logger log.Logger) Option {
 	return func(rp *Ringpop) error {
-		rp.log.SetLogger(name, logger)
+		rp.logger.SetLogger(name, logger)
 		return nil
 	}
 }

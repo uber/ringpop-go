@@ -1,9 +1,10 @@
-package modulelogger
+package modulelogger_test // avoid cycles
 
 import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/test/mocks"
 	"testing"
 )
@@ -29,20 +30,20 @@ func newMockLogger() *mockLogger {
 type ModuleLoggerSuite struct {
 	suite.Suite
 	// unit under test
-	uut *ModuleLogger
+	uut *modulelogger.ModuleLogger
 	log *mockLogger
 }
 
-func (s *ModuleLoggerSuite) assertParseLevel(level Level) {
-	l, err := ParseLevel(level.String())
+func (s *ModuleLoggerSuite) assertParseLevel(level modulelogger.Level) {
+	l, err := modulelogger.ParseLevel(level.String())
 	s.Require().NoError(err)
 	s.Exactly(level, l)
 }
 
 func (s *ModuleLoggerSuite) SetupTest() {
 	s.log = newMockLogger()
-	s.uut = New(s.log)
-	err := s.uut.SetLevel("testFatal", FatalLevel)
+	s.uut = modulelogger.New(s.log)
+	err := s.uut.SetLevel("testFatal", modulelogger.FatalLevel)
 	s.Require().NoError(err)
 }
 
@@ -113,7 +114,7 @@ func (s *ModuleLoggerSuite) TestLazyFields() {
 
 	s.uut.SetLogger("test", logger1)
 	fieldLogger.Debug("d msg")
-	s.uut.SetLevel("test", OffLevel)
+	s.uut.SetLevel("test", modulelogger.OffLevel)
 	fieldLogger.Panic("d msg")
 	s.Exactly(fieldLogger.Fields(), fields3)
 
@@ -131,17 +132,17 @@ func (s *ModuleLoggerSuite) TestLimitLevels() {
 	s.log.On("Error", "e msg", 4)
 	s.log.On("Fatal", "f msg", 5)
 	s.log.On("Panic", "p msg", 6)
-	s.uut.SetLevel(RootModule, DebugLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.DebugLevel)
 	s.uut.Debug("d msg", 1)
-	s.uut.SetLevel(RootModule, InfoLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.InfoLevel)
 	s.uut.Info("i msg", 2)
-	s.uut.SetLevel(RootModule, WarnLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.WarnLevel)
 	s.uut.Warn("w msg", 3)
-	s.uut.SetLevel(RootModule, ErrorLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.ErrorLevel)
 	s.uut.Error("e msg", 4)
-	s.uut.SetLevel(RootModule, FatalLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.FatalLevel)
 	s.uut.Fatal("f msg", 5)
-	s.uut.SetLevel(RootModule, PanicLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.PanicLevel)
 	s.uut.Panic("p msg", 6)
 	s.log.AssertExpectations(s.T())
 }
@@ -163,16 +164,16 @@ func (s *ModuleLoggerSuite) TestChangeRootLogger() {
 	mock := newMockLogger()
 	mock.On("Fatal", "f msg")
 	mock.On("Panic", "p msg")
-	s.uut.SetLogger(RootModule, mock)
+	s.uut.SetLogger(modulelogger.RootModule, mock)
 	s.uut.Fatal("f msg")
-	s.uut.Logger(RootModule).Panic("p msg")
+	s.uut.Logger(modulelogger.RootModule).Panic("p msg")
 	mock.AssertExpectations(s.T())
 }
 
 func (s *ModuleLoggerSuite) TestChangeRootLevel() {
-	s.uut.SetLevel(RootModule, OffLevel)
+	s.uut.SetLevel(modulelogger.RootModule, modulelogger.OffLevel)
 	s.uut.Panic("p msg")
-	s.uut.Logger(RootModule).Panic("p msg")
+	s.uut.Logger(modulelogger.RootModule).Panic("p msg")
 	s.log.AssertExpectations(s.T())
 }
 
@@ -188,25 +189,25 @@ func (s *ModuleLoggerSuite) TestChangeModuleLogger() {
 func (s *ModuleLoggerSuite) TestChangeModuleLevel() {
 	l := s.uut.Logger("testFatal")
 	s.log.On("Debug", "d msg")
-	s.uut.SetLevel("testFatal", DebugLevel)
+	s.uut.SetLevel("testFatal", modulelogger.DebugLevel)
 	l.Debug("d msg")
 	s.log.AssertExpectations(s.T())
 }
 
 func (s *ModuleLoggerSuite) TestSetLevelError() {
-	err := s.uut.SetLevel("testFatal", OffLevel+100)
+	err := s.uut.SetLevel("testFatal", modulelogger.OffLevel+100)
 	s.Error(err)
 }
 
 func (s *ModuleLoggerSuite) TestParseLevels() {
-	s.assertParseLevel(DebugLevel)
-	s.assertParseLevel(InfoLevel)
-	s.assertParseLevel(WarnLevel)
-	s.assertParseLevel(ErrorLevel)
-	s.assertParseLevel(FatalLevel)
-	s.assertParseLevel(PanicLevel)
-	s.assertParseLevel(OffLevel)
-	_, err := ParseLevel((OffLevel + 100).String())
+	s.assertParseLevel(modulelogger.DebugLevel)
+	s.assertParseLevel(modulelogger.InfoLevel)
+	s.assertParseLevel(modulelogger.WarnLevel)
+	s.assertParseLevel(modulelogger.ErrorLevel)
+	s.assertParseLevel(modulelogger.FatalLevel)
+	s.assertParseLevel(modulelogger.PanicLevel)
+	s.assertParseLevel(modulelogger.OffLevel)
+	_, err := modulelogger.ParseLevel((modulelogger.OffLevel + 100).String())
 	s.Error(err)
 }
 
@@ -227,7 +228,7 @@ func (s *ModuleLoggerSuite) TestChangeModuleOnTheFly() {
 	l = s.uut.Logger("test")
 	l = l.WithField("key", "value")
 	l = l.WithFields(fields)
-	l = GetModuleLogger(l, "other")
+	l = modulelogger.GetModuleLogger(l, "other")
 	l.Debug("d")
 
 	testLogger.AssertExpectations(s.T())
@@ -237,16 +238,16 @@ func (s *ModuleLoggerSuite) TestChangeModuleOnTheFly() {
 }
 
 func (s *ModuleLoggerSuite) TestParseInvalidLevel() {
-	_, err := ParseLevel("nolevel")
+	_, err := modulelogger.ParseLevel("nolevel")
 	s.Error(err)
 }
 
 func (s *ModuleLoggerSuite) TestGetModuleLogger() {
 	s.log.On("Fatal", "f")
 	s.log.On("Panic", "p")
-	l := GetModuleLogger(s.uut, "testFatal")
+	l := modulelogger.GetModuleLogger(s.uut, "testFatal")
 	l.Fatal("f")
-	l = GetModuleLogger(l, "testFatal")
+	l = modulelogger.GetModuleLogger(l, "testFatal")
 	l.Panic("p")
 	s.log.AssertExpectations(s.T())
 }
