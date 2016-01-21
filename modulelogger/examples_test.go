@@ -81,14 +81,14 @@ func ExampleUncofiguredModuleLoggers() {
 func ExampleWithFields() {
 	logger := getLogrusLogger()
 	ml := New(logger)
-
 	ml.SetLevel("x", ErrorLevel)
+
 	x := ml.Logger("x")
 
 	// Any fields set on the logger are forwarded to the wrapped logger
-	y := x.WithField("a", 1).WithField("b", 2)
-	y.Info("filtered, level too low")
-	y.Error("from x")
+	otherLogger := x.WithField("a", 1).WithField("b", 2)
+	otherLogger.Info("filtered, level too low")
+	otherLogger.Error("from x")
 
 	// Output:
 	// {"a":1,"b":2,"level":"error","msg":"from x","time":"notime"}
@@ -100,7 +100,7 @@ func ExampleChainig() {
 	ml.SetLevel("x", InfoLevel)
 	ml.SetLevel("y", WarnLevel)
 
-	// Add some metadata to the logger
+	// Add some metadata to the root logger
 	mlWithField := ml.WithField("app", "test")
 
 	// Sometimes a logger accumulates metadata and is passed around in the
@@ -111,9 +111,8 @@ func ExampleChainig() {
 
 	// When the logger is passed to another module, the underlying type is
 	// still a ModuleLogger. This makes it so that another module logger
-	// can be retrieved, preserving the fields previsou fields. In other
-	// words, if the interface would allow it, this would be similar to the
-	// following chain call:
+	// can be retrieved, preserving the previous fields. In other words, if
+	// the interface would allow it, this would be similar to:
 	// ml.WithField("app", "test").Logger("x").WithField("field_x", 1).Logger("y").WithField("field_y", 2)
 	module2 := GetModuleLogger(module1, "y").WithField("field_y", 2)
 
