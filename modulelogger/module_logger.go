@@ -1,11 +1,9 @@
-package util
+package modulelogger
 
 import (
 	"fmt"
 	log "github.com/uber-common/bark"
 )
-
-// The level definition is stolen from logrus.
 
 type Level uint8
 
@@ -65,18 +63,18 @@ const (
 
 const RootModule = "root"
 
-// NewModuleLogger returns a ModuleLogger instance with a consistent internal
-// state. The logger passed serves as the root logger, and all sub-loggers
-// default to using it unless configured otherwise.
-func NewModuleLogger(logger log.Logger) *ModuleLogger {
+// New returns a ModuleLogger instance with a consistent internal state. The
+// logger passed serves as the root logger, and all sub-loggers default to
+// using it unless configured otherwise.
+func New(logger log.Logger) *ModuleLogger {
 	ml := &ModuleLogger{
 		levels: make(map[string]Level),
 		logs:   make(map[string]log.Logger),
-		l: func(rl *RestrictedLogger) *RestrictedLogger {
+		getLogger: func(rl *RestrictedLogger) *RestrictedLogger {
 			return rl
 		}}
 	ml.SetLogger(RootModule, logger)
-	return ml.Logger(RootModule).(*ModuleLogger)
+	return ml.Logger(RootModule)
 }
 
 type RestrictedLogger struct {
@@ -166,25 +164,42 @@ func (rl *RestrictedLogger) Fields() log.Fields {
 // Method calls that return other loggers return instead a ModuleLogger
 // instance. This simplifies porting existing code unaware of module logging.
 type ModuleLogger struct {
-	l      func(*RestrictedLogger) *RestrictedLogger
-	levels map[string]Level
-	logs   map[string]log.Logger
+	// This is as a poor man's virtual method; all method calls from
+	// log.Logger interface delegate to the result of this function.
+	// Usually, this function is actually a closure, chain calling other
+	// closures, until the unterlying logger wrapped in a RestrictedLogger
+	// is returned.
+	getLogger func(*RestrictedLogger) *RestrictedLogger
+	levels    map[string]Level
+	logs      map[string]log.Logger
 }
 
-func (ml *ModuleLogger) getParentLogger(*RestrictedLogger) *RestrictedLogger { return ml.l(nil) }
-func (ml *ModuleLogger) Debug(args ...interface{})                           { ml.l(nil).Debug(args...) }
-func (ml *ModuleLogger) Info(args ...interface{})                            { ml.l(nil).Info(args...) }
-func (ml *ModuleLogger) Warn(args ...interface{})                            { ml.l(nil).Warn(args...) }
-func (ml *ModuleLogger) Error(args ...interface{})                           { ml.l(nil).Error(args...) }
-func (ml *ModuleLogger) Fatal(args ...interface{})                           { ml.l(nil).Fatal(args...) }
-func (ml *ModuleLogger) Panic(args ...interface{})                           { ml.l(nil).Panic(args...) }
-func (ml *ModuleLogger) Debugf(format string, args ...interface{})           { ml.l(nil).Debugf(format, args...) }
-func (ml *ModuleLogger) Infof(format string, args ...interface{})            { ml.l(nil).Infof(format, args...) }
-func (ml *ModuleLogger) Warnf(format string, args ...interface{})            { ml.l(nil).Warnf(format, args...) }
-func (ml *ModuleLogger) Errorf(format string, args ...interface{})           { ml.l(nil).Errorf(format, args...) }
-func (ml *ModuleLogger) Fatalf(format string, args ...interface{})           { ml.l(nil).Fatalf(format, args...) }
-func (ml *ModuleLogger) Panicf(format string, args ...interface{})           { ml.l(nil).Panicf(format, args...) }
-func (ml *ModuleLogger) Fields() log.Fields                                  { return ml.l(nil).Fields() }
+func (ml *ModuleLogger) getParentLogger(*RestrictedLogger) *RestrictedLogger { return ml.getLogger(nil) }
+func (ml *ModuleLogger) Debug(args ...interface{})                           { ml.getLogger(nil).Debug(args...) }
+func (ml *ModuleLogger) Info(args ...interface{})                            { ml.getLogger(nil).Info(args...) }
+func (ml *ModuleLogger) Warn(args ...interface{})                            { ml.getLogger(nil).Warn(args...) }
+func (ml *ModuleLogger) Error(args ...interface{})                           { ml.getLogger(nil).Error(args...) }
+func (ml *ModuleLogger) Fatal(args ...interface{})                           { ml.getLogger(nil).Fatal(args...) }
+func (ml *ModuleLogger) Panic(args ...interface{})                           { ml.getLogger(nil).Panic(args...) }
+func (ml *ModuleLogger) Debugf(format string, args ...interface{}) {
+	ml.getLogger(nil).Debugf(format, args...)
+}
+func (ml *ModuleLogger) Infof(format string, args ...interface{}) {
+	ml.getLogger(nil).Infof(format, args...)
+}
+func (ml *ModuleLogger) Warnf(format string, args ...interface{}) {
+	ml.getLogger(nil).Warnf(format, args...)
+}
+func (ml *ModuleLogger) Errorf(format string, args ...interface{}) {
+	ml.getLogger(nil).Errorf(format, args...)
+}
+func (ml *ModuleLogger) Fatalf(format string, args ...interface{}) {
+	ml.getLogger(nil).Fatalf(format, args...)
+}
+func (ml *ModuleLogger) Panicf(format string, args ...interface{}) {
+	ml.getLogger(nil).Panicf(format, args...)
+}
+func (ml *ModuleLogger) Fields() log.Fields { return ml.getLogger(nil).Fields() }
 
 // SetLogger overrides the logger used for a sub-logger.
 // The root logger, can be referenced using the "root" name.
@@ -209,12 +224,15 @@ func (ml *ModuleLogger) SetLevel(moduleName string, level Level) error {
 	return nil
 }
 
-// Logger returns a sub-logger.
-func (ml *ModuleLogger) Logger(moduleName string) log.Logger {
+// Logger returns a module specific sub-logger.
+// The sub-logger can be configured with SetLogger and SetLevel. Configuration
+// changes can be made on the fly with SetLogger or SetLevel and affect all
+// existing sub-loggers.
+func (ml *ModuleLogger) Logger(moduleName string) *ModuleLogger {
 	return &ModuleLogger{
 		levels: ml.levels,
 		logs:   ml.logs,
-		l: func(rl *RestrictedLogger) *RestrictedLogger {
+		getLogger: func(rl *RestrictedLogger) *RestrictedLogger {
 			if rl == nil {
 				l := ml.logs[RootModule]
 				if logger, ok := ml.logs[moduleName]; ok {
@@ -228,7 +246,7 @@ func (ml *ModuleLogger) Logger(moduleName string) log.Logger {
 					logger: l,
 					min:    level}
 			}
-			return ml.l(rl)
+			return ml.getLogger(rl)
 		}}
 }
 
@@ -236,8 +254,8 @@ func (ml *ModuleLogger) WithField(key string, value interface{}) log.Logger {
 	return &ModuleLogger{
 		levels: ml.levels,
 		logs:   ml.logs,
-		l: func(rl *RestrictedLogger) *RestrictedLogger {
-			return ml.l(rl).WithField(key, value)
+		getLogger: func(rl *RestrictedLogger) *RestrictedLogger {
+			return ml.getLogger(rl).WithField(key, value)
 		}}
 }
 
@@ -245,8 +263,8 @@ func (ml *ModuleLogger) WithFields(fields log.LogFields) log.Logger {
 	return &ModuleLogger{
 		levels: ml.levels,
 		logs:   ml.logs,
-		l: func(rl *RestrictedLogger) *RestrictedLogger {
-			return ml.l(rl).WithFields(fields)
+		getLogger: func(rl *RestrictedLogger) *RestrictedLogger {
+			return ml.getLogger(rl).WithFields(fields)
 		}}
 }
 

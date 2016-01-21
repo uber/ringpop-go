@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/test/mocks"
-	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -52,7 +52,7 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	s.Require().NoError(err)
 
 	// Check that these defaults are not nil
-	s.NotNil(rp.moduleLogger)
+	s.NotNil(rp.log)
 	s.NotNil(rp.statter)
 	s.Equal(defaultHashRingConfiguration, rp.configHashRing)
 
@@ -108,7 +108,7 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 	s.Require().NoError(err)
 
 	mockLogger.On("Debug", []interface{}{"Debug msg"}).Return()
-	rp.moduleLogger.Debug("Debug msg")
+	rp.log.Debug("Debug msg")
 	mockLogger.AssertCalled(s.T(), "Debug", []interface{}{"Debug msg"})
 }
 
@@ -116,21 +116,21 @@ func (s *RingpopOptionsTestSuite) TestDefaultModuleLevel() {
 	mockLogger := &mocks.Logger{}
 	rp, _ := New("test", Channel(s.channel), Logger(mockLogger))
 
-	rp.moduleLogger.Logger("swim").Debug("Debug msg")
+	rp.log.Logger("swim").Debug("Debug msg")
 	mockLogger.AssertNotCalled(s.T(), "Debug", "Debug msg")
 	mockLogger.On("Warn", []interface{}{"Warn msg"}).Return()
-	rp.moduleLogger.Logger("swim").Warn("Warn msg")
+	rp.log.Logger("swim").Warn("Warn msg")
 	mockLogger.AssertCalled(s.T(), "Warn", []interface{}{"Warn msg"})
 }
 
 func (s *RingpopOptionsTestSuite) TestChangeModuleLevel() {
 	mockLogger := &mocks.Logger{}
-	rp, _ := New("test", Channel(s.channel), ModuleLevel("swim", util.PanicLevel), Logger(mockLogger))
+	rp, _ := New("test", Channel(s.channel), ModuleLevel("swim", modulelogger.PanicLevel), Logger(mockLogger))
 
-	rp.moduleLogger.Logger("swim").Error("Error msg")
+	rp.log.Logger("swim").Error("Error msg")
 	mockLogger.AssertNotCalled(s.T(), "Error", "Error msg")
 	mockLogger.On("Panic", []interface{}{"Panic msg"}).Return()
-	rp.moduleLogger.Logger("swim").Panic("Panic msg")
+	rp.log.Logger("swim").Panic("Panic msg")
 	mockLogger.AssertCalled(s.T(), "Panic", []interface{}{"Panic msg"})
 }
 

@@ -27,8 +27,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/modulelogger"
 	"github.com/uber/ringpop-go/shared"
-	rutil "github.com/uber/ringpop-go/util"
 )
 
 type configuration struct {
@@ -121,10 +121,10 @@ func HashRingConfig(c *hashring.Configuration) Option {
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		if r.moduleLogger == nil {
-			r.moduleLogger = rutil.NewModuleLogger(l)
+		if r.log == nil {
+			r.log = modulelogger.New(l)
 		} else {
-			r.moduleLogger.SetLogger(rutil.RootModule, l)
+			r.log.SetLogger(modulelogger.RootModule, l)
 		}
 		return nil
 	}
@@ -133,9 +133,15 @@ func Logger(l log.Logger) Option {
 // ModuleLevel is used to configure different log levels per module. Messages
 // with a level less than minLevel are silenced. By default, an unconfigured
 // module outputs all messages.
-func ModuleLevel(name string, minLevel rutil.Level) Option {
+//
+// Example:
+// ringpop.New("my-app", ringpop.ModuleLevel("join", util.WarnLevel)
+//
+// This instructs the "join" logger to emit only warnings, fatal or panic
+// messages.
+func ModuleLevel(name string, minLevel modulelogger.Level) Option {
 	return func(rp *Ringpop) error {
-		rp.moduleLogger.SetLevel(name, minLevel)
+		rp.log.SetLevel(name, minLevel)
 		return nil
 	}
 }
@@ -143,7 +149,7 @@ func ModuleLevel(name string, minLevel rutil.Level) Option {
 // ModuleLogger is used to configure different loggers per module.
 func ModuleLogger(name string, logger log.Logger) Option {
 	return func(rp *Ringpop) error {
-		rp.moduleLogger.SetLogger(name, logger)
+		rp.log.SetLogger(name, logger)
 		return nil
 	}
 }
@@ -218,7 +224,7 @@ func defaultHashRingOptions(r *Ringpop) error {
 }
 
 func defaultSWIMLevel(r *Ringpop) error {
-	return ModuleLevel("swim", rutil.WarnLevel)(r)
+	return ModuleLevel("swim", modulelogger.WarnLevel)(r)
 }
 
 // defaultOptions are the default options/values when Ringpop is created. They
