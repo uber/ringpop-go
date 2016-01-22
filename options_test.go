@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
@@ -101,11 +102,17 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 	mockLogger := &mocks.Logger{}
 	mockLogger.On("WithField", mock.Anything, mock.Anything).Return(mockLogger)
 
-	rp, err := New("test", Channel(s.channel), Logger(mockLogger))
+	rp, err := New("test", Channel(s.channel), Logger(logger.Config{
+		Logger:  mockLogger,
+		Ringpop: logger.Debug, // Explicit
+	}))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	s.Exactly(mockLogger, rp.logger)
+	// The logger is wrapped, test for message propagation
+	mockLogger.On("Debug", []interface{}{"hello"})
+	rp.logger.Debug("hello")
+	mockLogger.AssertCalled(s.T(), "Debug", []interface{}{"hello"})
 }
 
 // TestStatter tests that the statter that's passed in gets applied correctly

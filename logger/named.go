@@ -14,6 +14,10 @@ func (rl *namedLogger) setLevel(level Level) {
 	rl.min = level
 }
 
+func (rl *namedLogger) setLogger(logger bark.Logger) {
+	rl.logger = logger
+}
+
 func (rl *namedLogger) shouldOutput(level Level) bool {
 	return level >= rl.min
 }

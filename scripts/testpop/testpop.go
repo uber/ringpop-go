@@ -26,6 +26,7 @@ import (
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/swim"
 
 	log "github.com/Sirupsen/logrus"
@@ -51,14 +52,14 @@ func main() {
 		log.Fatalf("could not create channel: %v", err)
 	}
 
-	logger := log.StandardLogger()
+	l := log.StandardLogger()
 	if *verbose {
-		logger.Level = log.DebugLevel
+		l.Level = log.DebugLevel
 	}
 	rp, _ := ringpop.New("ringpop",
 		ringpop.Channel(ch),
 		ringpop.Identity(*hostport),
-		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
+		ringpop.Logger(logger.Config{Logger: bark.NewLoggerFromLogrus(l)}),
 	)
 
 	if err := ch.ListenAndServe(*hostport); err != nil {

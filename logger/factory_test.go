@@ -14,7 +14,7 @@ type LoggerFactorySuite struct {
 
 func (s *LoggerFactorySuite) SetupTest() {
 	s.mock = &mocks.Logger{}
-	s.factory = New(s.mock)
+	s.factory = NewLoggerFactory(s.mock)
 }
 
 func (s *LoggerFactorySuite) TestLoggerIdentity() {

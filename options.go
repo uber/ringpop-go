@@ -27,6 +27,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 )
 
@@ -115,13 +116,20 @@ func HashRingConfig(c *hashring.Configuration) Option {
 	}
 }
 
-// Logger is used to specify a bark-compatible logger that will be used for
-// all Ringpop logging. If a logger is not provided, one will be created
-// automatically.
-func Logger(l log.Logger) Option {
+// Logger is used to specify a bark-compatible logger that will be used for all
+// Ringpop logging and the log levels for all modules. If a logger is not
+// provided, one will be created automatically.
+func Logger(conf logger.Config) Option {
 	return func(r *Ringpop) error {
-		r.logger = l
-		r.log = l
+		// Temp. name until we get rid of Ringpop.logger
+		if r.loggerFactory == nil {
+			r.loggerFactory = logger.New(conf)
+			r.log = r.loggerFactory.Ringpop()
+			r.logger = r.log
+		} else {
+			// Update the existing loggers instead.
+			r.loggerFactory.Config(conf)
+		}
 		return nil
 	}
 }
@@ -182,9 +190,17 @@ func defaultIdentityResolver(r *Ringpop) error {
 // defaultLogger is the default logger that is used for Ringpop if one is not
 // provided by the user.
 func defaultLogger(r *Ringpop) error {
-	return Logger(log.NewLoggerFromLogrus(&logrus.Logger{
-		Out: ioutil.Discard,
-	}))(r)
+	return Logger(logger.Config{
+		Logger: log.NewLoggerFromLogrus(&logrus.Logger{
+			Out: ioutil.Discard,
+		}),
+		Ringpop:    logger.Debug,
+		Gossip:     logger.Debug,
+		Suspicion:  logger.Debug,
+		Ring:       logger.Debug,
+		Membership: logger.Debug,
+		Damping:    logger.Debug,
+	})(r)
 }
 
 func defaultStatter(r *Ringpop) error {

@@ -11,7 +11,7 @@ type LoggerFactory struct {
 	cache  map[string]*namedLogger
 }
 
-func New(l bark.Logger) *LoggerFactory {
+func NewLoggerFactory(l bark.Logger) *LoggerFactory {
 	return &LoggerFactory{
 		logger: l,
 		cache:  make(map[string]*namedLogger),
@@ -44,5 +44,13 @@ func (lf *LoggerFactory) Logger(name string) Logger {
 		}
 		lf.cache[name] = restricted
 		return restricted
+	}
+}
+
+// Override the bark logger implementation with another one.
+func (lf *LoggerFactory) SetLogger(logger bark.Logger) {
+	lf.logger = logger
+	for _, namedLogger := range lf.cache {
+		namedLogger.setLogger(logger)
 	}
 }
