@@ -6,12 +6,14 @@ type Level uint8
 
 func (level Level) String() string {
 	switch level {
+	case Trace:
+		return "trace"
 	case Debug:
 		return "debug"
 	case Info:
 		return "info"
 	case Warn:
-		return "warning"
+		return "warn"
 	case Error:
 		return "error"
 	case Fatal:
@@ -36,12 +38,14 @@ func Parse(lvl string) (Level, error) {
 		return Fatal, nil
 	case "error":
 		return Error, nil
-	case "warn", "warning":
+	case "warn":
 		return Warn, nil
 	case "info":
 		return Info, nil
 	case "debug":
 		return Debug, nil
+	case "trace":
+		return Trace, nil
 	}
 
 	var l Level
@@ -49,7 +53,8 @@ func Parse(lvl string) (Level, error) {
 }
 
 const (
-	Debug Level = iota
+	Trace Level = iota
+	Debug
 	Info
 	Warn
 	Error
@@ -58,5 +63,5 @@ const (
 	Off
 )
 
-const lowestLevel = Debug
+const lowestLevel = Trace
 const highestLevel = Off

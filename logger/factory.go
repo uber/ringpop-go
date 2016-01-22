@@ -8,7 +8,14 @@ import (
 // restricted to a specific Level.
 type LoggerFactory struct {
 	logger bark.Logger
-	cache  map[string]*restrictedLogger
+	cache  map[string]*namedLogger
+}
+
+func New(l bark.Logger) *LoggerFactory {
+	return &LoggerFactory{
+		logger: l,
+		cache:  make(map[string]*namedLogger),
+	}
 }
 
 // SetLevel sets the minimum level for a named logger. A named logger emits
@@ -17,7 +24,7 @@ func (lf *LoggerFactory) SetLevel(name string, level Level) {
 	if restricted, ok := lf.cache[name]; ok {
 		restricted.setLevel(level)
 	} else {
-		lf.cache[name] = &restrictedLogger{
+		lf.cache[name] = &namedLogger{
 			logger: lf.logger,
 			min:    level,
 		}
@@ -26,12 +33,12 @@ func (lf *LoggerFactory) SetLevel(name string, level Level) {
 
 // Logger returns a named logger. If no level was previously set for this named
 // logger it defaults to the minimum level.
-func (lf *LoggerFactory) Logger(name string) *bark.Logger {
+func (lf *LoggerFactory) Logger(name string) Logger {
 	// XXX: fix races
 	if restricted, ok := lf.cache[name]; ok {
 		return restricted
 	} else {
-		restricted := &restrictedLogger{
+		restricted := &namedLogger{
 			logger: lf.logger,
 			min:    lowestLevel,
 		}
