@@ -20,7 +20,7 @@ func (r *ringpopLogger) HandleEvent(event events.Event) {
 		r.logger.WithFields(log.Fields{
 			"local":  event.Change.Source,
 			"update": event.Change,
-		}).Debugf("ringpop member declares other member %s", event.Change.Status)
+		}).Infof("ringpop member declares other member %s", event.Change.Status)
 
 	case swim.ChecksumComputeEvent:
 		// membership logger
@@ -31,7 +31,7 @@ func (r *ringpopLogger) HandleEvent(event events.Event) {
 				"checksum":    event.Checksum,
 				"oldChecksum": event.OldChecksum,
 				"timestamp":   time.Now().Unix(),
-			}).Debug("ringpop membership computed new checksum")
+			}).Info("ringpop membership computed new checksum")
 		}
 
 	case events.RingChecksumEvent:
@@ -43,7 +43,7 @@ func (r *ringpopLogger) HandleEvent(event events.Event) {
 				"checksum":    event.NewChecksum,
 				"oldChecksum": event.OldChecksum,
 				"timestamp":   time.Now().Unix(),
-			}).Debug("ringpop ring computed new checksum")
+			}).Info("ringpop ring computed new checksum")
 		}
 
 	case swim.MemberlistChangesAppliedEvent:
@@ -55,7 +55,7 @@ func (r *ringpopLogger) HandleEvent(event events.Event) {
 					"remote": change.Source,
 					// changes in ringpop go do not have an id.
 					// "updateId": change.id,
-				}).Debug("ringpop applied remote update")
+				}).Info("ringpop applied remote update")
 			}
 		}
 	}
