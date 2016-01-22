@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/test/mocks"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -112,6 +113,16 @@ func (s *HandlerTestSuite) TestAdminLeaveJoinHandlers() {
 	s.NoError(err, "calling handler should not result in error")
 	s.Equal(&Status{Status: "ok"}, status)
 	s.Equal(4, s.testNode.node.CountReachableMembers())
+
+	changes := s.testNode.node.disseminator.changes
+	address := s.testNode.node.Address()
+	incNo := changes[address].Incarnation
+
+	// The MakeAlive call in adminJoinHandler only takes effect when the newly
+	// generated incarnation number is bigger than the current one.
+	for util.TimeNowMS() == incNo {
+		time.Sleep(time.Millisecond)
+	}
 
 	// Test join handler brings it back to 5
 	status, err = s.testNode.node.adminJoinHandler(s.ctx, &emptyArg{})
