@@ -51,6 +51,8 @@ type Options struct {
 	RollupMaxUpdates    int
 
 	Logger log.Logger
+
+	Clock Clock
 }
 
 func defaultOptions() *Options {
@@ -70,6 +72,8 @@ func defaultOptions() *Options {
 		Logger: log.NewLoggerFromLogrus(&logrus.Logger{
 			Out: ioutil.Discard,
 		}),
+
+		Clock: &systemClock{},
 	}
 
 	return opts
@@ -104,6 +108,10 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.PingRequestSize = util.SelectInt(opts.PingRequestSize,
 		def.PingRequestSize)
+
+	if opts.Clock == nil {
+		opts.Clock = def.Clock
+	}
 
 	return opts
 }
@@ -154,6 +162,10 @@ type Node struct {
 
 	logger log.Logger
 	log    log.Logger // wraps the provided logger with a 'local: address' field
+
+	// clock is used to generate incarnation numbers and is typically set to
+	// systemClock.
+	clock Clock
 }
 
 // NewNode returns a new SWIM Node.
@@ -177,6 +189,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		clientRate: metrics.NewMeter(),
 		serverRate: metrics.NewMeter(),
 		totalRate:  metrics.NewMeter(),
+		clock:      opts.Clock,
 	}
 
 	node.memberlist = newMemberlist(node)
@@ -349,7 +362,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		return nil, err
 	}
 
-	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
+	n.memberlist.Reincarnate()
 
 	joinOpts := &joinOpts{
 		timeout:           opts.JoinTimeout,

@@ -24,7 +24,6 @@ import (
 	"errors"
 
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
@@ -122,7 +121,7 @@ func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {
 }
 
 func (n *Node) adminJoinHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
+	n.memberlist.Reincarnate()
 	return &Status{Status: "rejoined"}, nil
 }
 
