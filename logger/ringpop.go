@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 )
 
-// Config is used to set the ringpop logger implementation and the minimum
+// Options is used to set the ringpop logger implementation and the minimum
 // output level for each named logger.
 type Options struct {
 	// The underlying logger implementation to use.

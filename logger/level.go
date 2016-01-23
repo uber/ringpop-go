@@ -64,5 +64,6 @@ const (
 	Off
 )
 
+const defaultNotConfiguredNamedLogger = Warn
 const lowestLevel = Trace
 const highestLevel = Off
