@@ -53,7 +53,7 @@ func (s *NamedLoggerSuite) assertMessageNotLoggedAt(level Level) {
 	s.mock.AssertNotCalled(s.T(), levelToMethod(level)+"f", lString, []interface{}{lString})
 }
 
-// Call both .Debug("hello debug") and Debugf("format debug", "hello debug") or the logger
+// Call both .Debug("debug") and Debugf("debug", "debug") on the logger
 func (s *NamedLoggerSuite) logMessageAt(level Level) {
 	lString := level.String()
 	switch level {

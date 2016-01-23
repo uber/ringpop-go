@@ -34,6 +34,14 @@ func (s *LoggerFactorySuite) TestSetLevel() {
 	s.Equal(logger.min, Panic)
 }
 
+func (s *LoggerFactorySuite) TestSetLevelLow() {
+	s.Error(s.factory.SetLevel("x", unset))
+}
+
+func (s *LoggerFactorySuite) TestSetLevelHigh() {
+	s.Error(s.factory.SetLevel("x", highestLevel+1))
+}
+
 func TestLoggerFactorySuite(t *testing.T) {
 	suite.Run(t, new(LoggerFactorySuite))
 }

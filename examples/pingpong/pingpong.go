@@ -51,7 +51,7 @@ func newWorker(address string, channel *tchannel.Channel) *worker {
 	rp, err := ringpop.New("pingpong",
 		ringpop.Channel(channel),
 		ringpop.Identity(address),
-		ringpop.Logger(logger.Config{Logger: l}),
+		ringpop.Logger(logger.Options{Logger: l}),
 	)
 	if err != nil {
 		log.Fatalf("Unable to create Ringpop: %v", err)

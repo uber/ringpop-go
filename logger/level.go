@@ -53,7 +53,8 @@ func Parse(lvl string) (Level, error) {
 }
 
 const (
-	Trace Level = iota
+	unset Level = iota
+	Trace
 	Debug
 	Info
 	Warn

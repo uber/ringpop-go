@@ -104,7 +104,7 @@ func main() {
 	rp, err := ringpop.New("ping-app",
 		ringpop.Channel(ch),
 		ringpop.Identity(*hostport),
-		ringpop.Logger(logger.Config{Logger: bark.NewLoggerFromLogrus(l)}),
+		ringpop.Logger(logger.Options{Logger: bark.NewLoggerFromLogrus(l)}),
 	)
 	if err != nil {
 		log.Fatalf("Unable to create Ringpop: %v", err)

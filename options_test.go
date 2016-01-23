@@ -102,7 +102,7 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 	mockLogger := &mocks.Logger{}
 	mockLogger.On("WithField", mock.Anything, mock.Anything).Return(mockLogger)
 
-	rp, err := New("test", Channel(s.channel), Logger(logger.Config{
+	rp, err := New("test", Channel(s.channel), Logger(logger.Options{
 		Logger:  mockLogger,
 		Ringpop: logger.Debug, // Explicit
 	}))
