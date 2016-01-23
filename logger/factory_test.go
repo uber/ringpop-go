@@ -23,7 +23,7 @@ func (s *LoggerFactorySuite) TestLoggerIdentity() {
 
 func (s *LoggerFactorySuite) TestDefaultLevel() {
 	logger := s.factory.Logger("x").(*namedLogger)
-	s.Equal(logger.min, Trace)
+	s.Equal(logger.min, Warn)
 }
 
 func (s *LoggerFactorySuite) TestSetLevel() {
