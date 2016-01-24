@@ -23,7 +23,7 @@ package swim
 import (
 	"errors"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
@@ -77,7 +77,7 @@ func (n *Node) registerHandlers() error {
 func (n *Node) joinHandler(ctx json.Context, req *joinRequest) (*joinResponse, error) {
 	res, err := handleJoin(n, req)
 	if err != nil {
-		n.log.WithFields(log.Fields{
+		n.log.WithFields(logger.Fields{
 			"error":       err,
 			"joinRequest": req,
 		}).Debug("invalid join request received")

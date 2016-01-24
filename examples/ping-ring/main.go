@@ -27,7 +27,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
-	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
@@ -99,12 +98,12 @@ func main() {
 		log.Fatalf("channel did not create successfully: %v", err)
 	}
 
-	l := log.StandardLogger()
+	logger := log.StandardLogger()
 
 	rp, err := ringpop.New("ping-app",
 		ringpop.Channel(ch),
 		ringpop.Identity(*hostport),
-		ringpop.Logger(logger.Options{Logger: bark.NewLoggerFromLogrus(l)}),
+		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
 	if err != nil {
 		log.Fatalf("Unable to create Ringpop: %v", err)
@@ -113,7 +112,7 @@ func main() {
 	worker := &worker{
 		channel: ch,
 		ringpop: rp,
-		logger:  l,
+		logger:  logger,
 	}
 
 	if err := worker.RegisterPong(); err != nil {

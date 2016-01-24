@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go/json"
@@ -285,7 +285,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		numGroups++
 
 		if numJoined >= j.size {
-			j.node.log.WithFields(log.Fields{
+			j.node.log.WithFields(logger.Fields{
 				"joinSize":  j.size,
 				"joinTime":  time.Now().Sub(startTime),
 				"numJoined": numJoined,
@@ -299,7 +299,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		joinDuration := time.Now().Sub(startTime)
 
 		if joinDuration > j.maxJoinDuration {
-			j.node.log.WithFields(log.Fields{
+			j.node.log.WithFields(logger.Fields{
 				"joinDuration":    joinDuration,
 				"maxJoinDuration": j.maxJoinDuration,
 				"numJoined":       numJoined,
@@ -317,7 +317,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 			return nodesJoined, err
 		}
 
-		j.node.log.WithFields(log.Fields{
+		j.node.log.WithFields(logger.Fields{
 			"joinSize":  j.size,
 			"numJoined": numJoined,
 			"numFailed": numFailed,
@@ -363,7 +363,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			select {
 			case err := <-j.MakeCall(ctx, n, &res):
 				if err != nil {
-					j.node.log.WithFields(log.Fields{
+					j.node.log.WithFields(logger.Fields{
 						"remote":  n,
 						"timeout": j.timeout,
 					}).Debug("attempt to join node failed")
@@ -373,7 +373,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 				j.node.memberlist.Update(res.Membership)
 
 			case <-ctx.Done():
-				j.node.log.WithFields(log.Fields{
+				j.node.log.WithFields(logger.Fields{
 					"remote":  n,
 					"timeout": j.timeout,
 				}).Debug("attempt to join node timed out")
@@ -397,7 +397,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	wg.Wait()
 
 	// don't need to lock successes/failures since we're finished writing to them
-	j.node.log.WithFields(log.Fields{
+	j.node.log.WithFields(logger.Fields{
 		"groupSize":    len(group),
 		"joinSize":     j.size,
 		"joinTime":     time.Now().Sub(startTime),
@@ -428,7 +428,7 @@ func (j *joinSender) MakeCall(ctx json.Context, node string, res *joinResponse) 
 
 		err := json.CallPeer(ctx, peer, j.node.service, "/protocol/join", req, res)
 		if err != nil {
-			j.node.log.WithFields(log.Fields{
+			j.node.log.WithFields(logger.Fields{
 				"error": err,
 			}).Debug("could not complete join")
 			errC <- err

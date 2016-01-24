@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
@@ -71,7 +71,7 @@ func newPingRequestSender(node *Node, peer, target string, timeout time.Duration
 }
 
 func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
-	p.node.log.WithFields(log.Fields{
+	p.node.log.WithFields(logger.Fields{
 		"peer":   p.peer,
 		"target": p.target,
 	}).Debug("ping request send")
@@ -139,7 +139,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 		go func(peer Member) {
 			p := newPingRequestSender(node, peer.Address, target, timeout)
 
-			p.node.log.WithFields(log.Fields{
+			p.node.log.WithFields(logger.Fields{
 				"peer":   peer.Address,
 				"target": p.target,
 			}).Debug("sending ping request")

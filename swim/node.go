@@ -22,13 +22,11 @@ package swim
 
 import (
 	"errors"
-	"io/ioutil"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 )
@@ -50,10 +48,13 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
-	Logger log.Logger
+	Logger logger.Logger
 }
 
 func defaultOptions() *Options {
+
+	defaultLogger := logger.New(logger.Options{}).Ringpop()
+
 	opts := &Options{
 		SuspicionTimeout:  5000 * time.Millisecond,
 		MinProtocolPeriod: 200 * time.Millisecond,
@@ -67,9 +68,7 @@ func defaultOptions() *Options {
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
 
-		Logger: log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		}),
+		Logger: defaultLogger,
 	}
 
 	return opts
@@ -152,8 +151,8 @@ type Node struct {
 
 	startTime time.Time
 
-	logger log.Logger
-	log    log.Logger // wraps the provided logger with a 'local: address' field
+	logger logger.Logger
+	log    logger.Logger // wraps the provided logger with a 'local: address' field
 }
 
 // NewNode returns a new SWIM Node.
@@ -356,7 +355,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	joined, err := sendJoin(n, joinOpts)
 	if err != nil {
-		n.log.WithFields(log.Fields{
+		n.log.WithFields(logger.Fields{
 			"err": err.Error(),
 		}).Error("bootstrap failed")
 		return nil, err
@@ -467,7 +466,7 @@ func (n *Node) pingNextMember() {
 		}
 	}
 
-	n.log.WithFields(log.Fields{
+	n.log.WithFields(logger.Fields{
 		"target":    member.Address,
 		"errors":    errs,
 		"numErrors": len(errs),

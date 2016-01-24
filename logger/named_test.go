@@ -22,162 +22,102 @@ package logger
 
 import (
 	"github.com/stretchr/testify/suite"
-	"github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/test/mocks"
-	"strings"
 	"testing"
 )
 
-type NamedLoggerSuite struct {
-	mock   *mocks.Logger
-	logger *namedLogger
-	suite.Suite
+type dummyReceiver struct {
+	msg  *namedMsg
+	msgf *namedfMsg
 }
 
-func levelToMethod(level Level) string {
-	// Trace is just internal, it calls into Debug
-	if level == Trace {
-		level = Debug
-	}
-	return strings.Title(level.String())
+func (recv *dummyReceiver) Log(m *namedMsg) {
+	recv.msg = m
+}
+
+func (recv *dummyReceiver) Logf(m *namedfMsg) {
+	recv.msgf = m
+}
+
+type NamedLoggerSuite struct {
+	suite.Suite
+	recv   *dummyReceiver
+	logger *namedLogger
 }
 
 func (s *NamedLoggerSuite) SetupTest() {
-	s.mock = &mocks.Logger{}
+	s.recv = &dummyReceiver{}
 	s.logger = &namedLogger{
-		logger: s.mock,
-	}
-
-	levels := []Level{Trace, Debug, Info, Warn, Error, Fatal, Panic}
-
-	// Set all expected calls with the form:
-	// Debug("debug") and Debugf("debug", "debug")
-	for _, level := range levels {
-		lString := level.String()
-		s.mock.On(levelToMethod(level), []interface{}{lString})
-		s.mock.On(levelToMethod(level)+"f", lString, []interface{}{lString})
+		name:   "name",
+		fields: Fields{"key": 1},
+		recv:   s.recv,
 	}
 }
 
-// Make sure .Debug("debug") and .Debugf("debug", "debug") was called
-func (s *NamedLoggerSuite) assertMessageLoggedAt(level Level) {
-	lString := level.String()
-	s.mock.AssertCalled(s.T(), levelToMethod(level), []interface{}{lString})
-	s.mock.AssertCalled(s.T(), levelToMethod(level)+"f", lString, []interface{}{lString})
-}
-
-// Make sure .Debug("debug") and .Debugf("debug", "debug") was not called
-func (s *NamedLoggerSuite) assertMessageNotLoggedAt(level Level) {
-	lString := level.String()
-	s.mock.AssertNotCalled(s.T(), levelToMethod(level), []interface{}{lString})
-	s.mock.AssertNotCalled(s.T(), levelToMethod(level)+"f", lString, []interface{}{lString})
-}
-
-// Call both .Debug("debug") and Debugf("debug", "debug") on the logger
-func (s *NamedLoggerSuite) logMessageAt(level Level) {
-	lString := level.String()
-	switch level {
-	case Trace:
-		s.logger.Trace(lString)
-		s.logger.Tracef(lString, lString)
-	case Debug:
-		s.logger.Debug(lString)
-		s.logger.Debugf(lString, lString)
-	case Info:
-		s.logger.Info(lString)
-		s.logger.Infof(lString, lString)
-	case Warn:
-		s.logger.Warn(lString)
-		s.logger.Warnf(lString, lString)
-	case Error:
-		s.logger.Error(lString)
-		s.logger.Errorf(lString, lString)
-	case Fatal:
-		s.logger.Fatal(lString)
-		s.logger.Fatalf(lString, lString)
-	case Panic:
-		s.logger.Panic(lString)
-		s.logger.Panicf(lString, lString)
+// Test the messages are forwarded untouched with the right level.
+func (s *NamedLoggerSuite) TestForwarding() {
+	cases := []struct {
+		meth  func(logger *namedLogger, args ...interface{})
+		methf func(logger *namedLogger, format string, args ...interface{})
+		level level
+	}{
+		{meth: (*namedLogger).Trace, methf: (*namedLogger).Tracef, level: Trace},
+		{meth: (*namedLogger).Debug, methf: (*namedLogger).Debugf, level: Debug},
+		{meth: (*namedLogger).Info, methf: (*namedLogger).Infof, level: Info},
+		{meth: (*namedLogger).Warn, methf: (*namedLogger).Warnf, level: Warn},
+		{meth: (*namedLogger).Error, methf: (*namedLogger).Errorf, level: Error},
+		{meth: (*namedLogger).Fatal, methf: (*namedLogger).Fatalf, level: Fatal},
+		{meth: (*namedLogger).Panic, methf: (*namedLogger).Panicf, level: Panic},
+	}
+	for _, c := range cases {
+		c.meth(s.logger, "msg")
+		expected := &namedMsg{
+			name:   "name",
+			level:  c.level,
+			fields: Fields{"key": 1},
+			args:   []interface{}{"msg"},
+		}
+		s.Equal(s.recv.msg, expected)
+		c.methf(s.logger, "format", "msg")
+		s.Equal(s.recv.msgf, &namedfMsg{
+			namedMsg: expected,
+			format:   "format",
+		})
 	}
 }
 
-func (s *NamedLoggerSuite) TestDefaultLevel() {
-	s.logMessageAt(Trace)
-	s.assertMessageLoggedAt(Trace)
+func (s *NamedLoggerSuite) TestFieldChain() {
+	logger := s.logger.WithField("test", 1).WithField("key", 0)
+	logger.Debug("msg")
+	expected := &namedMsg{
+		name:   "name",
+		level:  Debug,
+		fields: Fields{"key": 0, "test": 1},
+		args:   []interface{}{"msg"},
+	}
+	s.Equal(s.recv.msg, expected)
+	logger.Debugf("format", "msg")
+	s.Equal(s.recv.msgf, &namedfMsg{
+		namedMsg: expected,
+		format:   "format",
+	})
 }
 
-func (s *NamedLoggerSuite) TestOffLevel() {
-	s.logger.setLevel(Off)
-	s.logMessageAt(Panic)
-	s.assertMessageNotLoggedAt(Panic)
-}
-
-func (s *NamedLoggerSuite) TestDebug() {
-	s.logger.setLevel(Debug)
-	s.logMessageAt(Trace)
-	s.assertMessageNotLoggedAt(Trace)
-	s.logMessageAt(Debug)
-	s.assertMessageLoggedAt(Debug)
-}
-
-func (s *NamedLoggerSuite) TestInfo() {
-	s.logger.setLevel(Info)
-	s.logMessageAt(Debug)
-	s.assertMessageNotLoggedAt(Debug)
-	s.logMessageAt(Info)
-	s.assertMessageLoggedAt(Info)
-}
-
-func (s *NamedLoggerSuite) TestWarn() {
-	s.logger.setLevel(Warn)
-	s.logMessageAt(Info)
-	s.assertMessageNotLoggedAt(Info)
-	s.logMessageAt(Warn)
-	s.assertMessageLoggedAt(Warn)
-}
-
-func (s *NamedLoggerSuite) TestError() {
-	s.logger.setLevel(Error)
-	s.logMessageAt(Warn)
-	s.assertMessageNotLoggedAt(Warn)
-	s.logMessageAt(Error)
-	s.assertMessageLoggedAt(Error)
-}
-
-func (s *NamedLoggerSuite) TestFatal() {
-	s.logger.setLevel(Fatal)
-	s.logMessageAt(Error)
-	s.assertMessageNotLoggedAt(Error)
-	s.logMessageAt(Fatal)
-	s.assertMessageLoggedAt(Fatal)
-}
-
-func (s *NamedLoggerSuite) TestPanic() {
-	s.logger.setLevel(Panic)
-	s.logMessageAt(Fatal)
-	s.assertMessageNotLoggedAt(Fatal)
-	s.logMessageAt(Panic)
-	s.assertMessageLoggedAt(Panic)
-}
-
-func (s *NamedLoggerSuite) TestWithField() {
-	otherLogger := &mocks.Logger{}
-	s.mock.On("WithField", "a", 1).Return(otherLogger)
-	withFieldLogger := s.logger.WithField("a", 1).(*namedLogger)
-	s.Equal(otherLogger, withFieldLogger.logger)
-}
-
-func (s *NamedLoggerSuite) TestWithFields() {
-	otherLogger := &mocks.Logger{}
-	s.mock.On("WithFields", nil).Return(otherLogger)
-	withFieldLogger := s.logger.WithFields(nil).(*namedLogger)
-	s.Equal(otherLogger, withFieldLogger.logger)
-}
-
-func (s *NamedLoggerSuite) TestFields() {
-	fields := bark.Fields{}
-	s.mock.On("Fields").Return(fields)
-	s.Equal(s.logger.Fields(), fields)
+func (s *NamedLoggerSuite) TestFieldsChain() {
+	logger := s.logger.WithFields(Fields{"a": 1, "b": 2})
+	logger = logger.WithFields(Fields{"b": 3, "key": 0})
+	logger.Debug("msg")
+	expected := &namedMsg{
+		name:   "name",
+		level:  Debug,
+		fields: Fields{"key": 0, "a": 1, "b": 3},
+		args:   []interface{}{"msg"},
+	}
+	s.Equal(s.recv.msg, expected)
+	logger.Debugf("format", "msg")
+	s.Equal(s.recv.msgf, &namedfMsg{
+		namedMsg: expected,
+		format:   "format",
+	})
 }
 
 func TestNamedLoggerSuite(t *testing.T) {

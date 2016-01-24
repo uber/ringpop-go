@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -133,18 +134,22 @@ func (s *HandlerTestSuite) TestNotImplementedHandler() {
 
 // TestErrorHandler tests that the errorHandler logs the correct error message.
 func (s *HandlerTestSuite) TestErrorHandler() {
-	logger := &mocks.Logger{}
+	log := &mocks.Logger{}
 
 	errTest := errors.New("test error")
 
-	logger.On("WithField", "error", errTest).Return(logger)
-	logger.On("Info", []interface{}{"error occurred"})
+	log.On("WithFields", logger.Fields{"error": errTest}).Return(log)
+	log.On("Info", []interface{}{"error occurred"})
 
 	originalLogger := s.testNode.node.log
-	s.testNode.node.log = logger
+	logWrapper := logger.New(logger.Options{
+		Logger:  log,
+		Ringpop: logger.Info,
+	}).Ringpop()
+	s.testNode.node.log = logWrapper
 
 	s.testNode.node.errorHandler(s.ctx, errTest)
-	logger.AssertExpectations(s.T())
+	log.AssertExpectations(s.T())
 
 	// Restore old logger, as stuff will be logged on teardown
 	s.testNode.node.log = originalLogger

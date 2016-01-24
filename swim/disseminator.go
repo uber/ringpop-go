@@ -24,7 +24,7 @@ import (
 	"math"
 	"sync"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 )
 
 var log10 = math.Log(10)
@@ -75,7 +75,7 @@ func (d *disseminator) AdjustMaxPropagations() {
 
 		d.node.emit(MaxPAdjustedEvent{prevMaxP, newMaxP})
 
-		d.node.log.WithFields(log.Fields{
+		d.node.log.WithFields(logger.Fields{
 			"newMax":            newMaxP,
 			"prevMax":           prevMaxP,
 			"propagationFactor": d.pFactor,
@@ -123,7 +123,7 @@ func (d *disseminator) IssueAsReceiver(senderAddress string,
 	} else if d.node.memberlist.Checksum() != senderChecksum {
 		d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
 
-		d.node.log.WithFields(log.Fields{
+		d.node.log.WithFields(logger.Fields{
 			"localChecksum":  d.node.memberlist.Checksum(),
 			"remote":         senderAddress,
 			"remoteChecksum": senderChecksum,

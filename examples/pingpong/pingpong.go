@@ -29,7 +29,6 @@ import (
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	gen "github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
-	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
@@ -46,12 +45,12 @@ type worker struct {
 }
 
 func newWorker(address string, channel *tchannel.Channel) *worker {
-	l := bark.NewLoggerFromLogrus(logrus.StandardLogger())
+	logger := bark.NewLoggerFromLogrus(logrus.StandardLogger())
 
 	rp, err := ringpop.New("pingpong",
 		ringpop.Channel(channel),
 		ringpop.Identity(address),
-		ringpop.Logger(logger.Options{Logger: l}),
+		ringpop.Logger(logger),
 	)
 	if err != nil {
 		log.Fatalf("Unable to create Ringpop: %v", err)

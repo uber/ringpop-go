@@ -21,7 +21,6 @@
 package logger
 
 import (
-	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"io/ioutil"
@@ -33,33 +32,65 @@ type Options struct {
 	// The underlying logger implementation to use.
 	Logger bark.Logger
 
-	Ringpop    Level
-	Gossip     Level
-	Suspicion  Level
-	Ring       Level
+	// Minimum level to which the Ringpop logger is restricted.
+	Ringpop Level
+	// Minimum level to which the Gossip logger is restricted.
+	Gossip Level
+	// Minimum level to which the Suspicion logger is restricted.
+	Suspicion Level
+	// Minimum level to which the Ring logger is restricted.
+	Ring Level
+	// Minimum level to which the Membership logger is restricted.
 	Membership Level
-	Damping    Level
+	// Minimum level to which the Damping logger is restricted.
+	Damping Level
 }
 
-// RingpopLogger is a factory for ringpop named loggers. Each named logger can
-// be configured independently to output messages only above a minimum level.
-type RingpopLogger struct {
-	factory *LoggerFactory
+// LogFactory provides a convenient way to produce named loggers and pass
+// metadata as fields between separate parts of the codebase.
+type LogFactory interface {
+	// Ringpop retutrns the logger used to log messages outside of any module.
+	Ringpop() Logger
+	// Gossip returns the logger used to log messages in the "gossip" module.
+	Gossip() Logger
+	// Suspicion returns the logger used to log messages in the "suspicion" module.
+	Suspicion() Logger
+	// Ring returns the logger used to log messages in the "ring" module.
+	Ring() Logger
+	// Membership returns the logger used to log messages in the "membership" module.
+	Membership() Logger
+	// Damping returns the logger used to log messages in the "damping" module.
+	Damping() Logger
+	WithField(key string, value interface{}) LogFactory
+	WithFields(fields Fields) LogFactory
 }
 
-// New creates a logger factory. If no logger is provided, a default one is
-// used. Unset module levels default to Warn.
-func New(conf Options) (*RingpopLogger, error) {
+// LogFacility is a LogFactory with some extra configuration methods.
+type LogFacility interface {
+	LogFactory
+	// Update changes the underlying logger and the levels for each named
+	// logger. If no logger is provided, the existing one is preserved;
+	// the same is true for unset level values.
+	Update(opts Options)
+}
+
+type ringpopFacility struct {
+	facility Facility
+}
+
+// New returns a static wrapper around Facility used by ringpop to produce
+// named loggers. Each named logger can be configured independently to output
+// messages only above a minimum level. If no logger is passed, one is created
+// by default.
+func New(opts Options) LogFacility {
 	defaultLogger := bark.NewLoggerFromLogrus(&logrus.Logger{
 		Out: ioutil.Discard,
 	})
-	logger := &RingpopLogger{
-		factory: NewLoggerFactory(defaultLogger),
+	rf := &ringpopFacility{
+		facility: NewFacility(defaultLogger),
 	}
-	if err := logger.Update(conf); err != nil {
-		return nil, err
-	}
-	return logger, nil
+	rf.Update(opts)
+	return rf
 }
 
 const (
@@ -71,66 +102,58 @@ const (
 	dampingLogger    = "damping"
 )
 
-// Update changes the underlying logger and the levels for each named logger.
-// If no logger is provided, the existing one is preserved; the same is true
-// for unset level values.
-func (rl *RingpopLogger) Update(conf Options) error {
-	if conf.Logger != nil {
-		rl.factory.SetLogger(conf.Logger)
+func (rf *ringpopFacility) Update(opts Options) {
+	if opts.Logger != nil {
+		rf.facility.SetLogger(opts.Logger)
 	}
-	if conf.Ringpop != unset {
-		if err := rl.factory.SetLevel(ringpopLogger, conf.Ringpop); err != nil {
-			return fmt.Errorf("Config.Ringpop: %v", err)
-		}
+	if opts.Ringpop != nil {
+		rf.facility.SetLevel(ringpopLogger, opts.Ringpop)
 	}
-	if conf.Gossip != unset {
-		if err := rl.factory.SetLevel(gossipLogger, conf.Gossip); err != nil {
-			return fmt.Errorf("Config.Gossip: %v", err)
-		}
+	if opts.Gossip != nil {
+		rf.facility.SetLevel(gossipLogger, opts.Gossip)
 	}
-	if conf.Suspicion != unset {
-		if err := rl.factory.SetLevel(suspicionLogger, conf.Suspicion); err != nil {
-			return fmt.Errorf("Config.Suspicion: %v", err)
-		}
+	if opts.Suspicion != nil {
+		rf.facility.SetLevel(suspicionLogger, opts.Suspicion)
 	}
-	if conf.Ring != unset {
-		if err := rl.factory.SetLevel(ringLogger, conf.Ring); err != nil {
-			return fmt.Errorf("Config.Ring: %v", err)
-		}
+	if opts.Ring != nil {
+		rf.facility.SetLevel(ringLogger, opts.Ring)
 	}
-	if conf.Membership != unset {
-		if err := rl.factory.SetLevel(membershipLogger, conf.Membership); err != nil {
-			return fmt.Errorf("Config.Membership: %v", err)
-		}
+	if opts.Membership != nil {
+		rf.facility.SetLevel(membershipLogger, opts.Membership)
 	}
-	if conf.Damping != unset {
-		if err := rl.factory.SetLevel(dampingLogger, conf.Damping); err != nil {
-			return fmt.Errorf("Config.Damping: %v", err)
-		}
+	if opts.Damping != nil {
+		rf.facility.SetLevel(dampingLogger, opts.Damping)
 	}
-	return nil
 }
 
-func (rl *RingpopLogger) Ringpop() Logger {
-	return rl.factory.Logger(ringpopLogger)
+func (rf *ringpopFacility) Ringpop() Logger    { return rf.facility.Logger(ringpopLogger) }
+func (rf *ringpopFacility) Gossip() Logger     { return rf.facility.Logger(gossipLogger) }
+func (rf *ringpopFacility) Suspicion() Logger  { return rf.facility.Logger(suspicionLogger) }
+func (rf *ringpopFacility) Ring() Logger       { return rf.facility.Logger(ringLogger) }
+func (rf *ringpopFacility) Membership() Logger { return rf.facility.Logger(membershipLogger) }
+func (rf *ringpopFacility) Damping() Logger    { return rf.facility.Logger(dampingLogger) }
+
+func (rf *ringpopFacility) WithField(key string, value interface{}) LogFactory {
+	return &ringpopFactory{factory: rf.facility.WithField(key, value)}
+}
+func (rf *ringpopFacility) WithFields(fields Fields) LogFactory {
+	return &ringpopFactory{factory: rf.facility.WithFields(fields)}
 }
 
-func (rl *RingpopLogger) Gossip() Logger {
-	return rl.factory.Logger(gossipLogger)
+type ringpopFactory struct {
+	factory Factory
 }
 
-func (rl *RingpopLogger) Suspicion() Logger {
-	return rl.factory.Logger(suspicionLogger)
-}
+func (rf *ringpopFactory) Ringpop() Logger    { return rf.factory.Logger(ringpopLogger) }
+func (rf *ringpopFactory) Gossip() Logger     { return rf.factory.Logger(gossipLogger) }
+func (rf *ringpopFactory) Suspicion() Logger  { return rf.factory.Logger(suspicionLogger) }
+func (rf *ringpopFactory) Ring() Logger       { return rf.factory.Logger(ringLogger) }
+func (rf *ringpopFactory) Membership() Logger { return rf.factory.Logger(membershipLogger) }
+func (rf *ringpopFactory) Damping() Logger    { return rf.factory.Logger(dampingLogger) }
 
-func (rl *RingpopLogger) Ring() Logger {
-	return rl.factory.Logger(ringLogger)
+func (rf *ringpopFactory) WithField(key string, value interface{}) LogFactory {
+	return &ringpopFactory{factory: rf.factory.WithField(key, value)}
 }
-
-func (rl *RingpopLogger) Membership() Logger {
-	return rl.factory.Logger(membershipLogger)
-}
-
-func (rl *RingpopLogger) Damping() Logger {
-	return rl.factory.Logger(dampingLogger)
+func (rf *ringpopFactory) WithFields(fields Fields) LogFactory {
+	return &ringpopFactory{factory: rf.factory.WithFields(fields)}
 }

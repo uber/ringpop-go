@@ -24,8 +24,7 @@ import (
 	"errors"
 	"time"
 
-	log "github.com/uber-common/bark"
-
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
@@ -95,7 +94,7 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 			Changes: req.Changes,
 		})
 
-		p.node.log.WithFields(log.Fields{
+		p.node.log.WithFields(logger.Fields{
 			"remote":  p.target,
 			"changes": req.Changes,
 		}).Debug("ping send")
@@ -104,7 +103,7 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 
 		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, res)
 		if err != nil {
-			p.node.log.WithFields(log.Fields{
+			p.node.log.WithFields(logger.Fields{
 				"remote": p.target,
 				"error":  err,
 			}).Debug("ping failed")

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 )
 
 type suspect interface {
@@ -37,7 +37,7 @@ type suspicion struct {
 	sync.Mutex
 
 	node *Node
-	log  log.Logger
+	log  logger.Logger
 
 	timeout time.Duration
 	timers  map[string]*time.Timer

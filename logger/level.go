@@ -22,10 +22,22 @@ package logger
 
 import "fmt"
 
-type Level uint8
+// Don't expose level to outside world.
+type level uint8
 
-func (level Level) String() string {
-	switch level {
+// Level represents a log level used to filter log messages.
+type Level interface {
+	// Level returns the underlying value of a log level.
+	Level() level
+}
+
+func (lvl level) Level() level {
+	return lvl
+}
+
+// String converts a log level to its string representation.
+func (lvl level) String() string {
+	switch lvl {
 	case Trace:
 		return "trace"
 	case Debug:
@@ -47,7 +59,7 @@ func (level Level) String() string {
 	return "unknown"
 }
 
-// Convert a string to a Level, the reverse of Level.String
+// Parse converts a string to a log level.
 func Parse(lvl string) (Level, error) {
 	switch lvl {
 	case "off":
@@ -73,17 +85,23 @@ func Parse(lvl string) (Level, error) {
 }
 
 const (
-	unset Level = iota
-	Trace
+	// Trace log level
+	Trace level = iota
+	// Debug log level
 	Debug
+	// Info log level
 	Info
+	// Warn log level
 	Warn
+	// Error log level
 	Error
+	// Fatal log level
 	Fatal
+	// Panic log level
 	Panic
+	// Off log level, turns off all logging.
+	// Use this carefuly as is it skips Panic calls.
 	Off
 )
 
 const defaultNotConfiguredNamedLogger = Warn
-const lowestLevel = Trace
-const highestLevel = Off

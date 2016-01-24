@@ -24,12 +24,10 @@ package replica
 
 import (
 	"errors"
-	"io/ioutil"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
-	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -97,7 +95,7 @@ type Replicator struct {
 	sender    Sender
 	channel   shared.SubChannel
 	forwarder *forward.Forwarder
-	logger    log.Logger
+	logger    logger.Logger
 	defaults  *Options
 }
 
@@ -128,19 +126,17 @@ func mergeDefaultOptions(opts *Options, def *Options) *Options {
 // NewReplicator returns a new Replicator instance that makes calls with the given
 // SubChannel to the service defined by SubChannel.GetServiceName(). The given n/w/r
 // values will be used as defaults for the replicator when none are provided
-func NewReplicator(s Sender, channel shared.SubChannel, logger log.Logger,
+func NewReplicator(s Sender, channel shared.SubChannel, log logger.Logger,
 	opts *Options) *Replicator {
 
-	if logger == nil {
-		logger = log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		})
+	if log == nil {
+		log = logger.New(logger.Options{}).Ringpop()
 	}
 
-	f := forward.NewForwarder(s, channel, logger)
+	f := forward.NewForwarder(s, channel, log)
 
 	opts = mergeDefaultOptions(opts, &Options{3, 1, 3, Parallel})
-	return &Replicator{s, channel, f, logger, opts}
+	return &Replicator{s, channel, f, log, opts}
 }
 
 // Read replicates a read request. It takes key(s) to be used for lookup of the requests
@@ -243,7 +239,7 @@ func (r *Replicator) readWrite(rw int, keys []string, request []byte, operation 
 	}
 
 	if len(responses) < rwValue {
-		r.logger.WithFields(log.Fields{
+		r.logger.WithFields(logger.Fields{
 			"nValue":       opts.NValue,
 			"rwValue":      rwValue,
 			"numResponses": len(responses),
@@ -324,7 +320,7 @@ func (r *Replicator) forwardRequest(dest string, copts *callOptions, fopts *forw
 		copts.Operation, keys, copts.Format, fopts)
 
 	if err != nil {
-		r.logger.WithFields(log.Fields{
+		r.logger.WithFields(logger.Fields{
 			"error": err,
 		}).Warn("replicator read/write error")
 

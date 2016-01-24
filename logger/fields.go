@@ -20,48 +20,34 @@
 
 package logger
 
-import (
-	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/test/mocks"
-	"testing"
-)
+// Fields redefine bark.Fields for convenience.
+type Fields map[string]interface{}
 
-type LoggerFactorySuite struct {
-	suite.Suite
-	mock    *mocks.Logger
-	factory *LoggerFactory
+// Fields implements the bark.LogFields interface.
+func (f Fields) Fields() map[string]interface{} {
+	return f
 }
 
-func (s *LoggerFactorySuite) SetupTest() {
-	s.mock = &mocks.Logger{}
-	s.factory = NewLoggerFactory(s.mock)
+// withField returns a new copy with the extra field set
+func (f Fields) withField(key string, value interface{}) Fields {
+	newSize := len(f) + 1
+	newFields := make(map[string]interface{}, newSize)
+	for k, v := range f {
+		newFields[k] = v
+	}
+	newFields[key] = value
+	return newFields
 }
 
-func (s *LoggerFactorySuite) TestLoggerIdentity() {
-	s.Exactly(s.factory.Logger("x"), s.factory.Logger("x"))
-}
-
-func (s *LoggerFactorySuite) TestDefaultLevel() {
-	logger := s.factory.Logger("x").(*namedLogger)
-	s.Equal(logger.min, Warn)
-}
-
-func (s *LoggerFactorySuite) TestSetLevel() {
-	s.factory.SetLevel("x", Warn)
-	logger := s.factory.Logger("x").(*namedLogger)
-	s.Equal(logger.min, Warn)
-	s.factory.SetLevel("x", Panic)
-	s.Equal(logger.min, Panic)
-}
-
-func (s *LoggerFactorySuite) TestSetLevelLow() {
-	s.Error(s.factory.SetLevel("x", unset))
-}
-
-func (s *LoggerFactorySuite) TestSetLevelHigh() {
-	s.Error(s.factory.SetLevel("x", highestLevel+1))
-}
-
-func TestLoggerFactorySuite(t *testing.T) {
-	suite.Run(t, new(LoggerFactorySuite))
+// withFields returns a new copy updated with other's values
+func (f Fields) withFields(other Fields) Fields {
+	newSize := len(f) + len(other)
+	newFields := make(map[string]interface{}, newSize)
+	for k, v := range f {
+		newFields[k] = v
+	}
+	for k, v := range other {
+		newFields[k] = v
+	}
+	return newFields
 }

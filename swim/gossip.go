@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 )
 
 // Gossip handles the protocol period of the SWIM protocol
@@ -163,7 +163,7 @@ func (g *gossip) RunProtocolPeriodLoop() {
 			})
 		}
 
-		g.node.log.WithFields(log.Fields{
+		g.node.log.WithFields(logger.Fields{
 			"start": startTime,
 			"end":   time.Now(),
 		}).Debug("stopped protocol period loop")

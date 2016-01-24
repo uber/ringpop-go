@@ -90,10 +90,9 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
-	// This is a temp. name until Ringpop.logger is no longer used.
-	loggerFactory *logger.RingpopLogger
-	logger        log.Logger
-	log           log.Logger
+	logFacility logger.LogFacility
+	logger      logger.Logger
+	log         logger.Logger
 
 	startTime time.Time
 }
