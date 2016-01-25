@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# Parse the output from `go test -v` and prints a summary at the end. Also only
+# outputs errors by default unless -v is specified.
+#
+
+declare verbose=false
+
+if [[ $1 == "-v"* ]]; then
+	verbose=true
+fi
+
+declare -i run=0
+declare -i passed=0
+declare -i failed=0
+declare -i skipped=0
+
+while IFS= read -r line; do
+	case $line in
+		"--- PASS:"*)
+			passed=$(($passed+1))
+			;;
+
+		"--- FAIL:"*)
+			failed=$(($failed+1))
+
+			# Output fail lines
+			if ! $verbose; then
+				echo "$line"
+			fi
+			;;
+
+		"--- SKIP:"*)
+			skipped=$(($skipped+1))
+			;;
+
+		# Skip output of "RUN" lines by default
+		"=== RUN"*)
+			run=$(($run+1))
+			;;
+
+		# Skip output of mock.go success lines (unicode char is the green tick)
+		*mock*$(echo -e "\xe2\x9c\x85")*)
+			;;
+
+		# Skip and ignore printing junk
+		PASS|FAIL|\?*)
+			;;
+
+		*)
+			# Output unknown lines
+			if ! $verbose; then
+				echo "$line"
+			fi
+			;;
+	esac
+
+	if $verbose; then
+		echo "$line"
+	fi
+
+done
+
+echo
+echo "# tests: $run"
+[ $passed -ne 0 ] && echo "# passed: $passed"
+[ $failed -ne 0 ] && echo "# failed: $failed"
+[ $skipped -ne 0 ] && echo "# skipped: $skipped"
+echo
+
+# Exit with non-zero code if there were test errors
+if [ $failed -ne 0 ]; then
+	exit 1
+fi
