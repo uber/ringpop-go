@@ -22,9 +22,9 @@ package swim
 
 import (
 	"errors"
+	"time"
 
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
 )
@@ -68,7 +68,7 @@ func (n *Node) registerHandlers() error {
 		"/admin/tick":         n.tickHandler, // Deprecated
 		"/admin/gossip/tick":  n.tickHandler,
 		"/admin/member/leave": n.adminLeaveHandler,
-		"/admin/member/join":  n.adminJoinHandler,
+		"/admin/member/join":  n.adminJoinHandler(&GlobalClock{}),
 	}
 
 	return json.Register(n.channel, handlers, n.errorHandler)
@@ -121,9 +121,40 @@ func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {
 	return &ping{Checksum: n.memberlist.Checksum()}, nil
 }
 
-func (n *Node) adminJoinHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	n.memberlist.MakeAlive(n.address, util.TimeNowMS())
-	return &Status{Status: "rejoined"}, nil
+type Clock interface {
+	Now() time.Time
+}
+
+type GlobalClock struct{}
+
+func (c *GlobalClock) Now() time.Time {
+	return time.Now()
+}
+
+type MockClock struct {
+	baseTime time.Time
+}
+
+func NewMockClock(time time.Time) *MockClock {
+	return &MockClock{time}
+}
+
+func (c *MockClock) Advance(duration time.Duration) time.Time {
+    c.baseTime = c.baseTime.Add(duration)
+    return c.baseTime
+}
+
+func (c *MockClock) Now() time.Time {
+	return c.baseTime
+}
+
+type handler func(json.Context, *emptyArg) (*Status, error)
+
+func (n *Node) adminJoinHandler(clock Clock) handler {
+	return func(ctx json.Context, req *emptyArg) (*Status, error) {
+		n.memberlist.MakeAlive(n.address, clock.Now().UnixNano() / int64(time.Millisecond))
+		return &Status{Status: "rejoined"}, nil
+	}
 }
 
 func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, error) {
