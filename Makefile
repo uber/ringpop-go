@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks testpop mocks out test test-integration test-unit
+.PHONY: clean clean-mocks testpop mocks out setup test test-integration test-unit
 
 SHELL = /bin/bash
 
@@ -7,8 +7,10 @@ export PATH := $(shell pwd)/scripts/travis/thrift-gen-release/linux-x86_64:$(PAT
 
 # go commands should use the Godeps/_workspace
 GODEPS := $(shell pwd)/Godeps/_workspace
-OLDGOPATH := $(GOPATH)
-export GOPATH = $(GODEPS):$(OLDGOPATH)
+USER_GOPATH := $(GOPATH)
+export GOPATH = $(GODEPS):$(USER_GOPATH)
+
+DEV_DEPS = github.com/uber/tchannel-go/thrift/thrift-gen github.com/vektra/mockery/...
 
 out:	test
 
@@ -21,6 +23,13 @@ clean-mocks:
 
 mocks:
 	test/gen-testfiles
+
+setup:
+	GOPATH=$(USER_GOPATH) go get -v $(DEV_DEPS)
+	@if ! which thrift | grep -q /; then \
+		echo "thrift not in PATH. (brew install thrift?)" >&2; \
+ 		exit 1; \
+	fi
 
 test:	test-unit test-integration
 
