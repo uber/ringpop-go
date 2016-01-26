@@ -81,7 +81,8 @@ type Ringpop struct {
 	listeners []events.EventListener
 
 	statter log.StatsReporter
-	stats   struct {
+
+	stats struct {
 		hostport string
 		prefix   string
 		keys     map[string]string
@@ -367,6 +368,17 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 		}
 		rp.statter.IncCounter(rp.getStatKey("updates"), nil, int64(len(event.Changes)))
 
+		// XXX this is a dummy test, not for production.
+		oldChecksum := checksumToString(event.OldChecksum)
+		newChecksum := checksumToString(event.NewChecksum)
+		rp.UpdateGauge("members-checksum", int64(0), "checksum", oldChecksum)
+		rp.UpdateGauge("members-checksum", int64(1), "checksum", newChecksum)
+		rp.UpdateGauge("members-count", int64(event.NumMembers), "status", "*")
+		rp.UpdateGauge("members-count", int64(event.CountByStatus[swim.Alive]), "status", swim.Alive)
+		rp.UpdateGauge("members-count", int64(event.CountByStatus[swim.Suspect]), "status", swim.Suspect)
+		rp.UpdateGauge("members-count", int64(event.CountByStatus[swim.Faulty]), "status", swim.Faulty)
+		rp.UpdateGauge("members-count", int64(event.CountByStatus[swim.Leave]), "status", swim.Leave)
+
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
@@ -413,6 +425,10 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
 		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
 		rp.statter.IncCounter(rp.getStatKey("membership.checksum-computed"), nil, 1)
+
+		// XXX this is a dummy test, not for production.
+		rp.UpdateGauge("checksum-tagged", int64(0), "checksum", checksumToString(event.OldChecksum))
+		rp.UpdateGauge("checksum-tagged", int64(1), "checksum", checksumToString(event.Checksum))
 
 	case swim.ChangesCalculatedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.disseminate"), nil, int64(len(event.Changes)))
@@ -629,6 +645,25 @@ func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, 
 	format tchannel.Format, opts *forward.Options) ([]byte, error) {
 
 	return rp.forwarder.ForwardRequest(request, dest, service, endpoint, keys, format, opts)
+}
+
+func (rp *Ringpop) UpdateGauge(name string, value int64, tagPairs ...string) {
+	tags := log.Tags{}
+	tags["service"] = "ringpopd-go"
+	tags["host-port"] = rp.stats.hostport
+	tags["name"] = name
+	for i := 1; i < len(tagPairs); i += 2 {
+		key := tagPairs[i-1]
+		value := tagPairs[i]
+		tags[key] = value
+	}
+
+	longName := rp.getStatKey(name)
+	rp.statter.UpdateGauge(longName, tags, value)
+}
+
+func checksumToString(checksum uint32) string {
+	return fmt.Sprintf("%08x", checksum)
 }
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes

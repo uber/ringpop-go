@@ -48,10 +48,11 @@ type MemberlistChangesReceivedEvent struct {
 // node's memberlist as well as the previous and new checksums and the
 // number of members in the memberlist
 type MemberlistChangesAppliedEvent struct {
-	Changes     []Change `json:"changes"`
-	OldChecksum uint32   `json:"oldChecksum"`
-	NewChecksum uint32   `json:"newChecksum"`
-	NumMembers  int      `json:"numMembers"`
+	Changes       []Change       `json:"changes"`
+	OldChecksum   uint32         `json:"oldChecksum"`
+	NewChecksum   uint32         `json:"newChecksum"`
+	NumMembers    int            `json:"numMembers"`
+	CountByStatus map[string]int `json:"countByStatus"`
 }
 
 // A FullSyncEvent is sent when the disseminator's node issues changes a
@@ -160,7 +161,7 @@ type ProtocolFrequencyEvent struct {
 type ChecksumComputeEvent struct {
 	Duration    time.Duration `json:"duration"`
 	Checksum    uint32        `json:"checksum"`
-	OldChecksum uint32        `json:"oldchecksum"`
+	OldChecksum uint32        `json:"oldChecksum"`
 }
 
 // A ChangesCalculatedEvent is sent when the disseminator generated the list of changes to send in a ping or its response
