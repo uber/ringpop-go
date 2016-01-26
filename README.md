@@ -18,18 +18,18 @@ go get github.com/uber/ringpop-go
 Developing
 ----------
 
-Run the tests by doing:
+First make certain that `thrift` is in your path. (OSX: `brew install thrift`). Then,
 
 ```
-make
+make setup
 ```
 
-To run the test you need both `thrift` and `thrift-gen` on your path. On OSX you
-can install them with the following commands:
+to install remaining golang dependencies.
 
-```bash
-brew install thrift
-go get github.com/uber/tchannel-go/thrift/thrift-gen
+Finally, run the tests by doing:
+
+```
+make test
 ```
 
 Documentation
