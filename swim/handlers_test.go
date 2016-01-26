@@ -189,12 +189,20 @@ func (s *HandlerTestSuite) TestJoinHandlerError() {
 
 func (s *HandlerTestSuite) TestPingRequestHandler() {
 	// Bootstrap the test node, so it's ready to receive pings
-	s.testNode.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &StaticHostList{[]string{s.testNode.node.Address()}},
+	node := s.testNode.node
+	node.Bootstrap(&BootstrapOptions{
+		DiscoverProvider: &StaticHostList{[]string{node.Address()}},
 	})
 
-	req := newPingRequest(s.testNode.node, s.testNode.node.Address())
-	res, err := s.testNode.node.pingRequestHandler(s.ctx, req)
+	req := &pingRequest{
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           nil,
+		Target:            node.Address(),
+	}
+
+	res, err := node.pingRequestHandler(s.ctx, req)
 
 	s.NoError(err)
 	s.True(res.Ok, "expected ok response from ping")
@@ -202,8 +210,16 @@ func (s *HandlerTestSuite) TestPingRequestHandler() {
 
 func (s *HandlerTestSuite) TestPingRequestHandlerFail() {
 	// Node is not ready to receive pings when it's not bootstrapped
-	req := newPingRequest(s.testNode.node, s.testNode.node.Address())
-	res, err := s.testNode.node.pingRequestHandler(s.ctx, req)
+	node := s.testNode.node
+	req := &pingRequest{
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           nil,
+		Target:            node.Address(),
+	}
+
+	res, err := node.pingRequestHandler(s.ctx, req)
 
 	s.Error(err)
 	s.Nil(res)

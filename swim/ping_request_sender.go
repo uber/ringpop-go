@@ -40,17 +40,6 @@ type pingRequest struct {
 	Changes           []Change `json:"changes"`
 }
 
-// newPingRequest creates a new ping request to the specified target.
-func newPingRequest(node *Node, targetHostPort string) *pingRequest {
-	return &pingRequest{
-		Source:            node.Address(),
-		SourceIncarnation: node.Incarnation(),
-		Checksum:          node.memberlist.Checksum(),
-		Changes:           node.disseminator.IssueAsSender(),
-		Target:            targetHostPort,
-	}
-}
-
 // A PingRequestSender is used to make a ping request to a remote node
 type pingRequestSender struct {
 	node    *Node
@@ -102,12 +91,19 @@ func (p *pingRequestSender) MakeCall(ctx json.Context, res *pingResponse) <-chan
 	go func() {
 		defer close(errC)
 
+		changes, bumpPiggybackCounters := p.node.disseminator.IssueAsSender()
+		req := &pingRequest{
+			Source:            p.node.Address(),
+			SourceIncarnation: p.node.Incarnation(),
+			Checksum:          p.node.memberlist.Checksum(),
+			Changes:           changes,
+			Target:            p.target,
+		}
+
 		peer := p.node.channel.Peers().GetOrAdd(p.peer)
-
-		req := newPingRequest(p.node, p.target)
-
 		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping-req", req, &res)
 		if err != nil {
+			bumpPiggybackCounters()
 			errC <- err
 			return
 		}

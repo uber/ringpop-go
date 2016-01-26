@@ -50,36 +50,29 @@ func handlePingRequest(node *Node, req *pingRequest) (*pingResponse, error) {
 	pingStartTime := time.Now()
 
 	res, err := sendPing(node, req.Target, node.pingTimeout)
-	if err != nil {
-		changes, _ := node.disseminator.IssueAsReceiver(req.Source,
-			req.SourceIncarnation, req.Checksum)
+	pingOk := err == nil
 
-		return &pingResponse{
-			Target:  req.Target,
-			Ok:      false,
-			Changes: changes,
-		}, nil
+	if pingOk {
+		node.emit(PingRequestPingEvent{
+			Local:    node.Address(),
+			Source:   req.Source,
+			Target:   req.Target,
+			Duration: time.Now().Sub(pingStartTime),
+		})
+
+		node.memberlist.Update(res.Changes)
 	}
 
-	node.emit(PingRequestPingEvent{
-		Local:    node.Address(),
-		Source:   req.Source,
-		Target:   req.Target,
-		Duration: time.Now().Sub(pingStartTime),
-	})
+	changes, fullSync :=
+		node.disseminator.IssueAsReceiver(req.Source, req.SourceIncarnation, req.Checksum)
 
-	node.memberlist.Update(res.Changes)
-
-	changes, fs := node.disseminator.IssueAsReceiver(req.Source,
-		req.SourceIncarnation, req.Checksum)
-
-	if fs {
+	if fullSync {
 		// TODO: something...
 	}
 
 	return &pingResponse{
 		Target:  req.Target,
-		Ok:      true,
+		Ok:      pingOk,
 		Changes: changes,
 	}, nil
 }
