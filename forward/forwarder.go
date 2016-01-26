@@ -22,13 +22,11 @@
 package forward
 
 import (
-	"io/ioutil"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -51,7 +49,7 @@ type Options struct {
 	RerouteRetries bool
 	RetrySchedule  []time.Duration
 	Timeout        time.Duration
-	Logger         log.Logger
+	Logger         logger.Logger
 }
 
 func (f *Forwarder) defaultOptions() *Options {
@@ -93,7 +91,7 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 type Forwarder struct {
 	sender  Sender
 	channel shared.SubChannel
-	logger  log.Logger
+	logger  logger.Logger
 
 	inflightLock sync.Mutex
 	inflight     int64
@@ -102,17 +100,15 @@ type Forwarder struct {
 }
 
 // NewForwarder returns a new forwarder
-func NewForwarder(s Sender, ch shared.SubChannel, logger log.Logger) *Forwarder {
-	if logger == nil {
-		logger = log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		})
+func NewForwarder(s Sender, ch shared.SubChannel, log logger.Logger) *Forwarder {
+	if log == nil {
+		log = logger.New(logger.Options{}).Ringpop()
 	}
 
 	return &Forwarder{
 		sender:  s,
 		channel: ch,
-		logger:  logger,
+		logger:  log,
 	}
 }
 

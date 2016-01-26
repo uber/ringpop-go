@@ -27,7 +27,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/raw"
@@ -59,7 +59,7 @@ type requestSender struct {
 
 	startTime, retryStartTime time.Time
 
-	logger log.Logger
+	logger logger.Logger
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
@@ -110,7 +110,7 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 		identity, _ := s.sender.WhoAmI()
 
-		s.logger.WithFields(log.Fields{
+		s.logger.WithFields(logger.Fields{
 			"local":       identity,
 			"destination": s.destination,
 			"service":     s.service,
@@ -124,7 +124,7 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 		identity, _ := s.sender.WhoAmI()
 
-		s.logger.WithFields(log.Fields{
+		s.logger.WithFields(logger.Fields{
 			"local":       identity,
 			"destination": s.destination,
 			"service":     s.service,

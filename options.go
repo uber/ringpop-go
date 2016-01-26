@@ -22,11 +22,10 @@ package ringpop
 
 import (
 	"errors"
-	"io/ioutil"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 )
 
@@ -115,13 +114,50 @@ func HashRingConfig(c *hashring.Configuration) Option {
 	}
 }
 
-// Logger is used to specify a bark-compatible logger that will be used for
-// all Ringpop logging. If a logger is not provided, one will be created
+// Logger is used to specify a bark-compatible logger that will be used for all
+// Ringpop logging. If a logger is not provided, one will be created
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		r.logger = l
-		r.log = l
+		opts := logger.Options{Logger: l}
+		// If no facility is set, create one, otherwise update the
+		// existing one. This in turn updates all existing loggers.
+		if r.logFacility == nil {
+			r.logFacility = logger.New(opts)
+			r.log = r.logFacility.Ringpop()
+			r.logger = r.logFacility.Ringpop()
+		} else {
+			r.logFacility.Update(opts)
+		}
+		return nil
+	}
+}
+
+// LoggingConfig is used to specify a bark-compatible logger that will be used
+// for all Ringpop logging and the log levels for all modules. If a logger is
+// not provided, one will be created automatically. Unset level values preserve
+// previous values.
+//
+// Example:
+//
+//     ringpop.New("my-app",
+//         ringpop.Channel(myChannel),
+//         ringpop.LoggingConfig(logger.Options{
+//             Logger: log,
+//             Gossip: logger.Debug,
+//         },
+//     )
+func LoggingConfig(opts logger.Options) Option {
+	return func(r *Ringpop) error {
+		// If no facility is set, create one, otherwise update the
+		// existing one. This in turn updates all existing loggers.
+		if r.logFacility == nil {
+			r.logFacility = logger.New(opts)
+			r.log = r.logFacility.Ringpop()
+			r.logger = r.logFacility.Ringpop()
+		} else {
+			r.logFacility.Update(opts)
+		}
 		return nil
 	}
 }
@@ -179,12 +215,12 @@ func defaultIdentityResolver(r *Ringpop) error {
 	return nil
 }
 
-// defaultLogger is the default logger that is used for Ringpop if one is not
-// provided by the user.
-func defaultLogger(r *Ringpop) error {
-	return Logger(log.NewLoggerFromLogrus(&logrus.Logger{
-		Out: ioutil.Discard,
-	}))(r)
+// defaultLogFacility is the default logger and module levels that are used for
+// Ringpop if none are provided by the user.
+func defaultLogFacility(r *Ringpop) error {
+	return LoggingConfig(logger.Options{
+		Ringpop: logger.Error,
+	})(r)
 }
 
 func defaultStatter(r *Ringpop) error {
@@ -199,7 +235,7 @@ func defaultHashRingOptions(r *Ringpop) error {
 // can be overridden at runtime.
 var defaultOptions = []Option{
 	defaultIdentityResolver,
-	defaultLogger,
+	defaultLogFacility,
 	defaultStatter,
 	defaultHashRingOptions,
 }

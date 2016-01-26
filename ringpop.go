@@ -36,6 +36,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/util"
@@ -89,8 +90,9 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
-	logger log.Logger
-	log    log.Logger
+	logFacility logger.LogFacility
+	logger      logger.Logger
+	log         logger.Logger
 
 	startTime time.Time
 }

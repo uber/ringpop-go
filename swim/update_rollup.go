@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logger"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -163,7 +163,7 @@ func (r *updateRollup) FlushBuffer() {
 		sinceLastFlush = now.Sub(r.timings.lastFlush)
 	}
 
-	r.node.log.WithFields(log.Fields{
+	r.node.log.WithFields(logger.Fields{
 		"checksum":         r.node.memberlist.Checksum(),
 		"sinceFirstUpdate": sinceFirstUpdate,
 		"sinceLastFlush":   sinceLastFlush,

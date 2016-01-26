@@ -60,7 +60,7 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	// instead.
 	testRingpop := &Ringpop{}
 	defaultStatter(testRingpop)
-	defaultLogger(testRingpop)
+	defaultLogFacility(testRingpop)
 	defaultHashRingOptions(testRingpop)
 
 	s.Equal(testRingpop.logger, rp.logger)
@@ -105,7 +105,10 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	s.Exactly(mockLogger, rp.logger)
+	// The logger is wrapped, test for message propagation
+	mockLogger.On("Error", []interface{}{"hello"})
+	rp.logFacility.Ringpop().Error("hello")
+	mockLogger.AssertCalled(s.T(), "Error", []interface{}{"hello"})
 }
 
 // TestStatter tests that the statter that's passed in gets applied correctly
