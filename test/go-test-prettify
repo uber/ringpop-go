@@ -68,7 +68,7 @@ echo "# tests: $run"
 [ $skipped -ne 0 ] && echo "# skipped: $skipped"
 echo
 
-# Exit with non-zero code if there were test errors
-if [ $failed -ne 0 ]; then
+# Exit with non-zero code if there were test or compile errors
+if [ $failed -ne 0 -o $run -eq 0 ]; then
 	exit 1
 fi
