@@ -114,11 +114,18 @@ func (s *HandlerTestSuite) TestAdminLeaveJoinHandlers() {
 	s.Equal(4, s.testNode.node.CountReachableMembers())
 
 	// Test join handler brings it back to 5
+	s.testNode.node.clock = mockClock(time.Now().Add(time.Millisecond))
 	status, err = s.testNode.node.adminJoinHandler(s.ctx, &emptyArg{})
 	s.NoError(err, "calling handler should not result in error")
 	s.Equal(&Status{Status: "rejoined"}, status)
 	s.Equal(5, s.testNode.node.CountReachableMembers())
 }
+
+// mockClock implements the Clock interface with a constant Now method.
+type mockClock time.Time
+
+// Now returns the time that is stored in the type.
+func (c mockClock) Now() time.Time { return time.Time(c) }
 
 // TestRegisterHandlers tests that registerHandler always succeeds.
 func (s *HandlerTestSuite) TestRegisterHandlers() {

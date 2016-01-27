@@ -175,6 +175,12 @@ func (m *memberlist) GetMembers() (members []Member) {
 	return
 }
 
+// Reincarnate sets the status of the node to Alive and updates the incarnation
+// number. It adds the change to the disseminator as well.
+func (m *memberlist) Reincarnate() []Change {
+	return m.MakeAlive(m.node.address, NowInMillis(m.node.clock))
+}
+
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
 	m.node.emit(MakeNodeStatusEvent{Alive})
 	return m.MakeChange(address, incarnation, Alive)
@@ -242,7 +248,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				Source:            change.Source,
 				SourceIncarnation: change.SourceIncarnation,
 				Address:           change.Address,
-				Incarnation:       util.TimeNowMS(),
+				Incarnation:       NowInMillis(m.node.clock),
 				Status:            Alive,
 				Timestamp:         util.Timestamp(time.Now()),
 			}
