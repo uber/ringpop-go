@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
@@ -60,10 +61,8 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	// instead.
 	testRingpop := &Ringpop{}
 	defaultStatter(testRingpop)
-	defaultLogger(testRingpop)
 	defaultHashRingOptions(testRingpop)
 
-	s.Equal(testRingpop.logger, rp.logger)
 	s.Equal(testRingpop.statter, rp.statter)
 	s.Equal(testRingpop.configHashRing, rp.configHashRing)
 }
@@ -99,13 +98,30 @@ func (s *RingpopOptionsTestSuite) TestChannelRequired() {
 // the Ringpop instance.
 func (s *RingpopOptionsTestSuite) TestLogger() {
 	mockLogger := &mocks.Logger{}
+	// Ignore random ringpop messages
+	for _, meth := range []string{"Debug", "Info", "Warn", "Error"} {
+		mockLogger.On(meth, mock.Anything)
+		mockLogger.On(meth+"f", mock.Anything, mock.Anything)
+	}
 	mockLogger.On("WithField", mock.Anything, mock.Anything).Return(mockLogger)
+	mockLogger.On("WithFields", mock.Anything).Return(mockLogger)
 
 	rp, err := New("test", Channel(s.channel), Logger(mockLogger))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	s.Exactly(mockLogger, rp.logger)
+	// The logger is wrapped, test for message propagation
+	mockLogger.On("Panic", []interface{}{"hello"})
+	rp.logger.Panic("hello")
+	mockLogger.AssertCalled(s.T(), "Panic", []interface{}{"hello"})
+}
+
+// TestLogLevelsError tests that named loggers can't have a severity level
+// above Fatal.
+func (s *RingpopOptionsTestSuite) TestLogLevelsError() {
+	levels := map[string]logging.Level{"named": logging.Panic}
+	_, err := New("test", Channel(s.channel), LogLevels(levels))
+	s.Error(err, "Setting log levels above Fatal should fail.")
 }
 
 // TestStatter tests that the statter that's passed in gets applied correctly

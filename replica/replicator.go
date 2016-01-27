@@ -24,12 +24,11 @@ package replica
 
 import (
 	"errors"
-	"io/ioutil"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -128,18 +127,17 @@ func mergeDefaultOptions(opts *Options, def *Options) *Options {
 // NewReplicator returns a new Replicator instance that makes calls with the given
 // SubChannel to the service defined by SubChannel.GetServiceName(). The given n/w/r
 // values will be used as defaults for the replicator when none are provided
+// Deprecation: logger is no longer used.
 func NewReplicator(s Sender, channel shared.SubChannel, logger log.Logger,
 	opts *Options) *Replicator {
 
-	if logger == nil {
-		logger = log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		})
-	}
-
-	f := forward.NewForwarder(s, channel, logger)
+	f := forward.NewForwarder(s, channel)
 
 	opts = mergeDefaultOptions(opts, &Options{3, 1, 3, Parallel})
+	logger = logging.Logger("replicator")
+	if identity, err := s.WhoAmI(); err == nil {
+		logger = logger.WithField("local", identity)
+	}
 	return &Replicator{s, channel, f, logger, opts}
 }
 

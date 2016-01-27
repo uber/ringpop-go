@@ -22,13 +22,12 @@
 package forward
 
 import (
-	"io/ioutil"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -51,7 +50,6 @@ type Options struct {
 	RerouteRetries bool
 	RetrySchedule  []time.Duration
 	Timeout        time.Duration
-	Logger         log.Logger
 }
 
 func (f *Forwarder) defaultOptions() *Options {
@@ -59,7 +57,6 @@ func (f *Forwarder) defaultOptions() *Options {
 		MaxRetries:    3,
 		RetrySchedule: []time.Duration{3 * time.Second, 6 * time.Second, 12 * time.Second},
 		Timeout:       3 * time.Second,
-		Logger:        f.logger,
 	}
 }
 
@@ -81,11 +78,6 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 		merged.RetrySchedule = def.RetrySchedule
 	}
 
-	merged.Logger = opts.Logger
-	if opts.Logger == nil {
-		merged.Logger = def.Logger
-	}
-
 	return &merged
 }
 
@@ -102,11 +94,11 @@ type Forwarder struct {
 }
 
 // NewForwarder returns a new forwarder
-func NewForwarder(s Sender, ch shared.SubChannel, logger log.Logger) *Forwarder {
-	if logger == nil {
-		logger = log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		})
+func NewForwarder(s Sender, ch shared.SubChannel) *Forwarder {
+
+	logger := logging.Logger("forwarder")
+	if identity, err := s.WhoAmI(); err == nil {
+		logger = logger.WithField("local", identity)
 	}
 
 	return &Forwarder{

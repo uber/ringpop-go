@@ -112,7 +112,7 @@ func (s *ForwarderTestSuite) SetupSuite() {
 	s.sender = sender
 	s.peer = peer
 
-	s.forwarder = NewForwarder(s.sender, s.channel.GetSubChannel("forwarder"), nil)
+	s.forwarder = NewForwarder(s.sender, s.channel.GetSubChannel("forwarder"))
 }
 
 func (s *ForwarderTestSuite) SetupTest() {

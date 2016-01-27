@@ -48,6 +48,7 @@ type dummies struct {
 
 func (s *requestSenderTestSuite) SetupTest() {
 	mockSender := &MockSender{}
+	mockSender.On("WhoAmI").Return("", nil)
 	dummies := s.newDummies(mockSender)
 	s.requestSender = newRequestSender(mockSender, dummies.emitter,
 		dummies.channel, dummies.request, dummies.keys, dummies.dest,
@@ -63,14 +64,12 @@ func (s *requestSenderTestSuite) newDummies(mockSender *MockSender) *dummies {
 		channel:  channel,
 		dest:     "dummydest",
 		endpoint: "/dummyendpoint",
-		emitter:  NewForwarder(mockSender, channel, newDummyLogger()),
+		emitter:  NewForwarder(mockSender, channel),
 		format:   tchannel.Thrift,
 		keys:     []string{},
-		options: &Options{
-			Logger: newDummyLogger(),
-		},
-		request: []byte{},
-		service: "dummyservice",
+		options:  &Options{},
+		request:  []byte{},
+		service:  "dummyservice",
 	}
 }
 

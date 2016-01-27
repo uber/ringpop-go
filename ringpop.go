@@ -36,6 +36,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/util"
@@ -90,7 +91,6 @@ type Ringpop struct {
 	}
 
 	logger log.Logger
-	log    log.Logger
 
 	startTime time.Time
 }
@@ -123,6 +123,7 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 		config: &configuration{
 			App: app,
 		},
+		logger: logging.Logger("ringpop"),
 	}
 
 	err = applyOptions(ringpop, defaultOptions)
@@ -159,9 +160,7 @@ func (rp *Ringpop) init() error {
 	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
 	rp.registerHandlers()
 
-	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.logger,
-	})
+	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, nil)
 	rp.node.RegisterListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
@@ -171,7 +170,7 @@ func (rp *Ringpop) init() error {
 	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
 	rp.stats.keys = make(map[string]string)
 
-	rp.forwarder = forward.NewForwarder(rp, rp.subChannel, rp.logger)
+	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
 	rp.forwarder.RegisterListener(rp)
 
 	rp.setState(initialized)
@@ -304,14 +303,14 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 
 	joined, err := rp.node.Bootstrap(&bootstrapOpts)
 	if err != nil {
-		rp.log.WithField("error", err).Info("bootstrap failed")
+		rp.logger.WithField("error", err).Info("bootstrap failed")
 		rp.setState(initialized)
 		return nil, err
 	}
 
 	rp.setState(ready)
 
-	rp.log.WithField("joined", joined).Info("bootstrap complete")
+	rp.logger.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
 }
 
@@ -525,7 +524,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	if !success {
 		err := errors.New("could not find destination for key")
-		rp.log.WithField("key", key).Warn(err)
+		rp.logger.WithField("key", key).Warn(err)
 		return "", err
 	}
 

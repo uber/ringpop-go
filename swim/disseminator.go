@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 )
 
 var log10 = math.Log(10)
@@ -44,6 +45,8 @@ type disseminator struct {
 	pFactor int
 
 	sync.RWMutex
+
+	logger log.Logger
 }
 
 // newDisseminator returns a new Disseminator instance.
@@ -53,6 +56,7 @@ func newDisseminator(n *Node) *disseminator {
 		changes: make(map[string]*pChange),
 		maxP:    1,
 		pFactor: 15,
+		logger:  logging.Logger("disseminator").WithField("local", n.Address()),
 	}
 
 	return d
@@ -75,7 +79,7 @@ func (d *disseminator) AdjustMaxPropagations() {
 
 		d.node.emit(MaxPAdjustedEvent{prevMaxP, newMaxP})
 
-		d.node.log.WithFields(log.Fields{
+		d.logger.WithFields(log.Fields{
 			"newMax":            newMaxP,
 			"prevMax":           prevMaxP,
 			"propagationFactor": d.pFactor,
@@ -128,7 +132,7 @@ func (d *disseminator) IssueAsReceiver(senderAddress string,
 	} else if d.node.memberlist.Checksum() != senderChecksum {
 		d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
 
-		d.node.log.WithFields(log.Fields{
+		d.logger.WithFields(log.Fields{
 			"localChecksum":  d.node.memberlist.Checksum(),
 			"remote":         senderAddress,
 			"remoteChecksum": senderChecksum,
