@@ -23,7 +23,6 @@ package ringpop
 import (
 	"fmt"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/uber-common/bark"
@@ -70,16 +69,6 @@ func (d *dummyListener) HandleEvent(event events.Event) {
 	d.l.Lock()
 	d.events++
 	d.l.Unlock()
-}
-
-func testPop(t *testing.T, hostport string) (*Ringpop, func()) {
-	ringpop, _ := New("test-app")
-
-	destroy := func() {
-		ringpop.Destroy()
-	}
-
-	return ringpop, destroy
 }
 
 func genAddresses(host, fromPort, toPort int) []string {
