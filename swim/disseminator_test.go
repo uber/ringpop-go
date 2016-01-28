@@ -60,6 +60,28 @@ func (s *DisseminatorTestSuite) TestChangesAreRecorded() {
 	s.Len(s.d.changes, 4, "expected four changes to be recorded")
 }
 
+func (s *DisseminatorTestSuite) TestChangesAreCleared() {
+	addresses := fakeHostPorts(1, 1, 2, 4)
+
+	for _, address := range addresses {
+		s.m.MakeAlive(address, s.incarnation)
+	}
+	fakeChange := Change{}
+	fakeChange.Address = "fake address"
+	s.d.ClearChange(fakeChange)
+	s.Equal(4, s.d.ChangeCount(), "expected no problems deleting non-existent changes")
+
+	changes := s.d.issueChanges(nil)
+	for i, c := range changes {
+		s.d.ClearChange(c)
+		s.Equal(4-i-1, s.d.ChangeCount(), "expected one change to be deleted")
+	}
+	s.Equal(0, s.d.ChangeCount(), "expected no change left")
+
+	s.d.ClearChange(fakeChange)
+	s.Equal(0, s.d.ChangeCount(), "expected no problems deleting non-existent changes")
+}
+
 func (s *DisseminatorTestSuite) TestFullSync() {
 	addresses := fakeHostPorts(1, 1, 2, 4)
 
