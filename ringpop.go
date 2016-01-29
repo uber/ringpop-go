@@ -296,6 +296,10 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 	}
 
 	if userBootstrapOpts == nil {
+		// XXX race condition?
+		rp.setState(ready)
+		me, _ := rp.WhoAmI()
+		rp.ring.AddServer(me)
 		return []string{}, nil
 	}
 
@@ -324,10 +328,7 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 // Ready returns whether or not ringpop is bootstrapped and ready to receive
 // requests.
 func (rp *Ringpop) Ready() bool {
-	if rp.getState() != ready {
-		return false
-	}
-	return rp.node.Ready()
+	return rp.getState() == ready
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

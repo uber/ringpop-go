@@ -45,3 +45,6 @@ testpop:	clean
 
 ping-ring:	clean
 	go build -o ping-ring examples/ping-ring/main.go
+
+ping-ring-debug:	clean
+	godebug build -instrument github.com/uber/ringpop-go,github.com/uber/ringpop-go/hashring -o ping-ring examples/ping-ring/main.go
