@@ -159,10 +159,12 @@ func (rp *Ringpop) init() error {
 	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
 	rp.registerHandlers()
 
-	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Logger: rp.logger,
-	})
-	rp.node.RegisterListener(rp)
+	/*
+		rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
+			Logger: rp.logger,
+		})
+		rp.node.RegisterListener(rp)
+	*/
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 	rp.ring.RegisterListener(rp)
@@ -291,6 +293,10 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 	identity, err := rp.identity()
 	if err != nil {
 		return nil, err
+	}
+
+	if userBootstrapOpts == nil {
+		return []string{}, nil
 	}
 
 	// If the user has provided a list of hosts (and not a bootstrap file),

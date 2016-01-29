@@ -26,7 +26,6 @@ import (
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
-	"github.com/uber/ringpop-go/swim"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel-go"
@@ -34,7 +33,6 @@ import (
 
 var (
 	hostport        = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
-	hostfile        = flag.String("hosts", "./hosts.json", "path to hosts file")
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 )
 
@@ -60,18 +58,13 @@ func main() {
 		ringpop.Identity(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
+	rp.Bootstrap(nil)
 
 	if err := ch.ListenAndServe(*hostport); err != nil {
 		log.Fatalf("could not listen on %s: %v", *hostport, err)
 	}
 
-	opts := &swim.BootstrapOptions{}
-	opts.File = *hostfile
-
-	_, err = rp.Bootstrap(opts)
-	if err != nil {
-		log.Fatalf("bootstrap failed: %v", err)
-	}
+	log.Infof("alive: %s", *hostport)
 
 	// block
 	select {}

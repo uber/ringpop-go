@@ -32,9 +32,11 @@ type Arg struct{}
 
 func (rp *Ringpop) registerHandlers() error {
 	handlers := map[string]interface{}{
-		"/health":       rp.health,
-		"/admin/stats":  rp.adminStatsHandler,
-		"/admin/lookup": rp.adminLookupHandler,
+		"/health":          rp.health,
+		"/admin/stats":     rp.adminStatsHandler,
+		"/admin/lookup":    rp.adminLookupHandler,
+		"/hashring/add":    rp.addMembers,
+		"/hashring/remove": rp.removeMembers,
 	}
 
 	return json.Register(rp.subChannel, handlers, func(ctx context.Context, err error) {
@@ -67,5 +69,31 @@ func (rp *Ringpop) adminLookupHandler(ctx json.Context, req *lookupRequest) (*lo
 }
 
 func (rp *Ringpop) adminReloadHandler(ctx json.Context, req *Arg) (*Arg, error) {
+	return nil, nil
+}
+
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+//
+//	Serf
+//
+//= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
+
+type membersRequest struct {
+	Members []string `json:"members"`
+}
+
+func (rp *Ringpop) addMembers(ctx json.Context, req *membersRequest) (*Arg, error) {
+	rp.log.Infof("add %v", req.Members)
+	for _, member := range req.Members {
+		rp.ring.AddServer(member)
+	}
+	return nil, nil
+}
+
+func (rp *Ringpop) removeMembers(ctx json.Context, req *membersRequest) (*Arg, error) {
+	rp.log.Infof("remove %v", req.Members)
+	for _, member := range req.Members {
+		rp.ring.RemoveServer(member)
+	}
 	return nil, nil
 }
