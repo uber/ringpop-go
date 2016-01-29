@@ -7,7 +7,7 @@ echo "running instance $instance_no"
 BIND="127.0.0.1"
 
 SERF="/usr/local/bin/serf"
-RINGPOP="./testpop"
+RINGPOP="./ping-ring"
 
 base_port=1300
 instance_port=`expr 10 \* $instance_no`
@@ -30,6 +30,7 @@ $RINGPOP -listen $ringpop_bind &
 ringpop_pid=$!
 
 if [ $instance_no -ne 0 ]; then
+	sleep 2
 	echo "Joining $serf_master"
 	$SERF join -rpc-addr=$serf_rpc_bind $serf_master
 fi
