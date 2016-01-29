@@ -27,7 +27,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
-	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
@@ -35,7 +34,6 @@ import (
 
 var (
 	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
-	hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
 )
 
 type worker struct {
@@ -72,6 +70,8 @@ func (w *worker) RegisterPong() error {
 func (w *worker) PingHandler(ctx json.Context, ping *Ping) (*Pong, error) {
 	var pong Pong
 	var res []byte
+
+	log.Infof("ping: %s", ping.Key)
 
 	handle, err := w.ringpop.HandleOrForward(ping.Key, ping.Bytes(), &res, "ping", "/ping", tchannel.JSON, nil)
 	if handle {
@@ -123,12 +123,11 @@ func main() {
 		log.Fatalf("could not listen on given hostport: %v", err)
 	}
 
-	opts := new(swim.BootstrapOptions)
-	opts.File = *hostfile
-
-	if _, err := worker.ringpop.Bootstrap(opts); err != nil {
+	if _, err := worker.ringpop.Bootstrap(nil); err != nil {
 		log.Fatalf("ringpop bootstrap failed: %v", err)
 	}
+
+	log.Infof("alive: %s", *hostport)
 
 	select {}
 }

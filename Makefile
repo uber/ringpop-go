@@ -15,7 +15,7 @@ DEV_DEPS = github.com/uber/tchannel-go/thrift/thrift-gen github.com/vektra/mocke
 out:	test
 
 clean:
-	rm -f testpop
+	rm -f testpop ping-ring
 
 clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
@@ -42,3 +42,6 @@ test-unit:
 
 testpop:	clean
 	go build scripts/testpop/testpop.go
+
+ping-ring:	clean
+	go build -o ping-ring examples/ping-ring/main.go
