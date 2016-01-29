@@ -1,8 +1,12 @@
-#!/bin/sh
+#!/bin/bash
 
 instance_no=$1
 
-echo "running instance $instance_no"
+e() {
+	echo "$instance_no: $1"
+}
+
+e "running instance $instance_no"
 
 BIND="127.0.0.1"
 
@@ -21,31 +25,31 @@ ringpop_port="`expr $instance_port + 3`"
 ringpop_bind="$BIND:$ringpop_port"
 
 
-echo "Starting serf on $serf_bind (rpc: $serf_rpc_bind)..."
+e "Starting serf on $serf_bind (rpc: $serf_rpc_bind)..."
 $SERF agent -bind=$serf_bind -rpc-addr=$serf_rpc_bind -node=$serf_node -tag rphost=$BIND -tag rpport=$ringpop_port -event-handler=./serf_events/eh.py &
 serf_pid=$!
 
-echo "Starting ringpop ($ringpop_bind)"
+e "Starting ringpop ($ringpop_bind)"
 $RINGPOP -listen $ringpop_bind &
 ringpop_pid=$!
 
 if [ $instance_no -ne 0 ]; then
 	sleep 2
-	echo "Joining $serf_master"
+	e "Joining $serf_master"
 	$SERF join -rpc-addr=$serf_rpc_bind $serf_master
 fi
 
-echo "serf_pid: $serf_pid, ringpop_pid: $ringpop_pid"
+e "serf_pid: $serf_pid, ringpop_pid: $ringpop_pid"
 running=1
 
 health_check() {
 	if ! kill -0 $serf_pid > /dev/null 2>&1; then
-		echo "serf down"
+		e "serf down"
 		return -1
 	fi
 
 	if ! kill -0 $ringpop_pid > /dev/null 2>&1; then
-		echo "ringpop down"
+		e "ringpop down"
 		return -2
 	fi
 
@@ -57,12 +61,22 @@ trap_handler() {
 }
 
 quit() {
-	echo "Quiting..."
-	kill $serf_pid > /dev/null 2>&1
-	kill $ringpop_pid > /dev/null 2>&1
+	e "Quiting..."
+	if kill -0 $serf_pid > /dev/null 2>&1; then
+		e "Stopping serf ($serf_rpc_bind)"
+		if [ $running -eq 1]; then 
+			$SERF leave -rpc-addr=$serf_rpc_bind
+		fi
+		wait $serf_pid
+	fi
+
+	if kill -0 $ringpop_pid > /dev/null 2>&1; then	
+		e "Killing $RINGPOP"
+		kill $ringpop_pid > /dev/null 2>&1
+	fi
 }
 
-trap trap_handler INT
+trap trap_handler 2
 
 while health_check
 do
@@ -70,7 +84,7 @@ do
 		break
 	fi
 
-	echo "Health check passed"
+	e "Health check passed"
 	sleep 1
 done
 
