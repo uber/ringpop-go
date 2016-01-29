@@ -22,7 +22,7 @@ ringpop_bind="$BIND:$ringpop_port"
 
 
 echo "Starting serf on $serf_bind (rpc: $serf_rpc_bind)..."
-$SERF agent -bind=$serf_bind -rpc-addr=$serf_rpc_bind -node=$serf_node -tag rphost=$BIND -tag rpport=$ringpop_port &
+$SERF agent -bind=$serf_bind -rpc-addr=$serf_rpc_bind -node=$serf_node -tag rphost=$BIND -tag rpport=$ringpop_port -event-handler=./serf_events/eh.py &
 
 sleep 5
 echo "Starting ringpop ($ringpop_bind)"
@@ -33,6 +33,3 @@ if [ $instance_no -ne 0 ]; then
 	$SERF join -rpc-addr=$serf_rpc_bind $serf_master
 fi
 
-function health_check() {
-	
-}
