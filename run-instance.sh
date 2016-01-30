@@ -26,7 +26,7 @@ ringpop_bind="$BIND:$ringpop_port"
 
 
 e "Starting serf on $serf_bind (rpc: $serf_rpc_bind)..."
-$SERF agent -bind=$serf_bind -rpc-addr=$serf_rpc_bind -node=$serf_node -tag rphost=$BIND -tag rpport=$ringpop_port -event-handler=./serf_events/eh.py &
+$SERF agent -bind=$serf_bind -rpc-addr=$serf_rpc_bind -node=$serf_node -tag rphost=$BIND -tag rpport=$ringpop_port &
 serf_pid=$!
 
 e "Starting ringpop ($ringpop_bind)"
@@ -64,7 +64,7 @@ quit() {
 	e "Quiting..."
 	if kill -0 $serf_pid > /dev/null 2>&1; then
 		e "Stopping serf ($serf_rpc_bind)"
-		if [ $running -eq 1]; then 
+		if [ $running -eq 1 ]; then
 			$SERF leave -rpc-addr=$serf_rpc_bind
 		fi
 		wait $serf_pid
