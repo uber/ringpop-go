@@ -47,7 +47,7 @@ func (s *JoinSenderTestSuite) TearDownTest() {
 	s.tnode.Destroy()
 }
 
-func (s *JoinSenderTestSuite) TestSendJoinNoBoostrapHosts() {
+func (s *JoinSenderTestSuite) TestSendJoinNoBootstrapHosts() {
 	joined, err := sendJoin(s.node, nil)
 
 	s.Error(err, "expected error for no bootstrap hosts")

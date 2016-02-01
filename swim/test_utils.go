@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
@@ -62,6 +63,30 @@ type testNode struct {
 func (n *testNode) Destroy() {
 	n.node.Destroy()
 	n.channel.Close()
+}
+
+func (n *testNode) closeAndWait(sender *tchannel.Channel) {
+	n.channel.Close()
+
+	// wait for tchannel to respond with connection refused errors.
+	for {
+		ctx, cancel := shared.NewTChannelContext(time.Millisecond * 50)
+
+		err := sender.Ping(ctx, n.node.Address())
+		if err == nil {
+			cancel()
+			continue
+		}
+
+		_, ok := err.(tchannel.SystemError)
+		if ok {
+			cancel()
+			continue
+		}
+
+		cancel()
+		break
+	}
 }
 
 // newChannelNode creates a testNode with a listening channel and associated

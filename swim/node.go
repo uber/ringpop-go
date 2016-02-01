@@ -236,11 +236,14 @@ func (n *Node) Incarnation() int64 {
 
 func (n *Node) emit(event interface{}) {
 	for _, listener := range n.listeners {
-		go listener.HandleEvent(event)
+		listener.HandleEvent(event)
 	}
 }
 
-// RegisterListener adds a listener that will receive swim events.
+// RegisterListener adds an EventListener to the node. When a swim event e is
+// emitted, l.HandleEvent(e) is called for every registered listener l.
+// Attention, all listeners are called synchronously. Be careful with
+// registering blocking and other slow calls.
 func (n *Node) RegisterListener(l EventListener) {
 	n.listeners = append(n.listeners, l)
 }
@@ -333,7 +336,7 @@ type BootstrapOptions struct {
 	// Minimum number of nodes to join to satisfy a bootstrap.
 	JoinSize int
 
-	// Maximum time to attempt joins before the entire boostrap process times
+	// Maximum time to attempt joins before the entire bootstrap process times
 	// out.
 	MaxJoinDuration time.Duration
 
@@ -466,30 +469,26 @@ func (n *Node) pingNextMember() {
 	}
 
 	// ping failed, send ping requests
-	var errs []error
-	for response := range sendPingRequests(n, member.Address, n.pingRequestSize, n.pingRequestTimeout) {
-		switch res := response.(type) {
-		case *pingResponse:
-			if res.Ok {
-				n.log.WithField("target", member.Address).Info("ping request target reachable")
-				n.memberlist.Update(res.Changes)
-				return
-			}
+	target := member.Address
+	targetReached, errs := indirectPing(n, target, n.pingRequestSize, n.pingRequestTimeout)
 
-			n.log.WithField("target", member.Address).Info("ping request target unreachable")
-			n.memberlist.MakeSuspect(member.Address, member.Incarnation)
-			return
-
-		case error:
-			errs = append(errs, res)
-		}
+	// if all helper nodes are unreachable, the indirectPing is inconclusive
+	if len(errs) == n.pingRequestSize {
+		n.log.WithFields(log.Fields{
+			"target":    target,
+			"errors":    errs,
+			"numErrors": len(errs),
+		}).Warn("ping request inconclusive due to errors")
+		return
 	}
 
-	n.log.WithFields(log.Fields{
-		"target":    member.Address,
-		"errors":    errs,
-		"numErrors": len(errs),
-	}).Warn("ping request inconclusive due to errors")
+	if !targetReached {
+		n.log.WithField("target", target).Info("ping request target unreachable")
+		n.memberlist.MakeSuspect(member.Address, member.Incarnation)
+		return
+	}
+
+	n.log.WithField("target", target).Info("ping request target reachable")
 }
 
 // GetReachableMembers returns a slice of members currently in this node's
