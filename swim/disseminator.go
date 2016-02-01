@@ -92,7 +92,10 @@ func (d *disseminator) AdjustMaxPropagations() {
 
 // HasChanges reports whether disseminator has changes to disseminate.
 func (d *disseminator) HasChanges() bool {
-	return len(d.changes) > 0
+	d.Lock()
+	r := len(d.changes) > 0
+	d.Unlock()
+	return r
 }
 
 func (d *disseminator) FullSync() (changes []Change) {
