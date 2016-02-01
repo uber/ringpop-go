@@ -189,7 +189,10 @@ func (d *disseminator) ClearChange(c Change) {
 func (d *disseminator) ChangeByAddress(address string) (Change, bool) {
 	d.Lock()
 	pc, ok := d.changes[address]
-	c := pc.Change
+	var c Change
+	if ok {
+		c = pc.Change
+	}
 	d.Unlock()
 	return c, ok
 }

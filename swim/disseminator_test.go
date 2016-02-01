@@ -60,6 +60,33 @@ func (s *DisseminatorTestSuite) TestChangesAreRecorded() {
 	s.Len(s.d.changes, 4, "expected four changes to be recorded")
 }
 
+func (s *DisseminatorTestSuite) TestChangeCount() {
+	addresses := fakeHostPorts(1, 1, 2, 4)
+	for i, address := range addresses {
+		s.Equal(i+1, s.d.ChangeCount(), "expected change to be recorded")
+
+		s.m.MakeAlive(address, s.incarnation)
+	}
+	s.Equal(len(addresses)+1, s.d.ChangeCount(), "expected no changes to be recorded")
+}
+
+func (s *DisseminatorTestSuite) TestChangeByAddress() {
+	addresses := fakeHostPorts(1, 1, 2, 4)
+
+	c, ok := s.d.ChangeByAddress(addresses[0])
+	s.False(ok, "expected changes does not contain this address yet")
+	s.Equal(Change{}, c, "expected change is nil")
+
+	for _, address := range addresses {
+		s.m.MakeAlive(address, s.incarnation)
+
+		c, ok := s.d.ChangeByAddress(address)
+		s.True(ok, "expected changes contains this address")
+		s.Equal(address, c.address(), "expected change has correct address")
+		s.Equal(s.incarnation, c.incarnation(), "expected change has correct incarnation")
+	}
+}
+
 func (s *DisseminatorTestSuite) TestChangesAreCleared() {
 	addresses := fakeHostPorts(1, 1, 2, 4)
 
