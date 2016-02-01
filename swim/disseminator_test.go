@@ -60,27 +60,27 @@ func (s *DisseminatorTestSuite) TestChangesAreRecorded() {
 	s.Len(s.d.changes, 4, "expected four changes to be recorded")
 }
 
-func (s *DisseminatorTestSuite) TestChangeCount() {
+func (s *DisseminatorTestSuite) TestChangesCount() {
 	addresses := fakeHostPorts(1, 1, 2, 4)
 	for i, address := range addresses {
-		s.Equal(i+1, s.d.ChangeCount(), "expected change to be recorded")
+		s.Equal(i+1, s.d.ChangesCount(), "expected change to be recorded")
 
 		s.m.MakeAlive(address, s.incarnation)
 	}
-	s.Equal(len(addresses)+1, s.d.ChangeCount(), "expected no changes to be recorded")
+	s.Equal(len(addresses)+1, s.d.ChangesCount(), "expected no changes to be recorded")
 }
 
-func (s *DisseminatorTestSuite) TestChangeByAddress() {
+func (s *DisseminatorTestSuite) TestChangesByAddress() {
 	addresses := fakeHostPorts(1, 1, 2, 4)
 
-	c, ok := s.d.ChangeByAddress(addresses[0])
+	c, ok := s.d.ChangesByAddress(addresses[0])
 	s.False(ok, "expected changes does not contain this address yet")
 	s.Equal(Change{}, c, "expected change is nil")
 
 	for _, address := range addresses {
 		s.m.MakeAlive(address, s.incarnation)
 
-		c, ok := s.d.ChangeByAddress(address)
+		c, ok := s.d.ChangesByAddress(address)
 		s.True(ok, "expected changes contains this address")
 		s.Equal(address, c.address(), "expected change has correct address")
 		s.Equal(s.incarnation, c.incarnation(), "expected change has correct incarnation")
@@ -96,17 +96,17 @@ func (s *DisseminatorTestSuite) TestChangesAreCleared() {
 	fakeChange := Change{}
 	fakeChange.Address = "fake address"
 	s.d.ClearChange(fakeChange)
-	s.Equal(4, s.d.ChangeCount(), "expected no problems deleting non-existent changes")
+	s.Equal(4, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 
 	changes := s.d.issueChanges(nil)
 	for i, c := range changes {
 		s.d.ClearChange(c)
-		s.Equal(4-i-1, s.d.ChangeCount(), "expected one change to be deleted")
+		s.Equal(4-i-1, s.d.ChangesCount(), "expected one change to be deleted")
 	}
-	s.Equal(0, s.d.ChangeCount(), "expected no change left")
+	s.Equal(0, s.d.ChangesCount(), "expected no change left")
 
 	s.d.ClearChange(fakeChange)
-	s.Equal(0, s.d.ChangeCount(), "expected no problems deleting non-existent changes")
+	s.Equal(0, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 }
 
 func (s *DisseminatorTestSuite) TestFullSync() {

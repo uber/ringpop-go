@@ -219,9 +219,9 @@ func (s *JoinSenderTestSuite) TestDontDisseminateJoinList() {
 
 	for i, tnode := range tnodes {
 		s.Equal(i+1, tnodes[i].node.memberlist.CountReachableMembers(), "expected that next node joined all previous ones")
-		s.Equal(1, tnodes[i].node.disseminator.ChangeCount(), "expected to only disseminate yourself")
+		s.Equal(1, tnodes[i].node.disseminator.ChangesCount(), "expected to only disseminate yourself")
 
-		_, ok := tnodes[i].node.disseminator.ChangeByAddress(tnode.node.Address())
+		_, ok := tnodes[i].node.disseminator.ChangesByAddress(tnode.node.Address())
 		s.True(ok, "expected to only disseminate yourself")
 	}
 }

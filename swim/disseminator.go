@@ -186,20 +186,20 @@ func (d *disseminator) ClearChange(c Change) {
 	d.Unlock()
 }
 
-func (d *disseminator) ChangeByAddress(address string) (Change, bool) {
-	d.Lock()
-	pc, ok := d.changes[address]
+func (d *disseminator) ChangesByAddress(address string) (Change, bool) {
+	d.RLock()
+	change, ok := d.changes[address]
 	var c Change
 	if ok {
-		c = pc.Change
+		c = change.Change
 	}
-	d.Unlock()
+	d.RUnlock()
 	return c, ok
 }
 
-func (d *disseminator) ChangeCount() int {
-	d.Lock()
+func (d *disseminator) ChangesCount() int {
+	d.RLock()
 	c := len(d.changes)
-	d.Unlock()
+	d.RUnlock()
 	return c
 }
