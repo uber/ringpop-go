@@ -18,54 +18,38 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package ringpop
+package logging
 
 import (
-	"github.com/uber/tchannel-go/json"
-	"golang.org/x/net/context"
+	"testing"
+
+	"github.com/stretchr/testify/suite"
 )
 
-// TODO: EVERYTHING!
+type LogLevelTestSuite struct {
+	suite.Suite
+}
 
-// Arg is a blank arg
-type Arg struct{}
-
-func (rp *Ringpop) registerHandlers() error {
-	handlers := map[string]interface{}{
-		"/health":       rp.health,
-		"/admin/stats":  rp.adminStatsHandler,
-		"/admin/lookup": rp.adminLookupHandler,
+// Test that level -> string -> level conversion produces the same level
+func (s *LogLevelTestSuite) TestLevels() {
+	// This is a custom level, higer than Debug
+	customLevel := Debug + 10
+	levels := []Level{Panic, Fatal, Error, Warn, Info, Debug, customLevel}
+	for _, level := range levels {
+		gotLevel, err := Parse(level.String())
+		s.NoError(err, "Converting a Level to a string and back should not fail.")
+		s.Equal(gotLevel, level, "Converting a Level to a string and back should produce the same Level.")
 	}
-
-	return json.Register(rp.subChannel, handlers, func(ctx context.Context, err error) {
-		rp.logger.WithField("error", err).Info("error occured")
-	})
 }
 
-func (rp *Ringpop) health(ctx json.Context, req *Arg) (*Arg, error) {
-	return nil, nil
-}
-
-func (rp *Ringpop) adminStatsHandler(ctx json.Context, req *Arg) (map[string]interface{}, error) {
-	return handleStats(rp), nil
-}
-
-type lookupRequest struct {
-	Key string `json:"key"`
-}
-
-type lookupResponse struct {
-	Dest string `json:"dest"`
-}
-
-func (rp *Ringpop) adminLookupHandler(ctx json.Context, req *lookupRequest) (*lookupResponse, error) {
-	dest, err := rp.Lookup(req.Key)
-	if err != nil {
-		return nil, err
+func (s *LogLevelTestSuite) TestInvalidLevel() {
+	levels := []string{"", "1234", "abc"}
+	for _, level := range levels {
+		_, err := Parse(level)
+		s.Error(err, "Converting an invalid string to a Level should fail.")
 	}
-	return &lookupResponse{Dest: dest}, nil
 }
 
-func (rp *Ringpop) adminReloadHandler(ctx json.Context, req *Arg) (*Arg, error) {
-	return nil, nil
+func TestLogLevelTestSuite(t *testing.T) {
+	suite.Run(t, new(LogLevelTestSuite))
 }

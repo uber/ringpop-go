@@ -25,6 +25,7 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -51,6 +52,8 @@ type updateRollup struct {
 		lastUpdate  time.Time
 		sync.RWMutex
 	}
+
+	logger log.Logger
 }
 
 func newUpdateRollup(node *Node, flushInterval time.Duration, maxUpdates int) *updateRollup {
@@ -58,6 +61,7 @@ func newUpdateRollup(node *Node, flushInterval time.Duration, maxUpdates int) *u
 		node:          node,
 		maxUpdates:    maxUpdates,
 		flushInterval: flushInterval,
+		logger:        logging.Logger("rollup").WithField("local", node.Address()),
 	}
 
 	rollup.buffer.updates = make(map[string][]Change)
@@ -144,7 +148,7 @@ func (r *updateRollup) FlushBuffer() {
 	r.buffer.Lock()
 
 	if len(r.buffer.updates) == 0 {
-		r.node.log.Debug("no updates flushed")
+		r.logger.Debug("no updates flushed")
 		r.buffer.Unlock()
 		return
 	}
@@ -163,7 +167,7 @@ func (r *updateRollup) FlushBuffer() {
 		sinceLastFlush = now.Sub(r.timings.lastFlush)
 	}
 
-	r.node.log.WithFields(log.Fields{
+	r.logger.WithFields(log.Fields{
 		"checksum":         r.node.memberlist.Checksum(),
 		"sinceFirstUpdate": sinceFirstUpdate,
 		"sinceLastFlush":   sinceLastFlush,

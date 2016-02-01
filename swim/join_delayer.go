@@ -20,16 +20,14 @@
 package swim
 
 import (
-	"errors"
 	"math"
 	"math/rand"
 	"time"
 
 	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/util"
 )
-
-var errLoggerRequired = errors.New("joinDelayer requires a logger")
 
 const (
 	defaultInitial = 100 * time.Millisecond
@@ -76,9 +74,6 @@ func newDelayOpts() *delayOpts {
 // exponentialDelayer applies a delay in between repeated join attempts.
 // The delay increases exponentially and is capped at maxDelay.
 type exponentialDelayer struct {
-	// joiner is the address of the node sending join requests.
-	joiner string
-
 	// logger logs when a maximum delay is reached.
 	logger bark.Logger
 
@@ -111,14 +106,9 @@ type exponentialDelayer struct {
 	numDelays uint
 }
 
-// newExponentialDelayer creates a new exponential delayer. joiner and logger
-// are required. opts is optional.
-func newExponentialDelayer(joiner string, logger bark.Logger,
-	opts *delayOpts) (*exponentialDelayer, error) {
-	if logger == nil {
-		return nil, errLoggerRequired
-	}
-
+// newExponentialDelayer creates a new exponential delayer. joiner is required.
+// opts is optional.
+func newExponentialDelayer(joiner string, opts *delayOpts) (*exponentialDelayer, error) {
 	if opts == nil {
 		opts = newDelayOpts()
 	}
@@ -134,8 +124,7 @@ func newExponentialDelayer(joiner string, logger bark.Logger,
 	}
 
 	return &exponentialDelayer{
-		joiner:          joiner,
-		logger:          logger,
+		logger:          logging.Logger("join").WithField("local", joiner),
 		initialDelay:    opts.initial,
 		nextDelayMin:    0,
 		maxDelayReached: false,
@@ -177,7 +166,6 @@ func (d *exponentialDelayer) delay() time.Duration {
 	// maximum allowable delay, log a message.
 	if uncappedDelay >= maxDelayMs && d.maxDelayReached == false {
 		d.logger.WithFields(bark.Fields{
-			"local":         d.joiner,
 			"numDelays":     d.numDelays,
 			"initialDelay":  d.initialDelay,
 			"minDelay":      d.nextDelayMin,

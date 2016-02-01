@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/raw"
@@ -66,6 +67,11 @@ type requestSender struct {
 func newRequestSender(sender Sender, emitter eventEmitter, channel shared.SubChannel, request []byte, keys []string,
 	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
+	logger := logging.Logger("sender")
+	if identity, err := sender.WhoAmI(); err != nil {
+		logger = logger.WithField("local", identity)
+	}
+
 	return &requestSender{
 		sender:         sender,
 		emitter:        emitter,
@@ -80,7 +86,7 @@ func newRequestSender(sender Sender, emitter eventEmitter, channel shared.SubCha
 		maxRetries:     opts.MaxRetries,
 		retrySchedule:  opts.RetrySchedule,
 		rerouteRetries: opts.RerouteRetries,
-		logger:         opts.Logger,
+		logger:         logger,
 	}
 }
 

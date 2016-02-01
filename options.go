@@ -22,11 +22,10 @@ package ringpop
 
 import (
 	"errors"
-	"io/ioutil"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 )
 
@@ -120,9 +119,16 @@ func HashRingConfig(c *hashring.Configuration) Option {
 // automatically.
 func Logger(l log.Logger) Option {
 	return func(r *Ringpop) error {
-		r.logger = l
-		r.log = l
+		logging.SetLogger(l)
 		return nil
+	}
+}
+
+// LogLevels is used to set the severity log level for all Ringpop named
+// loggers.
+func LogLevels(levels map[string]logging.Level) Option {
+	return func(r *Ringpop) error {
+		return logging.SetLevels(levels)
 	}
 }
 
@@ -179,12 +185,17 @@ func defaultIdentityResolver(r *Ringpop) error {
 	return nil
 }
 
-// defaultLogger is the default logger that is used for Ringpop if one is not
-// provided by the user.
-func defaultLogger(r *Ringpop) error {
-	return Logger(log.NewLoggerFromLogrus(&logrus.Logger{
-		Out: ioutil.Discard,
-	}))(r)
+// defaultLogLevels is the default configuration for all Ringpop named loggers.
+func defaultLogLevels(r *Ringpop) error {
+	return LogLevels(map[string]logging.Level{
+		"damping":       logging.Error,
+		"dissemination": logging.Error,
+		"gossip":        logging.Error,
+		"join":          logging.Warn,
+		"membership":    logging.Error,
+		"ring":          logging.Error,
+		"suspicion":     logging.Error,
+	})(r)
 }
 
 func defaultStatter(r *Ringpop) error {
@@ -199,7 +210,7 @@ func defaultHashRingOptions(r *Ringpop) error {
 // can be overridden at runtime.
 var defaultOptions = []Option{
 	defaultIdentityResolver,
-	defaultLogger,
+	defaultLogLevels,
 	defaultStatter,
 	defaultHashRingOptions,
 }

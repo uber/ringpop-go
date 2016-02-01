@@ -22,13 +22,12 @@ package swim
 
 import (
 	"errors"
-	"io/ioutil"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 )
@@ -50,8 +49,6 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
-	Logger log.Logger
-
 	Clock Clock
 }
 
@@ -69,10 +66,6 @@ func defaultOptions() *Options {
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
 
-		Logger: log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		}),
-
 		Clock: &systemClock{},
 	}
 
@@ -84,10 +77,6 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	if opts == nil {
 		return def
-	}
-
-	if opts.Logger == nil {
-		opts.Logger = def.Logger
 	}
 
 	opts.SuspicionTimeout = util.SelectDuration(opts.SuspicionTimeout,
@@ -161,7 +150,6 @@ type Node struct {
 	startTime time.Time
 
 	logger log.Logger
-	log    log.Logger // wraps the provided logger with a 'local: address' field
 
 	// clock is used to generate incarnation numbers and is typically set to
 	// systemClock.
@@ -177,8 +165,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		address: address,
 		app:     app,
 		channel: channel,
-		logger:  opts.Logger,
-		log:     opts.Logger.WithField("local", address),
+		logger:  logging.Logger("node").WithField("local", address),
 
 		joinTimeout:        opts.JoinTimeout,
 		pingTimeout:        opts.PingTimeout,
@@ -377,7 +364,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	joined, err := sendJoin(n, joinOpts)
 	if err != nil {
-		n.log.WithFields(log.Fields{
+		n.logger.WithFields(log.Fields{
 			"err": err.Error(),
 		}).Error("bootstrap failed")
 		return nil, err
@@ -449,12 +436,12 @@ func (n *Node) setPinging(pinging bool) {
 func (n *Node) pingNextMember() {
 	member, ok := n.memberiter.Next()
 	if !ok {
-		n.log.Warn("no pingable members")
+		n.logger.Warn("no pingable members")
 		return
 	}
 
 	if n.pinging() {
-		n.log.Warn("node already pinging")
+		n.logger.Warn("node already pinging")
 		return
 	}
 
@@ -474,7 +461,7 @@ func (n *Node) pingNextMember() {
 
 	// if all helper nodes are unreachable, the indirectPing is inconclusive
 	if len(errs) == n.pingRequestSize {
-		n.log.WithFields(log.Fields{
+		n.logger.WithFields(log.Fields{
 			"target":    target,
 			"errors":    errs,
 			"numErrors": len(errs),
@@ -483,12 +470,12 @@ func (n *Node) pingNextMember() {
 	}
 
 	if !targetReached {
-		n.log.WithField("target", target).Info("ping request target unreachable")
+		n.logger.WithField("target", target).Info("ping request target unreachable")
 		n.memberlist.MakeSuspect(member.Address, member.Incarnation)
 		return
 	}
 
-	n.log.WithField("target", target).Info("ping request target reachable")
+	n.logger.WithField("target", target).Info("ping request target reachable")
 }
 
 // GetReachableMembers returns a slice of members currently in this node's

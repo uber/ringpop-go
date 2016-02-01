@@ -61,7 +61,7 @@ func (s *joinDelayerTestSuite) SetupTest() {
 	logger.On("WithFields", mock.Anything).Return(logger)
 	logger.On("Warn", mock.Anything).Return(nil)
 
-	delayer, err := newExponentialDelayer("dummyjoiner", logger, opts)
+	delayer, err := newExponentialDelayer("dummyjoiner", opts)
 	s.NoError(err, "expected valid exponential delayer")
 	s.delayer = delayer
 }
@@ -88,11 +88,6 @@ func (s *joinDelayerTestSuite) TestDelayWithoutRandomness() {
 		delay := s.delayer.delay()
 		s.EqualValues(expectedDelay, delay, "join attempt delay is correct")
 	}
-}
-
-func (s *joinDelayerTestSuite) TestDelayerPreconditions() {
-	_, err := newExponentialDelayer("dummyjoiner", nil, nil)
-	s.Equal(err, errLoggerRequired, "logger required error")
 }
 
 func (s *joinDelayerTestSuite) TestMaxDelayReached() {

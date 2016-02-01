@@ -27,7 +27,10 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -142,19 +145,26 @@ func (s *HandlerTestSuite) TestNotImplementedHandler() {
 func (s *HandlerTestSuite) TestErrorHandler() {
 	logger := &mocks.Logger{}
 
+	// Make sure random log messages can be sent to this logger while it
+	// replaces the existing one.
+	logger.On("WithField", mock.Anything).Return(logger)
+	logger.On("WithFields", mock.Anything).Return(logger)
+	for _, meth := range []string{"Debug", "Info", "Warn", "Error"} {
+		// Debug(msg)
+		logger.On(meth, mock.Anything)
+		// Debugf(format, msg)
+		logger.On(meth+"f", mock.Anything, mock.Anything)
+	}
+
 	errTest := errors.New("test error")
-
-	logger.On("WithField", "error", errTest).Return(logger)
-	logger.On("Info", []interface{}{"error occurred"})
-
-	originalLogger := s.testNode.node.log
-	s.testNode.node.log = logger
+	logging.SetLogger(logger)
 
 	s.testNode.node.errorHandler(s.ctx, errTest)
-	logger.AssertExpectations(s.T())
-
-	// Restore old logger, as stuff will be logged on teardown
-	s.testNode.node.log = originalLogger
+	logger.AssertCalled(s.T(), "WithFields", bark.Fields{
+		"local": s.testNode.node.Address(),
+		"error": errTest,
+	})
+	logger.AssertCalled(s.T(), "Info", []interface{}{"error occurred"})
 }
 
 func (s *HandlerTestSuite) TestTickHandler() {
