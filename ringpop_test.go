@@ -549,6 +549,18 @@ func (s *RingpopTestSuite) TestEmptyJoinListCreatesSingleNodeCluster() {
 	s.Equal(ready, s.ringpop.state)
 }
 
+func (s *RingpopTestSuite) TestErrorOnChannelNotListening() {
+	ch, err := tchannel.NewChannel("test", nil)
+	s.Require().NoError(err)
+
+	rp, err := New("test", Channel(ch))
+	s.Require().NoError(err)
+
+	nodesJoined, err := rp.Bootstrap(&swim.BootstrapOptions{})
+	s.Exactly(err, ErrEphemeralIdentity)
+	s.Nil(nodesJoined)
+}
+
 func TestRingpopTestSuite(t *testing.T) {
 	suite.Run(t, new(RingpopTestSuite))
 }
