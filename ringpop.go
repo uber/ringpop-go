@@ -166,6 +166,16 @@ func (rp *Ringpop) init() error {
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 	rp.ring.RegisterListener(rp)
 
+	go func() {
+		for {
+			select {
+			case <-time.After(5 * time.Second):
+				rp.statter.UpdateGauge(rp.getStatKey("ring.checksum-periodic"), nil, int64(rp.ring.Checksum()))
+			}
+
+		}
+	}()
+
 	rp.stats.hostport = genStatsHostport(address)
 	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
 	rp.stats.keys = make(map[string]string)
@@ -434,6 +444,8 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
+		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum-periodic"), nil, int64((event.NewChecksum)))
+		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))
 
 	case events.RingChangedEvent:
 		added := int64(len(event.ServersAdded))
