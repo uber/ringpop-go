@@ -186,3 +186,27 @@ func (d *disseminator) RecordChange(change Change) {
 	d.changes[change.Address] = &pChange{change, 0}
 	d.Unlock()
 }
+
+func (d *disseminator) ClearChange(c Change) {
+	d.Lock()
+	delete(d.changes, c.Address)
+	d.Unlock()
+}
+
+func (d *disseminator) ChangesByAddress(address string) (Change, bool) {
+	d.RLock()
+	change, ok := d.changes[address]
+	var c Change
+	if ok {
+		c = change.Change
+	}
+	d.RUnlock()
+	return c, ok
+}
+
+func (d *disseminator) ChangesCount() int {
+	d.RLock()
+	c := len(d.changes)
+	d.RUnlock()
+	return c
+}
