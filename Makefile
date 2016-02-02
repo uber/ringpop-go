@@ -38,7 +38,7 @@ test-integration:
 
 test-unit:
 	go generate ./...
-	go test -v ./... |test/go-test-prettify
+	test/go-test-prettify ./...
 
 testpop:	clean
 	go build scripts/testpop/testpop.go
