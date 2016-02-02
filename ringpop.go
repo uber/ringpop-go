@@ -187,15 +187,16 @@ func (rp *Ringpop) identity() (string, error) {
 // r.channelIdentityResolver resolves the hostport identity from the current
 // TChannel object on the Ringpop instance.
 func (rp *Ringpop) channelIdentityResolver() (string, error) {
-	hostport := rp.channel.PeerInfo().HostPort
-	// Check that TChannel is listening. By default, TChannel listens on an
-	// ephemeral host/port. The real port is then assigned by the OS when
-	// ListenAndServe is called. If the hostport is 0.0.0.0:0, it means
-	// TChannel is not yet listening and the hostport cannot be resolved.
-	if hostport == "0.0.0.0:0" {
-		return "", fmt.Errorf("unable to resolve valid listen address (TChannel hostport is %s)", hostport)
+	peerInfo := rp.channel.PeerInfo()
+	// Check that TChannel is listening on a real hostport. By default,
+	// TChannel listens on an ephemeral host/port. The real port is then
+	// assigned by the OS when ListenAndServe is called. If the hostport is
+	// ephemeral, it means TChannel is not yet listening and the hostport
+	// cannot be resolved.
+	if peerInfo.IsEphemeralHostPort() {
+		return "", ErrEphemeralIdentity
 	}
-	return hostport, nil
+	return peerInfo.HostPort, nil
 }
 
 // Destroy stops all communication. Note that this does not close the TChannel

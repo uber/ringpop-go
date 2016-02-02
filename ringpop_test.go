@@ -557,7 +557,7 @@ func (s *RingpopTestSuite) TestErrorOnChannelNotListening() {
 	s.Require().NoError(err)
 
 	nodesJoined, err := rp.Bootstrap(&swim.BootstrapOptions{})
-	s.Error(err)
+	s.Exactly(err, ErrEphemeralIdentity)
 	s.Nil(nodesJoined)
 }
 
