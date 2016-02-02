@@ -27,6 +27,7 @@ import (
 // Clock is the interface that wraps the Now method.
 type Clock interface {
 	Now() time.Time
+	AfterFunc(time.Duration, func()) *time.Timer
 }
 
 // systemClock uses the system time to implement the Clock interface.
@@ -35,6 +36,11 @@ type systemClock struct{}
 // Now returns the current system time.
 func (c systemClock) Now() time.Time {
 	return time.Now()
+}
+
+// Calls f after d time. See time.AfterFunc.
+func (c systemClock) AfterFunc(d time.Duration, f func()) *time.Timer {
+	return time.AfterFunc(d, f)
 }
 
 // NowInMillis is a utility function that call Now on the clock and converts it

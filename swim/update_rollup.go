@@ -128,7 +128,7 @@ func (r *updateRollup) RenewFlushTimer() {
 		r.flushTimer.t.Stop()
 	}
 
-	r.flushTimer.t = time.AfterFunc(r.flushInterval, func() {
+	r.flushTimer.t = r.node.clock.AfterFunc(r.flushInterval, func() {
 		r.FlushBuffer()
 		r.RenewFlushTimer()
 	})

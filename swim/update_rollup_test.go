@@ -30,16 +30,19 @@ import (
 
 type RollupTestSuite struct {
 	suite.Suite
-	node        *Node
-	r           *updateRollup
-	incarnation int64
-	updates     []Change
+	node           *Node
+	r              *updateRollup
+	incarnation    int64
+	updates        []Change
+	mockafterclock *mockAfterClock
 }
 
 func (s *RollupTestSuite) SetupTest() {
+	s.mockafterclock = &mockAfterClock{systemClock: systemClock{}}
 	s.node = NewNode("test", "127.0.0.1:3001", nil, &Options{
 		RollupFlushInterval: 10000 * time.Second,
 		RollupMaxUpdates:    10000,
+		Clock:               s.mockafterclock,
 	})
 	s.r = s.node.rollup
 	s.incarnation = util.TimeNowMS()
@@ -90,9 +93,21 @@ func (s *RollupTestSuite) TestTrackUpdatesFlushes() {
 	s.Len(s.r.Buffer(), 1, "expected one change")
 }
 
-func (s *RollupTestSuite) TestFlushesAfterInterval() {
-	s.r.flushInterval = time.Millisecond
+func (s *RollupTestSuite) TestFlushingEmptiesTheBuffer() {
+	s.r.TrackUpdates([]Change{
+		Change{Address: "one"},
+		Change{Address: "two"},
+	})
+	s.Len(s.r.Buffer(), 2, "expected two updates to be in buffer")
+	s.r.FlushBuffer()
+	s.Empty(s.r.Buffer(), "expected buffer to be flushed")
+}
 
+// Enabling the background flusher flushes buffer after flushInterval.
+//
+// This is a bit higher-level test than TestFlushingEmptiesTheBuffer.
+// In this test, we mock the timer to trigger buffer flushing.
+func (s *RollupTestSuite) TestFlushesAfterInterval() {
 	s.r.TrackUpdates([]Change{
 		Change{Address: "one"},
 		Change{Address: "two"},
@@ -101,10 +116,22 @@ func (s *RollupTestSuite) TestFlushesAfterInterval() {
 	s.NotNil(s.r.FlushTimer(), "expected timer to be set")
 	s.Len(s.r.Buffer(), 2, "expected two updates to be in buffer")
 
-	time.Sleep(2 * time.Millisecond)
+	s.mockafterclock.f() // this tick triggers FlushTimer
 
 	s.Empty(s.r.Buffer(), "expected buffer to be flushed")
 	s.NotNil(s.r.FlushTimer(), "expected timer to be renewed")
+}
+
+// This facility is needed to mock 'AfterFunc', so we can capture it's arguments.
+// We will use the captured function later to mimic a fired timer.
+type mockAfterClock struct {
+	systemClock
+	f func() // Function that was passed to AfterFunc.
+}
+
+func (c *mockAfterClock) AfterFunc(t time.Duration, f func()) *time.Timer {
+	c.f = f
+	return time.AfterFunc(t, f)
 }
 
 func (s *RollupTestSuite) TestFlushTwice() {
