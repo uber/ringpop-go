@@ -7,6 +7,7 @@ type SwimNode struct {
 	mock.Mock
 }
 
+// Bootstrap provides a mock function with given fields: opts
 func (_m *SwimNode) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	ret := _m.Called(opts)
 
@@ -28,6 +29,8 @@ func (_m *SwimNode) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 
 	return r0, r1
 }
+
+// CountReachableMembers provides a mock function with given fields:
 func (_m *SwimNode) CountReachableMembers() int {
 	ret := _m.Called()
 
@@ -40,9 +43,13 @@ func (_m *SwimNode) CountReachableMembers() int {
 
 	return r0
 }
+
+// Destroy provides a mock function with given fields:
 func (_m *SwimNode) Destroy() {
 	_m.Called()
 }
+
+// GetReachableMembers provides a mock function with given fields:
 func (_m *SwimNode) GetReachableMembers() []string {
 	ret := _m.Called()
 
@@ -57,6 +64,8 @@ func (_m *SwimNode) GetReachableMembers() []string {
 
 	return r0
 }
+
+// MemberStats provides a mock function with given fields:
 func (_m *SwimNode) MemberStats() swim.MemberStats {
 	ret := _m.Called()
 
@@ -69,6 +78,8 @@ func (_m *SwimNode) MemberStats() swim.MemberStats {
 
 	return r0
 }
+
+// ProtocolStats provides a mock function with given fields:
 func (_m *SwimNode) ProtocolStats() swim.ProtocolStats {
 	ret := _m.Called()
 
@@ -81,6 +92,8 @@ func (_m *SwimNode) ProtocolStats() swim.ProtocolStats {
 
 	return r0
 }
+
+// Ready provides a mock function with given fields:
 func (_m *SwimNode) Ready() bool {
 	ret := _m.Called()
 
@@ -93,6 +106,8 @@ func (_m *SwimNode) Ready() bool {
 
 	return r0
 }
+
+// RegisterListener provides a mock function with given fields: l
 func (_m *SwimNode) RegisterListener(l swim.EventListener) {
 	_m.Called(l)
 }

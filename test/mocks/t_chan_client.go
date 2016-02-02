@@ -9,6 +9,7 @@ type TChanClient struct {
 	mock.Mock
 }
 
+// Call provides a mock function with given fields: ctx, serviceName, methodName, req, resp
 func (_m *TChanClient) Call(ctx thrift.Context, serviceName string, methodName string, req athrift.TStruct, resp athrift.TStruct) (bool, error) {
 	ret := _m.Called(ctx, serviceName, methodName, req, resp)
 
