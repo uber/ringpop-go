@@ -85,9 +85,10 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 
 		peer := p.node.channel.Peers().GetOrAdd(p.target)
 
+		changes, bumpPiggybackCounters := p.node.disseminator.IssueAsSender()
 		req := ping{
 			Checksum:          p.node.memberlist.Checksum(),
-			Changes:           p.node.disseminator.IssueAsSender(),
+			Changes:           changes,
 			Source:            p.node.Address(),
 			SourceIncarnation: p.node.Incarnation(),
 		}
@@ -114,6 +115,9 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 			errC <- err
 			return
 		}
+
+		// when ping was successful
+		bumpPiggybackCounters()
 
 		p.node.emit(PingSendCompleteEvent{
 			Local:    p.node.Address(),

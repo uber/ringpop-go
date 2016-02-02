@@ -37,10 +37,11 @@ func handlePing(node *Node, req *ping) (*ping, error) {
 
 	node.memberlist.Update(req.Changes)
 
-	changes, fs := node.disseminator.IssueAsReceiver(req.Source, req.SourceIncarnation, req.Checksum)
+	changes, fullSync :=
+		node.disseminator.IssueAsReceiver(req.Source, req.SourceIncarnation, req.Checksum)
 
-	if fs {
-		// TODO: something...
+	if fullSync {
+		// TODO: handle full sync
 	}
 
 	res := &ping{
