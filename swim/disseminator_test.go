@@ -98,7 +98,7 @@ func (s *DisseminatorTestSuite) TestChangesAreCleared() {
 	s.d.ClearChange(fakeChange)
 	s.Equal(4, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 
-	changes := s.d.issueChanges(nil)
+	changes := s.d.issueChanges()
 	for i, c := range changes {
 		s.d.ClearChange(c)
 		s.Equal(4-i-1, s.d.ChangesCount(), "expected one change to be deleted")
