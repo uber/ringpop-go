@@ -444,7 +444,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
-		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum-periodic"), nil, int64((event.NewChecksum)))
 		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))
 
 	case events.RingChangedEvent:
