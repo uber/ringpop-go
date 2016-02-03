@@ -23,6 +23,7 @@ package swim
 import (
 	"testing"
 	"time"
+	"fmt"
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
@@ -99,11 +100,23 @@ func (s *RollupTestSuite) TestFlushesAfterInterval() {
 	})
 
 	s.NotNil(s.r.FlushTimer(), "expected timer to be set")
+
+	// This is a race condition which never got triggered yet. If the scheduler
+	// decides to yield at this comment and proceed with flushing the buffer,
+	// assertion below will fail. Oops.
 	s.Len(s.r.Buffer(), 2, "expected two updates to be in buffer")
 
-	time.Sleep(2 * time.Millisecond)
+	// Flushing the buffer used to take <2ms on an otherwise idle machine. On
+	// travis-ci we might have a significantly less CPU shares, so wait longer.
+	sleepUpTo := 100 // Milliseconds
+	for i := 0; i < sleepUpTo; i++ {
+		if len(s.r.Buffer()) == 0 {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
 
-	s.Empty(s.r.Buffer(), "expected buffer to be flushed")
+	s.Empty(s.r.Buffer(), fmt.Sprintf("expected buffer to be flushed after %d ms", sleepUpTo))
 	s.NotNil(s.r.FlushTimer(), "expected timer to be renewed")
 }
 
