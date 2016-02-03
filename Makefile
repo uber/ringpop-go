@@ -10,7 +10,9 @@ GODEPS := $(shell pwd)/Godeps/_workspace
 USER_GOPATH := $(GOPATH)
 export GOPATH = $(GODEPS):$(USER_GOPATH)
 
-DEV_DEPS = github.com/uber/tchannel-go/thrift/thrift-gen github.com/vektra/mockery/...
+DEV_DEPS = github.com/uber/tchannel-go/thrift/thrift-gen \
+		   github.com/vektra/mockery/... \
+		   github.com/tools/godep
 
 out:	test
 
@@ -25,7 +27,7 @@ mocks:
 	test/gen-testfiles
 
 setup:
-	GOPATH=$(USER_GOPATH) go get -v $(DEV_DEPS)
+	GOPATH=$(USER_GOPATH) go get -u -v $(DEV_DEPS)
 	@if ! which thrift | grep -q /; then \
 		echo "thrift not in PATH. (brew install thrift?)" >&2; \
  		exit 1; \
