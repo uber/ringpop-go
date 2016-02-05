@@ -10,7 +10,7 @@ e "running instance $instance_no"
 
 BIND="127.0.0.1"
 
-SERF="/usr/local/bin/serf"
+SERF=$(which serf)
 RINGPOP="./ping-ring"
 
 base_port=1300
