@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/events"
@@ -35,6 +36,7 @@ import (
 
 type RingpopTestSuite struct {
 	suite.Suite
+	mockClock    *clock.Mock
 	ringpop      *Ringpop
 	channel      *tchannel.Channel
 	mockRingpop  *mocks.Ringpop
@@ -53,12 +55,13 @@ func createSingleNodeCluster(rp *Ringpop) error {
 }
 
 func (s *RingpopTestSuite) SetupTest() {
+	s.mockClock = clock.NewMock()
 
 	ch, err := tchannel.NewChannel("test", nil)
 	s.NoError(err, "channel must create successfully")
 	s.channel = ch
 
-	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch))
+	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch), Clock(s.mockClock))
 	s.NoError(err, "Ringpop must create successfully")
 
 	s.mockRingpop = &mocks.Ringpop{}
@@ -563,4 +566,36 @@ func (s *RingpopTestSuite) TestErrorOnChannelNotListening() {
 
 func TestRingpopTestSuite(t *testing.T) {
 	suite.Run(t, new(RingpopTestSuite))
+}
+
+func (s *RingpopTestSuite) TestStartTimersIdempotance() {
+	// starts empty. note that we use empty here to not overspecify --
+	// whether it's nil or an empty slice isn't really relevant, so long as
+	// it behaves well.
+	s.Empty(s.ringpop.tickers)
+
+	// init should default to have at least 1 timer --
+	// RingChecksumStatPeriod
+	s.ringpop.init()
+	s.NotEmpty(s.ringpop.tickers)
+
+	// validate idemopotence of startTimers
+	s.ringpop.startTimers()
+
+	// destroy works, and leaves it empty
+	s.ringpop.Destroy()
+	s.Empty(s.ringpop.tickers)
+
+	// idempotent stop
+	s.ringpop.stopTimers()
+}
+
+func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {
+	s.ringpop.init()
+	stats := newDummyStats()
+	s.ringpop.statter = stats
+	s.mockClock.Add(5 * time.Second)
+	_, ok := stats.vals["ringpop.127_0_0_1_3001.ring.checksum-periodic"]
+	s.True(ok, "missing stats for checksums being computed")
+	s.ringpop.Destroy()
 }

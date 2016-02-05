@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/util"
@@ -42,7 +43,7 @@ type updateRollup struct {
 	}
 
 	flushTimer struct {
-		t *time.Timer
+		t *clock.Timer
 		sync.Mutex
 	}
 
@@ -128,7 +129,7 @@ func (r *updateRollup) RenewFlushTimer() {
 		r.flushTimer.t.Stop()
 	}
 
-	r.flushTimer.t = time.AfterFunc(r.flushInterval, func() {
+	r.flushTimer.t = r.node.clock.AfterFunc(r.flushInterval, func() {
 		r.FlushBuffer()
 		r.RenewFlushTimer()
 	})
@@ -185,7 +186,7 @@ func (r *updateRollup) FlushBuffer() {
 }
 
 // testing func to avoid data races
-func (r *updateRollup) FlushTimer() *time.Timer {
+func (r *updateRollup) FlushTimer() *clock.Timer {
 	r.flushTimer.Lock()
 	timer := r.flushTimer.t
 	r.flushTimer.Unlock()

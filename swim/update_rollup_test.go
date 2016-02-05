@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
@@ -40,6 +41,7 @@ func (s *RollupTestSuite) SetupTest() {
 	s.node = NewNode("test", "127.0.0.1:3001", nil, &Options{
 		RollupFlushInterval: 10000 * time.Second,
 		RollupMaxUpdates:    10000,
+		Clock:               clock.NewMock(),
 	})
 	s.r = s.node.rollup
 	s.incarnation = util.TimeNowMS()
@@ -101,7 +103,7 @@ func (s *RollupTestSuite) TestFlushesAfterInterval() {
 	s.NotNil(s.r.FlushTimer(), "expected timer to be set")
 	s.Len(s.r.Buffer(), 2, "expected two updates to be in buffer")
 
-	time.Sleep(2 * time.Millisecond)
+	s.node.clock.(*clock.Mock).Add(2 * time.Millisecond)
 
 	s.Empty(s.r.Buffer(), "expected buffer to be flushed")
 	s.NotNil(s.r.FlushTimer(), "expected timer to be renewed")

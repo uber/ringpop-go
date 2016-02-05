@@ -31,6 +31,7 @@ import (
 	"time"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
@@ -73,6 +74,8 @@ type Ringpop struct {
 	state      state
 	stateMutex sync.RWMutex
 
+	clock clock.Clock
+
 	channel    shared.TChannel
 	subChannel shared.SubChannel
 	node       swim.NodeInterface
@@ -92,6 +95,7 @@ type Ringpop struct {
 
 	logger log.Logger
 
+	tickers   chan *clock.Ticker
 	startTime time.Time
 }
 
@@ -160,7 +164,9 @@ func (rp *Ringpop) init() error {
 	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
 	rp.registerHandlers()
 
-	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, nil)
+	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
+		Clock: rp.clock,
+	})
 	rp.node.RegisterListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
@@ -173,9 +179,42 @@ func (rp *Ringpop) init() error {
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
 	rp.forwarder.RegisterListener(rp)
 
+	rp.startTimers()
 	rp.setState(initialized)
 
 	return nil
+}
+
+// Starts periodic timers in a single goroutine. Can be turned back off via
+// stopTimers. At present, only 1 timer exists, to emit ring.checksum-periodic.
+func (rp *Ringpop) startTimers() {
+	if rp.tickers != nil {
+		return
+	}
+	rp.tickers = make(chan *clock.Ticker, 1) // 1 == max number of tickers
+
+	if rp.config.RingChecksumStatPeriod != RingChecksumStatPeriodNever {
+		ticker := rp.clock.Ticker(rp.config.RingChecksumStatPeriod)
+		rp.tickers <- ticker
+		go func() {
+			for _ = range ticker.C {
+				rp.statter.UpdateGauge(
+					rp.getStatKey("ring.checksum-periodic"),
+					nil,
+					int64(rp.ring.Checksum()))
+			}
+		}()
+	}
+}
+
+func (rp *Ringpop) stopTimers() {
+	if rp.tickers != nil {
+		close(rp.tickers)
+		for ticker := range rp.tickers {
+			ticker.Stop()
+		}
+		rp.tickers = nil
+	}
 }
 
 // identity returns a host:port string of the address that Ringpop should
@@ -206,6 +245,8 @@ func (rp *Ringpop) Destroy() {
 	if rp.node != nil {
 		rp.node.Destroy()
 	}
+
+	rp.stopTimers()
 
 	rp.setState(destroyed)
 }
@@ -435,6 +476,7 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
+		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))
 
 	case events.RingChangedEvent:
 		added := int64(len(event.ServersAdded))

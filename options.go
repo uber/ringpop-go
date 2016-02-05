@@ -22,7 +22,9 @@ package ringpop
 
 import (
 	"errors"
+	"time"
 
+	"github.com/benbjohnson/clock"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
@@ -35,6 +37,11 @@ type configuration struct {
 	// that App is taken as an argument of the Ringpop constructor and not a
 	// configuration option. This is to prevent accidental misconfiguration.
 	App string
+
+	// Configure the period by which ringpop emits the stat
+	// "ring.checksum-periodic". See func RingChecksumStatPeriod for
+	// specifics.
+	RingChecksumStatPeriod time.Duration
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -67,15 +74,28 @@ func applyOptions(r *Ringpop, opts []Option) error {
 func checkOptions(rp *Ringpop) []error {
 	errs := []error{}
 	if rp.channel == nil {
-		errs = append(errs, errors.New("Channel is required"))
+		errs = append(errs, errors.New("channel is required"))
 	}
 	if rp.identityResolver == nil {
-		errs = append(errs, errors.New("Identity resolver is nil"))
+		errs = append(errs, errors.New("identity resolver is nil"))
 	}
 	return errs
 }
 
 // Runtime options
+
+// Clock is used to set the Clock mechanism.  Testing harnesses will typically
+// replace this with a mocked clock.
+func Clock(c clock.Clock) Option {
+	return func(r *Ringpop) error {
+		if c == nil {
+			return errors.New("clock is required")
+		} else {
+			r.clock = c
+		}
+		return nil
+	}
+}
 
 // Channel is used to provide a TChannel instance that Ringpop should use for
 // all communication.
@@ -177,7 +197,37 @@ func IdentityResolverFunc(resolver IdentityResolver) Option {
 	}
 }
 
+// RingChecksumStatPeriodNever defines a "period" which disables
+// ring.checksum-periodic stat emission.
+const RingChecksumStatPeriodNever = time.Duration(-1)
+
+// RingChecksumStatPeriodDefault defines the default emission period for the
+// ring.checksum-periodic stat.
+const RingChecksumStatPeriodDefault = time.Duration(5 * time.Second)
+
+// RingChecksumStatPeriod configures the period between emissions of the stat
+// 'ring.checksum-periodic'. Using a value <=0 (or RingChecksumStatPeriodNever)
+// will disable emission of this stat. Using a value in (0, 10ms) will return
+// an error, as that value is unrealistically small. Normal values must
+// therefore be >=10ms. RingChecksumStatPeriodDefault defines the default.
+func RingChecksumStatPeriod(period time.Duration) Option {
+	return func(r *Ringpop) error {
+		if period <= 0 {
+			period = RingChecksumStatPeriodNever
+		} else if period < 10*time.Millisecond {
+			return errors.New("ring checksum stat period invalid below 10 ms")
+		}
+		r.config.RingChecksumStatPeriod = period
+		return nil
+	}
+}
+
 // Default options
+
+// defaultClock sets the ringpop clock interface to use the system clock
+func defaultClock(r *Ringpop) error {
+	return Clock(clock.New())(r)
+}
 
 // defaultIdentityResolver sets the default identityResolver
 func defaultIdentityResolver(r *Ringpop) error {
@@ -206,12 +256,18 @@ func defaultHashRingOptions(r *Ringpop) error {
 	return HashRingConfig(defaultHashRingConfiguration)(r)
 }
 
+func defaultRingChecksumStatPeriod(r *Ringpop) error {
+	return RingChecksumStatPeriod(RingChecksumStatPeriodDefault)(r)
+}
+
 // defaultOptions are the default options/values when Ringpop is created. They
 // can be overridden at runtime.
 var defaultOptions = []Option{
+	defaultClock,
 	defaultIdentityResolver,
 	defaultLogLevels,
 	defaultStatter,
+	defaultRingChecksumStatPeriod,
 	defaultHashRingOptions,
 }
 
