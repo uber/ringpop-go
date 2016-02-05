@@ -66,6 +66,34 @@ func (s *MemberlistTestSuite) SetupTest() {
 	}
 }
 
+func (s *MemberlistTestSuite) TestAddJoinList() {
+
+	joinList := s.changes
+
+	// We add all the members of this node to the joinList because we want
+	// the joinList to contain the change for the local member.
+	mems := s.node.disseminator.FullSync()
+	for _, mem := range mems {
+		joinList = append(joinList, mem)
+	}
+
+	// We make sure that the joinList contains a change for the local member.
+	var localMember *Change
+	for _, mem := range joinList {
+		if mem.Address == s.node.Address() {
+			localMember = &mem
+		}
+	}
+	s.NotNil(localMember, "expected joinList to contain a change for the local member")
+
+	// Add join list to the membership and see that its only stored change is
+	// for the local member.
+	s.m.AddJoinList(joinList)
+	s.Equal(1, s.node.disseminator.ChangesCount(), "expected to only have one change")
+	_, ok := s.node.disseminator.ChangesByAddress(s.node.Address())
+	s.True(ok, "expected to only have the local member as a change")
+}
+
 func (s *MemberlistTestSuite) TearDownTest() {
 	s.node.Destroy()
 }

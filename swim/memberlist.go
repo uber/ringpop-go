@@ -283,6 +283,22 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	return applied
 }
 
+// AddJoinList adds the list to the membership with the Update
+// function. However, as a side effect, Update adds changes to
+// the disseminator as well. Since we don't want to disseminate
+// the potentially very large join lists, we clear all the
+// changes from the disseminator, except for the one change
+// that refers to the make-alive of this node.
+func (m *memberlist) AddJoinList(list []Change) {
+	applied := m.Update(list)
+	for _, member := range applied {
+		if member.Address == m.node.Address() {
+			continue
+		}
+		m.node.disseminator.ClearChange(member.Address)
+	}
+}
+
 // gets a random position in [0, length of member list)
 func (m *memberlist) getJoinPosition() int {
 	l := len(m.members.list)
