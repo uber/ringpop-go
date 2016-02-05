@@ -223,9 +223,9 @@ func (d *disseminator) RecordChange(change Change) {
 	d.Unlock()
 }
 
-func (d *disseminator) ClearChange(c Change) {
+func (d *disseminator) ClearChange(address string) {
 	d.Lock()
-	delete(d.changes, c.Address)
+	delete(d.changes, address)
 	d.Unlock()
 }
 

@@ -95,17 +95,17 @@ func (s *DisseminatorTestSuite) TestChangesAreCleared() {
 	}
 	fakeChange := Change{}
 	fakeChange.Address = "fake address"
-	s.d.ClearChange(fakeChange)
+	s.d.ClearChange(fakeChange.Address)
 	s.Equal(4, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 
 	changes := s.d.issueChanges()
 	for i, c := range changes {
-		s.d.ClearChange(c)
+		s.d.ClearChange(c.Address)
 		s.Equal(4-i-1, s.d.ChangesCount(), "expected one change to be deleted")
 	}
 	s.Equal(0, s.d.ChangesCount(), "expected no change left")
 
-	s.d.ClearChange(fakeChange)
+	s.d.ClearChange(fakeChange.Address)
 	s.Equal(0, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 }
 

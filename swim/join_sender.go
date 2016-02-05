@@ -393,16 +393,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 					break
 				}
 
-				// We add the join list to the membership with the Update
-				// function. However, as a side effect, Update adds changes to
-				// the disseminator as well. Since we don't want to disseminate
-				// the potentially very large join lists, we clear all the
-				// changes from the disseminator, except for the one change
-				// that refers to the make-alive of this node.
-				j.node.memberlist.Update(res.Membership)
-				for _, change := range res.Membership {
-					j.node.disseminator.ClearChange(change)
-				}
+				j.node.memberlist.AddJoinList(res.Membership)
 
 			case <-ctx.Done():
 				j.logger.WithFields(log.Fields{
