@@ -22,13 +22,14 @@ package testutils
 
 import (
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/uber/tchannel-go"
 )
 
 type errorLoggerState struct {
-	matchCount int
+	matchCount []uint32
 }
 
 type errorLogger struct {
@@ -38,36 +39,43 @@ type errorLogger struct {
 	s *errorLoggerState
 }
 
-func (l errorLogger) checkErr(msg string, args ...interface{}) {
-	allowedCount := l.v.AllowedCount
-
-	if filter := l.v.AllowedFilter; filter != "" {
-		if !strings.Contains(msg, filter) {
-			l.t.Errorf(msg, args...)
+// checkFilters returns whether the message can be ignored by the filters.
+func (l errorLogger) checkFilters(msg string) bool {
+	match := -1
+	for i, filter := range l.v.Filters {
+		if strings.Contains(msg, filter.Filter) {
+			match = i
 		}
 	}
 
-	l.s.matchCount++
-	if l.s.matchCount <= allowedCount {
+	if match == -1 {
+		return false
+	}
+
+	matchCount := atomic.AddUint32(&l.s.matchCount[match], 1)
+	return uint(matchCount) <= l.v.Filters[match].Count
+}
+func (l errorLogger) checkErr(prefix, msg string) {
+	if l.checkFilters(msg) {
 		return
 	}
 
-	l.t.Errorf(msg, args...)
+	l.t.Errorf("%v: %s %v", prefix, msg, l.Fields())
 }
 
-func (l errorLogger) Fatalf(msg string, args ...interface{}) {
-	l.checkErr("[Fatal] "+msg, args...)
-	l.Logger.Fatalf(msg, args...)
+func (l errorLogger) Fatal(msg string) {
+	l.checkErr("[Fatal]", msg)
+	l.Logger.Fatal(msg)
 }
 
-func (l errorLogger) Errorf(msg string, args ...interface{}) {
-	l.checkErr("[Error] "+msg, args...)
-	l.Logger.Errorf(msg, args...)
+func (l errorLogger) Error(msg string) {
+	l.checkErr("[Error]", msg)
+	l.Logger.Error(msg)
 }
 
-func (l errorLogger) Warnf(msg string, args ...interface{}) {
-	l.checkErr("[Warn] "+msg, args...)
-	l.Logger.Warnf(msg, args...)
+func (l errorLogger) Warn(msg string) {
+	l.checkErr("[Warn]", msg)
+	l.Logger.Warn(msg)
 }
 
 func (l errorLogger) WithFields(fields ...tchannel.LogField) tchannel.Logger {

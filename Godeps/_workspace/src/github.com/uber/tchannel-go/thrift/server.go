@@ -37,9 +37,9 @@ type handler struct {
 
 // Server handles incoming TChannel calls and forwards them to the matching TChanServer.
 type Server struct {
+	sync.RWMutex
 	ch          tchannel.Registrar
 	log         tchannel.Logger
-	mut         sync.RWMutex
 	handlers    map[string]handler
 	metaHandler *metaHandler
 }
@@ -70,9 +70,9 @@ func (s *Server) Register(svr TChanServer, opts ...RegisterOption) {
 		opt.Apply(handler)
 	}
 
-	s.mut.Lock()
+	s.Lock()
 	s.handlers[service] = *handler
-	s.mut.Unlock()
+	s.Unlock()
 
 	for _, m := range svr.Methods() {
 		s.ch.Register(s, service+"::"+m)
@@ -87,10 +87,10 @@ func (s *Server) RegisterHealthHandler(f HealthFunc) {
 func (s *Server) onError(err error) {
 	// TODO(prashant): Expose incoming call errors through options for NewServer.
 	// Timeouts should not be reported as errors.
-	if se, ok := err.(tchannel.SystemError); ok && se.Code() == tchannel.ErrCodeTimeout {
+	if tchannel.GetSystemErrorCode(err) == tchannel.ErrCodeTimeout {
 		s.log.Debugf("thrift Server timeout: %v", err)
 	} else {
-		s.log.Errorf("thrift Server error: %v", err)
+		s.log.WithFields(tchannel.ErrField(err)).Error("Thrift server error.")
 	}
 }
 
@@ -99,7 +99,7 @@ func (s *Server) handle(origCtx context.Context, handler handler, method string,
 	if err != nil {
 		return err
 	}
-	headers, err := readHeaders(reader)
+	headers, err := ReadHeaders(reader)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (s *Server) handle(origCtx context.Context, handler handler, method string,
 		return err
 	}
 
-	if err := writeHeaders(writer, ctx.ResponseHeaders()); err != nil {
+	if err := WriteHeaders(writer, ctx.ResponseHeaders()); err != nil {
 		return err
 	}
 	if err := writer.Close(); err != nil {
@@ -161,8 +161,8 @@ func (s *Server) handle(origCtx context.Context, handler handler, method string,
 	return err
 }
 
-func getServiceMethod(operation string) (string, string, bool) {
-	s := string(operation)
+func getServiceMethod(method string) (string, string, bool) {
+	s := string(method)
 	sep := strings.Index(s, "::")
 	if sep == -1 {
 		return "", "", false
@@ -172,15 +172,15 @@ func getServiceMethod(operation string) (string, string, bool) {
 
 // Handle handles an incoming TChannel call and forwards it to the correct handler.
 func (s *Server) Handle(ctx context.Context, call *tchannel.InboundCall) {
-	op := call.OperationString()
+	op := call.MethodString()
 	service, method, ok := getServiceMethod(op)
 	if !ok {
 		log.Fatalf("Handle got call for %s which does not match the expected call format", op)
 	}
 
-	s.mut.RLock()
+	s.RLock()
 	handler, ok := s.handlers[service]
-	s.mut.RUnlock()
+	s.RUnlock()
 	if !ok {
 		log.Fatalf("Handle got call for service %v which is not registered", service)
 	}

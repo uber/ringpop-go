@@ -45,19 +45,45 @@ func newZeroCalculator() zeroCalculator {
 	return zeroCalculator{}
 }
 
-type preferIncomingCalculator struct{}
+type leastPendingCalculator struct{}
 
-func (preferIncomingCalculator) GetScore(p *Peer) uint64 {
-	if p.NumInbound() <= 0 {
+func (leastPendingCalculator) GetScore(p *Peer) uint64 {
+	inbound, outbound := p.NumConnections()
+	if inbound+outbound == 0 {
 		return math.MaxUint64
 	}
 
 	return uint64(p.NumPendingOutbound())
 }
 
-// newPreferIncomingCalculator calculates the score for peers. It prefers
-// peers who have incoming connections and choose based on the least pending
-// outbound calls. The less number of outbound calls, the smaller score the peer has.
+// newLeastPendingCalculator returns a strategy prefers any connected peer.
+// Within connected peers, least pending calls is used. Peers with less pending outbound calls
+// get a smaller score.
+func newLeastPendingCalculator() leastPendingCalculator {
+	return leastPendingCalculator{}
+}
+
+type preferIncomingCalculator struct{}
+
+func (preferIncomingCalculator) GetScore(p *Peer) uint64 {
+	inbound, outbound := p.NumConnections()
+	if inbound+outbound == 0 {
+		return math.MaxUint64
+	}
+
+	numPendingOutbound := uint64(p.NumPendingOutbound())
+	if inbound == 0 {
+		return math.MaxInt32 + numPendingOutbound
+	}
+
+	return numPendingOutbound
+}
+
+// newPreferIncomingCalculator returns a strategy that prefers peers with incoming connections.
+// The scoring tiers are:
+// Peers with incoming connections, peers with any connections, unconnected peers.
+// Within each tier, least pending calls is used. Peers with less pending outbound calls
+// get a smaller score.
 func newPreferIncomingCalculator() preferIncomingCalculator {
 	return preferIncomingCalculator{}
 }

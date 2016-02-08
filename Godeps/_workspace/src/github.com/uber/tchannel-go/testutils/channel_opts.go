@@ -54,18 +54,29 @@ type ChannelOpts struct {
 type LogVerification struct {
 	Disabled bool
 
-	// AllowedFilter specifies the substring match to search
-	// for in the log message to skip raising an error.
-	AllowedFilter string
+	Filters []LogFilter
+}
 
-	// AllowedCount is the maximum number of allowed warn+ logs matching
-	// AllowedFilter before errors are raised.
-	AllowedCount int
+// LogFilter is a single substring match that can be ignored.
+type LogFilter struct {
+	// Filter specifies the substring match to search
+	// for in the log message to skip raising an error.
+	Filter string
+
+	// Count is the maximum number of allowed warn+ logs matching
+	// Filter before errors are raised.
+	Count uint
 }
 
 // SetServiceName sets ServiceName.
 func (o *ChannelOpts) SetServiceName(svcName string) *ChannelOpts {
 	o.ServiceName = svcName
+	return o
+}
+
+// SetProcessName sets the ProcessName in ChannelOptions.
+func (o *ChannelOpts) SetProcessName(processName string) *ChannelOpts {
+	o.ProcessName = processName
 	return o
 }
 
@@ -81,6 +92,12 @@ func (o *ChannelOpts) SetTraceReporter(traceReporter tchannel.TraceReporter) *Ch
 	return o
 }
 
+// SetTraceReporterFactory sets TraceReporterFactory in ChannelOptions.
+func (o *ChannelOpts) SetTraceReporterFactory(factory tchannel.TraceReporterFactory) *ChannelOpts {
+	o.TraceReporterFactory = factory
+	return o
+}
+
 // SetFramePool sets FramePool in DefaultConnectionOptions.
 func (o *ChannelOpts) SetFramePool(framePool tchannel.FramePool) *ChannelOpts {
 	o.DefaultConnectionOptions.FramePool = framePool
@@ -93,6 +110,12 @@ func (o *ChannelOpts) SetTimeNow(timeNow func() time.Time) *ChannelOpts {
 	return o
 }
 
+// SetTraceSampleRate sets the TraceSampleRate in ChannelOptions.
+func (o *ChannelOpts) SetTraceSampleRate(sampleRate float64) *ChannelOpts {
+	o.ChannelOptions.TraceSampleRate = &sampleRate
+	return o
+}
+
 // DisableLogVerification disables log verification for this channel.
 func (o *ChannelOpts) DisableLogVerification() *ChannelOpts {
 	o.LogVerification.Disabled = true
@@ -101,9 +124,11 @@ func (o *ChannelOpts) DisableLogVerification() *ChannelOpts {
 
 // AddLogFilter sets an allowed filter for warning/error logs and sets
 // the maximum number of times that log can occur.
-func (o *ChannelOpts) AddLogFilter(filter string, maxCount int) *ChannelOpts {
-	o.LogVerification.AllowedFilter = filter
-	o.LogVerification.AllowedCount = maxCount
+func (o *ChannelOpts) AddLogFilter(filter string, maxCount uint) *ChannelOpts {
+	o.LogVerification.Filters = append(o.LogVerification.Filters, LogFilter{
+		Filter: filter,
+		Count:  maxCount,
+	})
 	return o
 }
 
@@ -137,5 +162,7 @@ func DefaultOpts(opts *ChannelOpts) *ChannelOpts {
 
 // WrapLogger wraps the given logger with extra verification.
 func (v *LogVerification) WrapLogger(t testing.TB, l tchannel.Logger) tchannel.Logger {
-	return errorLogger{l, t, v, &errorLoggerState{}}
+	return errorLogger{l, t, v, &errorLoggerState{
+		matchCount: make([]uint32, len(v.Filters)),
+	}}
 }

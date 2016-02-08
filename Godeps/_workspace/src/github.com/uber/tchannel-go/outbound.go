@@ -22,19 +22,20 @@ package tchannel
 
 import (
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/uber/tchannel-go/typed"
 	"golang.org/x/net/context"
 )
 
-// maxOperationSize is the maximum size of arg1.
-const maxOperationSize = 16 * 1024
+// maxMethodSize is the maximum size of arg1.
+const maxMethodSize = 16 * 1024
 
 // beginCall begins an outbound call on the connection
-func (c *Connection) beginCall(ctx context.Context, serviceName string, callOptions *CallOptions, operation string) (*OutboundCall, error) {
-	switch c.readState() {
+func (c *Connection) beginCall(ctx context.Context, serviceName, methodName string, callOptions *CallOptions) (*OutboundCall, error) {
+	now := c.timeNow()
+
+	switch state := c.readState(); state {
 	case connectionActive, connectionStartClose:
 		break
 	case connectionInboundClosed, connectionClosed:
@@ -42,7 +43,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 	case connectionWaitingToRecvInitReq, connectionWaitingToSendInitReq, connectionWaitingToRecvInitRes:
 		return nil, ErrConnectionNotReady
 	default:
-		return nil, errConnectionUnknownState
+		return nil, errConnectionUnknownState{"beginCall", state}
 	}
 
 	deadline, ok := ctx.Deadline()
@@ -50,7 +51,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 	if !ok {
 		return nil, ErrTimeoutRequired
 	}
-	timeToLive := deadline.Sub(time.Now())
+	timeToLive := deadline.Sub(now)
 	if timeToLive <= 0 {
 		return nil, ErrTimeout
 	}
@@ -85,7 +86,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 		TimeToLive: timeToLive,
 	}
 	call.statsReporter = c.statsReporter
-	call.createStatsTags(c.commonStatsTags, callOptions, operation)
+	call.createStatsTags(c.commonStatsTags, callOptions, methodName)
 	call.log = c.log.WithFields(LogField{"Out-Call", requestID})
 
 	// TODO(mmihic): It'd be nice to do this without an fptr
@@ -105,28 +106,35 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 		// TODO(mmihic): Potentially reject calls that are made outside a root context?
 		call.callReq.Tracing.EnableTracing(false)
 	}
+	call.callReq.Tracing.sampleRootSpan(c.traceSampleRate)
 
 	response := new(OutboundCallResponse)
+	response.startedAt = now
 	response.Annotations = Annotations{
 		reporter: c.traceReporter,
-		span:     call.callReq.Tracing,
-		endpoint: TargetEndpoint{
-			HostPort:    c.remotePeerInfo.HostPort,
-			ServiceName: serviceName,
-			Operation:   operation,
+		timeNow:  c.timeNow,
+		data: TraceData{
+			Span: call.callReq.Tracing,
+			Source: TraceEndpoint{
+				HostPort:    c.localPeerInfo.HostPort,
+				ServiceName: c.localPeerInfo.ServiceName,
+			},
+			Target: TraceEndpoint{
+				HostPort:    c.remotePeerInfo.HostPort,
+				ServiceName: serviceName,
+			},
+			Method: methodName,
 		},
-		timeNow: c.timeNow,
 		binaryAnnotationsBacking: [2]BinaryAnnotation{
 			{Key: "cn", Value: call.callReq.Headers[CallerName]},
 			{Key: "as", Value: call.callReq.Headers[ArgScheme]},
 		},
 	}
-	response.annotations = response.annotationsBacking[:0]
-	response.binaryAnnotations = response.binaryAnnotationsBacking[:]
-	response.AddAnnotation(AnnotationKeyClientSend)
+	response.data.Annotations = response.annotationsBacking[:0]
+	response.data.BinaryAnnotations = response.binaryAnnotationsBacking[:]
+	response.AddAnnotationAt(AnnotationKeyClientSend, now)
 
 	response.requestState = callOptions.RequestState
-	response.startedAt = c.timeNow()
 	response.mex = mex
 	response.log = c.log.WithFields(LogField{"Out-Response", requestID})
 	response.messageForFragment = func(initial bool) message {
@@ -142,7 +150,7 @@ func (c *Connection) beginCall(ctx context.Context, serviceName string, callOpti
 
 	call.response = response
 
-	if err := call.writeOperation([]byte(operation)); err != nil {
+	if err := call.writeMethod([]byte(methodName)); err != nil {
 		return nil, err
 	}
 	return call, nil
@@ -186,7 +194,7 @@ func (call *OutboundCall) Response() *OutboundCallResponse {
 }
 
 // createStatsTags creates the common stats tags, if they are not already created.
-func (call *OutboundCall) createStatsTags(connectionTags map[string]string, callOptions *CallOptions, operation string) {
+func (call *OutboundCall) createStatsTags(connectionTags map[string]string, callOptions *CallOptions, method string) {
 	call.commonStatsTags = map[string]string{
 		"target-service": call.callReq.Service,
 	}
@@ -194,18 +202,18 @@ func (call *OutboundCall) createStatsTags(connectionTags map[string]string, call
 		call.commonStatsTags[k] = v
 	}
 	if callOptions.Format != HTTP {
-		call.commonStatsTags["target-endpoint"] = string(operation)
+		call.commonStatsTags["target-endpoint"] = string(method)
 	}
 }
 
-// writeOperation writes the operation (arg1) to the call
-func (call *OutboundCall) writeOperation(operation []byte) error {
-	if len(operation) > maxOperationSize {
-		return call.failed(ErrOperationTooLarge)
+// writeMethod writes the method (arg1) to the call
+func (call *OutboundCall) writeMethod(method []byte) error {
+	if len(method) > maxMethodSize {
+		return call.failed(ErrMethodTooLarge)
 	}
 
 	call.statsReporter.IncCounter("outbound.calls.send", call.commonStatsTags, 1)
-	return NewArgWriter(call.arg1Writer()).Write(operation)
+	return NewArgWriter(call.arg1Writer()).Write(method)
 }
 
 // Arg2Writer returns a WriteCloser that can be used to write the second argument.
@@ -250,20 +258,20 @@ func (response *OutboundCallResponse) Format() Format {
 	return Format(response.callRes.Headers[ArgScheme])
 }
 
-// Arg2Reader returns an io.ReadCloser to read the second argument.
+// Arg2Reader returns an ArgReader to read the second argument.
 // The ReadCloser must be closed once the argument has been read.
-func (response *OutboundCallResponse) Arg2Reader() (io.ReadCloser, error) {
-	var operation []byte
-	if err := NewArgReader(response.arg1Reader()).Read(&operation); err != nil {
+func (response *OutboundCallResponse) Arg2Reader() (ArgReader, error) {
+	var method []byte
+	if err := NewArgReader(response.arg1Reader()).Read(&method); err != nil {
 		return nil, err
 	}
 
 	return response.arg2Reader()
 }
 
-// Arg3Reader returns an io.ReadCloser to read the last argument.
+// Arg3Reader returns an ArgReader to read the last argument.
 // The ReadCloser must be closed once the argument has been read.
-func (response *OutboundCallResponse) Arg3Reader() (io.ReadCloser, error) {
+func (response *OutboundCallResponse) Arg3Reader() (ArgReader, error) {
 	return response.arg3Reader()
 }
 
@@ -272,26 +280,37 @@ func (response *OutboundCallResponse) Arg3Reader() (io.ReadCloser, error) {
 // a request specific error, it will be written to the request's response
 // channel and converted into a SystemError returned from the next reader or
 // access call.
-func (c *Connection) handleError(frame *Frame) {
+// The return value is whether the frame should be released immediately.
+func (c *Connection) handleError(frame *Frame) bool {
 	errMsg := errorMessage{
 		id: frame.Header.ID,
 	}
 	rbuf := typed.NewReadBuffer(frame.SizedPayload())
 	if err := errMsg.read(rbuf); err != nil {
-		c.log.Warnf("Unable to read Error frame from %s: %v", c.remotePeerInfo, err)
-		c.connectionError(err)
-		return
+		c.log.WithFields(
+			LogField{"remotePeer", c.remotePeerInfo},
+			ErrField(err),
+		).Warn("Unable to read error frame.")
+		c.connectionError("parsing error frame", err)
+		return true
 	}
 
 	if errMsg.errCode == ErrCodeProtocol {
-		c.log.Warnf("Peer %s reported protocol error: %s", c.remotePeerInfo, errMsg.message)
-		c.connectionError(errMsg.AsSystemError())
-		return
+		c.log.WithFields(
+			LogField{"remotePeer", c.remotePeerInfo},
+			LogField{"error", errMsg.message},
+		).Warn("Peer reported protocol error.")
+		c.connectionError("received protocol error", errMsg.AsSystemError())
+		return true
 	}
 
 	if err := c.outbound.forwardPeerFrame(frame); err != nil {
 		c.log.Infof("Failed to forward error frame %v to mex, error: %v", frame.Header, errMsg)
+		return true
 	}
+
+	// If the frame was forwarded, then the other side is responsible for releasing the frame.
+	return false
 }
 
 func cloneTags(tags map[string]string) map[string]string {
@@ -305,13 +324,13 @@ func cloneTags(tags map[string]string) map[string]string {
 // doneReading shuts down the message exchange for this call.
 // For outgoing calls, the last message is reading the call response.
 func (response *OutboundCallResponse) doneReading(unexpected error) {
-	response.AddAnnotation(AnnotationKeyClientReceive)
+	now := response.GetTime()
+	response.AddAnnotationAt(AnnotationKeyClientReceive, now)
 	response.Report()
 
 	isSuccess := unexpected == nil && !response.ApplicationError()
 	lastAttempt := isSuccess || !response.requestState.HasRetries(unexpected)
 
-	now := response.GetTime()
 	latency := now.Sub(response.startedAt)
 	response.statsReporter.RecordTimer("outbound.calls.per-attempt.latency", response.commonStatsTags, latency)
 	if lastAttempt {

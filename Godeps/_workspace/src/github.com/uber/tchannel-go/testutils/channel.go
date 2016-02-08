@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"net"
 	"sync/atomic"
-	"testing"
 
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/raw"
@@ -75,21 +74,24 @@ func NewClientChannel(opts *ChannelOpts) (*tchannel.Channel, error) {
 }
 
 type rawFuncHandler struct {
-	t *testing.T
-	f func(context.Context, *raw.Args) (*raw.Res, error)
+	ch *tchannel.Channel
+	f  func(context.Context, *raw.Args) (*raw.Res, error)
 }
 
 func (h rawFuncHandler) OnError(ctx context.Context, err error) {
-	h.t.Errorf("simpleHandler OnError: %v %v", ctx, err)
+	h.ch.Logger().WithFields(
+		tchannel.LogField{Key: "context", Value: ctx},
+		tchannel.ErrField(err),
+	).Error("simpleHandler OnError.")
 }
 
 func (h rawFuncHandler) Handle(ctx context.Context, args *raw.Args) (*raw.Res, error) {
 	return h.f(ctx, args)
 }
 
-// RegisterFunc registers a function as a handler for the given operation name.
-func RegisterFunc(t *testing.T, ch *tchannel.Channel, name string,
+// RegisterFunc registers a function as a handler for the given method name.
+func RegisterFunc(ch *tchannel.Channel, name string,
 	f func(ctx context.Context, args *raw.Args) (*raw.Res, error)) {
 
-	ch.Register(raw.Wrap(rawFuncHandler{t, f}), name)
+	ch.Register(raw.Wrap(rawFuncHandler{ch, f}), name)
 }

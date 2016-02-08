@@ -23,11 +23,10 @@ package tchannel
 import (
 	"hash"
 	"hash/crc32"
+	"sync"
 )
 
-var (
-	crc32CastagnoliTable = crc32.MakeTable(crc32.Castagnoli)
-)
+var checksumPools [checksumCount]sync.Pool
 
 // A ChecksumType is a checksum algorithm supported by TChannel for checksumming call bodies
 type ChecksumType byte
@@ -44,7 +43,28 @@ const (
 
 	// ChecksumTypeCrc32C indicates the message checksum is calculated using crc32c
 	ChecksumTypeCrc32C ChecksumType = 3
+
+	checksumCount = 4
 )
+
+func init() {
+	crc32CastagnoliTable := crc32.MakeTable(crc32.Castagnoli)
+
+	ChecksumTypeNone.pool().New = func() interface{} {
+		return nullChecksum{}
+	}
+	ChecksumTypeCrc32.pool().New = func() interface{} {
+		return newHashChecksum(ChecksumTypeCrc32, crc32.NewIEEE())
+	}
+	ChecksumTypeCrc32C.pool().New = func() interface{} {
+		return newHashChecksum(ChecksumTypeCrc32C, crc32.New(crc32CastagnoliTable))
+	}
+
+	// TODO: Implement farm hash.
+	ChecksumTypeFarmhash.pool().New = func() interface{} {
+		return nullChecksum{}
+	}
+}
 
 // ChecksumSize returns the size in bytes of the checksum calculation
 func (t ChecksumType) ChecksumSize() int {
@@ -60,22 +80,21 @@ func (t ChecksumType) ChecksumSize() int {
 	}
 }
 
+// pool returns the sync.Pool used to pool checksums for this type.
+func (t ChecksumType) pool() *sync.Pool {
+	return &checksumPools[int(t)]
+}
+
 // New creates a new Checksum of the given type
 func (t ChecksumType) New() Checksum {
-	switch t {
-	case ChecksumTypeNone:
-		return nullChecksum{}
-	case ChecksumTypeCrc32:
-		return newHashChecksum(t, crc32.NewIEEE())
-	case ChecksumTypeCrc32C:
-		return newHashChecksum(t, crc32.New(crc32CastagnoliTable))
-	case ChecksumTypeFarmhash:
-		// TODO(mmihic): Implement
-		return nil
+	s := t.pool().Get().(Checksum)
+	s.Reset()
+	return s
+}
 
-	default:
-		return nil
-	}
+// Release puts a Checksum back in the pool.
+func (t ChecksumType) Release(checksum Checksum) {
+	t.pool().Put(checksum)
 }
 
 // A Checksum calculates a running checksum against a bytestream
@@ -91,6 +110,12 @@ type Checksum interface {
 
 	// Sum returns the current checksum value
 	Sum() []byte
+
+	// Release puts a Checksum back in the pool.
+	Release()
+
+	// Reset resets the checksum state to the default 0 value.
+	Reset()
 }
 
 // No checksum
@@ -107,6 +132,14 @@ func (c nullChecksum) Add(b []byte) []byte { return nil }
 
 // Sum returns the current checksum calculation
 func (c nullChecksum) Sum() []byte { return nil }
+
+// Release puts a Checksum back in the pool.
+func (c nullChecksum) Release() {
+	c.TypeCode().Release(c)
+}
+
+// Reset resets the checksum state to the default 0 value.
+func (c nullChecksum) Reset() {}
 
 // Hash Checksum
 type hashChecksum struct {
@@ -134,3 +167,9 @@ func (h *hashChecksum) Add(b []byte) []byte { h.hash.Write(b); return h.Sum() }
 
 // Sum returns the current value of the checksum calculation
 func (h *hashChecksum) Sum() []byte { return h.hash.Sum(h.sumCache) }
+
+// Release puts a Checksum back in the pool.
+func (h *hashChecksum) Release() { h.TypeCode().Release(h) }
+
+// Reset resets the checksum state to the default 0 value.
+func (h *hashChecksum) Reset() { h.hash.Reset() }

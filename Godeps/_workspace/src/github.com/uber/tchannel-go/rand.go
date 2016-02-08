@@ -28,7 +28,8 @@ import (
 // lockedSource allows a random number generator to be used by multiple goroutines concurrently.
 // The code is very similar to math/rand.lockedSource, which is unfortunately not exposed.
 type lockedSource struct {
-	mut sync.Mutex
+	sync.Mutex
+
 	src rand.Source
 }
 
@@ -38,14 +39,14 @@ func NewRand(seed int64) *rand.Rand {
 }
 
 func (r *lockedSource) Int63() (n int64) {
-	r.mut.Lock()
+	r.Lock()
 	n = r.src.Int63()
-	r.mut.Unlock()
+	r.Unlock()
 	return
 }
 
 func (r *lockedSource) Seed(seed int64) {
-	r.mut.Lock()
+	r.Lock()
 	r.src.Seed(seed)
-	r.mut.Unlock()
+	r.Unlock()
 }

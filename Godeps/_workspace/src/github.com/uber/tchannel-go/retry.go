@@ -182,12 +182,15 @@ func (rs *RequestState) AddSelectedPeer(hostPort string) {
 		return
 	}
 
+	host := getHost(hostPort)
 	if rs.SelectedPeers == nil {
 		rs.SelectedPeers = map[string]struct{}{
 			hostPort: struct{}{},
+			host:     struct{}{},
 		}
 	} else {
 		rs.SelectedPeers[hostPort] = struct{}{}
+		rs.SelectedPeers[host] = struct{}{}
 	}
 }
 
@@ -201,10 +204,10 @@ func (rs *RequestState) RetryCount() int {
 
 // RunWithRetry will take a function that makes the TChannel call, and will
 // rerun it as specifed in the RetryOptions in the Context.
-func (ch *Channel) RunWithRetry(ctx context.Context, f RetriableFunc) error {
+func (ch *Channel) RunWithRetry(runCtx context.Context, f RetriableFunc) error {
 	var err error
 
-	opts := getRetryOptions(ctx)
+	opts := getRetryOptions(runCtx)
 	rs := ch.getRequestState(opts)
 	defer requestStatePool.Put(rs)
 
@@ -212,10 +215,10 @@ func (ch *Channel) RunWithRetry(ctx context.Context, f RetriableFunc) error {
 		rs.Attempt++
 
 		if opts.TimeoutPerAttempt == 0 {
-			err = f(ctx, rs)
+			err = f(runCtx, rs)
 		} else {
-			ctx, cancel := context.WithTimeout(ctx, opts.TimeoutPerAttempt)
-			err = f(ctx, rs)
+			attemptCtx, cancel := context.WithTimeout(runCtx, opts.TimeoutPerAttempt)
+			err = f(attemptCtx, rs)
 			cancel()
 		}
 
@@ -240,4 +243,15 @@ func (ch *Channel) getRequestState(retryOpts *RetryOptions) *RequestState {
 		retryOpts: retryOpts,
 	}
 	return rs
+}
+
+// getHost returns the host part of a host:port. If no ':' is found, it returns the
+// original string. Note: This hand-rolled loop is faster than using strings.IndexByte.
+func getHost(hostPort string) string {
+	for i := 0; i < len(hostPort); i++ {
+		if hostPort[i] == ':' {
+			return hostPort[:i]
+		}
+	}
+	return hostPort
 }

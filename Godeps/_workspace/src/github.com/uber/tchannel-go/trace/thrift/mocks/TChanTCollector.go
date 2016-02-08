@@ -1,23 +1,3 @@
-// Copyright (c) 2015 Uber Technologies, Inc.
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
 package mocks
 
 import "github.com/uber/tchannel-go/trace/thrift/gen-go/tcollector"
@@ -29,33 +9,33 @@ type TChanTCollector struct {
 	mock.Mock
 }
 
-func (_m *TChanTCollector) MultiSubmit(ctx thrift.Context, spans []*tcollector.Span) ([]*tcollector.Response, error) {
-	ret := _m.Called(ctx, spans)
+func (_m *TChanTCollector) GetSamplingStrategy(_ctx thrift.Context, _serviceName string) (*tcollector.SamplingStrategyResponse, error) {
+	ret := _m.Called(_ctx, _serviceName)
 
-	var r0 []*tcollector.Response
-	if rf, ok := ret.Get(0).(func(thrift.Context, []*tcollector.Span) []*tcollector.Response); ok {
-		r0 = rf(ctx, spans)
+	var r0 *tcollector.SamplingStrategyResponse
+	if rf, ok := ret.Get(0).(func(thrift.Context, string) *tcollector.SamplingStrategyResponse); ok {
+		r0 = rf(_ctx, _serviceName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*tcollector.Response)
+			r0 = ret.Get(0).(*tcollector.SamplingStrategyResponse)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(thrift.Context, []*tcollector.Span) error); ok {
-		r1 = rf(ctx, spans)
+	if rf, ok := ret.Get(1).(func(thrift.Context, string) error); ok {
+		r1 = rf(_ctx, _serviceName)
 	} else {
 		r1 = ret.Error(1)
 	}
 
 	return r0, r1
 }
-func (_m *TChanTCollector) Submit(ctx thrift.Context, span *tcollector.Span) (*tcollector.Response, error) {
-	ret := _m.Called(ctx, span)
+func (_m *TChanTCollector) Submit(_ctx thrift.Context, _span *tcollector.Span) (*tcollector.Response, error) {
+	ret := _m.Called(_ctx, _span)
 
 	var r0 *tcollector.Response
 	if rf, ok := ret.Get(0).(func(thrift.Context, *tcollector.Span) *tcollector.Response); ok {
-		r0 = rf(ctx, span)
+		r0 = rf(_ctx, _span)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*tcollector.Response)
@@ -64,7 +44,28 @@ func (_m *TChanTCollector) Submit(ctx thrift.Context, span *tcollector.Span) (*t
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(thrift.Context, *tcollector.Span) error); ok {
-		r1 = rf(ctx, span)
+		r1 = rf(_ctx, _span)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+func (_m *TChanTCollector) SubmitBatch(_ctx thrift.Context, _spans []*tcollector.Span) ([]*tcollector.Response, error) {
+	ret := _m.Called(_ctx, _spans)
+
+	var r0 []*tcollector.Response
+	if rf, ok := ret.Get(0).(func(thrift.Context, []*tcollector.Span) []*tcollector.Response); ok {
+		r0 = rf(_ctx, _spans)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*tcollector.Response)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(thrift.Context, []*tcollector.Span) error); ok {
+		r1 = rf(_ctx, _spans)
 	} else {
 		r1 = ret.Error(1)
 	}

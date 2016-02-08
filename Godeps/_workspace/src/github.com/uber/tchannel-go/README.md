@@ -1,124 +1,67 @@
-# TChannel
+# TChannel [![GoDoc][doc-img]][doc] [![Build Status][ci-img]][ci] [![Coverage Status][cov-img]][cov]
 
-[![GoDoc](https://godoc.org/github.com/uber/tchannel-go?status.svg)](https://godoc.org/github.com/uber/tchannel-go)
+[TChannel][tchan-spec] is a multiplexing and framing protocol for RPC calls.
+tchannel-go is a Go implementation of the protocol, including client libraries
+for [Hyperbahn][hyperbahn].
 
-
-[TChannel](https://github.com/uber/tchannel/blob/master/docs/protocol.md) is a multiplexing and framing protocol for RPC calls.
-
-tchannel-go is a Go implementation of the TChannel protocol, and includes client libraries for [Hyperbahn](https://github.com/uber/hyperbahn).
-
-## Stability: experimental
-
-NOTE: `master:golang` is **not yet stable**
-
-## Thrift + TChannel Integration
-
-If you want to use Thrift+TChannel, you will want to read [this guide](guide/Thrift_Hyperbahn.md).
-
-## Getting Started
-
-Get Go from your package manager of choice or follow the [official installation instructions](https://golang.org/doc/install).
-
-```bash
-brew install go
-
-# This will be your GOPATH where all Go code will live.
-mkdir -p ~/gocode/src
-```
-
-Set up your environment for your shell of choice.
-
-```bash
-export GOPATH="${HOME}/gocode"
-export PATH="${PATH}":"${GOPATH}/bin"
-```
-
-TChannel uses [godep](https://github.com/tools/godep) to manage dependencies.  To get started:
-
-```bash
-go get github.com/uber/tchannel-go
-go get github.com/tools/godep
-cd $GOPATH/src/github.com/uber/tchannel-go
-godep restore
-make
-```
-### Examples
-
-Simple examples are included which demonstrate the TChannel API and features.
-
-
-#### PingPong
-```bash
-./build/examples/ping/pong
-```
-
-This example creates a client and server channel.  The server channel registers a PingService
-with a ping operation, which takes request Headers and a Ping body and returns the
-same Headers along with a Pong body.  The client sends a ping request to the server
-
-Note that every instance is bidirectional, so the same channel can be used for both sending
-and receiving requests to peers.  New connections are initiated on demand.
-
-
-#### KeyValue
-```bash
-./build/examples/keyvalue/server
-./build/examples/keyvalue/client
-```
-
-This example exposes a simple keyvalue service over TChannel using the Thrift protocol.
-The client has an interactive CLI that can be used to make calls to the server.
+If you'd like to start by writing a small Thrift and TChannel service, check
+out [this guide](guide/Thrift_Hyperbahn.md). For a less opinionated setup, see
+the [contribution guidelines](CONTRIBUTING.md).
 
 ## Overview
 
-TChannel is a network protocol with the following goals:
+TChannel is a network protocol that supports:
 
- * request / response model
- * multiple requests multiplexed across the same TCP socket
- * out of order responses
- * streaming request and responses
- * all frames checksummed
- * transport arbitrary payloads
- * easy to implement in multiple languages
- * near-redis performance
+ * A request/response model,
+ * Multiplexing multiple requests across the same TCP socket,
+ * Out-of-order responses,
+ * Streaming requests and responses,
+ * Checksummed frames,
+ * Transport of arbitrary payloads,
+ * Easy implementation in many languages, and
+ * Redis-like performance.
 
-This protocol is intended to run on datacenter networks for inter-process communication.
+This protocol is intended to run on datacenter networks for inter-process
+communication.
 
 ## Protocol
 
-TChannel frames have a fixed length header and 3 variable length fields. The underlying protocol
-does not assign meaning to these fields, but the included client/server implementation uses
-the first field to represent a unique endpoint or function name in an RPC model.
-The next two fields can be used for arbitrary data. Some suggested way to use the 3 fields are:
+TChannel frames have a fixed-length header and 3 variable-length fields. The
+underlying protocol does not assign meaning to these fields, but the included
+client/server implementation uses the first field to represent a unique
+endpoint or function name in an RPC model.  The next two fields can be used for
+arbitrary data. Some suggested way to use the 3 fields are:
 
-* URI path, HTTP method and headers as JSON, body
-* function name, headers, thrift / protobuf
+* URI path + HTTP method and headers as JSON + body, or
+* Function name + headers + thrift/protobuf.
 
-Note however that the only encoding supported by TChannel is UTF-8.  If you want JSON, you'll need
-to stringify and parse outside of TChannel.
+Note, however, that the only encoding supported by TChannel is UTF-8.  If you
+want JSON, you'll need to stringify and parse outside of TChannel.
 
-This design supports efficient routing and forwarding of data where the routing information needs
-to parse only the first or second field, but the 3rd field is forwarded without parsing.
+This design supports efficient routing and forwarding: routers need to parse
+the first or second field, but can forward the third field without parsing.
 
-There is no notion of client and server in this system. Every TChannel instance is capable of
-making or receiving requests, and thus requires a unique port on which to listen. This requirement may
-change in the future.
+There is no notion of client and server in this system. Every TChannel instance
+is capable of making and receiving requests, and thus requires a unique port on
+which to listen. This requirement may change in the future.
 
- - See [protocol.md](https://github.com/uber/tchannel/blob/master/docs/protocol.md) for more details
+See the [protocol specification][tchan-proto-spec] for more details.
 
-## Further examples
+## Examples
 
- - [ping](examples/ping/main.go): A simple ping/pong example using raw TChannel.
+ - [ping](examples/ping): A simple ping/pong example using raw TChannel.
  - [thrift](examples/thrift): A Thrift server/client example.
  - [keyvalue](examples/keyvalue): A keyvalue Thrift service with separate server and client binaries.
 
-## Tests
+<hr>
+This project is released under the [MIT License](LICENSE.md).
 
-`make test` or `make cover`
-
-## Contributors
-
- - mmihic
- - prashantv
-
-## MIT Licenced
+[doc-img]: https://godoc.org/github.com/uber/tchannel-go?status.svg
+[doc]: https://godoc.org/github.com/uber/tchannel-go
+[ci-img]: https://travis-ci.org/uber/tchannel-go.svg?branch=master
+[ci]: https://travis-ci.org/uber/tchannel-go
+[cov-img]: https://coveralls.io/repos/uber/tchannel-go/badge.svg?branch=master&service=github
+[cov]: https://coveralls.io/github/uber/tchannel-go?branch=master
+[tchan-spec]: http://tchannel.readthedocs.org/en/latest/
+[tchan-proto-spec]: http://tchannel.readthedocs.org/en/latest/protocol/
+[hyperbahn]: https://github.com/uber/hyperbahn

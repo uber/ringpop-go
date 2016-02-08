@@ -87,16 +87,16 @@ func makeCall(call *tchannel.OutboundCall, headers, arg3In, respHeaders, arg3Out
 	return true, "", nil
 }
 
-func (c *Client) startCall(ctx context.Context, operation string, callOptions *tchannel.CallOptions) (*tchannel.OutboundCall, error) {
+func (c *Client) startCall(ctx context.Context, method string, callOptions *tchannel.CallOptions) (*tchannel.OutboundCall, error) {
 	if c.hostPort != "" {
-		return c.ch.BeginCall(ctx, c.hostPort, c.targetService, operation, callOptions)
+		return c.ch.BeginCall(ctx, c.hostPort, c.targetService, method, callOptions)
 	}
 
-	return c.ch.GetSubChannel(c.targetService).BeginCall(ctx, operation, callOptions)
+	return c.ch.GetSubChannel(c.targetService).BeginCall(ctx, method, callOptions)
 }
 
 // Call makes a JSON call, with retries.
-func (c *Client) Call(ctx Context, operation string, arg, resp interface{}) error {
+func (c *Client) Call(ctx Context, method string, arg, resp interface{}) error {
 	var (
 		headers = ctx.Headers()
 
@@ -109,7 +109,7 @@ func (c *Client) Call(ctx Context, operation string, arg, resp interface{}) erro
 	err := c.ch.RunWithRetry(ctx, func(ctx context.Context, rs *tchannel.RequestState) error {
 		respHeaders, respErr, errAt, isOK = nil, nil, "", false
 
-		call, err := c.startCall(ctx, operation, &tchannel.CallOptions{
+		call, err := c.startCall(ctx, method, &tchannel.CallOptions{
 			Format:       tchannel.JSON,
 			RequestState: rs,
 		})
@@ -131,7 +131,7 @@ func (c *Client) Call(ctx Context, operation string, arg, resp interface{}) erro
 }
 
 // TODO(prashantv): Clean up json.Call* interfaces.
-func wrapCall(ctx Context, call *tchannel.OutboundCall, operation string, arg, resp interface{}) error {
+func wrapCall(ctx Context, call *tchannel.OutboundCall, method string, arg, resp interface{}) error {
 	var respHeaders map[string]string
 	var respErr ErrApplication
 	isOK, errAt, err := makeCall(call, ctx.Headers(), arg, &respHeaders, resp, &respErr)
@@ -147,21 +147,21 @@ func wrapCall(ctx Context, call *tchannel.OutboundCall, operation string, arg, r
 }
 
 // CallPeer makes a JSON call using the given peer.
-func CallPeer(ctx Context, peer *tchannel.Peer, serviceName, operation string, arg, resp interface{}) error {
-	call, err := peer.BeginCall(ctx, serviceName, operation, &tchannel.CallOptions{Format: tchannel.JSON})
+func CallPeer(ctx Context, peer *tchannel.Peer, serviceName, method string, arg, resp interface{}) error {
+	call, err := peer.BeginCall(ctx, serviceName, method, &tchannel.CallOptions{Format: tchannel.JSON})
 	if err != nil {
 		return err
 	}
 
-	return wrapCall(ctx, call, operation, arg, resp)
+	return wrapCall(ctx, call, method, arg, resp)
 }
 
 // CallSC makes a JSON call using the given subchannel.
-func CallSC(ctx Context, sc *tchannel.SubChannel, operation string, arg, resp interface{}) error {
-	call, err := sc.BeginCall(ctx, operation, &tchannel.CallOptions{Format: tchannel.JSON})
+func CallSC(ctx Context, sc *tchannel.SubChannel, method string, arg, resp interface{}) error {
+	call, err := sc.BeginCall(ctx, method, &tchannel.CallOptions{Format: tchannel.JSON})
 	if err != nil {
 		return err
 	}
 
-	return wrapCall(ctx, call, operation, arg, resp)
+	return wrapCall(ctx, call, method, arg, resp)
 }

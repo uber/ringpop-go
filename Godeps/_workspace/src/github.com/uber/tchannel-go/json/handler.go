@@ -33,7 +33,7 @@ var (
 	typeOfContext = reflect.TypeOf((*Context)(nil)).Elem()
 )
 
-// Handlers is the map from operation names to handlers.
+// Handlers is the map from method names to handlers.
 type Handlers map[string]interface{}
 
 // verifyHandler ensures that the given t is a function with the following signature:
@@ -94,9 +94,9 @@ func Register(registrar tchannel.Registrar, funcs Handlers, onError func(context
 	handlers := make(map[string]*handler)
 
 	handler := tchannel.HandlerFunc(func(ctx context.Context, call *tchannel.InboundCall) {
-		h, ok := handlers[string(call.Operation())]
+		h, ok := handlers[string(call.Method())]
 		if !ok {
-			onError(ctx, fmt.Errorf("call for unregistered method: %s", call.Operation()))
+			onError(ctx, fmt.Errorf("call for unregistered method: %s", call.Method()))
 			return
 		}
 

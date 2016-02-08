@@ -79,7 +79,7 @@ func main() {
 }
 
 type kvHandler struct {
-	mut  sync.RWMutex
+	sync.RWMutex
 	vals map[string]string
 }
 
@@ -94,8 +94,8 @@ func (h *kvHandler) Get(ctx thrift.Context, key string) (string, error) {
 		return "", err
 	}
 
-	h.mut.RLock()
-	defer h.mut.RUnlock()
+	h.RLock()
+	defer h.RUnlock()
 
 	if val, ok := h.vals[key]; ok {
 		return val, nil
@@ -110,8 +110,8 @@ func (h *kvHandler) Set(ctx thrift.Context, key, value string) error {
 		return err
 	}
 
-	h.mut.Lock()
-	defer h.mut.Unlock()
+	h.Lock()
+	defer h.Unlock()
 
 	h.vals[key] = value
 	// Example of how to use response headers. Normally, these values should be passed via result structs.
@@ -130,8 +130,8 @@ func (h *kvHandler) ClearAll(ctx thrift.Context) error {
 		return &keyvalue.NotAuthorized{}
 	}
 
-	h.mut.Lock()
-	defer h.mut.Unlock()
+	h.Lock()
+	defer h.Unlock()
 
 	h.vals = make(map[string]string)
 	return nil

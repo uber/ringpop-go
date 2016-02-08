@@ -97,6 +97,14 @@ func (cb *ContextBuilder) SetFormat(f Format) *ContextBuilder {
 	return cb
 }
 
+func (cb *ContextBuilder) SetRoutingDelegate(rd string) *ContextBuilder {
+	if cb.CallOptions == nil {
+		cb.CallOptions = new(CallOptions)
+	}
+	cb.CallOptions.RoutingDelegate = rd
+	return cb
+}
+
 // DisableTracing disables tracing.
 func (cb *ContextBuilder) DisableTracing() *ContextBuilder {
 	cb.TracingDisabled = true

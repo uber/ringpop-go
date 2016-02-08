@@ -7,12 +7,12 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/apache/thrift/lib/go/thrift",
-			"Rev": "61b8a29b0704ccd81b520f2300f5d1bb261fea3e"
+			"Rev": "23d6746079d7b5fdb38214387c63f987e68a6d8f"
 		},
 		{
 			"ImportPath": "github.com/cactus/go-statsd-client/statsd",
-			"Comment": "v2.0.1",
-			"Rev": "e2d8818d10f59a279d5a97778c1c4ecdbcd5c9df"
+			"Comment": "v3.0.0-2-g725f76b",
+			"Rev": "725f76bd0300c1f9562e76fd94c27aa17e41243e"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -20,16 +20,16 @@
 		},
 		{
 			"ImportPath": "github.com/jessevdk/go-flags",
-			"Comment": "v1-297-g1b89bf7",
-			"Rev": "1b89bf73cd2c3a911d7b2a279ab085c4a18cf539"
+			"Comment": "v1-326-gaa34304",
+			"Rev": "aa34304f81c710f34c76e964a3d996ec1330711d"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",
-			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
+			"Rev": "e8554b8641db39598be7f6342874b958f12ae1d4"
 		},
 		{
 			"ImportPath": "github.com/samuel/go-thrift/parser",
-			"Rev": "713394955d265d43898cc08f6240fe0f488e8eb6"
+			"Rev": "7ca0f3a69b29db19efe55fcd2da9a01c2476d4f6"
 		},
 		{
 			"ImportPath": "github.com/streadway/quantile",
@@ -37,26 +37,30 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
-			"Rev": "cbeaeb16a013161a98496fad62933b1d21786672"
+			"Rev": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Comment": "v1.0-17-g089c718",
-			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Comment": "v1.0-17-g089c718",
-			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Comment": "v1.0-17-g089c718",
-			"Rev": "089c7181b8c728499929ff09b62d3fdd8df8adff"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "b6fdb7d8a4ccefede406f8fe0f017fb58265054c"
+			"Rev": "6c89489cafabcbc76df9dbf84ebf07204673fecf"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
 		}
 	]
 }

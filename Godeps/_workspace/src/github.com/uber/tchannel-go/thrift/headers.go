@@ -23,13 +23,17 @@ package thrift
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/uber/tchannel-go/typed"
 )
 
-// TODO(prashant): Use a small buffer and then flush it when it's full.
-func writeHeaders(w io.Writer, headers map[string]string) error {
+// WriteHeaders writes the given key-value pairs using the following encoding:
+// len~2 (k~4 v~4)~len
+func WriteHeaders(w io.Writer, headers map[string]string) error {
+	// TODO(prashant): Since we are not writing length-prefixed data here,
+	// we can write out to the buffer, and if it fills up, flush it.
+	// Right now, we calculate the size of the required buffer and write it out.
+
 	// Calculate the size of the buffer that we need.
 	size := 2
 	for k, v := range headers {
@@ -51,7 +55,8 @@ func writeHeaders(w io.Writer, headers map[string]string) error {
 
 	// Safety check to ensure the bytes written calculation is correct.
 	if writeBuffer.BytesWritten() != size {
-		return fmt.Errorf("writeHeaders size calculation wrong, expected to write %v bytes, only wrote %v bytes",
+		return fmt.Errorf(
+			"writeHeaders size calculation wrong, expected to write %v bytes, only wrote %v bytes",
 			size, writeBuffer.BytesWritten())
 	}
 
@@ -59,24 +64,27 @@ func writeHeaders(w io.Writer, headers map[string]string) error {
 	return err
 }
 
-// TODO(prashant): Allow typed.ReadBuffer to read directly from the reader.
-func readHeaders(r io.Reader) (map[string]string, error) {
-	bs, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	buffer := typed.NewReadBuffer(bs)
-	numHeaders := buffer.ReadUint16()
+func readHeaders(reader *typed.Reader) (map[string]string, error) {
+	numHeaders := reader.ReadUint16()
 	if numHeaders == 0 {
-		return nil, buffer.Err()
+		return nil, reader.Err()
 	}
 
 	headers := make(map[string]string, numHeaders)
-	for i := 0; i < int(numHeaders) && buffer.Err() == nil; i++ {
-		k := buffer.ReadLen16String()
-		v := buffer.ReadLen16String()
+	for i := 0; i < int(numHeaders) && reader.Err() == nil; i++ {
+		k := reader.ReadLen16String()
+		v := reader.ReadLen16String()
 		headers[k] = v
 	}
-	return headers, buffer.Err()
+
+	return headers, reader.Err()
+}
+
+// ReadHeaders reads key-value pairs encoded using WriteHeaders.
+func ReadHeaders(r io.Reader) (map[string]string, error) {
+	reader := typed.NewReader(r)
+	m, err := readHeaders(reader)
+	reader.Release()
+
+	return m, err
 }

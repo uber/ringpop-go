@@ -29,7 +29,7 @@ import (
 )
 
 // WriteRequest writes a http.Request to the given writers.
-func WriteRequest(call argWriter, req *http.Request) error {
+func WriteRequest(call tchannel.ArgWritable, req *http.Request) error {
 	// TODO(prashant): Allow creating write buffers that let you grow the buffer underneath.
 	wb := typed.NewWriteBufferWithSize(10000)
 	wb.WriteLen8String(req.Method)
@@ -61,7 +61,7 @@ func WriteRequest(call argWriter, req *http.Request) error {
 }
 
 // ReadRequest reads a http.Request from the given readers.
-func ReadRequest(call argReader) (*http.Request, error) {
+func ReadRequest(call tchannel.ArgReadable) (*http.Request, error) {
 	var arg2 []byte
 	if err := tchannel.NewArgReader(call.Arg2Reader()).Read(&arg2); err != nil {
 		return nil, err

@@ -164,6 +164,10 @@ const (
 
 	// SpeculativeExecution header specifies the number of nodes on which to run the request.
 	SpeculativeExecution TransportHeaderName = "se"
+
+	// RoutingDelegate header identifies an intermediate service which knows
+	// how to route the request to the intended recipient.
+	RoutingDelegate TransportHeaderName = "rd"
 )
 
 // transportHeaders are passed as part of a CallReq/CallRes

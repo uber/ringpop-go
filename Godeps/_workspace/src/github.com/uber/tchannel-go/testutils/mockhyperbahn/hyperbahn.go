@@ -22,20 +22,24 @@ package mockhyperbahn
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/hyperbahn"
+	hthrift "github.com/uber/tchannel-go/hyperbahn/gen-go/hyperbahn"
 	"github.com/uber/tchannel-go/json"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 // Mock is up a mock Hyperbahn server for tests.
 type Mock struct {
 	sync.RWMutex
 
-	ch         *tchannel.Channel
-	respCh     chan int
-	advertised []string
+	ch              *tchannel.Channel
+	respCh          chan int
+	advertised      []string
+	discoverResults map[string][]string
 }
 
 // New returns a mock Hyperbahn server that can be used for testing.
@@ -46,14 +50,47 @@ func New() (*Mock, error) {
 	}
 
 	mh := &Mock{
-		ch:     ch,
-		respCh: make(chan int),
+		ch:              ch,
+		respCh:          make(chan int),
+		discoverResults: make(map[string][]string),
 	}
 	if err := json.Register(ch, json.Handlers{"ad": mh.adHandler}, nil); err != nil {
 		return nil, err
 	}
 
+	thriftServer := thrift.NewServer(ch)
+	thriftServer.Register(hthrift.NewTChanHyperbahnServer(mh))
+
 	return mh, ch.ListenAndServe("127.0.0.1:0")
+}
+
+// SetDiscoverResult sets the given hostPorts as results for the Discover call.
+func (h *Mock) SetDiscoverResult(serviceName string, hostPorts []string) {
+	h.Lock()
+	defer h.Unlock()
+
+	h.discoverResults[serviceName] = hostPorts
+}
+
+// Discover returns the IPs for a discovery query if some were set using SetDiscoverResult.
+// Otherwise, it returns an error.
+func (h *Mock) Discover(ctx thrift.Context, query *hthrift.DiscoveryQuery) (*hthrift.DiscoveryResult_, error) {
+	h.RLock()
+	defer h.RUnlock()
+
+	hostPorts, ok := h.discoverResults[query.ServiceName]
+	if !ok {
+		return nil, fmt.Errorf("no discovery results set for %v", query.ServiceName)
+	}
+
+	peers, err := toServicePeers(hostPorts)
+	if err != nil {
+		return nil, fmt.Errorf("invalid discover result set: %v", err)
+	}
+
+	return &hthrift.DiscoveryResult_{
+		Peers: peers,
+	}, nil
 }
 
 // Configuration returns a hyperbahn.Configuration object used to configure a

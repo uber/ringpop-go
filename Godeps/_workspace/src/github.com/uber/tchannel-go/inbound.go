@@ -23,7 +23,6 @@ package tchannel
 import (
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"golang.org/x/net/context"
@@ -35,6 +34,7 @@ var errInboundRequestAlreadyActive = errors.New("inbound request is already acti
 // exchange to receive further fragments for that call, and dispatching it in
 // another goroutine
 func (c *Connection) handleCallReq(frame *Frame) bool {
+	now := c.timeNow()
 	switch state := c.readState(); state {
 	case connectionActive:
 		break
@@ -52,7 +52,10 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	initialFragment, err := parseInboundFragment(c.framePool, frame, callReq)
 	if err != nil {
 		// TODO(mmihic): Probably want to treat this as a protocol error
-		c.log.Errorf("could not decode %s: %v", frame.Header, err)
+		c.log.WithFields(
+			LogField{"header", frame.Header},
+			ErrField(err),
+		).Error("Couldn't decode initial fragment.")
 		return true
 	}
 
@@ -65,8 +68,8 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 		if err == errDuplicateMex {
 			err = errInboundRequestAlreadyActive
 		}
-		c.log.Errorf("could not register exchange for %s", frame.Header)
-		c.SendSystemError(frame.Header.ID, nil, err)
+		c.log.WithFields(LogField{"header", frame.Header}).Error("Couldn't register exchange.")
+		c.protocolError(frame.Header.ID, errInboundRequestAlreadyActive)
 		return true
 	}
 
@@ -77,22 +80,26 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	}
 
 	response := new(InboundCallResponse)
+	response.calledAt = now
 	response.Annotations = Annotations{
 		reporter: c.traceReporter,
-		span:     callReq.Tracing,
-		endpoint: TargetEndpoint{
-			HostPort:    c.localPeerInfo.HostPort,
-			ServiceName: callReq.Service,
+		timeNow:  c.timeNow,
+		data: TraceData{
+			Span: callReq.Tracing,
+			Source: TraceEndpoint{
+				HostPort:    c.localPeerInfo.HostPort,
+				ServiceName: callReq.Service,
+			},
 		},
-		timeNow: c.timeNow,
 		binaryAnnotationsBacking: [2]BinaryAnnotation{
 			{Key: "cn", Value: callReq.Headers[CallerName]},
 			{Key: "as", Value: callReq.Headers[ArgScheme]},
 		},
 	}
-	response.annotations = response.annotationsBacking[:0]
-	response.binaryAnnotations = response.binaryAnnotationsBacking[:]
-	response.AddAnnotation(AnnotationKeyServerReceive)
+	response.data.Target = response.data.Source
+	response.data.Annotations = response.annotationsBacking[:0]
+	response.data.BinaryAnnotations = response.binaryAnnotationsBacking[:]
+	response.AddAnnotationAt(AnnotationKeyServerReceive, now)
 	response.mex = mex
 	response.conn = c
 	response.cancel = cancel
@@ -130,7 +137,7 @@ func (c *Connection) handleCallReq(frame *Frame) bool {
 	response.commonStatsTags = call.commonStatsTags
 
 	setResponseHeaders(call.headers, response.headers)
-	go c.dispatchInbound(c.connID, callReq.ID(), call)
+	go c.dispatchInbound(c.connID, callReq.ID(), call, frame)
 	return false
 }
 
@@ -157,38 +164,49 @@ func (call *InboundCall) createStatsTags(connectionTags map[string]string) {
 }
 
 // dispatchInbound ispatches an inbound call to the appropriate handler
-func (c *Connection) dispatchInbound(_ uint32, _ uint32, call *InboundCall) {
+func (c *Connection) dispatchInbound(_ uint32, _ uint32, call *InboundCall, frame *Frame) {
+	releaseFrame := func() {
+		c.framePool.Release(frame)
+	}
+
 	if c.log.Enabled(LogLevelDebug) {
 		c.log.Debugf("Received incoming call for %s from %s", call.ServiceName(), c.remotePeerInfo)
 	}
 
-	if err := call.readOperation(); err != nil {
-		c.log.Errorf("Could not read operation from %s: %v", c.remotePeerInfo, err)
+	if err := call.readMethod(); err != nil {
+		c.log.WithFields(
+			LogField{"remotePeer", c.remotePeerInfo},
+			ErrField(err),
+		).Error("Couldn't read method.")
+		releaseFrame()
 		return
 	}
 
-	call.commonStatsTags["endpoint"] = string(call.operation)
+	call.commonStatsTags["endpoint"] = string(call.method)
 	call.statsReporter.IncCounter("inbound.calls.recvd", call.commonStatsTags, 1)
-	call.response.calledAt = c.timeNow()
-	call.response.SetOperation(string(call.operation))
+	call.response.SetMethod(string(call.method))
 
-	// NB(mmihic): Don't cast operation name to string here - this will
+	// NB(mmihic): Don't cast method name to string here - this will
 	// create a copy of the byte array, where as aliasing to string in the
 	// map look up can be optimized by the compiler to avoid the copy.  See
 	// https://github.com/golang/go/issues/3512
-	h := c.handlers.find(call.ServiceName(), call.Operation())
+	h := c.handlers.find(call.ServiceName(), call.Method())
 	if h == nil {
 		// Check the subchannel map to see if we find one there
 		if c.log.Enabled(LogLevelDebug) {
-			c.log.Debugf("Checking the subchannel's handlers for %s:%s", call.ServiceName(), call.Operation())
+			c.log.Debugf("Checking the subchannel's handlers for %s:%s", call.ServiceName(), call.Method())
 		}
 
-		h = c.subChannels.find(call.ServiceName(), call.Operation())
+		h = c.subChannels.find(call.ServiceName(), call.Method())
 	}
 	if h == nil {
-		c.log.Errorf("Could not find handler for %s:%s", call.ServiceName(), call.Operation())
+		c.log.WithFields(
+			LogField{"serviceName", call.ServiceName()},
+			LogField{"method", call.MethodString()},
+		).Error("Couldn't find handler.")
 		call.Response().SendSystemError(
-			NewSystemError(ErrCodeBadRequest, "no handler for service %q and operation %q", call.ServiceName(), call.Operation()))
+			NewSystemError(ErrCodeBadRequest, "no handler for service %q and method %q", call.ServiceName(), call.Method()))
+		releaseFrame()
 		return
 	}
 
@@ -200,7 +218,7 @@ func (c *Connection) dispatchInbound(_ uint32, _ uint32, call *InboundCall) {
 	}()
 
 	if c.log.Enabled(LogLevelDebug) {
-		c.log.Debugf("Dispatching %s:%s from %s", call.ServiceName(), call.Operation(), c.remotePeerInfo)
+		c.log.Debugf("Dispatching %s:%s from %s", call.ServiceName(), call.Method(), c.remotePeerInfo)
 	}
 	h.Handle(call.mex.ctx, call)
 }
@@ -212,8 +230,8 @@ type InboundCall struct {
 	conn            *Connection
 	response        *InboundCallResponse
 	serviceName     string
-	operation       []byte
-	operationString string
+	method          []byte
+	methodString    string
 	headers         transportHeaders
 	span            Span
 	statsReporter   StatsReporter
@@ -225,14 +243,14 @@ func (call *InboundCall) ServiceName() string {
 	return call.serviceName
 }
 
-// Operation returns the operation being called
-func (call *InboundCall) Operation() []byte {
-	return call.operation
+// Method returns the method being called
+func (call *InboundCall) Method() []byte {
+	return call.method
 }
 
-// OperationString returns the operation being called as a string.
-func (call *InboundCall) OperationString() string {
-	return call.operationString
+// MethodString returns the method being called as a string.
+func (call *InboundCall) MethodString() string {
+	return call.methodString
 }
 
 // Format the format of the request from the ArgScheme transport header.
@@ -250,27 +268,37 @@ func (call *InboundCall) ShardKey() string {
 	return call.headers[ShardKey]
 }
 
-// Reads the entire operation name (arg1) from the request stream.
-func (call *InboundCall) readOperation() error {
+// RoutingDelegate returns the routing delegate from the RoutingDelegate transport header.
+func (call *InboundCall) RoutingDelegate() string {
+	return call.headers[RoutingDelegate]
+}
+
+// RemotePeer returns the caller's peer info.
+func (call *InboundCall) RemotePeer() PeerInfo {
+	return call.conn.RemotePeerInfo()
+}
+
+// Reads the entire method name (arg1) from the request stream.
+func (call *InboundCall) readMethod() error {
 	var arg1 []byte
 	if err := NewArgReader(call.arg1Reader()).Read(&arg1); err != nil {
 		return call.failed(err)
 	}
 
-	call.operation = arg1
-	call.operationString = string(arg1)
+	call.method = arg1
+	call.methodString = string(arg1)
 	return nil
 }
 
-// Arg2Reader returns an io.ReadCloser to read the second argument.
+// Arg2Reader returns an ArgReader to read the second argument.
 // The ReadCloser must be closed once the argument has been read.
-func (call *InboundCall) Arg2Reader() (io.ReadCloser, error) {
+func (call *InboundCall) Arg2Reader() (ArgReader, error) {
 	return call.arg2Reader()
 }
 
-// Arg3Reader returns an io.ReadCloser to read the last argument.
+// Arg3Reader returns an ArgReader to read the last argument.
 // The ReadCloser must be closed once the argument has been read.
-func (call *InboundCall) Arg3Reader() (io.ReadCloser, error) {
+func (call *InboundCall) Arg3Reader() (ArgReader, error) {
 	return call.arg3Reader()
 }
 
@@ -350,10 +378,11 @@ func (response *InboundCallResponse) Arg3Writer() (ArgWriter, error) {
 // For incoming calls, the last message is sending the call response.
 func (response *InboundCallResponse) doneSending() {
 	// TODO(prashant): Move this to when the message is actually being sent.
-	response.AddAnnotation(AnnotationKeyServerSend)
+	now := response.GetTime()
+	response.AddAnnotationAt(AnnotationKeyServerSend, now)
 	response.Report()
 
-	latency := response.GetTime().Sub(response.calledAt)
+	latency := now.Sub(response.calledAt)
 	response.statsReporter.RecordTimer("inbound.calls.latency", response.commonStatsTags, latency)
 
 	if response.systemError {

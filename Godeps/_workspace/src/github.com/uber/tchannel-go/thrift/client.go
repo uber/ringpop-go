@@ -53,11 +53,11 @@ func NewClient(ch *tchannel.Channel, serviceName string, opts *ClientOptions) TC
 	return client
 }
 
-func (c *client) startCall(ctx context.Context, operation string, callOptions *tchannel.CallOptions) (*tchannel.OutboundCall, error) {
+func (c *client) startCall(ctx context.Context, method string, callOptions *tchannel.CallOptions) (*tchannel.OutboundCall, error) {
 	if c.opts.HostPort != "" {
-		return c.ch.BeginCall(ctx, c.opts.HostPort, c.serviceName, operation, callOptions)
+		return c.ch.BeginCall(ctx, c.opts.HostPort, c.serviceName, method, callOptions)
 	}
-	return c.sc.BeginCall(ctx, operation, callOptions)
+	return c.sc.BeginCall(ctx, method, callOptions)
 }
 
 func writeArgs(call *tchannel.OutboundCall, headers map[string]string, req thrift.TStruct) error {
@@ -65,7 +65,7 @@ func writeArgs(call *tchannel.OutboundCall, headers map[string]string, req thrif
 	if err != nil {
 		return err
 	}
-	if err := writeHeaders(writer, headers); err != nil {
+	if err := WriteHeaders(writer, headers); err != nil {
 		return err
 	}
 	if err := writer.Close(); err != nil {
@@ -77,12 +77,10 @@ func writeArgs(call *tchannel.OutboundCall, headers map[string]string, req thrif
 		return err
 	}
 
-	wp := getProtocolWriter(writer)
-	if err := req.Write(wp.protocol); err != nil {
-		thriftProtocolPool.Put(wp)
+	if err := WriteStruct(writer, req); err != nil {
 		return err
 	}
-	thriftProtocolPool.Put(wp)
+
 	return writer.Close()
 }
 
@@ -94,7 +92,7 @@ func readResponse(response *tchannel.OutboundCallResponse, resp thrift.TStruct) 
 		return nil, false, err
 	}
 
-	headers, err := readHeaders(reader)
+	headers, err := ReadHeaders(reader)
 	if err != nil {
 		return nil, false, err
 	}
@@ -109,12 +107,10 @@ func readResponse(response *tchannel.OutboundCallResponse, resp thrift.TStruct) 
 		return headers, success, err
 	}
 
-	wp := getProtocolReader(reader)
-	if err := resp.Read(wp.protocol); err != nil {
-		thriftProtocolPool.Put(wp)
+	if err := ReadStruct(reader, resp); err != nil {
 		return headers, success, err
 	}
-	thriftProtocolPool.Put(wp)
+
 	return headers, success, reader.Close()
 }
 

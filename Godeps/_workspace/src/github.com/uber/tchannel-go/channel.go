@@ -29,12 +29,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/tchannel-go/tnet"
+
 	"golang.org/x/net/context"
 )
 
 var (
 	errAlreadyListening  = errors.New("channel already listening")
-	errInvalidStateForOp = errors.New("channel is in an invalid state for that operation")
+	errInvalidStateForOp = errors.New("channel is in an invalid state for that method")
 
 	// ErrNoServiceName is returned when no service name is provided when
 	// creating a new channel.
@@ -43,6 +45,9 @@ var (
 
 const (
 	ephemeralHostPort = "0.0.0.0:0"
+
+	// DefaultTraceSampleRate is the default sampling rate for traces.
+	DefaultTraceSampleRate = 1.0
 )
 
 // TraceReporterFactory is the interface of the method to generate TraceReporter instance.
@@ -71,6 +76,10 @@ type ChannelOptions struct {
 
 	// Trace reporter factory to generate trace reporter instance.
 	TraceReporterFactory TraceReporterFactory
+
+	// TraceSampleRate is the rate of requests to sample, and should be in the range [0, 1].
+	// If this value is not set, then DefaultTraceSampleRate is used.
+	TraceSampleRate *float64
 }
 
 // ChannelState is the state of a channel.
@@ -112,22 +121,23 @@ type Channel struct {
 
 	// mutable contains all the members of Channel which are mutable.
 	mutable struct {
-		mut      sync.RWMutex // protects members of the mutable struct.
-		state    ChannelState
-		peerInfo LocalPeerInfo // May be ephemeral if this is a client only channel
-		l        net.Listener  // May be nil if this is a client only channel
-		conns    map[uint32]*Connection
+		sync.RWMutex // protects members of the mutable struct.
+		state        ChannelState
+		peerInfo     LocalPeerInfo // May be ephemeral if this is a client only channel
+		l            net.Listener  // May be nil if this is a client only channel
+		conns        map[uint32]*Connection
 	}
 }
 
 // channelConnectionCommon is the list of common objects that both use
 // and can be copied directly from the channel to the connection.
 type channelConnectionCommon struct {
-	log           Logger
-	statsReporter StatsReporter
-	traceReporter TraceReporter
-	subChannels   *subChannelMap
-	timeNow       func() time.Time
+	log             Logger
+	statsReporter   StatsReporter
+	traceReporter   TraceReporter
+	subChannels     *subChannelMap
+	timeNow         func() time.Time
+	traceSampleRate float64
 }
 
 // NewChannel creates a new Channel.  The new channel can be used to send outbound requests
@@ -162,12 +172,20 @@ func NewChannel(serviceName string, opts *ChannelOptions) (*Channel, error) {
 		timeNow = time.Now
 	}
 
+	traceSampleRate := DefaultTraceSampleRate
+	if opts.TraceSampleRate != nil {
+		traceSampleRate = *opts.TraceSampleRate
+	}
+
 	ch := &Channel{
 		channelConnectionCommon: channelConnectionCommon{
-			log:           logger.WithFields(LogField{"service", serviceName}),
-			statsReporter: statsReporter,
-			subChannels:   &subChannelMap{},
-			timeNow:       timeNow,
+			log: logger.WithFields(
+				LogField{"service", serviceName},
+				LogField{"process", processName}),
+			statsReporter:   statsReporter,
+			subChannels:     &subChannelMap{},
+			timeNow:         timeNow,
+			traceSampleRate: traceSampleRate,
 		},
 
 		connectionOptions: opts.DefaultConnectionOptions,
@@ -210,13 +228,13 @@ func (ch *Channel) ConnectionOptions() *ConnectionOptions {
 // a separate goroutine.
 func (ch *Channel) Serve(l net.Listener) error {
 	mutable := &ch.mutable
-	mutable.mut.Lock()
-	defer mutable.mut.Unlock()
+	mutable.Lock()
+	defer mutable.Unlock()
 
 	if mutable.l != nil {
 		return errAlreadyListening
 	}
-	mutable.l = l
+	mutable.l = tnet.Wrap(l)
 
 	if mutable.state != ChannelClient {
 		return errInvalidStateForOp
@@ -224,6 +242,8 @@ func (ch *Channel) Serve(l net.Listener) error {
 	mutable.state = ChannelListening
 
 	mutable.peerInfo.HostPort = l.Addr().String()
+	ch.log = ch.log.WithFields(LogField{"hostPort", mutable.peerInfo.HostPort})
+
 	peerInfo := mutable.peerInfo
 	ch.log.Debugf("%v (%v) listening on %v", peerInfo.ProcessName, peerInfo.ServiceName, peerInfo.HostPort)
 	go ch.serve()
@@ -235,20 +255,20 @@ func (ch *Channel) Serve(l net.Listener) error {
 // This method does not block as the handling of connections is done in a goroutine.
 func (ch *Channel) ListenAndServe(hostPort string) error {
 	mutable := &ch.mutable
-	mutable.mut.RLock()
+	mutable.RLock()
 
 	if mutable.l != nil {
-		mutable.mut.RUnlock()
+		mutable.RUnlock()
 		return errAlreadyListening
 	}
 
 	l, err := net.Listen("tcp", hostPort)
 	if err != nil {
-		mutable.mut.RUnlock()
+		mutable.RUnlock()
 		return err
 	}
 
-	mutable.mut.RUnlock()
+	mutable.RUnlock()
 	return ch.Serve(l)
 }
 
@@ -258,8 +278,8 @@ type Registrar interface {
 	// ServiceName returns the service name that this Registrar is for.
 	ServiceName() string
 
-	// Register registers a handler for ServiceName and the given operation.
-	Register(h Handler, operationName string)
+	// Register registers a handler for ServiceName and the given method.
+	Register(h Handler, methodName string)
 
 	// Logger returns the logger for this Registrar.
 	Logger() Logger
@@ -274,16 +294,16 @@ type Registrar interface {
 	Peers() *PeerList
 }
 
-// Register registers a handler for a service+operation pair
-func (ch *Channel) Register(h Handler, operationName string) {
-	ch.handlers.register(h, ch.PeerInfo().ServiceName, operationName)
+// Register registers a handler for a service+method pair
+func (ch *Channel) Register(h Handler, methodName string) {
+	ch.handlers.register(h, ch.PeerInfo().ServiceName, methodName)
 }
 
 // PeerInfo returns the current peer info for the channel
 func (ch *Channel) PeerInfo() LocalPeerInfo {
-	ch.mutable.mut.RLock()
+	ch.mutable.RLock()
 	peerInfo := ch.mutable.peerInfo
-	ch.mutable.mut.RUnlock()
+	ch.mutable.RUnlock()
 
 	return peerInfo
 }
@@ -327,9 +347,9 @@ func (ch *Channel) rootPeers() *RootPeerList {
 
 // BeginCall starts a new call to a remote peer, returning an OutboundCall that can
 // be used to write the arguments of the call.
-func (ch *Channel) BeginCall(ctx context.Context, hostPort, serviceName, operationName string, callOptions *CallOptions) (*OutboundCall, error) {
+func (ch *Channel) BeginCall(ctx context.Context, hostPort, serviceName, methodName string, callOptions *CallOptions) (*OutboundCall, error) {
 	p := ch.rootPeers().GetOrAdd(hostPort)
-	return p.BeginCall(ctx, serviceName, operationName, callOptions)
+	return p.BeginCall(ctx, serviceName, methodName, callOptions)
 }
 
 // serve runs the listener to accept and manage new incoming connections, blocking
@@ -350,7 +370,10 @@ func (ch *Channel) serve() {
 				if max := 1 * time.Second; acceptBackoff > max {
 					acceptBackoff = max
 				}
-				ch.log.Warnf("accept error: %v; retrying in %v", err, acceptBackoff)
+				ch.log.WithFields(
+					ErrField(err),
+					LogField{"backoff", acceptBackoff},
+				).Warn("Accept error, will wait and retry.")
 				time.Sleep(acceptBackoff)
 				continue
 			} else {
@@ -358,7 +381,7 @@ func (ch *Channel) serve() {
 				if ch.State() >= ChannelStartClose {
 					return
 				}
-				ch.log.Fatalf("unrecoverable accept error: %v; closing server", err)
+				ch.log.WithFields(ErrField(err)).Fatal("Unrecoverable accept error, closing server.")
 				return
 			}
 		}
@@ -373,7 +396,7 @@ func (ch *Channel) serve() {
 		}
 		if _, err := ch.newInboundConnection(netConn, events); err != nil {
 			// Server is getting overloaded - begin rejecting new connections
-			ch.log.Errorf("could not create new TChannelConnection for incoming conn: %v", err)
+			ch.log.WithFields(ErrField(err)).Error("Couldn't create new TChannelConnection for incoming conn.")
 			netConn.Close()
 			continue
 		}
@@ -421,6 +444,15 @@ func (ch *Channel) ServiceName() string {
 	return ch.PeerInfo().ServiceName
 }
 
+func getTimeout(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return DefaultConnectTimeout
+	}
+
+	return deadline.Sub(time.Now())
+}
+
 // Connect connects the channel.
 func (ch *Channel) Connect(ctx context.Context, hostPort string) (*Connection, error) {
 	switch state := ch.State(); state {
@@ -438,7 +470,8 @@ func (ch *Channel) Connect(ctx context.Context, hostPort string) (*Connection, e
 		OnCloseStateChange: ch.connectionCloseStateChange,
 		OnExchangeUpdated:  ch.exchangeUpdated,
 	}
-	c, err := ch.newOutboundConnection(hostPort, events)
+
+	c, err := ch.newOutboundConnection(getTimeout(ctx), hostPort, events)
 	if err != nil {
 		return nil, err
 	}
@@ -447,10 +480,10 @@ func (ch *Channel) Connect(ctx context.Context, hostPort string) (*Connection, e
 		return nil, err
 	}
 
-	ch.mutable.mut.Lock()
+	ch.mutable.Lock()
 	ch.mutable.conns[c.connID] = c
 	chState := ch.mutable.state
-	ch.mutable.mut.Unlock()
+	ch.mutable.Unlock()
 
 	// Any connections added after the channel is in StartClose should also be set to start close.
 	if chState == ChannelStartClose {
@@ -478,8 +511,9 @@ func (ch *Channel) exchangeUpdated(c *Connection) {
 
 // updatePeer updates the score of the peer and update it's position in heap as well.
 func (ch *Channel) updatePeer(p *Peer) {
-	ch.peers.UpdatePeer(p)
+	ch.peers.updatePeer(p)
 	ch.subChannels.updatePeer(p)
+	p.callOnUpdateComplete()
 }
 
 // incomingConnectionActive adds a new active connection to our peer list.
@@ -493,9 +527,9 @@ func (ch *Channel) incomingConnectionActive(c *Connection) {
 	p.AddInboundConnection(c)
 	ch.updatePeer(p)
 
-	ch.mutable.mut.Lock()
+	ch.mutable.Lock()
 	ch.mutable.conns[c.connID] = c
-	ch.mutable.mut.Unlock()
+	ch.mutable.Unlock()
 }
 
 // removeClosedConn removes a connection if it's closed.
@@ -504,9 +538,9 @@ func (ch *Channel) removeClosedConn(c *Connection) {
 		return
 	}
 
-	ch.mutable.mut.Lock()
+	ch.mutable.Lock()
 	delete(ch.mutable.conns, c.connID)
-	ch.mutable.mut.Unlock()
+	ch.mutable.Unlock()
 }
 
 // connectionCloseStateChange is called when a connection's close state changes.
@@ -522,14 +556,14 @@ func (ch *Channel) connectionCloseStateChange(c *Connection) {
 		return
 	}
 
-	ch.mutable.mut.RLock()
+	ch.mutable.RLock()
 	minState := connectionClosed
 	for _, c := range ch.mutable.conns {
 		if s := c.readState(); s < minState {
 			minState = s
 		}
 	}
-	ch.mutable.mut.RUnlock()
+	ch.mutable.RUnlock()
 
 	var updateTo ChannelState
 	if minState >= connectionClosed {
@@ -539,9 +573,9 @@ func (ch *Channel) connectionCloseStateChange(c *Connection) {
 	}
 
 	if updateTo > 0 {
-		ch.mutable.mut.Lock()
+		ch.mutable.Lock()
 		ch.mutable.state = updateTo
-		ch.mutable.mut.Unlock()
+		ch.mutable.Unlock()
 		chState = updateTo
 	}
 
@@ -556,9 +590,9 @@ func (ch *Channel) Closed() bool {
 
 // State returns the current channel state.
 func (ch *Channel) State() ChannelState {
-	ch.mutable.mut.RLock()
+	ch.mutable.RLock()
 	state := ch.mutable.state
-	ch.mutable.mut.RUnlock()
+	ch.mutable.RUnlock()
 
 	return state
 }
@@ -568,8 +602,9 @@ func (ch *Channel) State() ChannelState {
 // 2. When all incoming connections are drained, the connection blocks new outgoing calls.
 // 3. When all connections are drainged, the channel's state is updated to Closed.
 func (ch *Channel) Close() {
+	ch.Logger().Infof("Channel.Close called")
 	var connections []*Connection
-	ch.mutable.mut.Lock()
+	ch.mutable.Lock()
 
 	if ch.mutable.l != nil {
 		ch.mutable.l.Close()
@@ -582,7 +617,7 @@ func (ch *Channel) Close() {
 	for _, c := range ch.mutable.conns {
 		connections = append(connections, c)
 	}
-	ch.mutable.mut.Unlock()
+	ch.mutable.Unlock()
 
 	for _, c := range connections {
 		c.Close()
