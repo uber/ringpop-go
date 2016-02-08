@@ -13,12 +13,14 @@ before_script:
   - go get github.com/vektra/mockery/.../
 
 env:
+  - RUN="make lint"
   - RUN="make test-unit"
   - RUN="make test-integration"
   - RUN=test/update-coveralls
 
 matrix:
   allow_failures:
+    - env: RUN="make lint"
     - env: RUN=test/update-coveralls
   fast_finish: true
 
