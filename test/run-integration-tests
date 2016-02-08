@@ -130,7 +130,7 @@ run-test-for-cluster-size() {
 }
 
 #
-# Run the integration tests against the testpop binary.
+# Run the integration tests against the testpop binary, in parallel.
 #
 run-tests() {
     for cluster_size in $test_cluster_sizes; do
@@ -151,13 +151,28 @@ run-tests() {
     wait-all
 }
 
+#
+# Run the integration tests against the testpop binary, in serial.
+#
+run-tests-serial() {
+    local exit_code=0
+
+    for cluster_size in $test_cluster_sizes; do
+        echo "Running test for cluster size ${cluster_size}..." |prefix "test-runner"
+        run-test-for-cluster-size $cluster_size || exit_code=1
+    done
+
+    return $exit_code
+}
+
 # Fetch and build in parallel
 { fetch-ringpop-common 2>&1|prefix "fetch ringpop-common"; } &
 { build-testpop 2>&1|prefix "build testpop"; } &
 wait-all
 
 # Run integration tests
-run-tests
+#run-tests
+run-tests-serial
 test_result=$?
 
 if [ $test_result -eq 0 ]; then

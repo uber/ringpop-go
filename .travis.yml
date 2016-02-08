@@ -20,8 +20,6 @@ env:
 matrix:
   allow_failures:
     - env: RUN=test/update-coveralls
-    # Temporarily allow the integration tests to fail until we fix them
-    - env: RUN="make test-integration"
   fast_finish: true
 
 script:
