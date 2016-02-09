@@ -563,7 +563,10 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	dest, success := rp.ring.Lookup(key)
 
-	rp.emit(events.LookupEvent{key, time.Now().Sub(startTime)})
+	rp.emit(events.LookupEvent{
+		Key:      key,
+		Duration: time.Now().Sub(startTime),
+	})
 
 	if !success {
 		err := errors.New("could not find destination for key")

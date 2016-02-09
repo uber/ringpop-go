@@ -136,7 +136,7 @@ func (d *disseminator) bumpPiggybackCounters(changes []Change) {
 			continue
 		}
 
-		c.p += 1
+		c.p++
 		if c.p >= d.maxP {
 			delete(d.changes, c.Address)
 		}
@@ -198,7 +198,7 @@ func (d *disseminator) issueChanges() []Change {
 	d.Lock()
 
 	// To make JSON output [] instead of null on empty change list
-	result := make([]Change, 0)
+	result := []Change{}
 	for _, change := range d.changes {
 		result = append(result, change.Change)
 	}
