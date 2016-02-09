@@ -12,7 +12,8 @@ export GOPATH = $(GODEPS):$(USER_GOPATH)
 
 DEV_DEPS = github.com/uber/tchannel-go/thrift/thrift-gen \
 		   github.com/vektra/mockery/... \
-		   github.com/tools/godep
+		   github.com/tools/godep \
+		   github.com/golang/lint/golint
 
 # Automatically gather packages
 PKGS = $(shell find . -type d -maxdepth 3 \
