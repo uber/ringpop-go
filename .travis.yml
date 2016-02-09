@@ -21,7 +21,6 @@ env:
 
 matrix:
   allow_failures:
-    - env: RUN="make lint"
     - env: RUN=test/update-coveralls
   fast_finish: true
 
