@@ -2,16 +2,11 @@
 #
 # Run integration tests for ringpop-go.
 #
-# Integration tests for different cluster sizes are run in parallel. Success
-# output is suppressed and only the failures are shown.
-#
-# 2015-01-14
-#
 set -eo pipefail
 
 declare project_root="${0%/*}/.."
 declare ringpop_common_dir="${0%/*}/ringpop-common"
-declare tap_filter="${ringpop_common_dir}/test/tap-filter.js"
+declare tap_filter="${ringpop_common_dir}/test/tap-filter"
 
 declare test_cluster_sizes="1 2 3 4 5 10"
 declare test_result=
@@ -80,7 +75,7 @@ fetch-ringpop-common() {
     # Check tap-filter exists in ringpop-common. It is required to filter output
     # correctly to stdout/stderr
     if ! [ -x "$tap_filter" ]; then
-        echo "ERROR: missing 'test/tap-filter.js' in ringpop-common" >&2
+        echo "ERROR: missing '$tap_filter' in ringpop-common" >&2
         exit 1
     fi
 }
@@ -120,8 +115,7 @@ run-test-for-cluster-size() {
         {
             echo "FAIL: Test failed for cluster size $cluster_size"
             # Output the test data through tap-filter, which discards success
-            # info unless -v is specified.
-            cat "$output_file" |$tap_filter
+            cat "$output_file" |$tap_filter 2>&1
 
         } | prefix "test-errors-${cluster_size}" >&2
 
