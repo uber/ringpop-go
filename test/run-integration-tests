@@ -2,16 +2,11 @@
 #
 # Run integration tests for ringpop-go.
 #
-# Integration tests for different cluster sizes are run in parallel. Success
-# output is suppressed and only the failures are shown.
-#
-# 2015-01-14
-#
 set -eo pipefail
 
 declare project_root="${0%/*}/.."
 declare ringpop_common_dir="${0%/*}/ringpop-common"
-declare tap_filter="${ringpop_common_dir}/test/tap-filter.js"
+declare tap_filter="${ringpop_common_dir}/test/tap-filter"
 
 declare test_cluster_sizes="1 2 3 4 5 10"
 declare test_result=
@@ -80,7 +75,7 @@ fetch-ringpop-common() {
     # Check tap-filter exists in ringpop-common. It is required to filter output
     # correctly to stdout/stderr
     if ! [ -x "$tap_filter" ]; then
-        echo "ERROR: missing 'test/tap-filter.js' in ringpop-common" >&2
+        echo "ERROR: missing '$tap_filter' in ringpop-common" >&2
         exit 1
     fi
 }
@@ -120,8 +115,7 @@ run-test-for-cluster-size() {
         {
             echo "FAIL: Test failed for cluster size $cluster_size"
             # Output the test data through tap-filter, which discards success
-            # info unless -v is specified.
-            cat "$output_file" |$tap_filter
+            cat "$output_file" |$tap_filter 2>&1
 
         } | prefix "test-errors-${cluster_size}" >&2
 
@@ -130,7 +124,7 @@ run-test-for-cluster-size() {
 }
 
 #
-# Run the integration tests against the testpop binary.
+# Run the integration tests against the testpop binary, in parallel.
 #
 run-tests() {
     for cluster_size in $test_cluster_sizes; do
@@ -151,13 +145,28 @@ run-tests() {
     wait-all
 }
 
+#
+# Run the integration tests against the testpop binary, in serial.
+#
+run-tests-serial() {
+    local exit_code=0
+
+    for cluster_size in $test_cluster_sizes; do
+        echo "Running test for cluster size ${cluster_size}..." |prefix "test-runner"
+        run-test-for-cluster-size $cluster_size || exit_code=1
+    done
+
+    return $exit_code
+}
+
 # Fetch and build in parallel
 { fetch-ringpop-common 2>&1|prefix "fetch ringpop-common"; } &
 { build-testpop 2>&1|prefix "build testpop"; } &
 wait-all
 
 # Run integration tests
-run-tests
+#run-tests
+run-tests-serial
 test_result=$?
 
 if [ $test_result -eq 0 ]; then
