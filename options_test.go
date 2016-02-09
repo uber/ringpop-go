@@ -22,6 +22,7 @@ package ringpop
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -42,6 +43,10 @@ func (s *RingpopOptionsTestSuite) SetupTest() {
 	s.Require().NoError(err, "Channel creation failed")
 
 	s.channel = ch
+}
+
+func (s *RingpopOptionsTestSuite) TearDownTest() {
+	s.channel.Close()
 }
 
 // TestDefaults tests that the default options are applied to a Ringpop
@@ -171,6 +176,51 @@ func (s *RingpopOptionsTestSuite) TestIdentityResolverFunc() {
 // if the user sets the identity resolver to nil
 func (s *RingpopOptionsTestSuite) TestMissingIdentityResolver() {
 	rp, err := New("test", Channel(s.channel), IdentityResolverFunc(nil))
+	s.Nil(rp)
+	s.Error(err)
+}
+
+// TestClockNil confirms that nil clock option returns an error.
+func (s *RingpopOptionsTestSuite) TestClockNil() {
+	rp, err := New("test", Clock(nil))
+	s.Nil(rp)
+	s.Error(err)
+}
+
+// TestDefaultRingChecksumStatPeriod confirms that default gets installed.
+func (s *RingpopOptionsTestSuite) TestDefaultRingChecksumStatPeriod() {
+	rp, err := New("test", Channel(s.channel))
+	s.NoError(err)
+	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodDefault)
+}
+
+// TestDisabledRingChecksumStat confirms that disabled switch stays disabled.
+func (s *RingpopOptionsTestSuite) TestDisabledRingChecksumStat() {
+	tchan := Channel(s.channel)
+
+	rp, err := New("test", tchan, RingChecksumStatPeriod(RingChecksumStatPeriodNever))
+	s.NoError(err)
+	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodNever)
+
+	rp, err = New("test", tchan, RingChecksumStatPeriod(0))
+	s.NoError(err)
+	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodNever)
+
+	rp, err = New("test", tchan, RingChecksumStatPeriod(-23))
+	s.NoError(err)
+	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodNever)
+}
+
+// TestSpecifiedRingChecksumStatPeriod confirms that sane periods pass through.
+func (s *RingpopOptionsTestSuite) TestSpecifiedRingChecksumStatPeriod() {
+	rp, err := New("test", Channel(s.channel), RingChecksumStatPeriod(42*time.Second))
+	s.NoError(err)
+	s.Equal(rp.config.RingChecksumStatPeriod, time.Duration(42*time.Second))
+}
+
+// TestTooSmallRingChecksumStatPeriod confirms that insane periods return error.
+func (s *RingpopOptionsTestSuite) TestTooSmallRingChecksumStatPeriod() {
+	rp, err := New("test", Channel(s.channel), RingChecksumStatPeriod(1*time.Nanosecond))
 	s.Nil(rp)
 	s.Error(err)
 }

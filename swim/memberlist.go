@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
 	"github.com/uber/ringpop-go/util"
 )
@@ -178,7 +179,7 @@ func (m *memberlist) GetMembers() (members []Member) {
 // Reincarnate sets the status of the node to Alive and updates the incarnation
 // number. It adds the change to the disseminator as well.
 func (m *memberlist) Reincarnate() []Change {
-	return m.MakeAlive(m.node.address, NowInMillis(m.node.clock))
+	return m.MakeAlive(m.node.address, nowInMillis(m.node.clock))
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
@@ -248,7 +249,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				Source:            change.Source,
 				SourceIncarnation: change.SourceIncarnation,
 				Address:           change.Address,
-				Incarnation:       NowInMillis(m.node.clock),
+				Incarnation:       nowInMillis(m.node.clock),
 				Status:            Alive,
 				Timestamp:         util.Timestamp(time.Now()),
 			}
@@ -380,4 +381,10 @@ func (m *memberlist) CountReachableMembers() int {
 	m.members.RUnlock()
 
 	return count
+}
+
+// nowInMillis is a utility function that call Now on the clock and converts it
+// to milliseconds.
+func nowInMillis(c clock.Clock) int64 {
+	return c.Now().UnixNano() / int64(time.Millisecond)
 }

@@ -15,6 +15,10 @@
 			"Rev": "5bc8b5a3a5da507b6f87436ca629be664496a69f"
 		},
 		{
+			"ImportPath": "github.com/benbjohnson/clock",
+			"Rev": "a620c1cc9866f84a2550ad53f4f353ec030fa26b"
+		},
+		{
 			"ImportPath": "github.com/cactus/go-statsd-client/statsd",
 			"Comment": "v2.0.1-3-g8947bd0",
 			"Rev": "8947bd0d9e04e8c27671c33753340b51b835efdc"

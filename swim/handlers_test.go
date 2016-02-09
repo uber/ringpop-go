@@ -27,6 +27,7 @@ import (
 
 	"golang.org/x/net/context"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-common/bark"
@@ -39,8 +40,9 @@ import (
 type HandlerTestSuite struct {
 	suite.Suite
 
-	testNode *testNode
-	cluster  *swimCluster
+	mockClock *clock.Mock
+	testNode  *testNode
+	cluster   *swimCluster
 
 	ctx       tchannel.ContextWithHeaders
 	ctxCancel context.CancelFunc
@@ -50,6 +52,9 @@ func (s *HandlerTestSuite) SetupTest() {
 	// Create a test node, on its own. Tests can join this to the cluster for
 	// testing, if they want.
 	s.testNode = newChannelNode(s.T())
+	s.NotNil(s.testNode.node.clock)
+	s.mockClock = s.testNode.node.clock.(*clock.Mock)
+	s.NotNil(s.mockClock)
 
 	// Create a cluster for testing. Join these guys to each other.
 	s.cluster = newSwimCluster(4)
@@ -117,18 +122,13 @@ func (s *HandlerTestSuite) TestAdminLeaveJoinHandlers() {
 	s.Equal(4, s.testNode.node.CountReachableMembers())
 
 	// Test join handler brings it back to 5
-	s.testNode.node.clock = mockClock(time.Now().Add(time.Millisecond))
+	s.NotNil(s.mockClock)
+	s.mockClock.Add(time.Millisecond)
 	status, err = s.testNode.node.adminJoinHandler(s.ctx, &emptyArg{})
 	s.NoError(err, "calling handler should not result in error")
 	s.Equal(&Status{Status: "rejoined"}, status)
 	s.Equal(5, s.testNode.node.CountReachableMembers())
 }
-
-// mockClock implements the Clock interface with a constant Now method.
-type mockClock time.Time
-
-// Now returns the time that is stored in the type.
-func (c mockClock) Now() time.Time { return time.Time(c) }
 
 // TestRegisterHandlers tests that registerHandler always succeeds.
 func (s *HandlerTestSuite) TestRegisterHandlers() {

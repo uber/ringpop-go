@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
@@ -49,7 +50,7 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
-	Clock Clock
+	Clock clock.Clock
 }
 
 func defaultOptions() *Options {
@@ -66,7 +67,7 @@ func defaultOptions() *Options {
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
 
-		Clock: &systemClock{},
+		Clock: clock.New(),
 	}
 
 	return opts
@@ -151,9 +152,9 @@ type Node struct {
 
 	logger log.Logger
 
-	// clock is used to generate incarnation numbers and is typically set to
-	// systemClock.
-	clock Clock
+	// clock is used to generate incarnation numbers; it is typically the
+	// system clock, wrapped via clock.New()
+	clock clock.Clock
 }
 
 // NewNode returns a new SWIM Node.

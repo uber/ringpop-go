@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/uber/ringpop-go/shared"
@@ -101,7 +102,9 @@ func newChannelNode(t *testing.T) *testNode {
 	require.NoError(t, err, "channel must listen")
 
 	hostport := ch.PeerInfo().HostPort
-	node := NewNode("test", hostport, ch.GetSubChannel("test"), nil)
+	node := NewNode("test", hostport, ch.GetSubChannel("test"), &Options{
+		Clock: clock.NewMock(),
+	})
 
 	return &testNode{node, ch}
 }
@@ -112,7 +115,9 @@ func newChannelNodeWithHostPort(t *testing.T, hostport string) *testNode {
 	ch, err := tchannel.NewChannel("test", nil)
 	require.NoError(t, err, "channel must create successfully")
 
-	node := NewNode("test", hostport, ch.GetSubChannel("test"), nil)
+	node := NewNode("test", hostport, ch.GetSubChannel("test"), &Options{
+		Clock: clock.NewMock(),
+	})
 
 	return &testNode{node, ch}
 }
