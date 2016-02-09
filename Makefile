@@ -36,14 +36,12 @@ clean-mocks:
 lint:
 	@:>/tmp/lint.log
 
-	@echo -e "\033[0;32mRunning golint...\033[0m"
-	-golint ./... | grep -Ev '(test|examples)/' | tee -a /tmp/lint.log
+	@-golint ./... | grep -Ev '(test|examples)/' | tee -a /tmp/lint.log
 
-	@echo -e "\033[0;32mRunning go vet...\033[0m"
 	@for pkg in $(PKGS); do \
 		{ \
-			 find $$pkg -mindepth 1 -maxdepth 1 -name '*.go' \
-				| xargs go tool vet 2>&1 ; \
+			 find $$pkg -maxdepth 1 -mindepth 1 -type f -name '*.go' \
+				-exec go tool vet -printfuncs Logf:3 {} + 2>&1 ; \
 		} | tee -a /tmp/lint.log ; \
 	done;
 

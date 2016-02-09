@@ -22,8 +22,9 @@ package logging
 
 import (
 	"fmt"
-	"github.com/uber-common/bark"
 	"sync"
+
+	"github.com/uber-common/bark"
 )
 
 // Facility is a collection of named loggers that can be configured
