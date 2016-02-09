@@ -90,9 +90,8 @@ func Clock(c clock.Clock) Option {
 	return func(r *Ringpop) error {
 		if c == nil {
 			return errors.New("clock is required")
-		} else {
-			r.clock = c
 		}
+		r.clock = c
 		return nil
 	}
 }
