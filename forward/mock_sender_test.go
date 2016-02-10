@@ -6,6 +6,7 @@ type MockSender struct {
 	mock.Mock
 }
 
+// WhoAmI provides a mock function with given fields:
 func (_m *MockSender) WhoAmI() (string, error) {
 	ret := _m.Called()
 
@@ -25,6 +26,8 @@ func (_m *MockSender) WhoAmI() (string, error) {
 
 	return r0, r1
 }
+
+// Lookup provides a mock function with given fields: _a0
 func (_m *MockSender) Lookup(_a0 string) (string, error) {
 	ret := _m.Called(_a0)
 

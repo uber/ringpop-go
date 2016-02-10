@@ -31,14 +31,14 @@ const (
 	// Alive is the member "alive" state
 	Alive = "alive"
 
+	// Suspect is the member "suspect" state
+	Suspect = "suspect"
+
 	// Faulty is the member "faulty" state
 	Faulty = "faulty"
 
 	// Leave is the member "leave" state
 	Leave = "leave"
-
-	// Suspect is the member "suspect" state
-	Suspect = "suspect"
 )
 
 // A Member is a member in the member list
@@ -70,46 +70,46 @@ func shuffle(members []*Member) []*Member {
 	return newMembers
 }
 
+// nonLocalOverride returns wether a change should be applied to the member.
+// This function assumes that the address of the member and the change are
+// equal.
 func (m *Member) nonLocalOverride(change Change) bool {
-	return m.aliveOverride(change) ||
-		m.suspectOverride(change) ||
-		m.faultyOverride(change) ||
-		m.leaveOverride(change)
+	// change is younger than current member
+	if change.Incarnation > m.Incarnation {
+		return true
+	}
+
+	// change is older than current member
+	if change.Incarnation < m.Incarnation {
+		return false
+	}
+
+	// If the incarnation numbers are equal, we look at the state to
+	// determine wether the change overrides this member.
+	return statePrecedence(change.Status) > statePrecedence(m.Status)
 }
 
-func (m *Member) aliveOverride(change Change) bool {
-	return change.Status == Alive && change.Incarnation > m.Incarnation
-}
-
-func (m *Member) faultyOverride(change Change) bool {
-	return change.Status == Faulty &&
-		((m.Status == Suspect && change.Incarnation >= m.Incarnation) ||
-			(m.Status == Faulty && change.Incarnation > m.Incarnation) ||
-			(m.Status == Alive && change.Incarnation >= m.Incarnation))
-}
-
-func (m *Member) leaveOverride(change Change) bool {
-	return change.Status == Leave &&
-		m.Status != Leave && change.Incarnation >= m.Incarnation
-}
-
-func (m *Member) suspectOverride(change Change) bool {
-	return change.Status == Suspect &&
-		((m.Status == Suspect && change.Incarnation > m.Incarnation) ||
-			(m.Status == Faulty && change.Incarnation > m.Incarnation) ||
-			(m.Status == Alive && change.Incarnation >= m.Incarnation))
-}
-
+// localOverride returns whether a change should be applied to to the member
 func (m *Member) localOverride(local string, change Change) bool {
-	return m.localSuspectOverride(local, change) || m.localFaultyOverride(local, change)
+	if m.Address != local {
+		return false
+	}
+	return change.Status == Faulty || change.Status == Suspect
 }
 
-func (m *Member) localFaultyOverride(local string, change Change) bool {
-	return m.Address == local && change.Status == Faulty
-}
-
-func (m *Member) localSuspectOverride(local string, change Change) bool {
-	return m.Address == local && change.Status == Suspect
+func statePrecedence(s string) int {
+	switch s {
+	case Alive:
+		return 0
+	case Suspect:
+		return 1
+	case Faulty:
+		return 2
+	case Leave:
+		return 3
+	default:
+		panic("invalid state")
+	}
 }
 
 func (m *Member) isReachable() bool {

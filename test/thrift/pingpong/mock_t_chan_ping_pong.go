@@ -8,6 +8,7 @@ type MockTChanPingPong struct {
 	mock.Mock
 }
 
+// Ping provides a mock function with given fields: ctx, request
 func (_m *MockTChanPingPong) Ping(ctx thrift.Context, request *Ping) (*Pong, error) {
 	ret := _m.Called(ctx, request)
 

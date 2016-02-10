@@ -8,6 +8,7 @@ type ClientFactory struct {
 	mock.Mock
 }
 
+// GetLocalClient provides a mock function with given fields:
 func (_m *ClientFactory) GetLocalClient() interface{} {
 	ret := _m.Called()
 
@@ -22,6 +23,8 @@ func (_m *ClientFactory) GetLocalClient() interface{} {
 
 	return r0
 }
+
+// MakeRemoteClient provides a mock function with given fields: client
 func (_m *ClientFactory) MakeRemoteClient(client thrift.TChanClient) interface{} {
 	ret := _m.Called(client)
 

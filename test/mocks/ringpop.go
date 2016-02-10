@@ -15,9 +15,12 @@ type Ringpop struct {
 	mock.Mock
 }
 
+// Destroy provides a mock function with given fields:
 func (_m *Ringpop) Destroy() {
 	_m.Called()
 }
+
+// App provides a mock function with given fields:
 func (_m *Ringpop) App() string {
 	ret := _m.Called()
 
@@ -30,6 +33,8 @@ func (_m *Ringpop) App() string {
 
 	return r0
 }
+
+// WhoAmI provides a mock function with given fields:
 func (_m *Ringpop) WhoAmI() (string, error) {
 	ret := _m.Called()
 
@@ -49,6 +54,8 @@ func (_m *Ringpop) WhoAmI() (string, error) {
 
 	return r0, r1
 }
+
+// Uptime provides a mock function with given fields:
 func (_m *Ringpop) Uptime() (time.Duration, error) {
 	ret := _m.Called()
 
@@ -68,9 +75,13 @@ func (_m *Ringpop) Uptime() (time.Duration, error) {
 
 	return r0, r1
 }
+
+// RegisterListener provides a mock function with given fields: l
 func (_m *Ringpop) RegisterListener(l events.EventListener) {
 	_m.Called(l)
 }
+
+// Bootstrap provides a mock function with given fields: opts
 func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	ret := _m.Called(opts)
 
@@ -92,6 +103,8 @@ func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 
 	return r0, r1
 }
+
+// Checksum provides a mock function with given fields:
 func (_m *Ringpop) Checksum() (uint32, error) {
 	ret := _m.Called()
 
@@ -111,6 +124,8 @@ func (_m *Ringpop) Checksum() (uint32, error) {
 
 	return r0, r1
 }
+
+// Lookup provides a mock function with given fields: key
 func (_m *Ringpop) Lookup(key string) (string, error) {
 	ret := _m.Called(key)
 
@@ -130,6 +145,8 @@ func (_m *Ringpop) Lookup(key string) (string, error) {
 
 	return r0, r1
 }
+
+// LookupN provides a mock function with given fields: key, n
 func (_m *Ringpop) LookupN(key string, n int) ([]string, error) {
 	ret := _m.Called(key, n)
 
@@ -151,6 +168,8 @@ func (_m *Ringpop) LookupN(key string, n int) ([]string, error) {
 
 	return r0, r1
 }
+
+// GetReachableMembers provides a mock function with given fields:
 func (_m *Ringpop) GetReachableMembers() ([]string, error) {
 	ret := _m.Called()
 
@@ -172,6 +191,8 @@ func (_m *Ringpop) GetReachableMembers() ([]string, error) {
 
 	return r0, r1
 }
+
+// CountReachableMembers provides a mock function with given fields:
 func (_m *Ringpop) CountReachableMembers() (int, error) {
 	ret := _m.Called()
 
@@ -191,6 +212,8 @@ func (_m *Ringpop) CountReachableMembers() (int, error) {
 
 	return r0, r1
 }
+
+// HandleOrForward provides a mock function with given fields: key, request, response, service, endpoint, format, opts
 func (_m *Ringpop) HandleOrForward(key string, request []byte, response *[]byte, service string, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error) {
 	ret := _m.Called(key, request, response, service, endpoint, format, opts)
 
@@ -210,6 +233,8 @@ func (_m *Ringpop) HandleOrForward(key string, request []byte, response *[]byte,
 
 	return r0, r1
 }
+
+// Forward provides a mock function with given fields: dest, keys, request, service, endpoint, format, opts
 func (_m *Ringpop) Forward(dest string, keys []string, request []byte, service string, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error) {
 	ret := _m.Called(dest, keys, request, service, endpoint, format, opts)
 
