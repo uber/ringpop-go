@@ -30,6 +30,9 @@ import (
 
 var log10 = math.Log(10)
 
+// defaultPFactor is the piggyback factor value, described in the swim paper.
+const defaultPFactor int = 15
+
 // A pChange is a change with a p count representing the number of times the
 // change has been propagated to other nodes.
 type pChange struct {
@@ -57,8 +60,8 @@ func newDisseminator(n *Node) *disseminator {
 	d := &disseminator{
 		node:    n,
 		changes: make(map[string]*pChange),
-		maxP:    1,
-		pFactor: 15,
+		maxP:    defaultPFactor,
+		pFactor: defaultPFactor,
 		logger:  logging.Logger("disseminator").WithField("local", n.Address()),
 	}
 
@@ -66,10 +69,6 @@ func newDisseminator(n *Node) *disseminator {
 }
 
 func (d *disseminator) AdjustMaxPropagations() {
-	if !d.node.Ready() {
-		return
-	}
-
 	d.Lock()
 
 	numPingable := d.node.memberlist.NumPingableMembers()
