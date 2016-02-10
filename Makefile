@@ -34,18 +34,19 @@ clean-mocks:
 	rm -rf test/thrift/pingpong/
 
 lint:
-	@:>/tmp/lint.log
+	@:>lint.log
 
-	@-golint ./... | grep -Ev '(test|gen-go)/' | tee -a /tmp/lint.log
+	@-golint ./... | grep -Ev '(test|gen-go)/' | tee -a lint.log
 
 	@for pkg in $(PKGS); do \
 		{ \
 			 find $$pkg -maxdepth 1 -mindepth 1 -type f -name '*.go' \
 				-exec go tool vet -printfuncs Logf:3 {} + 2>&1 ; \
-		} | tee -a /tmp/lint.log ; \
+		} | tee -a lint.log ; \
 	done;
 
-	@[ ! -s /tmp/lint.log ]
+	@[ ! -s lint.log ]
+	@rm -f lint.log
 
 mocks:
 	test/gen-testfiles
@@ -57,7 +58,7 @@ setup:
  		exit 1; \
 	fi
 
-	ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+	ln -s ../../scripts/pre-commit .git/hooks/pre-commit
 
 test:	test-unit test-integration
 
