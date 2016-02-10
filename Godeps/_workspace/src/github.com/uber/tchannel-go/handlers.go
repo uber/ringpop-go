@@ -21,56 +21,86 @@
 package tchannel
 
 import (
+	"reflect"
+	"runtime"
 	"sync"
 
 	"golang.org/x/net/context"
 )
 
 // A Handler is an object that can be registered with a Channel to process
-// incoming calls for a given service and operation
+// incoming calls for a given service and method
 type Handler interface {
 	// Handles an incoming call for service
 	Handle(ctx context.Context, call *InboundCall)
 }
 
-// A HandlerFunc is an adapter to allow the use of ordering functions as
-// Channel handlers.  If f is a function with the appropriate signature,
-// HandlerFunc(f) is a Hander object that calls f
+// A HandlerFunc is an adapter to allow the use of ordinary functions as
+// Channel handlers.  If f is a function with the appropriate signature, then
+// HandlerFunc(f) is a Handler object that calls f.
 type HandlerFunc func(ctx context.Context, call *InboundCall)
 
 // Handle calls f(ctx, call)
 func (f HandlerFunc) Handle(ctx context.Context, call *InboundCall) { f(ctx, call) }
 
+// An ErrorHandlerFunc is an adapter to allow the use of ordinary functions as
+// Channel handlers, with error handling convenience.  If f is a function with
+// the appropriate signature, then ErrorHandlerFunc(f) is a Handler object that
+// calls f.
+type ErrorHandlerFunc func(ctx context.Context, call *InboundCall) error
+
+// Handle calls f(ctx, call)
+func (f ErrorHandlerFunc) Handle(ctx context.Context, call *InboundCall) {
+	if err := f(ctx, call); err != nil {
+		if GetSystemErrorCode(err) == ErrCodeUnexpected {
+			call.log.WithFields(f.getLogFields()...).WithFields(ErrField(err)).Error("Unexpected handler error")
+		}
+		call.Response().SendSystemError(err)
+	}
+}
+
+func (f ErrorHandlerFunc) getLogFields() LogFields {
+	ptr := reflect.ValueOf(f).Pointer()
+	handlerFunc := runtime.FuncForPC(ptr) // can't be nil
+	fileName, fileLine := handlerFunc.FileLine(ptr)
+	return LogFields{
+		{"handlerFuncName", handlerFunc.Name()},
+		{"handlerFuncFileName", fileName},
+		{"handlerFuncFileLine", fileLine},
+	}
+}
+
 // Manages handlers
 type handlerMap struct {
-	mut      sync.RWMutex
+	sync.RWMutex
+
 	handlers map[string]map[string]Handler
 }
 
 // Registers a handler
-func (hmap *handlerMap) register(h Handler, serviceName, operation string) {
-	hmap.mut.Lock()
-	defer hmap.mut.Unlock()
+func (hmap *handlerMap) register(h Handler, serviceName, method string) {
+	hmap.Lock()
+	defer hmap.Unlock()
 
 	if hmap.handlers == nil {
 		hmap.handlers = make(map[string]map[string]Handler)
 	}
 
-	operations := hmap.handlers[serviceName]
-	if operations == nil {
-		operations = make(map[string]Handler)
-		hmap.handlers[serviceName] = operations
+	methods := hmap.handlers[serviceName]
+	if methods == nil {
+		methods = make(map[string]Handler)
+		hmap.handlers[serviceName] = methods
 	}
 
-	operations[operation] = h
+	methods[method] = h
 }
 
-// Finds the handler matching the given service and operation.  See https://github.com/golang/go/issues/3512
-// for the reason that operation is []byte instead of a string
-func (hmap *handlerMap) find(serviceName string, operation []byte) Handler {
-	hmap.mut.RLock()
-	handler := hmap.handlers[serviceName][string(operation)]
-	hmap.mut.RUnlock()
+// Finds the handler matching the given service and method.  See https://github.com/golang/go/issues/3512
+// for the reason that method is []byte instead of a string
+func (hmap *handlerMap) find(serviceName string, method []byte) Handler {
+	hmap.RLock()
+	handler := hmap.handlers[serviceName][string(method)]
+	hmap.RUnlock()
 
 	return handler
 }

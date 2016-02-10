@@ -27,15 +27,43 @@ import (
 	"io/ioutil"
 )
 
+// ArgReader is the interface for the arg2 and arg3 streams on an
+// OutboundCallResponse and an InboundCall
+type ArgReader io.ReadCloser
+
+// ArgWriter is the interface for the arg2 and arg3 streams on an OutboundCall
+// and an InboundCallResponse
+type ArgWriter interface {
+	io.WriteCloser
+
+	// Flush flushes the currently written bytes without waiting for the frame
+	// to be filled.
+	Flush() error
+}
+
+// ArgWritable is an interface for providing arg2 and arg3 writer streams;
+// implemented by reqResWriter e.g. OutboundCall and InboundCallResponse
+type ArgWritable interface {
+	Arg2Writer() (ArgWriter, error)
+	Arg3Writer() (ArgWriter, error)
+}
+
+// ArgReadable is an interface for providing arg2 and arg3 reader streams;
+// implemented by reqResReader e.g. InboundCall and OutboundCallResponse.
+type ArgReadable interface {
+	Arg2Reader() (ArgReader, error)
+	Arg3Reader() (ArgReader, error)
+}
+
 // ArgReadHelper providers a simpler interface to reading arguments.
 type ArgReadHelper struct {
-	reader io.ReadCloser
+	reader ArgReader
 	err    error
 }
 
 // NewArgReader wraps the result of calling ArgXReader to provide a simpler
 // interface for reading arguments.
-func NewArgReader(reader io.ReadCloser, err error) ArgReadHelper {
+func NewArgReader(reader ArgReader, err error) ArgReadHelper {
 	return ArgReadHelper{reader, err}
 }
 

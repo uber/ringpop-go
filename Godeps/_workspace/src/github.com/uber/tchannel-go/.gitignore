@@ -1,5 +1,15 @@
+build
+Godeps/_workspace
+thrift-gen-release/
+
+# Lint output
+lint.log
+
+# Cover profiles
+*.out
+
+# Editor and OS detritus
 *~
 *.swp
 .DS_Store
-build
-Godeps/_workspace
+.idea

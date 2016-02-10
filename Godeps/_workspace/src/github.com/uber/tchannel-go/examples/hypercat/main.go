@@ -35,8 +35,8 @@ import (
 var options = struct {
 	ServiceName string `short:"s" long:"service" required:"true" description:"The TChannel/Hyperbahn service name"`
 
-	// OperationName can be specified multiple times to listen on multiple operations.
-	OperationName []string `short:"o" long:"operation" required:"true" description:"The operation name to handle"`
+	// MethodName can be specified multiple times to listen on multiple methods.
+	MethodName []string `short:"o" long:"method" required:"true" description:"The method name to handle"`
 
 	// HostPort can just be :port or port, in which case host defaults to tchannel's ListenIP.
 	HostPort string `short:"l" long:"hostPort" default:":0" description:"The port or host:port to listen on"`
@@ -84,7 +84,7 @@ func main() {
 		log.Fatalf("NewChannel failed: %v", err)
 	}
 
-	for _, op := range options.OperationName {
+	for _, op := range options.MethodName {
 		ch.Register(tchannel.HandlerFunc(handler), op)
 	}
 
@@ -93,7 +93,7 @@ func main() {
 	}
 
 	peerInfo := ch.PeerInfo()
-	log.Printf("listening for %v:%v on %v", peerInfo.ServiceName, options.OperationName, peerInfo.HostPort)
+	log.Printf("listening for %v:%v on %v", peerInfo.ServiceName, options.MethodName, peerInfo.HostPort)
 	select {}
 }
 

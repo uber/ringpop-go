@@ -30,7 +30,7 @@ import (
 )
 
 // ReadResponse reads a http.Response from the given readers.
-func ReadResponse(call argReader) (*http.Response, error) {
+func ReadResponse(call tchannel.ArgReadable) (*http.Response, error) {
 	var arg2 []byte
 	if err := tchannel.NewArgReader(call.Arg2Reader()).Read(&arg2); err != nil {
 		return nil, err
@@ -65,12 +65,12 @@ func ReadResponse(call argReader) (*http.Response, error) {
 type tchanResponseWriter struct {
 	headers    http.Header
 	statusCode int
-	response   argWriter
+	response   tchannel.ArgWritable
 	arg3Writer io.WriteCloser
 	err        error
 }
 
-func newTChanResponseWriter(response argWriter) *tchanResponseWriter {
+func newTChanResponseWriter(response tchannel.ArgWritable) *tchanResponseWriter {
 	return &tchanResponseWriter{
 		headers:    make(http.Header),
 		statusCode: http.StatusOK,
@@ -133,7 +133,7 @@ func (w *tchanResponseWriter) finish() error {
 
 // ResponseWriter returns a http.ResponseWriter that will write to an underlying writer.
 // It also returns a function that should be called once the handler has completed.
-func ResponseWriter(response argWriter) (http.ResponseWriter, func() error) {
+func ResponseWriter(response tchannel.ArgWritable) (http.ResponseWriter, func() error) {
 	responseWriter := newTChanResponseWriter(response)
 	return responseWriter, responseWriter.finish
 }

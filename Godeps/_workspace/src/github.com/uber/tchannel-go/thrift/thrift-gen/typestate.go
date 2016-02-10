@@ -42,7 +42,7 @@ type State struct {
 func newState(v *parser.Thrift, all map[string]parseState) *State {
 	typedefs := make(map[string]*parser.Type)
 	for k, v := range v.Typedefs {
-		typedefs[k] = v
+		typedefs[k] = v.Type
 	}
 
 	// Enums are typedefs to an int64.

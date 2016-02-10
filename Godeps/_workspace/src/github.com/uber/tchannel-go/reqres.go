@@ -22,7 +22,6 @@ package tchannel
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/uber/tchannel-go/typed"
 )
@@ -189,24 +188,24 @@ type reqResReader struct {
 	err                error
 }
 
-// arg1Reader returns an io.ReadCloser to read arg1.
-func (r *reqResReader) arg1Reader() (io.ReadCloser, error) {
+// arg1Reader returns an ArgReader to read arg1.
+func (r *reqResReader) arg1Reader() (ArgReader, error) {
 	return r.argReader(false /* last */, reqResReaderPreArg1, reqResReaderPreArg2)
 }
 
-// arg2Reader returns an io.ReadCloser to read arg2.
-func (r *reqResReader) arg2Reader() (io.ReadCloser, error) {
+// arg2Reader returns an ArgReader to read arg2.
+func (r *reqResReader) arg2Reader() (ArgReader, error) {
 	return r.argReader(false /* last */, reqResReaderPreArg2, reqResReaderPreArg3)
 }
 
-// arg3Reader returns an io.ReadCloser to read arg3.
-func (r *reqResReader) arg3Reader() (io.ReadCloser, error) {
+// arg3Reader returns an ArgReader to read arg3.
+func (r *reqResReader) arg3Reader() (ArgReader, error) {
 	return r.argReader(true /* last */, reqResReaderPreArg3, reqResReaderComplete)
 }
 
-// argReader returns an io.ReadCloser that can be used to read an argument. The ReadCloser
-// must be closed once the argument has been read.
-func (r *reqResReader) argReader(last bool, inState reqResReaderState, outState reqResReaderState) (io.ReadCloser, error) {
+// argReader returns an ArgReader that can be used to read an argument. The
+// ReadCloser must be closed once the argument has been read.
+func (r *reqResReader) argReader(last bool, inState reqResReaderState, outState reqResReaderState) (ArgReader, error) {
 	if r.state != inState {
 		return nil, r.failed(errReqResReaderStateMismatch{state: r.state, expectedState: inState})
 	}

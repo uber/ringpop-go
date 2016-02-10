@@ -28,7 +28,9 @@ import (
 	"time"
 
 	"github.com/uber/tchannel-go"
+	htypes "github.com/uber/tchannel-go/hyperbahn/gen-go/hyperbahn"
 	tjson "github.com/uber/tchannel-go/json"
+	tthrift "github.com/uber/tchannel-go/thrift"
 )
 
 // Client manages Hyperbahn connections and registrations.
@@ -37,7 +39,9 @@ type Client struct {
 	services []string
 	opts     ClientOptions
 	quit     chan struct{}
-	client   *tjson.Client
+
+	jsonClient      *tjson.Client
+	hyperbahnClient htypes.TChanHyperbahn
 }
 
 // FailStrategy is the strategy to use when registration fails maxRegistrationFailures
@@ -48,18 +52,40 @@ const (
 	// FailStrategyFatal will call Fatalf on the channel's logger after triggering handler.OnError.
 	// This is the default strategy.
 	FailStrategyFatal FailStrategy = iota
-	// FailStrategyIgnore will only call handler.OnError, even on fatal errors.
+	// FailStrategyIgnore will only call handler.OnError, even after many
+	// errors, and will continue to retry forever.
 	FailStrategyIgnore
 )
 
 const hyperbahnServiceName = "hyperbahn"
 
+// UnmarshalYAML implements the yaml.UnmarshalYAML interface. This allows FailStrategy
+// to be specified as a string (e.g. "fatal") in configuration files.
+func (f *FailStrategy) UnmarshalYAML(unmarshal func(v interface{}) error) error {
+	var strategy string
+	if err := unmarshal(&strategy); err != nil {
+		return err
+	}
+
+	switch strategy {
+	case "fatal":
+		*f = FailStrategyFatal
+	case "ignore":
+		*f = FailStrategyIgnore
+	default:
+		return fmt.Errorf("not a valid fail strategy: %q", strategy)
+	}
+	return nil
+}
+
 // ClientOptions are used to configure this Hyperbahn client.
 type ClientOptions struct {
-	// Timeout defaults to 1 second if it is not set.
-	Timeout      time.Duration
-	Handler      Handler
-	FailStrategy FailStrategy
+	// Timeout defaults to 3 seconds if it is not set.
+	Timeout time.Duration
+	// TimeoutPerAttempt defaults to 1 second if it is not set.
+	TimeoutPerAttempt time.Duration
+	Handler           Handler
+	FailStrategy      FailStrategy
 }
 
 // NewClient creates a new Hyperbahn client using the given channel.
@@ -71,7 +97,10 @@ func NewClient(ch *tchannel.Channel, config Configuration, opts *ClientOptions) 
 		client.opts = *opts
 	}
 	if client.opts.Timeout == 0 {
-		client.opts.Timeout = time.Second
+		client.opts.Timeout = 3 * time.Second
+	}
+	if client.opts.TimeoutPerAttempt == 0 {
+		client.opts.TimeoutPerAttempt = time.Second
 	}
 	if client.opts.Handler == nil {
 		client.opts.Handler = nullHandler{}
@@ -86,7 +115,10 @@ func NewClient(ch *tchannel.Channel, config Configuration, opts *ClientOptions) 
 		addPeer(ch, node)
 	}
 
-	client.client = tjson.NewClient(ch, hyperbahnServiceName, nil)
+	client.jsonClient = tjson.NewClient(ch, hyperbahnServiceName, nil)
+	thriftClient := tthrift.NewClient(ch, hyperbahnServiceName, nil)
+	client.hyperbahnClient = htypes.NewTChanHyperbahnClient(thriftClient)
+
 	return client, nil
 }
 
@@ -140,9 +172,10 @@ func (c *Client) getServiceNames(otherServices []tchannel.Registrar) {
 func (c *Client) Advertise(otherServices ...tchannel.Registrar) error {
 	c.getServiceNames(otherServices)
 
-	if err := c.sendAdvertise(); err != nil {
+	if err := c.initialAdvertise(); err != nil {
 		return err
 	}
+
 	c.opts.Handler.On(Advertised)
 	go c.advertiseLoop()
 	return nil
@@ -160,5 +193,7 @@ func (c *Client) IsClosed() bool {
 
 // Close closes the Hyperbahn client, which stops any background re-advertisements.
 func (c *Client) Close() {
-	close(c.quit)
+	if !c.IsClosed() {
+		close(c.quit)
+	}
 }

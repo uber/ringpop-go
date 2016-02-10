@@ -85,23 +85,23 @@ func setupServer(host string, basePort, instanceNum int) error {
 }
 
 type kvHandler struct {
-	mut  sync.RWMutex
+	sync.RWMutex
 	vals map[string]string
 }
 
 func (h *kvHandler) WithLock(write bool, f func()) {
 	if write {
-		h.mut.Lock()
+		h.Lock()
 	} else {
-		h.mut.RLock()
+		h.RLock()
 	}
 
 	f()
 
 	if write {
-		h.mut.Unlock()
+		h.Unlock()
 	} else {
-		h.mut.RUnlock()
+		h.RUnlock()
 	}
 }
 
@@ -134,7 +134,7 @@ func (h *kvHandler) Set(ctx context.Context, args *raw.Args) (*raw.Res, error) {
 }
 
 func (h *kvHandler) Handle(ctx context.Context, args *raw.Args) (*raw.Res, error) {
-	switch args.Operation {
+	switch args.Method {
 	case "ping":
 		return h.Ping(ctx, args)
 	case "get":
@@ -142,7 +142,7 @@ func (h *kvHandler) Handle(ctx context.Context, args *raw.Args) (*raw.Res, error
 	case "put":
 		return h.Set(ctx, args)
 	default:
-		return nil, errors.New("unknown operation")
+		return nil, errors.New("unknown method")
 	}
 }
 

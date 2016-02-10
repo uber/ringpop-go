@@ -21,6 +21,7 @@
 package tchannel
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -73,6 +74,16 @@ func (fh FrameHeader) FrameSize() uint16 {
 }
 
 func (fh FrameHeader) String() string { return fmt.Sprintf("%v[%d]", fh.messageType, fh.ID) }
+
+// MarshalJSON returns a `{"id":NNN, "msgType":MMM, "size":SSS}` representation
+func (fh FrameHeader) MarshalJSON() ([]byte, error) {
+	s := struct {
+		ID      uint32      `json:"id"`
+		MsgType messageType `json:"msgType"`
+		Size    uint16      `json:"size"`
+	}{fh.ID, fh.messageType, fh.size}
+	return json.Marshal(s)
+}
 
 func (fh *FrameHeader) read(r *typed.ReadBuffer) error {
 	fh.size = r.ReadUint16()
@@ -164,6 +175,7 @@ func (f *Frame) write(msg message) error {
 	}
 
 	f.Header.ID = msg.ID()
+	f.Header.reserved1 = 0
 	f.Header.messageType = msg.messageType()
 	f.Header.SetPayloadSize(uint16(wbuf.BytesWritten()))
 	return nil

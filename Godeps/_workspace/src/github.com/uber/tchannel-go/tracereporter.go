@@ -39,6 +39,22 @@ const (
 	AnnotationKeyServerReceive = "sr"
 )
 
+// TraceEndpoint represents a service endpoint.
+type TraceEndpoint struct {
+	HostPort    string
+	ServiceName string
+}
+
+// TraceData is the data reported to the TracerReporter.
+type TraceData struct {
+	Span              Span
+	Annotations       []Annotation
+	BinaryAnnotations []BinaryAnnotation
+	Source            TraceEndpoint
+	Target            TraceEndpoint
+	Method            string
+}
+
 // BinaryAnnotation is additional context information about the span.
 type BinaryAnnotation struct {
 	Key string
@@ -55,16 +71,15 @@ type Annotation struct {
 // TraceReporter is the interface used to report Trace spans.
 type TraceReporter interface {
 	// Report method is intended to report Span information.
-	// It returns any error encountered otherwise nil.
-	Report(span Span, annotations []Annotation, binaryAnnotations []BinaryAnnotation, targetEndpoint TargetEndpoint)
+	Report(data TraceData)
 }
 
 // TraceReporterFunc allows using a function as a TraceReporter.
-type TraceReporterFunc func(span Span, annotations []Annotation, binaryAnnotations []BinaryAnnotation, targetEndpoint TargetEndpoint)
+type TraceReporterFunc func(TraceData)
 
 // Report calls the underlying function.
-func (f TraceReporterFunc) Report(span Span, annotations []Annotation, binaryAnnotations []BinaryAnnotation, targetEndpoint TargetEndpoint) {
-	f(span, annotations, binaryAnnotations, targetEndpoint)
+func (f TraceReporterFunc) Report(data TraceData) {
+	f(data)
 }
 
 // NullReporter is the default TraceReporter which does not do anything.
@@ -72,7 +87,7 @@ var NullReporter TraceReporter = nullReporter{}
 
 type nullReporter struct{}
 
-func (nullReporter) Report(_ Span, _ []Annotation, _ []BinaryAnnotation, _ TargetEndpoint) {
+func (nullReporter) Report(_ TraceData) {
 }
 
 // SimpleTraceReporter is a trace reporter which prints using the default logger.
@@ -80,28 +95,23 @@ var SimpleTraceReporter TraceReporter = simpleTraceReporter{}
 
 type simpleTraceReporter struct{}
 
-func (simpleTraceReporter) Report(
-	span Span, annotations []Annotation, binaryAnnotations []BinaryAnnotation, targetEndpoint TargetEndpoint) {
-	log.Printf("SimpleTraceReporter.Report span: %+v annotations: %+v binaryAnnotations: %+v targetEndpoint: %+v",
-		span, annotations, binaryAnnotations, targetEndpoint)
+func (simpleTraceReporter) Report(data TraceData) {
+	log.Printf("SimpleTraceReporter.Report span: %+v", data)
 }
 
 // Annotations is used to track annotations and report them to a TraceReporter.
 type Annotations struct {
-	timeNow           func() time.Time
-	reporter          TraceReporter
-	endpoint          TargetEndpoint
-	span              Span
-	annotations       []Annotation
-	binaryAnnotations []BinaryAnnotation
+	timeNow  func() time.Time
+	reporter TraceReporter
+	data     TraceData
 
 	annotationsBacking       [2]Annotation
 	binaryAnnotationsBacking [2]BinaryAnnotation
 }
 
-// SetOperation sets the operation being called.
-func (as *Annotations) SetOperation(operation string) {
-	as.endpoint.Operation = operation
+// SetMethod sets the method being called.
+func (as *Annotations) SetMethod(method string) {
+	as.data.Method = method
 }
 
 // GetTime returns the time using the timeNow function stored in the annotations.
@@ -112,18 +122,18 @@ func (as *Annotations) GetTime() time.Time {
 // AddBinaryAnnotation adds a binary annotation.
 func (as *Annotations) AddBinaryAnnotation(key string, value interface{}) {
 	binaryAnnotation := BinaryAnnotation{Key: key, Value: value}
-	as.binaryAnnotations = append(as.binaryAnnotations, binaryAnnotation)
+	as.data.BinaryAnnotations = append(as.data.BinaryAnnotations, binaryAnnotation)
 }
 
-// AddAnnotation adds a standard annotation.
-func (as *Annotations) AddAnnotation(key AnnotationKey) {
-	annotation := Annotation{Key: key, Timestamp: as.timeNow()}
-	as.annotations = append(as.annotations, annotation)
+// AddAnnotationAt adds a standard annotation with the specified time.
+func (as *Annotations) AddAnnotationAt(key AnnotationKey, ts time.Time) {
+	annotation := Annotation{Key: key, Timestamp: ts}
+	as.data.Annotations = append(as.data.Annotations, annotation)
 }
 
 // Report reports the annotations to the given trace reporter, if tracing is enabled in the span.
 func (as *Annotations) Report() {
-	if as.span.TracingEnabled() {
-		as.reporter.Report(as.span, as.annotations, as.binaryAnnotations, as.endpoint)
+	if as.data.Span.TracingEnabled() {
+		as.reporter.Report(as.data)
 	}
 }

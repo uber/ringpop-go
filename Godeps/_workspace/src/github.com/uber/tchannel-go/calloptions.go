@@ -46,6 +46,10 @@ type CallOptions struct {
 
 	// RequestState stores request state across retry attempts.
 	RequestState *RequestState
+
+	// RoutingDelegate identifies a service capable of routing a request to its
+	// intended recipient.
+	RoutingDelegate string
 }
 
 var defaultCallOptions = &CallOptions{}
@@ -62,6 +66,9 @@ func (c *CallOptions) overrideHeaders(headers transportHeaders) {
 	}
 	if c.ShardKey != "" {
 		headers[ShardKey] = c.ShardKey
+	}
+	if c.RoutingDelegate != "" {
+		headers[RoutingDelegate] = c.RoutingDelegate
 	}
 }
 

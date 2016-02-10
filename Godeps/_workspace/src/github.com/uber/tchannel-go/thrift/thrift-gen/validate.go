@@ -42,7 +42,8 @@ func validateMethod(svc *parser.Service, m *parser.Method) error {
 	}
 	for _, arg := range m.Arguments {
 		if arg.Optional {
-			return fmt.Errorf("service methods cannot contain optional arguments: %v.%v:%v", svc.Name, m.Name, arg.Name)
+			// Go treats argument structs as "Required" in the generated code interface.
+			arg.Optional = false
 		}
 	}
 	return nil

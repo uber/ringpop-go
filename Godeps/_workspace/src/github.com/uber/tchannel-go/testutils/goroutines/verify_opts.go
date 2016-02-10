@@ -18,20 +18,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package http
+package goroutines
 
-import (
-	"io"
+import "bytes"
 
-	"github.com/uber/tchannel-go"
-)
-
-type argWriter interface {
-	Arg2Writer() (tchannel.ArgWriter, error)
-	Arg3Writer() (tchannel.ArgWriter, error)
+// VerifyOpts contains
+type VerifyOpts struct {
+	// Exclude is a string that will exclude a stack from being considered a leak.
+	Exclude string
 }
 
-type argReader interface {
-	Arg2Reader() (io.ReadCloser, error)
-	Arg3Reader() (io.ReadCloser, error)
+// ShouldSkip returns whether the given stack should be skipped when doing verification.
+func (opts *VerifyOpts) ShouldSkip(s Stack) bool {
+	if opts == nil || len(opts.Exclude) == 0 {
+		return false
+	}
+
+	return bytes.Contains(s.Full(), []byte(opts.Exclude))
 }

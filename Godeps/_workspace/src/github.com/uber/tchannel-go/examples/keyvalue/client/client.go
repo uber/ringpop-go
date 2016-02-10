@@ -143,7 +143,7 @@ func clear(adminClient keyvalue.TChanAdmin) {
 	if err := adminClient.ClearAll(ctx); err != nil {
 		switch err := err.(type) {
 		case *keyvalue.NotAuthorized:
-			log.Printf("You are not authorized to perform this operation")
+			log.Printf("You are not authorized to perform this method")
 		default:
 			log.Printf("ClearAll failed unexpectedly: %v", err)
 		}

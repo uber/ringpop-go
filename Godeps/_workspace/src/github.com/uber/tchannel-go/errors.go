@@ -93,8 +93,8 @@ var (
 	// ErrChannelClosed is a SystemError indicating that the channel has been closed.
 	ErrChannelClosed = NewSystemError(ErrCodeDeclined, "closed channel")
 
-	// ErrOperationTooLarge is a SystemError indicating that the operation is too large.
-	ErrOperationTooLarge = NewSystemError(ErrCodeProtocol, "operation too large")
+	// ErrMethodTooLarge is a SystemError indicating that the method is too large.
+	ErrMethodTooLarge = NewSystemError(ErrCodeProtocol, "method too large")
 )
 
 // A SystemError is a system-level error, containing an error code and message

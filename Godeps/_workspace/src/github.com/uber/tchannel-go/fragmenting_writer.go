@@ -23,7 +23,6 @@ package tchannel
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/uber/tchannel-go/typed"
 )
@@ -39,14 +38,6 @@ const (
 	hasMoreFragmentsFlag = 0x01 // flags indicating there are more fragments coming
 )
 
-// ArgWriter is the interface returned by ArgXWriter.
-type ArgWriter interface {
-	io.WriteCloser
-
-	// Flush flushes the currently written bytes without waiting for the frame to be filled.
-	Flush() error
-}
-
 // A writableFragment is a fragment that can be written to, containing a buffer
 // for contents, a running checksum, and placeholders for the fragment flags
 // and final checksum value
@@ -60,10 +51,12 @@ type writableFragment struct {
 
 // finish finishes the fragment, updating the final checksum and fragment flags
 func (f *writableFragment) finish(hasMoreFragments bool) {
+	f.checksumRef.Update(f.checksum.Sum())
 	if hasMoreFragments {
 		f.flagsRef.Update(hasMoreFragmentsFlag)
+	} else {
+		f.checksum.Release()
 	}
-	f.checksumRef.Update(f.checksum.Sum())
 }
 
 // A writableChunk is a chunk of data within a fragment, representing the

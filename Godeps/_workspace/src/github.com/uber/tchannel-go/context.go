@@ -46,6 +46,15 @@ type IncomingCall interface {
 
 	// ShardKey returns the shard key from the ShardKey transport header.
 	ShardKey() string
+
+	// RoutingDelegate returns the routing delegate from RoutingDelegate
+	// transport header.
+	RoutingDelegate() string
+
+	// RemotePeer returns the caller's peer information.
+	// If the caller is an ephemeral peer, then the HostPort cannot be used to make new
+	// connections to the caller.
+	RemotePeer() PeerInfo
 }
 
 func getTChannelParams(ctx context.Context) *tchannelCtxParams {

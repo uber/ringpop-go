@@ -42,7 +42,9 @@ func Register(registrar tchannel.Registrar) {
 	handler := func(ctx context.Context, call *tchannel.InboundCall) {
 		req, err := thttp.ReadRequest(call)
 		if err != nil {
-			registrar.Logger().Warnf("Failed to read HTTP request: %v", err)
+			registrar.Logger().WithFields(
+				tchannel.LogField{Key: "err", Value: err.Error()},
+			).Warn("Failed to read HTTP request.")
 			return
 		}
 

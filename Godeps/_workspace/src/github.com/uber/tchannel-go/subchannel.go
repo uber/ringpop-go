@@ -33,6 +33,7 @@ type SubChannelOption func(*SubChannel)
 func Isolated(s *SubChannel) {
 	s.Lock()
 	s.peers = s.topChannel.peers.newSibling()
+	s.peers.SetStrategy(newLeastPendingCalculator())
 	s.Unlock()
 }
 
@@ -52,7 +53,7 @@ type SubChannel struct {
 
 // Map of subchannel and the corresponding service
 type subChannelMap struct {
-	mut         sync.RWMutex
+	sync.RWMutex
 	subchannels map[string]*SubChannel
 }
 
@@ -75,7 +76,7 @@ func (c *SubChannel) ServiceName() string {
 
 // BeginCall starts a new call to a remote peer, returning an OutboundCall that can
 // be used to write the arguments of the call.
-func (c *SubChannel) BeginCall(ctx context.Context, operationName string, callOptions *CallOptions) (*OutboundCall, error) {
+func (c *SubChannel) BeginCall(ctx context.Context, methodName string, callOptions *CallOptions) (*OutboundCall, error) {
 	if callOptions == nil {
 		callOptions = defaultCallOptions
 	}
@@ -85,7 +86,7 @@ func (c *SubChannel) BeginCall(ctx context.Context, operationName string, callOp
 		return nil, err
 	}
 
-	return peer.BeginCall(ctx, c.ServiceName(), operationName, callOptions)
+	return peer.BeginCall(ctx, c.ServiceName(), methodName, callOptions)
 }
 
 // Peers returns the PeerList for this subchannel.
@@ -100,9 +101,9 @@ func (c *SubChannel) Isolated() bool {
 	return c.topChannel.Peers() != c.peers
 }
 
-// Register registers a handler on the subchannel for a service+operation pair
-func (c *SubChannel) Register(h Handler, operationName string) {
-	c.handlers.register(h, c.ServiceName(), operationName)
+// Register registers a handler on the subchannel for a service+method pair
+func (c *SubChannel) Register(h Handler, methodName string) {
+	c.handlers.register(h, c.ServiceName(), methodName)
 }
 
 // Logger returns the logger for this subchannel.
@@ -122,10 +123,10 @@ func (c *SubChannel) StatsTags() map[string]string {
 	return tags
 }
 
-// Find if a handler for the given service+operation pair exists
-func (subChMap *subChannelMap) find(serviceName string, operation []byte) Handler {
+// Find if a handler for the given service+method pair exists
+func (subChMap *subChannelMap) find(serviceName string, method []byte) Handler {
 	if sc, ok := subChMap.get(serviceName); ok {
-		return sc.handlers.find(serviceName, operation)
+		return sc.handlers.find(serviceName, method)
 	}
 
 	return nil
@@ -133,8 +134,8 @@ func (subChMap *subChannelMap) find(serviceName string, operation []byte) Handle
 
 // Register a new subchannel for the given serviceName
 func (subChMap *subChannelMap) registerNewSubChannel(serviceName string, ch *Channel) *SubChannel {
-	subChMap.mut.Lock()
-	defer subChMap.mut.Unlock()
+	subChMap.Lock()
+	defer subChMap.Unlock()
 
 	if subChMap.subchannels == nil {
 		subChMap.subchannels = make(map[string]*SubChannel)
@@ -151,9 +152,9 @@ func (subChMap *subChannelMap) registerNewSubChannel(serviceName string, ch *Cha
 
 // Get subchannel if, we have one
 func (subChMap *subChannelMap) get(serviceName string) (*SubChannel, bool) {
-	subChMap.mut.RLock()
+	subChMap.RLock()
 	sc, ok := subChMap.subchannels[serviceName]
-	subChMap.mut.RUnlock()
+	subChMap.RUnlock()
 	return sc, ok
 }
 
@@ -167,13 +168,13 @@ func (subChMap *subChannelMap) getOrAdd(serviceName string, ch *Channel) *SubCha
 }
 
 func (subChMap *subChannelMap) updatePeer(p *Peer) {
-	subChMap.mut.RLock()
+	subChMap.RLock()
 	for _, subCh := range subChMap.subchannels {
 		if subCh.Isolated() {
 			subCh.RLock()
-			subCh.Peers().UpdatePeer(p)
+			subCh.Peers().updatePeer(p)
 			subCh.RUnlock()
 		}
 	}
-	subChMap.mut.RUnlock()
+	subChMap.RUnlock()
 }

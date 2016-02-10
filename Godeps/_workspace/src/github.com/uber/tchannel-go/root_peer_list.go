@@ -92,7 +92,7 @@ func (l *RootPeerList) onConnChange(peer *Peer) {
 	hostPort := peer.HostPort()
 	p, ok := l.Get(hostPort)
 	if !ok {
-		l.channel.Logger().Errorf("got connection state change for a peer not in the root peer list")
+		l.channel.Logger().Error("got connection state change for a peer not in the root peer list")
 		return
 	}
 

@@ -14,8 +14,9 @@ import (
 
 // TChanTCollector is the interface that defines the server handler and client interface.
 type TChanTCollector interface {
-	MultiSubmit(ctx thrift.Context, spans []*Span) ([]*Response, error)
+	GetSamplingStrategy(ctx thrift.Context, serviceName string) (*SamplingStrategyResponse, error)
 	Submit(ctx thrift.Context, span *Span) (*Response, error)
+	SubmitBatch(ctx thrift.Context, spans []*Span) ([]*Response, error)
 }
 
 // Implementation of a client and service handler.
@@ -37,12 +38,12 @@ func NewTChanTCollectorClient(client thrift.TChanClient) TChanTCollector {
 	return NewTChanTCollectorInheritedClient("TCollector", client)
 }
 
-func (c *tchanTCollectorClient) MultiSubmit(ctx thrift.Context, spans []*Span) ([]*Response, error) {
-	var resp TCollectorMultiSubmitResult
-	args := TCollectorMultiSubmitArgs{
-		Spans: spans,
+func (c *tchanTCollectorClient) GetSamplingStrategy(ctx thrift.Context, serviceName string) (*SamplingStrategyResponse, error) {
+	var resp TCollectorGetSamplingStrategyResult
+	args := TCollectorGetSamplingStrategyArgs{
+		ServiceName: serviceName,
 	}
-	success, err := c.client.Call(ctx, c.thriftService, "multi_submit", &args, &resp)
+	success, err := c.client.Call(ctx, c.thriftService, "getSamplingStrategy", &args, &resp)
 	if err == nil && !success {
 	}
 
@@ -55,6 +56,18 @@ func (c *tchanTCollectorClient) Submit(ctx thrift.Context, span *Span) (*Respons
 		Span: span,
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "submit", &args, &resp)
+	if err == nil && !success {
+	}
+
+	return resp.GetSuccess(), err
+}
+
+func (c *tchanTCollectorClient) SubmitBatch(ctx thrift.Context, spans []*Span) ([]*Response, error) {
+	var resp TCollectorSubmitBatchResult
+	args := TCollectorSubmitBatchArgs{
+		Spans: spans,
+	}
+	success, err := c.client.Call(ctx, c.thriftService, "submitBatch", &args, &resp)
 	if err == nil && !success {
 	}
 
@@ -79,33 +92,36 @@ func (s *tchanTCollectorServer) Service() string {
 
 func (s *tchanTCollectorServer) Methods() []string {
 	return []string{
-		"multi_submit",
+		"getSamplingStrategy",
 		"submit",
+		"submitBatch",
 	}
 }
 
 func (s *tchanTCollectorServer) Handle(ctx thrift.Context, methodName string, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
 	switch methodName {
-	case "multi_submit":
-		return s.handleMultiSubmit(ctx, protocol)
+	case "getSamplingStrategy":
+		return s.handleGetSamplingStrategy(ctx, protocol)
 	case "submit":
 		return s.handleSubmit(ctx, protocol)
+	case "submitBatch":
+		return s.handleSubmitBatch(ctx, protocol)
 
 	default:
 		return false, nil, fmt.Errorf("method %v not found in service %v", methodName, s.Service())
 	}
 }
 
-func (s *tchanTCollectorServer) handleMultiSubmit(ctx thrift.Context, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
-	var req TCollectorMultiSubmitArgs
-	var res TCollectorMultiSubmitResult
+func (s *tchanTCollectorServer) handleGetSamplingStrategy(ctx thrift.Context, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
+	var req TCollectorGetSamplingStrategyArgs
+	var res TCollectorGetSamplingStrategyResult
 
 	if err := req.Read(protocol); err != nil {
 		return false, nil, err
 	}
 
 	r, err :=
-		s.handler.MultiSubmit(ctx, req.Spans)
+		s.handler.GetSamplingStrategy(ctx, req.ServiceName)
 
 	if err != nil {
 		return false, nil, err
@@ -126,6 +142,26 @@ func (s *tchanTCollectorServer) handleSubmit(ctx thrift.Context, protocol athrif
 
 	r, err :=
 		s.handler.Submit(ctx, req.Span)
+
+	if err != nil {
+		return false, nil, err
+	} else {
+		res.Success = r
+	}
+
+	return err == nil, &res, nil
+}
+
+func (s *tchanTCollectorServer) handleSubmitBatch(ctx thrift.Context, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
+	var req TCollectorSubmitBatchArgs
+	var res TCollectorSubmitBatchResult
+
+	if err := req.Read(protocol); err != nil {
+		return false, nil, err
+	}
+
+	r, err :=
+		s.handler.SubmitBatch(ctx, req.Spans)
 
 	if err != nil {
 		return false, nil, err
