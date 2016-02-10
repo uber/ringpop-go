@@ -21,7 +21,7 @@ PKGS = $(shell find . -type d -maxdepth 3 \
 	! -path '*/_*' \
 	! -path '*/Godeps*' \
 	! -path '*/test*' \
-	! -path '*/examples*' \
+	! -path '*/gen-go*' \
 )
 
 out:	test
@@ -36,7 +36,7 @@ clean-mocks:
 lint:
 	@:>/tmp/lint.log
 
-	@-golint ./... | grep -Ev '(test|examples)/' | tee -a /tmp/lint.log
+	@-golint ./... | grep -Ev '(test|gen-go)/' | tee -a /tmp/lint.log
 
 	@for pkg in $(PKGS); do \
 		{ \
