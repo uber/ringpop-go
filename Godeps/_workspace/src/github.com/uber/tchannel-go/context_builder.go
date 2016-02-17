@@ -97,6 +97,7 @@ func (cb *ContextBuilder) SetFormat(f Format) *ContextBuilder {
 	return cb
 }
 
+// SetRoutingDelegate sets the RoutingDelegate call options ("rd" transport header).
 func (cb *ContextBuilder) SetRoutingDelegate(rd string) *ContextBuilder {
 	if cb.CallOptions == nil {
 		cb.CallOptions = new(CallOptions)

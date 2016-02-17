@@ -84,7 +84,9 @@ type LogFields []LogField
 // NullLogger is a logger that emits nowhere
 var NullLogger Logger = nullLogger{}
 
-type nullLogger struct{}
+type nullLogger struct {
+	fields LogFields
+}
 
 func (nullLogger) Enabled(_ LogLevel) bool                { return false }
 func (nullLogger) Fatal(msg string)                       { os.Exit(1) }
@@ -94,8 +96,14 @@ func (nullLogger) Infof(msg string, args ...interface{})  {}
 func (nullLogger) Info(msg string)                        {}
 func (nullLogger) Debugf(msg string, args ...interface{}) {}
 func (nullLogger) Debug(msg string)                       {}
-func (nullLogger) Fields() LogFields                      { return nil }
-func (l nullLogger) WithFields(_ ...LogField) Logger      { return l }
+func (l nullLogger) Fields() LogFields                    { return l.fields }
+
+func (l nullLogger) WithFields(fields ...LogField) Logger {
+	newFields := make([]LogField, len(l.Fields())+len(fields))
+	n := copy(newFields, l.Fields())
+	copy(newFields[n:], fields)
+	return nullLogger{newFields}
+}
 
 // SimpleLogger prints logging information to standard out.
 var SimpleLogger = NewLogger(os.Stdout)

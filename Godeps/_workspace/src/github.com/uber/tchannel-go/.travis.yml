@@ -6,7 +6,7 @@ install: make install_ci
 script:
  - make test_ci
  - make cover_ci
- # Travis restores Godeps to the workspace, which we want to ignore.
- - rm -rf Godeps/_workspace
+ # Travis restores Godeps to the workspace, which we want to ignore from lint.
+ - rm -rf Godeps/_workspace/src
  - make lint
 

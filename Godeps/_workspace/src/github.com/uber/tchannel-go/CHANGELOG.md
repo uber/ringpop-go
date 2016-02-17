@@ -1,6 +1,14 @@
 Changelog
 =========
 
+# 1.0.3
+
+* Improved performance when writing Thrift structs
+* Make closing message exchanges less disruptive, changes a panic due to
+  closing a channel twice to an error log.
+* Introspection now includes information about all channels created
+  in the current process.
+
 # 1.0.2
 
 * Extend the `ContextBuilder` API to support setting the transport-level

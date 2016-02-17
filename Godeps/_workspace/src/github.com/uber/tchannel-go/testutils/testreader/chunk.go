@@ -53,6 +53,9 @@ func (r *errorReader) Read(bs []byte) (int, error) {
 		if r.remaining == nil {
 			return 0, ErrUser
 		}
+		if len(r.remaining) == 0 {
+			return 0, nil
+		}
 	}
 
 	n := copy(bs, r.remaining)

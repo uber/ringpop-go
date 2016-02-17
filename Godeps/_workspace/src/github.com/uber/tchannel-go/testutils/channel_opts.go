@@ -66,6 +66,9 @@ type LogFilter struct {
 	// Count is the maximum number of allowed warn+ logs matching
 	// Filter before errors are raised.
 	Count uint
+
+	// FieldFilters specifies expected substring matches for fields.
+	FieldFilters map[string]string
 }
 
 // SetServiceName sets ServiceName.
@@ -124,10 +127,16 @@ func (o *ChannelOpts) DisableLogVerification() *ChannelOpts {
 
 // AddLogFilter sets an allowed filter for warning/error logs and sets
 // the maximum number of times that log can occur.
-func (o *ChannelOpts) AddLogFilter(filter string, maxCount uint) *ChannelOpts {
+func (o *ChannelOpts) AddLogFilter(filter string, maxCount uint, fields ...string) *ChannelOpts {
+	fieldFilters := make(map[string]string)
+	for i := 0; i < len(fields); i += 2 {
+		fieldFilters[fields[i]] = fields[i+1]
+	}
+
 	o.LogVerification.Filters = append(o.LogVerification.Filters, LogFilter{
-		Filter: filter,
-		Count:  maxCount,
+		Filter:       filter,
+		Count:        maxCount,
+		FieldFilters: fieldFilters,
 	})
 	return o
 }
