@@ -38,10 +38,11 @@ type configuration struct {
 	// configuration option. This is to prevent accidental misconfiguration.
 	App string
 
-	// Configure the period by which ringpop emits the stat
-	// "ring.checksum-periodic". See func RingChecksumStatPeriod for
-	// specifics.
-	RingChecksumStatPeriod time.Duration
+	// Configure the period by which ringpop emits the stats
+	// "membership.checksum-periodic" and "ring.checksum-periodic".
+	// See funcs {Membership,Ring}ChecksumStatPeriod for specifics.
+	MembershipChecksumStatPeriod time.Duration
+	RingChecksumStatPeriod       time.Duration
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -90,9 +91,8 @@ func Clock(c clock.Clock) Option {
 	return func(r *Ringpop) error {
 		if c == nil {
 			return errors.New("clock is required")
-		} else {
-			r.clock = c
 		}
+		r.clock = c
 		return nil
 	}
 }
@@ -197,23 +197,38 @@ func IdentityResolverFunc(resolver IdentityResolver) Option {
 	}
 }
 
-// RingChecksumStatPeriodNever defines a "period" which disables
-// ring.checksum-periodic stat emission.
-const RingChecksumStatPeriodNever = time.Duration(-1)
+// StatPeriodNever defines a "period" which disables a periodic stat emission.
+const StatPeriodNever = time.Duration(-1)
 
-// RingChecksumStatPeriodDefault defines the default emission period for the
-// ring.checksum-periodic stat.
-const RingChecksumStatPeriodDefault = time.Duration(5 * time.Second)
+// StatPeriodDefault defines the default emission period for a periodic stat.
+const StatPeriodDefault = time.Duration(5 * time.Second)
 
-// RingChecksumStatPeriod configures the period between emissions of the stat
-// 'ring.checksum-periodic'. Using a value <=0 (or RingChecksumStatPeriodNever)
+// MembershipChecksumStatPeriod configures the period between emissions of the
+// stat 'membership.checksum-periodic'. Using a value <=0 (or StatPeriodNever)
 // will disable emission of this stat. Using a value in (0, 10ms) will return
 // an error, as that value is unrealistically small. Normal values must
-// therefore be >=10ms. RingChecksumStatPeriodDefault defines the default.
+// therefore be >=10ms.  StatPeriodDefault defines the default.
+func MembershipChecksumStatPeriod(period time.Duration) Option {
+	return func(r *Ringpop) error {
+		if period <= 0 {
+			period = StatPeriodNever
+		} else if period < 10*time.Millisecond {
+			return errors.New("membership checksum stat period invalid below 10 ms")
+		}
+		r.config.MembershipChecksumStatPeriod = period
+		return nil
+	}
+}
+
+// RingChecksumStatPeriod configures the period between emissions of the stat
+// 'ring.checksum-periodic'. Using a value <=0 (or StatPeriodNever) will
+// disable emission of this stat. Using a value in (0, 10ms) will return an
+// error, as that value is unrealistically small. Normal values must therefore
+// be >=10ms. StatPeriodDefault defines the default.
 func RingChecksumStatPeriod(period time.Duration) Option {
 	return func(r *Ringpop) error {
 		if period <= 0 {
-			period = RingChecksumStatPeriodNever
+			period = StatPeriodNever
 		} else if period < 10*time.Millisecond {
 			return errors.New("ring checksum stat period invalid below 10 ms")
 		}
@@ -256,8 +271,12 @@ func defaultHashRingOptions(r *Ringpop) error {
 	return HashRingConfig(defaultHashRingConfiguration)(r)
 }
 
+func defaultMembershipChecksumStatPeriod(r *Ringpop) error {
+	return MembershipChecksumStatPeriod(StatPeriodDefault)(r)
+}
+
 func defaultRingChecksumStatPeriod(r *Ringpop) error {
-	return RingChecksumStatPeriod(RingChecksumStatPeriodDefault)(r)
+	return RingChecksumStatPeriod(StatPeriodDefault)(r)
 }
 
 // defaultOptions are the default options/values when Ringpop is created. They
@@ -267,6 +286,7 @@ var defaultOptions = []Option{
 	defaultIdentityResolver,
 	defaultLogLevels,
 	defaultStatter,
+	defaultMembershipChecksumStatPeriod,
 	defaultRingChecksumStatPeriod,
 	defaultHashRingOptions,
 }

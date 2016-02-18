@@ -595,7 +595,9 @@ func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {
 	stats := newDummyStats()
 	s.ringpop.statter = stats
 	s.mockClock.Add(5 * time.Second)
-	_, ok := stats.vals["ringpop.127_0_0_1_3001.ring.checksum-periodic"]
-	s.True(ok, "missing stats for checksums being computed")
+	_, ok := stats.vals["ringpop.127_0_0_1_3001.membership.checksum-periodic"]
+	s.True(ok, "membership checksum stat")
+	_, ok = stats.vals["ringpop.127_0_0_1_3001.ring.checksum-periodic"]
+	s.True(ok, "ring checksum stat")
 	s.ringpop.Destroy()
 }
