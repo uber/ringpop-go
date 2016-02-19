@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# run-vet runs go vet on .go files in the specified directory. It runs the
+# output through lint-warn. It then swaps stdin/stdout so the error output
+# can be tee'd to a file. Warnings are thus printed to stderr.
+#
+set -ueo pipefail
+
+declare script_dir="${0%/*}"
+
+_go-vet() {
+	find "$@" -maxdepth 1 -mindepth 1 -type f -name '*.go' \
+		-exec go tool vet -printfuncs Logf:3 {} + 2>&1 ; \
+}
+
+_lint-warn() {
+	# Run lint-warn, but swap stdout and stderr
+	"$script_dir"/lint-warn "$script_dir"/lint-excludes 3>&2 2>&1 1>&3
+}
+
+_go-vet "$@" | _lint-warn

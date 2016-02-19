@@ -39,10 +39,7 @@ lint:
 	@-golint ./... | grep -Ev '(test|gen-go)/' | tee -a lint.log
 
 	@for pkg in $(PKGS); do \
-		{ \
-			 find $$pkg -maxdepth 1 -mindepth 1 -type f -name '*.go' \
-				-exec go tool vet -printfuncs Logf:3 {} + 2>&1 ; \
-		} | tee -a lint.log ; \
+		scripts/lint/run-vet "$$pkg" | tee -a lint.log; \
 	done;
 
 	@[ ! -s lint.log ]
