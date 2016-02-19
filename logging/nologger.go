@@ -44,4 +44,6 @@ func (l noLogger) WithField(key string, value interface{}) bark.Logger { return 
 func (l noLogger) WithFields(keyValues bark.LogFields) bark.Logger     { return l }
 func (l noLogger) Fields() bark.Fields                                 { return nil }
 
+// NoLogger is the default logger used by logging facilities when a logger
+// is not passed.
 var NoLogger = noLogger{}

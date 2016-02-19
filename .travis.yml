@@ -11,8 +11,10 @@ before_script:
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
   - go get github.com/vektra/mockery/.../
+  - go get github.com/golang/lint/golint
 
 env:
+  - RUN="make lint"
   - RUN="make test-unit"
   - RUN="make test-integration"
   - RUN=test/update-coveralls

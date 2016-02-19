@@ -203,11 +203,11 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.failed.destroyed"], "missing stats for join failed due to error")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.JoinTriesUpdateEvent{1})
+	s.ringpop.HandleEvent(swim.JoinTriesUpdateEvent{Retries: 1})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.join.retries"], "missing stats for join retries")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.JoinTriesUpdateEvent{2})
+	s.ringpop.HandleEvent(swim.JoinTriesUpdateEvent{Retries: 2})
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.join.retries"], "join tries didn't update")
 	// expected listener to record 1 event
 
@@ -218,19 +218,19 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.lookup"], "missing lookup timer")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Alive})
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Alive})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-alive"], "missing make-alive stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Faulty})
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Faulty})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-faulty"], "missing make-faulty stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Suspect})
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Suspect})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-suspect"], "missing make-suspect stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{swim.Leave})
+	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Leave})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.make-leave"], "missing make-leave stat")
 	// expected listener to record 1 event
 
@@ -243,11 +243,11 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(3000), stats.vals["ringpop.127_0_0_1_3001.compute-checksum"], "missing compute-checksum stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.RequestBeforeReadyEvent{swim.PingEndpoint})
+	s.ringpop.HandleEvent(swim.RequestBeforeReadyEvent{Endpoint: swim.PingEndpoint})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.not-ready.ping"], "missing not-ready.ping stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.RequestBeforeReadyEvent{swim.PingReqEndpoint})
+	s.ringpop.HandleEvent(swim.RequestBeforeReadyEvent{Endpoint: swim.PingReqEndpoint})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.not-ready.ping-req"], "missing not-ready.ping-req stat")
 	// expected listener to record 1 event
 
@@ -271,20 +271,20 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	// forward.InflightRequestsChangedEvent:
-	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{5})
+	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{Inflight: 5})
 	s.Equal(int64(5), stats.vals["ringpop.127_0_0_1_3001.requestProxy.inflight"], "missing requestProxy.inflight stat")
 	// expected listener to record 1 event
 
 	// test an update on the Inflight requests count
-	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{4})
+	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{Inflight: 4})
 	s.Equal(int64(4), stats.vals["ringpop.127_0_0_1_3001.requestProxy.inflight"], "missing requestProxy.inflight stat (update)")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{forward.InflightIncrement})
+	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{Operation: forward.InflightIncrement})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.miscount.increment"], "missing requestProxy.miscount.increment stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{forward.InflightDecrement})
+	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{Operation: forward.InflightDecrement})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.miscount.decrement"], "missing requestProxy.miscount.decrement stat")
 	// expected listener to record 1 event
 
@@ -296,7 +296,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.send.error"], "missing requestProxy.send.error stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(forward.MaxRetriesEvent{3})
+	s.ringpop.HandleEvent(forward.MaxRetriesEvent{MaxRetries: 3})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.failed"], "missing requestProxy.retry.failed stat")
 	// expected listener to record 1 event
 
@@ -309,15 +309,21 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	me, _ := s.ringpop.WhoAmI()
-	s.ringpop.HandleEvent(forward.RerouteEvent{genAddresses(1, 1, 1)[0], me})
+	s.ringpop.HandleEvent(forward.RerouteEvent{
+		OldDestination: genAddresses(1, 1, 1)[0],
+		NewDestination: me,
+	})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.reroute.local"], "missing requestProxy.retry.reroute.local stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(forward.RerouteEvent{genAddresses(1, 1, 1)[0], genAddresses(1, 2, 2)[0]})
+	s.ringpop.HandleEvent(forward.RerouteEvent{
+		OldDestination: genAddresses(1, 1, 1)[0],
+		NewDestination: genAddresses(1, 2, 2)[0],
+	})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.reroute.remote"], "missing requestProxy.retry.reroute.remote stat")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(forward.RetrySuccessEvent{1})
+	s.ringpop.HandleEvent(forward.RetrySuccessEvent{NumRetries: 1})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.requestProxy.retry.succeeded"], "missing requestProxy.retry.reroute.remote stat")
 	// expected listener to record 1 event
 

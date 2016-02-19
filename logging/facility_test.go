@@ -59,8 +59,8 @@ func (s *LogFacilityTestSuite) TestForwarding() {
 		s.mockLogger.AssertCalled(s.T(), "WithFields", fields)
 
 		fields = bark.Fields{"b": 2}
-		s.facility.Logf("name", level, fields, "format", msg)
-		s.mockLogger.AssertCalled(s.T(), methName+"f", "format", msg)
+		s.facility.Logf("name", level, fields, "format %s", msg)
+		s.mockLogger.AssertCalled(s.T(), methName+"f", "format %s", msg)
 		s.mockLogger.AssertCalled(s.T(), "WithFields", fields)
 	}
 }
@@ -87,9 +87,9 @@ func (s *LogFacilityTestSuite) TestSetLevels() {
 func (s *LogFacilityTestSuite) afterLevelIsSet() {
 	msg := []interface{}{"msg"}
 	s.facility.Log("name", Debug, nil, msg)
-	s.facility.Logf("name", Debug, nil, "format", msg)
+	s.facility.Logf("name", Debug, nil, "format %s", msg)
 	s.mockLogger.AssertNotCalled(s.T(), "Debug", msg)
-	s.mockLogger.AssertNotCalled(s.T(), "Debugf", "format", msg)
+	s.mockLogger.AssertNotCalled(s.T(), "Debugf", "format %s", msg)
 }
 
 func (s *LogFacilityTestSuite) TestSetLevelError() {

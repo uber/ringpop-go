@@ -113,7 +113,10 @@ func (r *HashRing) AddServer(address string) bool {
 	ok := r.addServerNoLock(address)
 	if ok {
 		r.computeChecksumNoLock()
-		r.emit(events.RingChangedEvent{[]string{address}, nil})
+		r.emit(events.RingChangedEvent{
+			ServersAdded:   []string{address},
+			ServersRemoved: nil,
+		})
 	}
 	r.Unlock()
 	return ok
@@ -144,7 +147,10 @@ func (r *HashRing) RemoveServer(address string) bool {
 	ok := r.removeServerNoLock(address)
 	if ok {
 		r.computeChecksumNoLock()
-		r.emit(events.RingChangedEvent{nil, []string{address}})
+		r.emit(events.RingChangedEvent{
+			ServersAdded:   nil,
+			ServersRemoved: []string{address},
+		})
 	}
 	r.Unlock()
 	return ok
@@ -196,7 +202,10 @@ func (r *HashRing) addRemoveServersNoLock(add []string, remove []string) bool {
 
 	if changed {
 		r.computeChecksumNoLock()
-		r.emit(events.RingChangedEvent{add, remove})
+		r.emit(events.RingChangedEvent{
+			ServersAdded:   add,
+			ServersRemoved: remove,
+		})
 	}
 	return changed
 }

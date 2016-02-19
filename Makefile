@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks testpop mocks out setup test test-integration test-unit
+.PHONY: clean clean-mocks testpop lint mocks out setup test test-integration test-unit
 
 SHELL = /bin/bash
 
@@ -12,7 +12,17 @@ export GOPATH = $(GODEPS):$(USER_GOPATH)
 
 DEV_DEPS = github.com/uber/tchannel-go/thrift/thrift-gen \
 		   github.com/vektra/mockery/... \
-		   github.com/tools/godep
+		   github.com/tools/godep \
+		   github.com/golang/lint/golint
+
+# Automatically gather packages
+PKGS = $(shell find . -type d -maxdepth 3 \
+	! -path '*/.git*' \
+	! -path '*/_*' \
+	! -path '*/Godeps*' \
+	! -path '*/test*' \
+	! -path '*/gen-go*' \
+)
 
 out:	test
 
@@ -23,6 +33,18 @@ clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
 	rm -rf test/thrift/pingpong/
 
+lint:
+	@:>lint.log
+
+	@-golint ./... | grep -Ev '(test|gen-go)/' | tee -a lint.log
+
+	@for pkg in $(PKGS); do \
+		scripts/lint/run-vet "$$pkg" | tee -a lint.log; \
+	done;
+
+	@[ ! -s lint.log ]
+	@rm -f lint.log
+
 mocks:
 	test/gen-testfiles
 
@@ -32,6 +54,8 @@ setup:
 		echo "thrift not in PATH. (brew install thrift?)" >&2; \
  		exit 1; \
 	fi
+
+	ln -s ../../scripts/pre-commit .git/hooks/pre-commit
 
 test:	test-unit test-integration
 

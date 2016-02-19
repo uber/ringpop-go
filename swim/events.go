@@ -130,7 +130,7 @@ type PingRequestsSendEvent struct {
 	Peers  []string `json:"peers"`
 }
 
-// A PingRequestSendError is sent when the node can't get a response sending ping requests to remote nodes
+// A PingRequestSendErrorEvent is sent when the node can't get a response sending ping requests to remote nodes
 type PingRequestSendErrorEvent struct {
 	Local  string   `json:"local"`
 	Target string   `json:"target"`
