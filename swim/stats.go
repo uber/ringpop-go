@@ -38,6 +38,11 @@ type MemberStats struct {
 	Members  []Member `json:"members"`
 }
 
+// GetChecksum returns the current checksum of the node's memberlist.
+func (n *Node) GetChecksum() uint32 {
+	return n.memberlist.Checksum()
+}
+
 // MemberStats returns the current checksum of the node's memberlist and a slice
 // of the members in the memberlist in lexographically sorted order by address
 func (n *Node) MemberStats() MemberStats {

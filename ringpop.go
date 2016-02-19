@@ -191,9 +191,22 @@ func (rp *Ringpop) startTimers() {
 	if rp.tickers != nil {
 		return
 	}
-	rp.tickers = make(chan *clock.Ticker, 1) // 1 == max number of tickers
+	rp.tickers = make(chan *clock.Ticker, 32) // 32 == max number of tickers
 
-	if rp.config.RingChecksumStatPeriod != RingChecksumStatPeriodNever {
+	if rp.config.MembershipChecksumStatPeriod != StatPeriodNever {
+		ticker := rp.clock.Ticker(rp.config.MembershipChecksumStatPeriod)
+		rp.tickers <- ticker
+		go func() {
+			for _ = range ticker.C {
+				rp.statter.UpdateGauge(
+					rp.getStatKey("membership.checksum-periodic"),
+					nil,
+					int64(rp.node.GetChecksum()))
+			}
+		}()
+	}
+
+	if rp.config.RingChecksumStatPeriod != StatPeriodNever {
 		ticker := rp.clock.Ticker(rp.config.RingChecksumStatPeriod)
 		rp.tickers <- ticker
 		go func() {

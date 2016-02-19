@@ -191,24 +191,24 @@ func (s *RingpopOptionsTestSuite) TestClockNil() {
 func (s *RingpopOptionsTestSuite) TestDefaultRingChecksumStatPeriod() {
 	rp, err := New("test", Channel(s.channel))
 	s.NoError(err)
-	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodDefault)
+	s.Equal(rp.config.RingChecksumStatPeriod, StatPeriodDefault)
 }
 
 // TestDisabledRingChecksumStat confirms that disabled switch stays disabled.
 func (s *RingpopOptionsTestSuite) TestDisabledRingChecksumStat() {
 	tchan := Channel(s.channel)
 
-	rp, err := New("test", tchan, RingChecksumStatPeriod(RingChecksumStatPeriodNever))
+	rp, err := New("test", tchan, RingChecksumStatPeriod(StatPeriodNever))
 	s.NoError(err)
-	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodNever)
+	s.Equal(rp.config.RingChecksumStatPeriod, StatPeriodNever)
 
 	rp, err = New("test", tchan, RingChecksumStatPeriod(0))
 	s.NoError(err)
-	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodNever)
+	s.Equal(rp.config.RingChecksumStatPeriod, StatPeriodNever)
 
 	rp, err = New("test", tchan, RingChecksumStatPeriod(-23))
 	s.NoError(err)
-	s.Equal(rp.config.RingChecksumStatPeriod, RingChecksumStatPeriodNever)
+	s.Equal(rp.config.RingChecksumStatPeriod, StatPeriodNever)
 }
 
 // TestSpecifiedRingChecksumStatPeriod confirms that sane periods pass through.

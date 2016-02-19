@@ -112,6 +112,7 @@ type NodeInterface interface {
 	Bootstrap(opts *BootstrapOptions) ([]string, error)
 	CountReachableMembers() int
 	Destroy()
+	GetChecksum() uint32
 	GetReachableMembers() []string
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
