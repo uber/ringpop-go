@@ -23,6 +23,7 @@ package tchannel
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	"github.com/uber/tchannel-go/typed"
 	"golang.org/x/net/context"
@@ -53,6 +54,9 @@ type messageExchange struct {
 	msgType   messageType
 	mexset    *messageExchangeSet
 	framePool FramePool
+
+	// shutdownAtomic is an atomically updated uint32.
+	shutdownAtomic uint32
 }
 
 // forwardPeerFrame forwards a frame from a peer to the message exchange, where
@@ -136,7 +140,11 @@ func (mex *messageExchange) recvPeerFrameOfType(msgType messageType) (*Frame, er
 // receive channel remains open, however, in case there are concurrent
 // goroutines sending to it.
 func (mex *messageExchange) shutdown() {
-	mex.mexset.removeExchange(mex.msgID)
+	// The reader and writer side can both hit errors and try to shutdown the mex,
+	// so we ensure that it's only shut down once.
+	if atomic.CompareAndSwapUint32(&mex.shutdownAtomic, 0, 1) {
+		mex.mexset.removeExchange(mex.msgID)
+	}
 }
 
 // inboundTimeout is called when an exchange times out, but a handler may still be
@@ -164,8 +172,19 @@ type messageExchangeSet struct {
 	onAdded    func()
 	sendChRefs sync.WaitGroup
 
-	// exchanges is mutable, and is protected by the mutex.
-	exchanges map[uint32]*messageExchange
+	// maps are mutable, and are protected by the mutex.
+	exchanges        map[uint32]*messageExchange
+	timeoutExchanges map[uint32]struct{}
+}
+
+// newMessageExchangeSet creates a new messageExchangeSet with a given name.
+func newMessageExchangeSet(log Logger, name string) *messageExchangeSet {
+	return &messageExchangeSet{
+		name:             name,
+		log:              log.WithFields(LogField{"exchange", name}),
+		exchanges:        make(map[uint32]*messageExchange),
+		timeoutExchanges: make(map[uint32]struct{}),
+	}
 }
 
 // newExchange creates and adds a new message exchange to this set
@@ -186,19 +205,11 @@ func (mexset *messageExchangeSet) newExchange(ctx context.Context, framePool Fra
 
 	mexset.Lock()
 	if existingMex := mexset.exchanges[mex.msgID]; existingMex != nil {
-		if existingMex == mex {
-			mexset.log.WithFields(
-				LogField{"name", mexset.name},
-				LogField{"msgType", mex.msgType},
-				LogField{"msgID", mex.msgID},
-			).Warn("mex registered multiple times.")
-		} else {
-			mexset.log.WithFields(
-				LogField{"msgID", mex.msgID},
-				LogField{"existingType", existingMex.msgType},
-				LogField{"newType", mex.msgType},
-			).Warn("Duplicate msg ID for active and new mex.")
-		}
+		mexset.log.WithFields(
+			LogField{"msgID", mex.msgID},
+			LogField{"existingType", existingMex.msgType},
+			LogField{"newType", mex.msgType},
+		).Warn("Duplicate msg ID for active and new mex.")
 
 		mexset.Unlock()
 		return nil, errDuplicateMex
@@ -214,6 +225,22 @@ func (mexset *messageExchangeSet) newExchange(ctx context.Context, framePool Fra
 	return mex, nil
 }
 
+// deleteExchange will delete msgID, and return whether it was found or whether it was
+// timed out. This method must be called with the lock.
+func (mexset *messageExchangeSet) deleteExchange(msgID uint32) (found, timedOut bool) {
+	if _, found := mexset.exchanges[msgID]; found {
+		delete(mexset.exchanges, msgID)
+		return true, false
+	}
+
+	if _, timedOut := mexset.timeoutExchanges[msgID]; timedOut {
+		delete(mexset.timeoutExchanges, msgID)
+		return false, true
+	}
+
+	return false, false
+}
+
 // removeExchange removes a message exchange from the set, if it exists.
 // It decrements the sendChRefs wait group, signalling that this exchange no longer has
 // any active goroutines that will try to send to sendCh.
@@ -223,21 +250,39 @@ func (mexset *messageExchangeSet) removeExchange(msgID uint32) {
 	}
 
 	mexset.Lock()
-	delete(mexset.exchanges, msgID)
+	found, timedOut := mexset.deleteExchange(msgID)
 	mexset.Unlock()
 
+	if !found && !timedOut {
+		mexset.log.WithFields(
+			LogField{"msgID", msgID},
+		).Error("Tried to remove exchange multiple times")
+		return
+	}
+
+	// If the message exchange was found, then we perform clean up actions.
+	// These clean up actions can only be run once per exchange.
 	mexset.sendChRefs.Done()
 	mexset.onRemoved()
 }
 
 // timeoutExchange is similar to removeExchange, however it does not decrement
-// the sendChRefs wait group.
+// the sendChRefs wait group, since there could still be a handler running that
+// will write to the send channel.
 func (mexset *messageExchangeSet) timeoutExchange(msgID uint32) {
 	mexset.log.Debugf("Removing %s message exchange %d due to timeout", mexset.name, msgID)
 
 	mexset.Lock()
-	delete(mexset.exchanges, msgID)
+	found, timedOut := mexset.deleteExchange(msgID)
+	if found || timedOut {
+		// Record in timeoutExchange if we deleted the exchange.
+		mexset.timeoutExchanges[msgID] = struct{}{}
+	}
 	mexset.Unlock()
+
+	if timedOut {
+		mexset.log.WithFields(LogField{"msgID", msgID}).Error("Exchange timed out already")
+	}
 
 	mexset.onRemoved()
 }

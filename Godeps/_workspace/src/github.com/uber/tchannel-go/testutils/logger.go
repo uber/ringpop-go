@@ -21,12 +21,44 @@
 package testutils
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/uber/tchannel-go"
 )
+
+// Matches returns true if the message and fields match the filter.
+func (f LogFilter) Matches(msg string, fields tchannel.LogFields) bool {
+	// First check the message and ensure it contains Filter
+	if !strings.Contains(msg, f.Filter) {
+		return false
+	}
+
+	// if there are no field filters, then the message match is enough.
+	if len(f.FieldFilters) == 0 {
+		return true
+	}
+
+	fieldsMap := make(map[string]interface{})
+	for _, field := range fields {
+		fieldsMap[field.Key] = field.Value
+	}
+
+	for k, filter := range f.FieldFilters {
+		value, ok := fieldsMap[k]
+		if !ok {
+			return false
+		}
+
+		if !strings.Contains(fmt.Sprint(value), filter) {
+			return false
+		}
+	}
+
+	return true
+}
 
 type errorLoggerState struct {
 	matchCount []uint32
@@ -43,7 +75,7 @@ type errorLogger struct {
 func (l errorLogger) checkFilters(msg string) bool {
 	match := -1
 	for i, filter := range l.v.Filters {
-		if strings.Contains(msg, filter.Filter) {
+		if filter.Matches(msg, l.Fields()) {
 			match = i
 		}
 	}
@@ -60,7 +92,7 @@ func (l errorLogger) checkErr(prefix, msg string) {
 		return
 	}
 
-	l.t.Errorf("%v: %s %v", prefix, msg, l.Fields())
+	l.t.Errorf("%v: %s %v", prefix, msg, l.Logger.Fields())
 }
 
 func (l errorLogger) Fatal(msg string) {

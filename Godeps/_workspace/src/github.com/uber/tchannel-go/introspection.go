@@ -38,6 +38,9 @@ type IntrospectionOptions struct {
 
 // RuntimeState is a snapshot of the runtime state for a channel.
 type RuntimeState struct {
+	// CreatedStack is the stack for how this channel was created.
+	CreatedStack string `json:"createdStack"`
+
 	// LocalPeer is the local peer information (service name, host-port, etc).
 	LocalPeer LocalPeerInfo `json:"localPeer"`
 
@@ -52,12 +55,21 @@ type RuntimeState struct {
 
 	// NumConnections is the number of connections stored in the channel.
 	NumConnections int `json:"numConnections"`
+
+	// OtherChannels is information about any other channels running in this process.
+	OtherChannels map[string][]ChannelInfo `json:"otherChannels,omitEmpty"`
 }
 
 // GoRuntimeStateOptions are the options used when getting Go runtime state.
 type GoRuntimeStateOptions struct {
 	// IncludeGoStacks will include all goroutine stacks.
 	IncludeGoStacks bool `json:"includeGoStacks"`
+}
+
+// ChannelInfo is the state of other channels in the same process.
+type ChannelInfo struct {
+	CreatedStack string        `json:"createdStack"`
+	LocalPeer    LocalPeerInfo `json:"localPeer"`
 }
 
 // GoRuntimeState is a snapshot of runtime stats from the runtime.
@@ -128,11 +140,41 @@ func (ch *Channel) IntrospectState(opts *IntrospectionOptions) *RuntimeState {
 	ch.mutable.RUnlock()
 
 	return &RuntimeState{
+		CreatedStack:   ch.createdStack,
 		LocalPeer:      ch.PeerInfo(),
 		SubChannels:    ch.subChannels.IntrospectState(opts),
 		RootPeers:      ch.rootPeers().IntrospectState(opts),
 		Peers:          ch.Peers().IntrospectList(opts),
 		NumConnections: conns,
+		OtherChannels:  ch.IntrospectOthers(opts),
+	}
+}
+
+// IntrospectOthers returns the ChannelInfo for all other channels in this process.
+func (ch *Channel) IntrospectOthers(opts *IntrospectionOptions) map[string][]ChannelInfo {
+	channelMap.Lock()
+	defer channelMap.Unlock()
+
+	states := make(map[string][]ChannelInfo)
+	for svc, channels := range channelMap.existing {
+		channelInfos := make([]ChannelInfo, 0, len(channels))
+		for _, otherChan := range channels {
+			if ch == otherChan {
+				continue
+			}
+			channelInfos = append(channelInfos, otherChan.ReportInfo(opts))
+		}
+		states[svc] = channelInfos
+	}
+
+	return states
+}
+
+// ReportInfo returns ChannelInfo for a channel.
+func (ch *Channel) ReportInfo(opts *IntrospectionOptions) ChannelInfo {
+	return ChannelInfo{
+		CreatedStack: ch.createdStack,
+		LocalPeer:    ch.PeerInfo(),
 	}
 }
 

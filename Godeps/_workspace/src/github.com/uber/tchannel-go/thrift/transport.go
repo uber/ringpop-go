@@ -21,6 +21,7 @@
 package thrift
 
 import (
+	"errors"
 	"io"
 	"sync"
 
@@ -31,7 +32,11 @@ import (
 type readWriterTransport struct {
 	io.Writer
 	io.Reader
+	readBuf  [1]byte
+	writeBuf [1]byte
 }
+
+var errNoBytesRead = errors.New("no bytes read")
 
 func (t *readWriterTransport) Open() error {
 	return nil
@@ -49,6 +54,37 @@ func (t *readWriterTransport) Close() error {
 	return nil
 }
 
+func (t *readWriterTransport) ReadByte() (byte, error) {
+	v := t.readBuf[0:1]
+
+	var n int
+	var err error
+
+	for {
+		n, err = t.Read(v)
+		if n > 0 || err != nil {
+			break
+		}
+	}
+
+	if err == io.EOF && n > 0 {
+		err = nil
+	}
+	return v[0], err
+}
+
+func (t *readWriterTransport) WriteByte(b byte) error {
+	v := t.writeBuf[:1]
+
+	v[0] = b
+	_, err := t.Write(v)
+	return err
+}
+
+func (t *readWriterTransport) WriteString(s string) (int, error) {
+	return io.WriteString(t.Writer, s)
+}
+
 // RemainingBytes returns the max number of bytes (same as Thrift's StreamTransport) as we
 // do not know how many bytes we have left.
 func (t *readWriterTransport) RemainingBytes() uint64 {
@@ -56,7 +92,7 @@ func (t *readWriterTransport) RemainingBytes() uint64 {
 	return maxSize
 }
 
-var _ thrift.TTransport = &readWriterTransport{}
+var _ thrift.TRichTransport = &readWriterTransport{}
 
 type thriftProtocol struct {
 	transport *readWriterTransport

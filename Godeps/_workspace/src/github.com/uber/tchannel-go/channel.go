@@ -114,6 +114,7 @@ const (
 type Channel struct {
 	channelConnectionCommon
 
+	createdStack      string
 	commonStatsTags   map[string]string
 	connectionOptions ConnectionOptions
 	handlers          *handlerMap
@@ -215,6 +216,8 @@ func NewChannel(serviceName string, opts *ChannelOptions) (*Channel, error) {
 	ch.traceReporter = traceReporter
 
 	ch.registerInternal()
+
+	registerNewChannel(ch)
 	return ch, nil
 }
 
@@ -622,4 +625,5 @@ func (ch *Channel) Close() {
 	for _, c := range connections {
 		c.Close()
 	}
+	removeClosedChannel(ch)
 }

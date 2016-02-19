@@ -146,8 +146,8 @@ type Connection struct {
 	sendCh          chan *Frame
 	state           connectionState
 	stateMut        sync.RWMutex
-	inbound         messageExchangeSet
-	outbound        messageExchangeSet
+	inbound         *messageExchangeSet
+	outbound        *messageExchangeSet
 	handlers        *handlerMap
 	nextMessageID   uint32
 	events          connectionEvents
@@ -245,23 +245,15 @@ func (ch *Channel) newConnection(conn net.Conn, initialState connectionState, ev
 	c := &Connection{
 		channelConnectionCommon: ch.channelConnectionCommon,
 
-		connID:        connID,
-		conn:          conn,
-		framePool:     framePool,
-		state:         initialState,
-		sendCh:        make(chan *Frame, sendBufferSize),
-		localPeerInfo: peerInfo,
-		checksumType:  checksumType,
-		inbound: messageExchangeSet{
-			name:      messageExchangeSetInbound,
-			log:       log.WithFields(LogField{"exchange", messageExchangeSetInbound}),
-			exchanges: make(map[uint32]*messageExchange),
-		},
-		outbound: messageExchangeSet{
-			name:      messageExchangeSetOutbound,
-			log:       log.WithFields(LogField{"exchange", messageExchangeSetOutbound}),
-			exchanges: make(map[uint32]*messageExchange),
-		},
+		connID:          connID,
+		conn:            conn,
+		framePool:       framePool,
+		state:           initialState,
+		sendCh:          make(chan *Frame, sendBufferSize),
+		localPeerInfo:   peerInfo,
+		checksumType:    checksumType,
+		inbound:         newMessageExchangeSet(log, messageExchangeSetInbound),
+		outbound:        newMessageExchangeSet(log, messageExchangeSetOutbound),
 		handlers:        ch.handlers,
 		events:          events,
 		commonStatsTags: ch.commonStatsTags,
@@ -768,13 +760,14 @@ func (c *Connection) checkExchanges() {
 	if updated != 0 {
 		// If the connection is closed, we can safely close the channel.
 		if updated == connectionClosed {
-			go func() {
+			// Pass connID on the stack so can more easily debug panics or leaked goroutines.
+			go func(connID uint32) {
 				// We cannot close sendCh until we are sure that there are no other goroutines
 				// that may try to write to sendCh.
 				c.inbound.waitForSendCh()
 				c.outbound.waitForSendCh()
 				close(c.sendCh)
-			}()
+			}(c.connID)
 		}
 
 		c.log.Debugf("checkExchanges updated connection state to %v", updated)
