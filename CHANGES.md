@@ -1,12 +1,32 @@
 ringpop-go changes
 ==================
 
+v0.3.0
+------
+
+* Fix "keys have diverged" forwarding error for retries #69
+* Fix possible race in disseminator #86
+* Fix possible issue with leave state not being applied correctly #94
+* Fix issues where unnecessary full syncs could occur #95, #97
+* Improvements to join:
+    * Join retries now have exponential backoff #68
+    * Improved resilience to possible partitions at startup #65
+    * Reduce network chatter on join #85
+* Hashring performance improvements (see discussion on [#58](https://github.com/uber/ringpop-go/pull/58#issuecomment-169653883)) #58
+* Revamped logging; new logger options #83
+* New stats to aid partition detection #92, #104
+* Improved test coverage across the board
+* Update and test with latest TChannel (v1.0.3) #103
+* Various fixes and improvements to test infrastructure
+
+
 v0.2.3
 ------
 
 * Fix retry mechanism for forwarded requests. When multiple keys are forwarded
 and a retry is attempted, the retry would fail with a "key destinations have
 diverged" error.
+
 
 v0.2.2
 ------
