@@ -71,11 +71,13 @@ func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
 	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
+	oldChecksum := m.members.checksum
 	m.members.checksum = checksum
 	m.members.Unlock()
 	m.node.emit(ChecksumComputeEvent{
-		Duration: time.Now().Sub(startTime),
-		Checksum: checksum,
+		Duration:    time.Now().Sub(startTime),
+		Checksum:    checksum,
+		OldChecksum: oldChecksum,
 	})
 }
 
@@ -212,7 +214,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		}
 	}
 
-	return m.Update([]Change{Change{
+	changes := m.Update([]Change{Change{
 		Source:            m.local.Address,
 		SourceIncarnation: m.local.Incarnation,
 		Address:           address,
@@ -220,6 +222,12 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		Status:            status,
 		Timestamp:         util.Timestamp(time.Now()),
 	}})
+
+	if len(changes) > 0 {
+		m.node.emit(ChangeMadeEvent{changes[0]})
+	}
+
+	return changes
 }
 
 // updates the member list with the slice of changes, applying selectively
@@ -271,12 +279,22 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	if len(applied) > 0 {
 		oldChecksum := m.Checksum()
 		m.ComputeChecksum()
-		m.node.emit(MemberlistChangesAppliedEvent{
-			Changes:     applied,
-			OldChecksum: oldChecksum,
-			NewChecksum: m.Checksum(),
-			NumMembers:  m.NumMembers(),
-		})
+
+		// XXX throw away.
+		event := MemberlistChangesAppliedEvent{
+			Changes:       applied,
+			OldChecksum:   oldChecksum,
+			NewChecksum:   m.Checksum(),
+			NumMembers:    m.NumMembers(),
+			CountByStatus: map[string]int{Alive: 0, Suspect: 0, Faulty: 0, Leave: 0},
+		}
+		m.members.RLock()
+		for _, member := range m.members.list {
+			event.CountByStatus[member.Status]++
+		}
+		m.members.RUnlock()
+
+		m.node.emit(event)
 		m.node.handleChanges(applied)
 		m.node.rollup.TrackUpdates(applied)
 	}
