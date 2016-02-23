@@ -45,6 +45,14 @@ type memberlist struct {
 		checksum  uint32
 		sync.RWMutex
 	}
+
+	// TODO: rework locking in ringpop-go (see #113). Required for Update().
+
+	// Updates to membership list and hash ring should happen atomically. We
+	// could use members lock for that, but that introduces more deadlocks, so
+	// making a short-term fix instead by adding another lock. Like said, this
+	// is short-term, see github#113.
+	sync.Mutex
 }
 
 // newMemberlist returns a new member list
@@ -230,6 +238,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
+	m.Lock()
 	m.members.Lock()
 
 	for _, change := range changes {
@@ -281,6 +290,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		m.node.rollup.TrackUpdates(applied)
 	}
 
+	m.Unlock()
 	return applied
 }
 
