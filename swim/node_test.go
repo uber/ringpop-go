@@ -59,11 +59,11 @@ func (s *NodeTestSuite) TestStartStop() {
 
 	s.True(s.testNode.node.gossip.Stopped(), "gossip should be stopped")
 	s.True(s.testNode.node.Stopped(), "node should be stopped")
-	s.False(s.testNode.node.suspicion.enabled, "suspicion should not be enabled")
+	s.False(s.testNode.node.stateTransitions.enabled, "suspicion should not be enabled")
 
 	s.testNode.node.Start()
 
-	s.True(s.testNode.node.suspicion.enabled, "suspicon should be enabled")
+	s.True(s.testNode.node.stateTransitions.enabled, "suspicon should be enabled")
 	s.False(s.testNode.node.Stopped(), "node should not be stopped")
 	s.False(s.testNode.node.gossip.Stopped(), "gossip should not be stopped")
 }
@@ -77,7 +77,7 @@ func (s *NodeTestSuite) TestStoppedBootstrapOption() {
 	s.True(s.testNode.node.gossip.Stopped(), "gossip should be stopped")
 	// TODO: Should these also be stopped?
 	//s.True(s.testNode.node.Stopped(), "node should be stopped")
-	//s.False(s.testNode.node.suspicion.enabled, "suspicion should not be enabled")
+	//s.False(s.testNode.node.stateTransitions.enabled, "suspicion should not be enabled")
 }
 
 func TestNodeTestSuite(t *testing.T) {

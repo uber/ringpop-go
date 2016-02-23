@@ -118,7 +118,7 @@ func (s *GossipTestSuite) TestSuspicionStarted() {
 
 	s.g.ProtocolPeriod()
 
-	s.NotNil(s.node.suspicion.Timer("127.0.0.1:3010"), "expected suspicion timer to be set")
+	s.NotNil(s.node.stateTransitions.timer("127.0.0.1:3010"), "expected state timer to be set")
 }
 
 func TestGossipTestSuite(t *testing.T) {

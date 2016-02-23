@@ -40,7 +40,7 @@ var (
 
 // Options is a configuration struct passed the NewNode constructor.
 type Options struct {
-	SuspicionTimeout  time.Duration
+	StateTimeouts     StateTimeouts
 	MinProtocolPeriod time.Duration
 
 	JoinTimeout, PingTimeout, PingRequestTimeout time.Duration
@@ -55,7 +55,10 @@ type Options struct {
 
 func defaultOptions() *Options {
 	opts := &Options{
-		SuspicionTimeout:  5000 * time.Millisecond,
+		StateTimeouts: StateTimeouts{
+			Suspect: 5000 * time.Millisecond,
+		},
+
 		MinProtocolPeriod: 200 * time.Millisecond,
 
 		JoinTimeout:        1000 * time.Millisecond,
@@ -80,8 +83,7 @@ func mergeDefaultOptions(opts *Options) *Options {
 		return def
 	}
 
-	opts.SuspicionTimeout = util.SelectDuration(opts.SuspicionTimeout,
-		def.SuspicionTimeout)
+	opts.StateTimeouts = mergeStateTimeouts(opts.StateTimeouts, def.StateTimeouts)
 
 	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod,
 		def.MinProtocolPeriod)
@@ -130,13 +132,13 @@ type Node struct {
 		sync.RWMutex
 	}
 
-	channel      shared.SubChannel
-	memberlist   *memberlist
-	memberiter   memberIter
-	disseminator *disseminator
-	suspicion    *suspicion
-	gossip       *gossip
-	rollup       *updateRollup
+	channel          shared.SubChannel
+	memberlist       *memberlist
+	memberiter       memberIter
+	disseminator     *disseminator
+	stateTransitions *stateTransitions
+	gossip           *gossip
+	rollup           *updateRollup
 
 	joinTimeout, pingTimeout, pingRequestTimeout time.Duration
 
@@ -182,7 +184,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
-	node.suspicion = newSuspicion(node, opts.SuspicionTimeout)
+	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
@@ -239,7 +241,7 @@ func (n *Node) RegisterListener(l EventListener) {
 // Start starts the SWIM protocol and all sub-protocols.
 func (n *Node) Start() {
 	n.gossip.Start()
-	n.suspicion.Reenable()
+	n.stateTransitions.Enable()
 
 	n.state.Lock()
 	n.state.stopped = false
@@ -249,7 +251,7 @@ func (n *Node) Start() {
 // Stop stops the SWIM protocol and all sub-protocols.
 func (n *Node) Stop() {
 	n.gossip.Stop()
-	n.suspicion.Disable()
+	n.stateTransitions.Disable()
 
 	n.state.Lock()
 	n.state.stopped = true
@@ -396,18 +398,18 @@ func (n *Node) handleChanges(changes []Change) {
 
 		switch change.Status {
 		case Alive:
-			n.suspicion.Stop(change)
+			n.stateTransitions.Cancel(change)
 			n.disseminator.AdjustMaxPropagations()
 
 		case Faulty:
-			n.suspicion.Stop(change)
+			n.stateTransitions.Cancel(change)
 
 		case Suspect:
-			n.suspicion.Start(change)
+			n.stateTransitions.ScheduleSuspectToFaulty(change)
 			n.disseminator.AdjustMaxPropagations()
 
 		case Leave:
-			n.suspicion.Stop(change)
+			n.stateTransitions.Cancel(change)
 			n.disseminator.AdjustMaxPropagations()
 		}
 	}
