@@ -28,7 +28,9 @@ import (
 	"strings"
 	"sync"
 
+	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/logging"
 
 	"github.com/dgryski/go-farm"
 )
@@ -55,6 +57,8 @@ type HashRing struct {
 	tree      *redBlackTree
 	checksum  uint32
 
+	logger log.Logger
+
 	listeners []events.EventListener
 }
 
@@ -76,6 +80,7 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		hashfunc: func(str string) int {
 			return int(hashfunc([]byte(str)))
 		},
+		logger: logging.Logger("ring"),
 	}
 
 	r.serverSet = make(map[string]struct{})
@@ -100,6 +105,13 @@ func (r *HashRing) computeChecksumNoLock() {
 	bytes := []byte(strings.Join(addresses, ";"))
 	old := r.checksum
 	r.checksum = farm.Fingerprint32(bytes)
+
+	if r.checksum != old {
+		r.logger.WithFields(log.Fields{
+			"checksum":    r.checksum,
+			"oldChecksum": old,
+		}).Debug("ringpop ring computed new checksum")
+	}
 
 	r.emit(events.RingChecksumEvent{
 		OldChecksum: old,
