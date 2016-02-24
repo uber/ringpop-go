@@ -28,7 +28,7 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/uber-common/bark"
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 
@@ -57,7 +57,7 @@ type HashRing struct {
 	tree      *redBlackTree
 	checksum  uint32
 
-	logger log.Logger
+	logger bark.Logger
 
 	listeners []events.EventListener
 }
@@ -107,7 +107,7 @@ func (r *HashRing) computeChecksumNoLock() {
 	r.checksum = farm.Fingerprint32(bytes)
 
 	if r.checksum != old {
-		r.logger.WithFields(log.Fields{
+		r.logger.WithFields(bark.Fields{
 			"checksum":    r.checksum,
 			"oldChecksum": old,
 		}).Debug("ringpop ring computed new checksum")

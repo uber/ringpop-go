@@ -31,7 +31,7 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
-	log "github.com/uber-common/bark"
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/util"
 )
@@ -48,7 +48,7 @@ type memberlist struct {
 		sync.RWMutex
 	}
 
-	logger log.Logger
+	logger bark.Logger
 
 	// TODO: rework locking in ringpop-go (see #113). Required for Update().
 
@@ -89,7 +89,7 @@ func (m *memberlist) ComputeChecksum() {
 	m.members.Unlock()
 
 	if oldChecksum != checksum {
-		m.logger.WithFields(log.Fields{
+		m.logger.WithFields(bark.Fields{
 			"checksum":    checksum,
 			"oldChecksum": oldChecksum,
 		}).Debug("ringpop membership computed new checksum")
@@ -245,7 +245,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 	}})
 
 	if len(changes) > 0 {
-		m.logger.WithFields(log.Fields{
+		m.logger.WithFields(bark.Fields{
 			"update": changes[0],
 		}).Debugf("ringpop member declares other member %s", changes[0].Status)
 
@@ -308,7 +308,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 		for _, change := range applied {
 			if change.Source != m.node.address {
-				m.logger.WithFields(log.Fields{
+				m.logger.WithFields(bark.Fields{
 					"remote": change.Source,
 					// changes in ringpop go do not have an id.
 					// "updateId": change.id,
