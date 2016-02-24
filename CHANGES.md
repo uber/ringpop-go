@@ -8,6 +8,7 @@ v0.DEV (to be released)
   `DiscoverProvider` interface #119
 * Ringpop will always assume the current host (`ringpop.node.identity`) is part
   of the cluster. Previously, it was true for only `Host`-based discovery.
+* Add Go 1.6 testing on CI
 
 ### Release notes
 
