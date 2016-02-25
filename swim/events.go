@@ -191,11 +191,6 @@ type ChangeFilteredEvent struct {
 	Change Change
 }
 
-// A ChangeMadeEvent is sent when a node declares a new state for an other node
-type ChangeMadeEvent struct {
-	Change Change
-}
-
 // A JoinTriesUpdateEvent is sent when the joiner tries to join a group
 type JoinTriesUpdateEvent struct {
 	Retries int
