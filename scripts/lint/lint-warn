@@ -24,16 +24,18 @@ while IFS= read -r line; do
 	IFS=$'\n'
 	for exclude in $lint_exclude_patterns; do
 		if [[ "$line" == $exclude ]]; then
-			buf="WARNING [excluded]: $line"
-			continue
+			buf="WARNING: $line"
+			break
 		fi
 	done
 
-	if [ ! -z "$buf" ]; then
-		echo "$buf"
-	else
-		echo "$line" >&2
+	if [ -z "$buf" ]; then
+		# Print the error
+		echo "ERROR: $line" >&2
 		exit_code=1
+	else
+		# Print the warning
+		echo "$buf"
 	fi
 done
 
