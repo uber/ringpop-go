@@ -308,8 +308,6 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			if change.Source != m.node.address {
 				m.logger.WithFields(bark.Fields{
 					"remote": change.Source,
-					// changes in ringpop go do not have an id.
-					// "updateId": change.id,
 				}).Debug("ringpop applied remote update")
 			}
 		}
