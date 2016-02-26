@@ -1,6 +1,43 @@
 ringpop-go changes
 ==================
 
+v0.DEV (to be released)
+-----------------------
+
+* Remove `File` and `Host`-based discover providers in favor of
+  `DiscoverProvider` interface #119
+* Ringpop will always assume the current host (`ringpop.node.identity`) is part
+  of the cluster. Previously, it was true for only `Host`-based discovery.
+
+### Release notes
+
+`BootstrapOptions.File` and `BootstrapOptions.Hosts` are replaced with
+`BootstrapOptions.DiscoverProvider`. `DiscoverProvider` is an interface which
+requires a single method:
+
+    type DiscoverProvider interface {
+        Hosts() ([]string, error)
+    }
+
+We have implemented compatible DiscoverProviders for both `File` and `Hosts`,
+so you can now do for a JSON `File`:
+
+```diff
++       "github.com/uber/ringpop-go/discovery/jsonfile"
+...
+-       bootstrapOpts.File = *hostfile
++       bootstrapOpts.DiscoverProvider = jsonfile.New(*hostfile)
+```
+
+For static `Hosts`:
+
+```diff
++       "github.com/uber/ringpop-go/discovery/statichosts"
+...
+-       bootstrapOpts.Hosts = []string{"127.0.0.1:3000", "127.0.0.1:3001"}
++       bootstrapOpts.DiscoverProvider = statichosts.New("127.0.0.1:3000", "127.0.0.1:3001")
+```
+
 v0.3.0
 ------
 

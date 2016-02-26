@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/discovery"
+
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
@@ -69,7 +71,7 @@ type joinOpts struct {
 
 	// discoverProvider is the DiscoverProvider that this joinSender will use to
 	// enumerate bootstrap hosts.
-	discoverProvider DiscoverProvider
+	discoverProvider discovery.DiscoverProvider
 
 	// delayer delays repeated join attempts.
 	delayer joinDelayer
@@ -122,7 +124,7 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 	}
 
 	if opts.discoverProvider == nil {
-		return nil, errors.New("missing host provider in join options")
+		return nil, errors.New("no discover provider")
 	}
 
 	// Resolve/retrieve bootstrap hosts from the provider specified in the
@@ -131,8 +133,12 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(bootstrapHosts) == 0 {
-		return nil, errors.New("bootstrap hosts cannot be empty")
+
+	// Check we're in the bootstrap host list and add ourselves if we're not
+	// there. If the host list is empty, this will create a single-node
+	// cluster.
+	if !util.StringInSlice(bootstrapHosts, node.Address()) {
+		bootstrapHosts = append(bootstrapHosts, node.Address())
 	}
 
 	js := &joinSender{

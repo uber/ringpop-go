@@ -29,6 +29,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -147,8 +148,8 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 		hostports = append(hostports, tn.node.Address())
 
 		_, err := tn.node.Bootstrap(&BootstrapOptions{
-			Hosts:   hostports,
-			Stopped: true,
+			DiscoverProvider: statichosts.New(hostports...),
+			Stopped:          true,
 		})
 		require.NoError(t, err, "node must bootstrap successfully")
 	}
@@ -253,7 +254,7 @@ func newSwimCluster(size int) *swimCluster {
 // joined to the existing nodes.
 func (c *swimCluster) Add(n *Node) {
 	n.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &StaticHostList{c.Addresses()},
+		DiscoverProvider: statichosts.New(c.Addresses()...),
 	})
 	c.nodes = append(c.nodes, n)
 }
@@ -270,7 +271,7 @@ func (c *swimCluster) Addresses() (hostports []string) {
 func (c *swimCluster) Bootstrap() {
 	for _, node := range c.nodes {
 		node.Bootstrap(&BootstrapOptions{
-			DiscoverProvider: &StaticHostList{c.Addresses()},
+			DiscoverProvider: statichosts.New(c.Addresses()...),
 		})
 	}
 }

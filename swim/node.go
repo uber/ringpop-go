@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/discovery"
+
 	"github.com/benbjohnson/clock"
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
@@ -302,18 +304,8 @@ func (n *Node) Ready() bool {
 
 // BootstrapOptions is a configuration struct passed to Node.Bootstrap.
 type BootstrapOptions struct {
-	// The DiscoverProvider resolves a list of bootstrap hosts. If this is
-	// specified, it takes priority over the legacy Hosts and File options
-	// below.
-	DiscoverProvider DiscoverProvider
-
-	// Slice of hosts to bootstrap with, prioritized over provided file.
-	// TODO: Deprecate this option in favour of accepting only a DiscoverProvider.
-	Hosts []string
-
-	// File containing a JSON array of hosts to bootstrap with.
-	// TODO: Deprecate this option in favour of accepting only a DiscoverProvider.
-	File string
+	// The DiscoverProvider resolves a list of bootstrap hosts.
+	DiscoverProvider discovery.DiscoverProvider
 
 	// Whether or not gossip should be started immediately after a successful
 	// bootstrap.
@@ -347,13 +339,6 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		opts = &BootstrapOptions{}
 	}
 
-	// This exists to resolve the bootstrap hosts provider implementation from
-	// the deprecated "File" and "Hosts" options in BootstrapOptions.
-	discoverProvider, err := resolveDiscoverProvider(opts)
-	if err != nil {
-		return nil, err
-	}
-
 	n.memberlist.Reincarnate()
 
 	joinOpts := &joinOpts{
@@ -361,7 +346,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 		size:              opts.JoinSize,
 		maxJoinDuration:   opts.MaxJoinDuration,
 		parallelismFactor: opts.ParallelismFactor,
-		discoverProvider:  discoverProvider,
+		discoverProvider:  opts.DiscoverProvider,
 	}
 
 	joined, err := sendJoin(n, joinOpts)

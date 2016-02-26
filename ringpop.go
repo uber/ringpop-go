@@ -40,7 +40,6 @@ import (
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
-	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -330,11 +329,10 @@ func (rp *Ringpop) setState(s state) {
 // Bootstrap starts communication for this Ringpop instance.
 //
 // When Bootstrap is called, this Ringpop instance will attempt to contact
-// other instances from a seed list provided either in the BootstrapOptions or
-// as a JSON file.
+// other instances from the DiscoverProvider.
 //
 // If no seed hosts are provided, a single-node cluster will be created.
-func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string, error) {
+func (rp *Ringpop) Bootstrap(bootstrapOpts *swim.BootstrapOptions) ([]string, error) {
 	if rp.getState() < initialized {
 		err := rp.init()
 		if err != nil {
@@ -342,21 +340,7 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 		}
 	}
 
-	identity, err := rp.identity()
-	if err != nil {
-		return nil, err
-	}
-
-	// If the user has provided a list of hosts (and not a bootstrap file),
-	// check we're in the bootstrap host list and add ourselves if we're not
-	// there. If the host list is empty, this will create a single-node
-	// cluster.
-	bootstrapOpts := *userBootstrapOpts
-	if len(bootstrapOpts.File) == 0 && !util.StringInSlice(bootstrapOpts.Hosts, identity) {
-		bootstrapOpts.Hosts = append(bootstrapOpts.Hosts, identity)
-	}
-
-	joined, err := rp.node.Bootstrap(&bootstrapOpts)
+	joined, err := rp.node.Bootstrap(bootstrapOpts)
 	if err != nil {
 		rp.logger.WithField("error", err).Info("bootstrap failed")
 		rp.setState(initialized)

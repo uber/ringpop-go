@@ -22,6 +22,8 @@ package swim
 
 import (
 	"encoding/json"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -54,20 +56,12 @@ func (s *BootstrapTestSuite) TestBootstrapOk() {
 	s.Equal(6, s.node.CountReachableMembers())
 }
 
-func (s *BootstrapTestSuite) TestBootstrapTimesOut() {
-	_, err := s.node.Bootstrap(&BootstrapOptions{
-		Hosts:           fakeHostPorts(1, 1, 1, 0),
-		MaxJoinDuration: time.Millisecond,
-	})
-
-	s.Error(err, "expected bootstrap to exceed join duration")
-}
-
 func (s *BootstrapTestSuite) TestBootstrapJoinsTimeOut() {
+	hosts := append(fakeHostPorts(2, 2, 1, 5), s.node.Address())
 	_, err := s.node.Bootstrap(&BootstrapOptions{
-		Hosts:           append(fakeHostPorts(2, 2, 1, 5), s.node.Address()),
-		MaxJoinDuration: time.Millisecond,
-		JoinTimeout:     time.Millisecond / 2,
+		DiscoverProvider: statichosts.New(hosts...),
+		MaxJoinDuration:  time.Millisecond,
+		JoinTimeout:      time.Millisecond / 2,
 	})
 
 	s.Error(err, "expected bootstrap to exceed join duration")
@@ -82,8 +76,8 @@ func (s *BootstrapTestSuite) TestBootstrapDestroy() {
 
 	go func() {
 		_, err := s.node.Bootstrap(&BootstrapOptions{
-			Hosts:       fakeHostPorts(1, 1, 1, 10),
-			JoinTimeout: time.Millisecond,
+			DiscoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 10)...),
+			JoinTimeout:      time.Millisecond,
 		})
 		errChan <- err
 	}()
@@ -101,7 +95,7 @@ func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {
 	waitForConvergence(s.T(), 500*time.Millisecond, s.peers...)
 
 	s.tnode.node.Bootstrap(&BootstrapOptions{
-		Hosts: bootstrapList,
+		DiscoverProvider: statichosts.New(bootstrapList...),
 	})
 
 	// test that there are no changes to disseminate after the bootstrapping of a host
@@ -128,7 +122,7 @@ func (s *BootstrapTestSuite) TestBootstrapFailsWithNoBootstrapHosts() {
 // default on successful bootstrap.
 func (s *BootstrapTestSuite) TestGossipStartedByDefault() {
 	_, err := s.node.Bootstrap(&BootstrapOptions{
-		Hosts: []string{s.node.Address()},
+		DiscoverProvider: statichosts.New(s.node.Address()),
 	})
 	s.Require().NoError(err, "unable to create single node cluster")
 
@@ -139,8 +133,8 @@ func (s *BootstrapTestSuite) TestGossipStartedByDefault() {
 // when Stopped is set to True in the BootstrapOptions.
 func (s *BootstrapTestSuite) TestGossipStoppedOnBootstrap() {
 	_, err := s.node.Bootstrap(&BootstrapOptions{
-		Hosts:   []string{s.node.Address()},
-		Stopped: true,
+		DiscoverProvider: statichosts.New(s.node.Address()),
+		Stopped:          true,
 	})
 	s.Require().NoError(err, "unable to create single node cluster")
 
@@ -173,7 +167,7 @@ func (s *BootstrapTestSuite) TestJSONFileHostList() {
 
 	// Bootstrap from the JSON file
 	nodesJoined, err := s.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &JSONFileHostList{file.Name()},
+		DiscoverProvider: jsonfile.New(file.Name()),
 	})
 	sort.Strings(nodesJoined)
 
@@ -181,18 +175,21 @@ func (s *BootstrapTestSuite) TestJSONFileHostList() {
 	s.Equal(peerHostPorts, nodesJoined, "nodes joined should match hostports")
 }
 
-func (s *BootstrapTestSuite) TestInvalidJSONFile() {
-	_, err := s.node.Bootstrap(&BootstrapOptions{
-		File: "/invalid",
-	})
-	s.Error(err, "open /invalid: no such file or directory", "should fail to open file")
+// Errs in returning Hosts with a predefined error message
+type ParrotDiscoverProvider string
+
+func (m ParrotDiscoverProvider) Error() string {
+	return string(m)
+}
+func (m ParrotDiscoverProvider) Hosts() ([]string, error) {
+	return nil, m
 }
 
-func (s *BootstrapTestSuite) TestMalformedJSONFile() {
+func (s *BootstrapTestSuite) TestFailingDiscoverProvider() {
 	_, err := s.node.Bootstrap(&BootstrapOptions{
-		File: "test/invalidhosts.json",
+		DiscoverProvider: ParrotDiscoverProvider("no hosts today"),
 	})
-	s.Error(err, "invalid character 'T' looking for beginning of value", "should fail to unmarhsal JSON")
+	s.Error(err, "no hosts today", "should propagate error message")
 }
 
 func (s *BootstrapTestSuite) TestDisseminationCounterAfterBootstrap() {
@@ -202,8 +199,8 @@ func (s *BootstrapTestSuite) TestDisseminationCounterAfterBootstrap() {
 
 	s.Equal(s.node.disseminator.pFactor, s.node.disseminator.maxP, "Initial maxP value should equal pFactor")
 	s.node.Bootstrap(&BootstrapOptions{
-		Hosts:   bootstrapList,
-		Stopped: true,
+		DiscoverProvider: statichosts.New(bootstrapList...),
+		Stopped:          true,
 	})
 	waitForConvergence(s.T(), 5*time.Second, append(s.peers, s.tnode)...)
 

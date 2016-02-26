@@ -27,6 +27,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
@@ -124,7 +125,7 @@ func main() {
 	}
 
 	opts := new(swim.BootstrapOptions)
-	opts.File = *hostfile
+	opts.DiscoverProvider = jsonfile.New(*hostfile)
 
 	if _, err := worker.ringpop.Bootstrap(opts); err != nil {
 		log.Fatalf("ringpop bootstrap failed: %v", err)

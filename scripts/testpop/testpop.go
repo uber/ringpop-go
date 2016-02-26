@@ -26,6 +26,7 @@ import (
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
 	"github.com/uber/ringpop-go/swim"
 
 	log "github.com/Sirupsen/logrus"
@@ -66,7 +67,7 @@ func main() {
 	}
 
 	opts := &swim.BootstrapOptions{}
-	opts.File = *hostfile
+	opts.DiscoverProvider = jsonfile.New(*hostfile)
 
 	_, err = rp.Bootstrap(opts)
 	if err != nil {

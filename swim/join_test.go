@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -47,27 +48,12 @@ func (s *JoinSenderTestSuite) TearDownTest() {
 	s.tnode.Destroy()
 }
 
-func (s *JoinSenderTestSuite) TestSendJoinNoBootstrapHosts() {
-	joined, err := sendJoin(s.node, nil)
-
-	s.Error(err, "expected error for no bootstrap hosts")
-	s.Empty(joined, "expected no nodes to be joined")
-}
-
-func (s *JoinSenderTestSuite) TestJoinNoBootstrapHosts() {
-	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: &StaticHostList{},
-	})
-	s.Error(err, "expected error for no bootstrap hosts")
-	s.Nil(joiner, "expected joiner to be nil")
-}
-
 func (s *JoinSenderTestSuite) TestSelectGroup() {
 	fakeHosts := fakeHostPorts(1, 1, 2, 3)
 	bootstrapHosts := append(fakeHosts, s.node.Address())
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: &StaticHostList{bootstrapHosts},
+		discoverProvider: statichosts.New(bootstrapHosts...),
 	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
@@ -83,7 +69,7 @@ func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
 	expected := fakeHostPorts(1, 1, 2, 3)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: &StaticHostList{bootstrapHosts},
+		discoverProvider: statichosts.New(bootstrapHosts...),
 	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
@@ -102,7 +88,7 @@ func (s *JoinSenderTestSuite) TestSelectGroupExcludes() {
 	bootstrapHosts := fakeHostPorts(1, 1, 1, 5)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: &StaticHostList{bootstrapHosts},
+		discoverProvider: statichosts.New(bootstrapHosts...),
 	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
@@ -119,7 +105,7 @@ func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
 	bootstrapHosts := append(fakeHostPorts(1, 4, 1, 1), fakeHostPorts(1, 1, 2, 4)...)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider:  &StaticHostList{bootstrapHosts},
+		discoverProvider:  statichosts.New(bootstrapHosts...),
 		parallelismFactor: 1,
 	})
 	s.Require().NoError(err, "cannot have an error")
@@ -135,7 +121,7 @@ func (s *JoinSenderTestSuite) TestSelectGroupMixes() {
 	bootstrapHosts := append(fakeHostPorts(1, 2, 1, 1), fakeHostPorts(1, 1, 2, 3)...)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider:  &StaticHostList{bootstrapHosts},
+		discoverProvider:  statichosts.New(bootstrapHosts...),
 		parallelismFactor: 1,
 	})
 	s.Require().NoError(err, "cannot have an error")
@@ -156,7 +142,7 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 	bootstrapNodes(s.T(), peer)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
+		discoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 1)...),
 	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
@@ -182,7 +168,7 @@ func (s *JoinSenderTestSuite) TestJoinSelf() {
 	bootstrapNodes(s.T(), s.tnode)
 
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
+		discoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 1)...),
 	})
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
@@ -203,7 +189,7 @@ func (s *JoinSenderTestSuite) TestCustomDelayer() {
 	delayer := &nullDelayer{}
 	joiner, err := newJoinSender(s.node, &joinOpts{
 		delayer:          delayer,
-		discoverProvider: &StaticHostList{fakeHostPorts(1, 1, 1, 1)},
+		discoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 1)...),
 	})
 	s.NoError(err, "expected valid joiner")
 	s.Equal(delayer, joiner.delayer, "custom delayer was set")
