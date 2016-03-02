@@ -28,6 +28,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
 	gen "github.com/uber/ringpop-go/examples/pingpong/gen-go/pingpong"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
@@ -120,7 +121,7 @@ func main() {
 	}
 
 	bsopts := new(swim.BootstrapOptions)
-	bsopts.File = *hostfile
+	bsopts.DiscoverProvider = jsonfile.New(*hostfile)
 	bsopts.Stopped = true
 	if _, err := worker.ringpop.Bootstrap(bsopts); err != nil {
 		log.Fatalf("could not bootstrap ringpop: %v", err)

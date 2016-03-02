@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 )
 
 type NodeTestSuite struct {
@@ -52,7 +53,7 @@ func (s *NodeTestSuite) TestAppName() {
 
 func (s *NodeTestSuite) TestStartStop() {
 	s.testNode.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &StaticHostList{},
+		DiscoverProvider: statichosts.New(),
 	})
 
 	s.testNode.node.Stop()
@@ -70,7 +71,7 @@ func (s *NodeTestSuite) TestStartStop() {
 
 func (s *NodeTestSuite) TestStoppedBootstrapOption() {
 	s.testNode.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &StaticHostList{},
+		DiscoverProvider: statichosts.New(),
 		Stopped:          true,
 	})
 
