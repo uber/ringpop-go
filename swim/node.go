@@ -52,6 +52,9 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
+	PartitionHealPeriod           time.Duration
+	PartitionHealBaseProbabillity float64
+
 	Clock clock.Clock
 }
 
@@ -68,6 +71,9 @@ func defaultOptions() *Options {
 
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
+
+		PartitionHealPeriod:           30 * time.Second,
+		PartitionHealBaseProbabillity: 3,
 
 		Clock: clock.New(),
 	}
@@ -92,6 +98,12 @@ func mergeDefaultOptions(opts *Options) *Options {
 		def.RollupMaxUpdates)
 	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval,
 		def.RollupFlushInterval)
+
+	opts.PartitionHealPeriod = util.SelectDuration(opts.PartitionHealPeriod,
+		def.PartitionHealPeriod)
+
+	opts.PartitionHealBaseProbabillity = util.SelectFloat(opts.PartitionHealBaseProbabillity,
+		def.PartitionHealBaseProbabillity)
 
 	opts.JoinTimeout = util.SelectDuration(opts.JoinTimeout, def.JoinTimeout)
 	opts.PingTimeout = util.SelectDuration(opts.PingTimeout, def.PingTimeout)
@@ -133,13 +145,17 @@ type Node struct {
 		sync.RWMutex
 	}
 
-	channel      shared.SubChannel
-	memberlist   *memberlist
-	memberiter   memberIter
-	disseminator *disseminator
-	suspicion    *suspicion
-	gossip       *gossip
-	rollup       *updateRollup
+	channel          shared.SubChannel
+	discoverProvider discovery.DiscoverProvider
+	memberlist       *memberlist
+	memberiter       memberIter
+	disseminator     *disseminator
+	suspicion        *suspicion
+	gossip           *gossip
+	rollup           *updateRollup
+
+	// when we get more healer strategies we can make the abstraction of a healer interface
+	healer *discoverProviderHealer
 
 	joinTimeout, pingTimeout, pingRequestTimeout time.Duration
 
@@ -186,6 +202,12 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
 	node.suspicion = newSuspicion(node, opts.SuspicionTimeout)
+
+	node.healer = newDiscoverProviderHealer(
+		node,
+		opts.PartitionHealBaseProbabillity,
+		opts.PartitionHealPeriod,
+	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
@@ -243,6 +265,7 @@ func (n *Node) RegisterListener(l EventListener) {
 func (n *Node) Start() {
 	n.gossip.Start()
 	n.suspicion.Reenable()
+	n.healer.Start()
 
 	n.state.Lock()
 	n.state.stopped = false
@@ -253,6 +276,7 @@ func (n *Node) Start() {
 func (n *Node) Stop() {
 	n.gossip.Stop()
 	n.suspicion.Disable()
+	n.healer.Stop()
 
 	n.state.Lock()
 	n.state.stopped = true
@@ -341,12 +365,12 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	n.memberlist.Reincarnate()
 
+	n.discoverProvider = opts.DiscoverProvider
 	joinOpts := &joinOpts{
 		timeout:           opts.JoinTimeout,
 		size:              opts.JoinSize,
 		maxJoinDuration:   opts.MaxJoinDuration,
 		parallelismFactor: opts.ParallelismFactor,
-		discoverProvider:  opts.DiscoverProvider,
 	}
 
 	joined, err := sendJoin(n, joinOpts)

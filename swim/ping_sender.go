@@ -132,6 +132,35 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 	return errC
 }
 
+// sendPingWithChanges sends a special ping to the target with the given changes.
+// In normal pings the disseminator is consulted to create issue the changes,
+// this is not the case in this function. Only the given changes are transmitted.
+func sendPingWithChanges(node *Node, target string, changes []Change, timeout time.Duration) (*ping, error) {
+	ctx, cancel := shared.NewTChannelContext(timeout)
+	defer cancel()
+
+	peer := node.channel.Peers().GetOrAdd(target)
+
+	req := ping{
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           changes,
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+	}
+
+	res := &ping{}
+
+	node.logger.WithFields(log.Fields{
+		"remote":  target,
+		"changes": changes,
+	}).Debug("ping send with custom changes")
+
+	// var startTime = time.Now()
+
+	err := json.CallPeer(ctx, peer, node.service, "/protocol/ping", req, res)
+	return res, err
+}
+
 // SendPing sends a ping to target node that times out after timeout
 func sendPing(node *Node, target string, timeout time.Duration) (*ping, error) {
 	ps := newPingSender(node, target, timeout)

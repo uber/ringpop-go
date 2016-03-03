@@ -208,3 +208,6 @@ type RequestBeforeReadyEvent struct {
 
 // A RefuteUpdateEvent is sent when a node detects gossip about its own state that needs to be corrected
 type RefuteUpdateEvent struct{}
+
+// AttemptHealEvent is sent when the partitionHealer is triggered to heal a partition
+type AttemptHealEvent struct{}
