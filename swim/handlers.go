@@ -66,8 +66,8 @@ func (n *Node) registerHandlers() error {
 		"/admin/gossip/stop":  n.gossipHandlerStop,
 		"/admin/tick":         n.tickHandler, // Deprecated
 		"/admin/gossip/tick":  n.tickHandler,
-		"/admin/member/leave": n.adminLeaveHandler,
-		"/admin/member/join":  n.adminJoinHandler,
+		"/admin/leave":        n.adminLeaveHandler,
+		"/admin/join":         n.adminJoinHandler,
 	}
 
 	return json.Register(n.channel, handlers, n.errorHandler)

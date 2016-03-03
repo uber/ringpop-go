@@ -1,6 +1,11 @@
 ringpop-go changes
 ==================
 
+v0.3.1
+------
+
+* Fix `/admin/leave` and `/admin/join` to work with `ringpop-admin`
+
 v0.3.0
 ------
 
