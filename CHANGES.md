@@ -8,6 +8,8 @@ v0.DEV (to be released)
   `DiscoverProvider` interface #119
 * Ringpop will always assume the current host (`ringpop.node.identity`) is part
   of the cluster. Previously, it was true for only `Host`-based discovery.
+* Implemented reaping of faulty nodes. By default ringpop will remove faulty nodes
+  after 24 hours of being in faulty state.
 
 ### Release notes
 

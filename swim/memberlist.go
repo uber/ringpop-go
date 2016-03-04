@@ -107,6 +107,11 @@ func (m *memberlist) GenChecksumString() string {
 	var strings sort.StringSlice
 
 	for _, member := range m.members.list {
+		// Don't include Tombstone nodes in the checksum to avoid
+		// bringing them back to life through full syncs
+		if member.Status == Tombstone {
+			continue
+		}
 		s := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
 		strings = append(strings, s)
 	}
@@ -129,6 +134,31 @@ func (m *memberlist) Member(address string) (*Member, bool) {
 	m.members.RUnlock()
 
 	return member, ok
+}
+
+// RemoveMember removes the member from the membership list. If the membership has
+// changed during this operation a new checksum will be computed.
+func (m *memberlist) RemoveMember(address string) bool {
+	m.members.Lock()
+	member, hasMember := m.members.byAddress[address]
+	if hasMember {
+		delete(m.members.byAddress, address)
+		for i, lMember := range m.members.list {
+			if member == lMember {
+				// a safe way to remove a pointer from a slice
+				m.members.list, m.members.list[len(m.members.list)-1] = append(m.members.list[:i], m.members.list[i+1:]...), nil
+				break
+			}
+		}
+	}
+	m.members.Unlock()
+
+	if hasMember {
+		// if we changed the membership recompute the actual checksum
+		m.ComputeChecksum()
+	}
+
+	return hasMember
 }
 
 func (m *memberlist) MemberAt(i int) *Member {
@@ -225,6 +255,21 @@ func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Leave)
 }
 
+func (m *memberlist) MakeTombstone(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Tombstone})
+	return m.MakeChange(address, incarnation, Tombstone)
+}
+
+func (m *memberlist) Evict(address string) {
+	if m.local.Address == address {
+		// We should not evict ourselves from the memberlist. This should not be reached, but we will make noise in the logs
+		m.logger.Error("ringpop tried to evict the local member from the memberlist, action has been prevented")
+		return
+	}
+
+	m.RemoveMember(address)
+}
+
 // makes a change to the member list
 func (m *memberlist) MakeChange(address string, incarnation int64, status string) []Change {
 	if m.local == nil {
@@ -269,8 +314,9 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 		// first time member has been seen, take change wholesale
 		if !ok {
-			m.Apply(change)
-			applied = append(applied, change)
+			if m.Apply(change) {
+				applied = append(applied, change)
+			}
 			continue
 		}
 
@@ -286,15 +332,18 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				Timestamp:         util.Timestamp(time.Now()),
 			}
 
-			m.Apply(overrideChange)
-			applied = append(applied, overrideChange)
+			if m.Apply(overrideChange) {
+				applied = append(applied, overrideChange)
+			}
+
 			continue
 		}
 
 		// if non-local override, apply change wholesale
 		if member.nonLocalOverride(change) {
-			m.Apply(change)
-			applied = append(applied, change)
+			if m.Apply(change) {
+				applied = append(applied, change)
+			}
 		}
 	}
 
@@ -352,10 +401,16 @@ func (m *memberlist) getJoinPosition() int {
 }
 
 // applies a change directly to the member list
-func (m *memberlist) Apply(change Change) {
+func (m *memberlist) Apply(change Change) bool {
 	member, ok := m.members.byAddress[change.Address]
 
 	if !ok {
+		// avoid indefinite tombstones by not creating new nodes
+		// directly in this state
+		if change.Status == Tombstone {
+			return false
+		}
+
 		member = &Member{
 			Address:     change.Address,
 			Status:      change.Status,
@@ -375,6 +430,8 @@ func (m *memberlist) Apply(change Change) {
 	member.Status = change.Status
 	member.Incarnation = change.Incarnation
 	member.Unlock()
+
+	return true
 }
 
 // shuffles the member list
