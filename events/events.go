@@ -49,3 +49,9 @@ type LookupEvent struct {
 	Key      string
 	Duration time.Duration
 }
+
+// Ready is fired when ringpop has successfully bootstrapped and is ready to receive requests and other method calls.
+type Ready struct{}
+
+// Destroyed is fired when ringpop has been destroyed and should not be responding to requests or lookup requests.
+type Destroyed struct{}
