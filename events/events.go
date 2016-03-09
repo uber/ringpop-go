@@ -31,6 +31,9 @@ type EventListener interface {
 	HandleEvent(event Event)
 }
 
+// A Bootstrapped event is sent when ringpop has bootstrapped
+type Bootstrapped struct{}
+
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
 type RingChangedEvent struct {
 	ServersAdded   []string

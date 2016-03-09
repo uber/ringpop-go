@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/events"
+	eventsmock "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
@@ -383,6 +384,37 @@ func (s *RingpopTestSuite) TestStateReady() {
 	createSingleNodeCluster(s.ringpop)
 
 	s.Equal(ready, s.ringpop.state)
+}
+
+// TestStateReady tests that Ringpop is ready after successful bootstrapping.
+func (s *RingpopTestSuite) TestBootstrappedEvent() {
+	called := make(chan bool, 1)
+
+	l := &eventsmock.EventListener{}
+
+	// trap Bootstrapped event and signal on the channel that we received the call
+	l.On("HandleEvent", events.Bootstrapped{}).Return().Run(func(args mock.Arguments) {
+		called <- true
+	})
+
+	// There are more events being fired which we don't care about
+	l.On("HandleEvent", mock.Anything).Return()
+
+	s.ringpop.RegisterListener(l)
+
+	// Bootstrap
+	createSingleNodeCluster(s.ringpop)
+
+	// block till we have received the bootstrapped event with a timeout of 100ms in the case that it failes to fire
+	select {
+	case <-called:
+		break
+	case <-time.After(100 * time.Millisecond):
+		s.Fail("no bootstrap event after bootstrapping")
+	}
+
+	// Assert that the Bootstrapped event has fired
+	l.AssertCalled(s.T(), "HandleEvent", events.Bootstrapped{})
 }
 
 // TestStateDestroyed tests that Ringpop is in a destroyed state after calling
