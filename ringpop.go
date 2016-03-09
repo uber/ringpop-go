@@ -366,6 +366,9 @@ func (rp *Ringpop) Bootstrap(userBootstrapOpts *swim.BootstrapOptions) ([]string
 	rp.setState(ready)
 
 	rp.logger.WithField("joined", joined).Info("bootstrap complete")
+
+	rp.emit(events.Bootstrapped{})
+
 	return joined, nil
 }
 
