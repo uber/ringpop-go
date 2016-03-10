@@ -31,6 +31,8 @@ import (
 
 	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
+	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -45,12 +47,23 @@ type memberlist struct {
 		checksum  uint32
 		sync.RWMutex
 	}
+
+	logger bark.Logger
+
+	// TODO: rework locking in ringpop-go (see #113). Required for Update().
+
+	// Updates to membership list and hash ring should happen atomically. We
+	// could use members lock for that, but that introduces more deadlocks, so
+	// making a short-term fix instead by adding another lock. Like said, this
+	// is short-term, see github#113.
+	sync.Mutex
 }
 
 // newMemberlist returns a new member list
 func newMemberlist(n *Node) *memberlist {
 	m := &memberlist{
-		node: n,
+		node:   n,
+		logger: logging.Logger("membership").WithField("local", n.address),
 	}
 
 	m.members.byAddress = make(map[string]*Member)
@@ -71,11 +84,21 @@ func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
 	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
+	oldChecksum := m.members.checksum
 	m.members.checksum = checksum
 	m.members.Unlock()
+
+	if oldChecksum != checksum {
+		m.logger.WithFields(bark.Fields{
+			"checksum":    checksum,
+			"oldChecksum": oldChecksum,
+		}).Debug("ringpop membership computed new checksum")
+	}
+
 	m.node.emit(ChecksumComputeEvent{
-		Duration: time.Now().Sub(startTime),
-		Checksum: checksum,
+		Duration:    time.Now().Sub(startTime),
+		Checksum:    checksum,
+		OldChecksum: oldChecksum,
 	})
 }
 
@@ -212,7 +235,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		}
 	}
 
-	return m.Update([]Change{Change{
+	changes := m.Update([]Change{Change{
 		Source:            m.local.Address,
 		SourceIncarnation: m.local.Incarnation,
 		Address:           address,
@@ -220,6 +243,14 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		Status:            status,
 		Timestamp:         util.Timestamp(time.Now()),
 	}})
+
+	if len(changes) > 0 {
+		m.logger.WithFields(bark.Fields{
+			"update": changes[0],
+		}).Debugf("ringpop member declares other member %s", changes[0].Status)
+	}
+
+	return changes
 }
 
 // updates the member list with the slice of changes, applying selectively
@@ -230,6 +261,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
+	m.Lock()
 	m.members.Lock()
 
 	for _, change := range changes {
@@ -271,6 +303,15 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	if len(applied) > 0 {
 		oldChecksum := m.Checksum()
 		m.ComputeChecksum()
+
+		for _, change := range applied {
+			if change.Source != m.node.address {
+				m.logger.WithFields(bark.Fields{
+					"remote": change.Source,
+				}).Debug("ringpop applied remote update")
+			}
+		}
+
 		m.node.emit(MemberlistChangesAppliedEvent{
 			Changes:     applied,
 			OldChecksum: oldChecksum,
@@ -281,6 +322,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		m.node.rollup.TrackUpdates(applied)
 	}
 
+	m.Unlock()
 	return applied
 }
 

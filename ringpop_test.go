@@ -27,6 +27,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
@@ -48,7 +49,7 @@ type RingpopTestSuite struct {
 func createSingleNodeCluster(rp *Ringpop) error {
 	// Bootstrapping with an empty list will created a single-node cluster.
 	_, err := rp.Bootstrap(&swim.BootstrapOptions{
-		Hosts: []string{},
+		DiscoverProvider: statichosts.New(),
 	})
 
 	return err
@@ -335,7 +336,7 @@ func (s *RingpopTestSuite) TestRingpopReady() {
 	s.False(s.ringpop.Ready())
 	// Create single node cluster.
 	s.ringpop.Bootstrap(&swim.BootstrapOptions{
-		Hosts: []string{"127.0.0.1:3001"},
+		DiscoverProvider: statichosts.New("127.0.0.1:3001"),
 	})
 	s.True(s.ringpop.Ready())
 }
@@ -366,10 +367,7 @@ func (s *RingpopTestSuite) TestStateInitialized() {
 
 	// Bootstrap that will fail
 	_, err = rp.Bootstrap(&swim.BootstrapOptions{
-		Hosts: []string{
-			"127.0.0.1:9000",
-			"127.0.0.1:9001",
-		},
+		DiscoverProvider: statichosts.New("127.0.0.1:9000", "127.0.0.1:9001"),
 		// A MaxJoinDuration of 1 millisecond should fail immediately
 		// without prolonging the test suite.
 		MaxJoinDuration: time.Millisecond,
@@ -517,37 +515,9 @@ func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
 
 	// Call Bootstrap with ourselves missing
 	_, err := s.ringpop.Bootstrap(&swim.BootstrapOptions{
-		Hosts: []string{"127.0.0.1:3002"},
+		DiscoverProvider: statichosts.New("127.0.0.1:3002"),
 	})
 
-	// Test that self was added
-	s.mockSwimNode.AssertCalled(s.T(), "Bootstrap", &swim.BootstrapOptions{
-		Hosts: []string{"127.0.0.1:3002", "127.0.0.1:3001"},
-	})
-	s.Nil(err)
-}
-
-// TestDontAddSelfForFileBootstrap tests that Ringpop only adds itself to the
-// bootstrap host list automatically, if Hosts is the bootstrap mode.
-func (s *RingpopTestSuite) TestDontAddSelfForFileBootstrap() {
-	// Init ringpop, but then override the swim node with mock node
-	s.ringpop.init()
-	s.ringpop.node = s.mockSwimNode
-
-	s.mockSwimNode.On("Bootstrap", mock.Anything).Return(
-		[]string{"127.0.0.1:3001", "127.0.0.1:3002"},
-		nil,
-	)
-
-	// Call Bootstrap with File option and no Hosts
-	_, err := s.ringpop.Bootstrap(&swim.BootstrapOptions{
-		File: "./hosts.json",
-	})
-
-	// Test that Hosts is still empty
-	s.mockSwimNode.AssertCalled(s.T(), "Bootstrap", &swim.BootstrapOptions{
-		File: "./hosts.json",
-	})
 	s.Nil(err)
 }
 

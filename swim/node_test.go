@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 )
 
 type NodeTestSuite struct {
@@ -52,32 +53,32 @@ func (s *NodeTestSuite) TestAppName() {
 
 func (s *NodeTestSuite) TestStartStop() {
 	s.testNode.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &StaticHostList{},
+		DiscoverProvider: statichosts.New(),
 	})
 
 	s.testNode.node.Stop()
 
 	s.True(s.testNode.node.gossip.Stopped(), "gossip should be stopped")
 	s.True(s.testNode.node.Stopped(), "node should be stopped")
-	s.False(s.testNode.node.suspicion.enabled, "suspicion should not be enabled")
+	s.False(s.testNode.node.stateTransitions.enabled, "suspicion should not be enabled")
 
 	s.testNode.node.Start()
 
-	s.True(s.testNode.node.suspicion.enabled, "suspicon should be enabled")
+	s.True(s.testNode.node.stateTransitions.enabled, "suspicon should be enabled")
 	s.False(s.testNode.node.Stopped(), "node should not be stopped")
 	s.False(s.testNode.node.gossip.Stopped(), "gossip should not be stopped")
 }
 
 func (s *NodeTestSuite) TestStoppedBootstrapOption() {
 	s.testNode.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: &StaticHostList{},
+		DiscoverProvider: statichosts.New(),
 		Stopped:          true,
 	})
 
 	s.True(s.testNode.node.gossip.Stopped(), "gossip should be stopped")
 	// TODO: Should these also be stopped?
 	//s.True(s.testNode.node.Stopped(), "node should be stopped")
-	//s.False(s.testNode.node.suspicion.enabled, "suspicion should not be enabled")
+	//s.False(s.testNode.node.stateTransitions.enabled, "suspicion should not be enabled")
 }
 
 func TestNodeTestSuite(t *testing.T) {

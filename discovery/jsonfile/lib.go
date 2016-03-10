@@ -1,4 +1,4 @@
-// Copyright (c) 2015 Uber Technologies, Inc.
+// Copyright (c) 2016 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,28 +18,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package swim
+package jsonfile
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 )
 
-// A DiscoverProvider is a interface that provides a list of peers for a node
-// to bootstrap from.
-type DiscoverProvider interface {
-	Hosts() ([]string, error)
-}
-
-// JSONFileHostList is a DiscoverProvider that reads a list of hosts from a
-// JSON file.
-type JSONFileHostList struct {
+// HostList is a DiscoverProvider that reads a list of hosts from a JSON file.
+type HostList struct {
 	filePath string
 }
 
 // Hosts reads hosts from a JSON file.
-func (p *JSONFileHostList) Hosts() ([]string, error) {
+func (p *HostList) Hosts() ([]string, error) {
 	var hosts []string
 
 	data, err := ioutil.ReadFile(p.filePath)
@@ -55,31 +47,7 @@ func (p *JSONFileHostList) Hosts() ([]string, error) {
 	return hosts, nil
 }
 
-// StaticHostList is a static list of hosts to bootstrap from.
-type StaticHostList struct {
-	hosts []string
-}
-
-// Hosts just returns the static list of hosts that was provided to this struct
-// on construction.
-func (p *StaticHostList) Hosts() ([]string, error) {
-	return p.hosts, nil
-}
-
-// resolveDiscoverProvider reads legacy BootstrapOptions and determines which
-// DiscoverProvider implementation to use for enumerating a list of bootstrap
-// hosts.
-// TODO: Remove this function and legacy File/Hosts fields from
-// BootstrapOptions and accept only a DiscoverProvider.
-func resolveDiscoverProvider(opts *BootstrapOptions) (DiscoverProvider, error) {
-	if opts.DiscoverProvider != nil {
-		return opts.DiscoverProvider, nil
-	}
-	if len(opts.Hosts) != 0 {
-		return &StaticHostList{opts.Hosts}, nil
-	}
-	if len(opts.File) != 0 {
-		return &JSONFileHostList{opts.File}, nil
-	}
-	return nil, errors.New("no discover provider")
+// New creates a provider which reads the JSON file for the hosts.
+func New(filePath string) *HostList {
+	return &HostList{filePath}
 }

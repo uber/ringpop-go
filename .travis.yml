@@ -1,5 +1,6 @@
 language: go
 go:
+  - 1.6
   - 1.5
 
 before_install:
@@ -17,7 +18,6 @@ env:
   - RUN="make lint"
   - RUN="make test-unit"
   - RUN="make test-integration"
-  - RUN=test/update-coveralls
 
 matrix:
   allow_failures:
@@ -26,3 +26,6 @@ matrix:
 
 script:
   - test/travis
+
+after_success:
+  - test/update-coveralls
