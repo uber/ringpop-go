@@ -39,6 +39,9 @@ const (
 
 	// Leave is the member "leave" state
 	Leave = "leave"
+
+	// Tombstone is the member "tombstone" state
+	Tombstone = "tombstone"
 )
 
 // A Member is a member in the member list
@@ -94,7 +97,7 @@ func (m *Member) localOverride(local string, change Change) bool {
 	if m.Address != local {
 		return false
 	}
-	return change.Status == Faulty || change.Status == Suspect
+	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
 }
 
 func statePrecedence(s string) int {
@@ -107,6 +110,8 @@ func statePrecedence(s string) int {
 		return 2
 	case Leave:
 		return 3
+	case Tombstone:
+		return 4
 	default:
 		panic("invalid state")
 	}
