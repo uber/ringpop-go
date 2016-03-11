@@ -1,29 +1,50 @@
 ringpop-go changes
 ==================
 
-v0.DEV (to be released)
------------------------
+v0.4.0
+------
 
-* Remove `File` and `Host`-based discover providers in favor of
-  `DiscoverProvider` interface #119
-* Ringpop will always assume the current host (`ringpop.node.identity`) is part
-  of the cluster. Previously, it was true for only `Host`-based discovery.
-* Add Go 1.6 testing on CI
-* Implemented reaping of faulty nodes. By default ringpop will remove faulty nodes
-  after 24 hours of being in faulty state.
+* Feature: Faulty nodes are now automatically reaped from nodes' membership
+  lists after (24 hours by default). #123
+* New options for controlling suspect and reaping times. #123
+* Add new `Ready` and `Destroyed` events to ringpop. #125
+* Add additional logging to bring ringpop-go on par with ringpop-node log
+  messages. #116
+* Fix bug where Ringpop automatically added itself to the bootstrap hosts for
+  host-based bootstrapping, but not other bootstrapping methods. #120
+* Fix race condition where membership and hashring could be inconsistent with
+  each other. #112
+* Remove `File` and `Host` options from bootstrap options in favor of
+  `DiscoverProvider` interface. #120
+* Add Go 1.6 to testing on CI
 
 ### Release notes
 
-`BootstrapOptions.File` and `BootstrapOptions.Hosts` are replaced with
+#### Version incompatibility in protocol
+
+Since 0.4.0 introduces a new node/member state, 0.4.0 is not backwards-compatible with previous versions.
+
+Note rolling upgrades with older versions do work, but undefined behaviour will occur if two versions run in parallel for longer than the `FaultyPeriod` (default 24 hours).
+
+#### Changes to Bootstrap
+
+This release contains a breaking change to the options provided to the
+`ringpop.Bootstrap` call.
+
+`BootstrapOptions.File` and `BootstrapOptions.Hosts` have been replaced with
 `BootstrapOptions.DiscoverProvider`. `DiscoverProvider` is an interface which
 requires a single method:
 
-    type DiscoverProvider interface {
-        Hosts() ([]string, error)
-    }
+```go
+type DiscoverProvider interface {
+    Hosts() ([]string, error)
+}
+```
 
-We have implemented compatible DiscoverProviders for both `File` and `Hosts`,
-so you can now do for a JSON `File`:
+Ringpop comes with DiscoverProviders for the previous `File` and `Hosts`
+options out of the box.
+
+To upgrade if you were previously using `File`:
 
 ```diff
 +       "github.com/uber/ringpop-go/discovery/jsonfile"
@@ -40,6 +61,7 @@ For static `Hosts`:
 -       bootstrapOpts.Hosts = []string{"127.0.0.1:3000", "127.0.0.1:3001"}
 +       bootstrapOpts.DiscoverProvider = statichosts.New("127.0.0.1:3000", "127.0.0.1:3001")
 ```
+
 
 v0.3.0
 ------
