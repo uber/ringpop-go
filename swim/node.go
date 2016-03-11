@@ -383,6 +383,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	if !opts.Stopped {
 		n.gossip.Start()
+		n.healer.Start()
 	}
 
 	n.state.Lock()
