@@ -225,6 +225,53 @@ func (s *RingpopOptionsTestSuite) TestTooSmallRingChecksumStatPeriod() {
 	s.Error(err)
 }
 
+func (s *RingpopOptionsTestSuite) TestSuspectPeriodConfig() {
+	rp, err := New("test", Channel(s.channel), SuspectPeriod(1*time.Second))
+	s.Require().NoError(err)
+	s.Require().NotNil(rp)
+
+	s.Equal(rp.config.StateTimeouts.Suspect, 1*time.Second)
+	s.Equal(rp.config.StateTimeouts.Faulty, time.Duration(0))
+	s.Equal(rp.config.StateTimeouts.Tombstone, time.Duration(0))
+}
+
+func (s *RingpopOptionsTestSuite) TestFaultyPeriodConfig() {
+	rp, err := New("test", Channel(s.channel), FaultyPeriod(2*time.Second))
+	s.Require().NoError(err)
+	s.Require().NotNil(rp)
+
+	s.Equal(rp.config.StateTimeouts.Suspect, time.Duration(0))
+	s.Equal(rp.config.StateTimeouts.Faulty, 2*time.Second)
+	s.Equal(rp.config.StateTimeouts.Tombstone, time.Duration(0))
+}
+
+func (s *RingpopOptionsTestSuite) TestTombstonePeriodConfig() {
+	rp, err := New("test", Channel(s.channel), TombstonePeriod(3*time.Second))
+	s.Require().NoError(err)
+	s.Require().NotNil(rp)
+
+	s.Equal(rp.config.StateTimeouts.Suspect, time.Duration(0))
+	s.Equal(rp.config.StateTimeouts.Faulty, time.Duration(0))
+	s.Equal(rp.config.StateTimeouts.Tombstone, 3*time.Second)
+}
+
+func (s *RingpopOptionsTestSuite) TestCombinedPeriodConfig() {
+	rp, err := New(
+		"test",
+		Channel(s.channel),
+		SuspectPeriod(1*time.Second),
+		FaultyPeriod(2*time.Second),
+		TombstonePeriod(3*time.Second),
+	)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(rp)
+
+	s.Equal(rp.config.StateTimeouts.Suspect, 1*time.Second)
+	s.Equal(rp.config.StateTimeouts.Faulty, 2*time.Second)
+	s.Equal(rp.config.StateTimeouts.Tombstone, 3*time.Second)
+}
+
 func TestRingpopOptionsTestSuite(t *testing.T) {
 	suite.Run(t, new(RingpopOptionsTestSuite))
 }

@@ -164,7 +164,8 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Clock: rp.clock,
+		StateTimeouts: rp.config.StateTimeouts,
+		Clock:         rp.clock,
 	})
 	rp.node.RegisterListener(rp)
 
@@ -313,11 +314,23 @@ func (rp *Ringpop) getState() state {
 	return r
 }
 
-// setState sets the state of the current Ringpop instance.
+// setState sets the state of the current Ringpop instance. It will emit an appropriate
+// event when the state will actually change
 func (rp *Ringpop) setState(s state) {
 	rp.stateMutex.Lock()
+	oldState := rp.state
 	rp.state = s
 	rp.stateMutex.Unlock()
+
+	// test if the state has changed with this call to setState
+	if oldState != s {
+		switch s {
+		case ready:
+			rp.emit(events.Ready{})
+		case destroyed:
+			rp.emit(events.Destroyed{})
+		}
+	}
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

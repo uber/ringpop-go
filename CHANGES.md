@@ -9,6 +9,8 @@ v0.DEV (to be released)
 * Ringpop will always assume the current host (`ringpop.node.identity`) is part
   of the cluster. Previously, it was true for only `Host`-based discovery.
 * Add Go 1.6 testing on CI
+* Implemented reaping of faulty nodes. By default ringpop will remove faulty nodes
+  after 24 hours of being in faulty state.
 
 ### Release notes
 
