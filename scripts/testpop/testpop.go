@@ -23,6 +23,7 @@ package main
 import (
 	"flag"
 	"regexp"
+	"time"
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
@@ -60,6 +61,9 @@ func main() {
 		ringpop.Channel(ch),
 		ringpop.Identity(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
+		ringpop.SuspectPeriod(5*time.Second),
+		ringpop.FaultyPeriod(5*time.Second),
+		ringpop.TombstonePeriod(5*time.Second),
 	)
 
 	if err := ch.ListenAndServe(*hostport); err != nil {
