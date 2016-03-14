@@ -29,7 +29,6 @@ import (
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim"
 )
 
 type configuration struct {
@@ -44,9 +43,6 @@ type configuration struct {
 	// See funcs {Membership,Ring}ChecksumStatPeriod for specifics.
 	MembershipChecksumStatPeriod time.Duration
 	RingChecksumStatPeriod       time.Duration
-
-	// StateTimeouts keeps the state transition timeouts for swim to use
-	StateTimeouts swim.StateTimeouts
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -237,45 +233,6 @@ func RingChecksumStatPeriod(period time.Duration) Option {
 			return errors.New("ring checksum stat period invalid below 10 ms")
 		}
 		r.config.RingChecksumStatPeriod = period
-		return nil
-	}
-}
-
-// SuspectPeriod configures the period it takes ringpop to declare a node faulty
-// after ringpop has first detected the node to be unresponsive to a healthcheck.
-// When a node is declared faulty it is removed from the consistent hashring and
-// stops forwarding traffic to that node. All keys previously routed to that node
-// will then be routed to the new owner of the key
-func SuspectPeriod(period time.Duration) Option {
-	return func(r *Ringpop) error {
-		r.config.StateTimeouts.Suspect = period
-		return nil
-	}
-}
-
-// FaultyPeriod configures the period Ringpop keeps a faulty node in its memberlist.
-// Even though the node will not receive any traffic it is still present in the
-// list in case it will come back online later. After this timeout ringpop will
-// remove the node from its membership list permanently. If a node happens to come
-// back after it has been removed from the membership Ringpop still allows it to
-// join and take its old position in the hashring. To remove the node from the
-// distributed membership it will mark it as a tombstone which can be removed from
-// every members membership list independently.
-func FaultyPeriod(period time.Duration) Option {
-	return func(r *Ringpop) error {
-		r.config.StateTimeouts.Faulty = period
-		return nil
-	}
-}
-
-// TombstonePeriod configures the period of the last time of the lifecycle in of
-// a node in the membership list. This period should give the gossip protocol the
-// time it needs to disseminate this change. If configured too short the node in
-// question might show up again in faulty state in the distributed memberlist of
-// Ringpop.
-func TombstonePeriod(period time.Duration) Option {
-	return func(r *Ringpop) error {
-		r.config.StateTimeouts.Tombstone = period
 		return nil
 	}
 }
