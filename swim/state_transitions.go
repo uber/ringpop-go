@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/util"
@@ -36,7 +37,7 @@ type subject interface {
 }
 
 type transitionTimer struct {
-	*time.Timer
+	*clock.Timer
 
 	// state represents the state the subject was in when the transition was scheduled
 	state string
@@ -46,30 +47,40 @@ type transitionTimer struct {
 type stateTransitions struct {
 	sync.Mutex
 
-	node *Node
-
+	node     *Node
+	clock    clock.Clock
 	timeouts StateTimeouts
 	timers   map[string]*transitionTimer
 	enabled  bool
-	logger   bark.Logger
+
+	logger bark.Logger
 }
 
 // StateTimeouts contains the configured timeouts for every state before transitioning to the new state
 type StateTimeouts struct {
 	// Suspect is the timeout it takes a node in suspect mode to transition to faulty
 	Suspect time.Duration
+
+	// Faulty is the timeout it takes a node in faulty mode to transition to tombstone
+	Faulty time.Duration
+
+	// Tombstone is the timeout it takes a node in tombstone mode to be evicted
+	Tombstone time.Duration
 }
 
 func mergeStateTimeouts(one StateTimeouts, two StateTimeouts) StateTimeouts {
 	return StateTimeouts{
-		Suspect: util.SelectDuration(one.Suspect, two.Suspect),
+		Suspect:   util.SelectDuration(one.Suspect, two.Suspect),
+		Faulty:    util.SelectDuration(one.Faulty, two.Faulty),
+		Tombstone: util.SelectDuration(one.Tombstone, two.Tombstone),
 	}
 }
 
 // newStateTransitions returns a new state transition controller that can be used to schedule state transitions for nodes
-func newStateTransitions(n *Node, timeouts StateTimeouts) *stateTransitions {
+func newStateTransitions(n *Node, clock clock.Clock, timeouts StateTimeouts) *stateTransitions {
 	return &stateTransitions{
 		node:     n,
+		clock:    clock,
 		timeouts: timeouts,
 		timers:   make(map[string]*transitionTimer),
 		enabled:  true,
@@ -83,6 +94,26 @@ func (s *stateTransitions) ScheduleSuspectToFaulty(subject subject) {
 	s.schedule(subject, Suspect, s.timeouts.Suspect, func() {
 		// transition the subject to faulty
 		s.node.memberlist.MakeFaulty(subject.address(), subject.incarnation())
+	})
+	s.Unlock()
+}
+
+// ScheduleFaultyToTombstone starts the faulty timer. After the Faulty timeout the node will be declared tombstone
+func (s *stateTransitions) ScheduleFaultyToTombstone(subject subject) {
+	s.Lock()
+	s.schedule(subject, Faulty, s.timeouts.Faulty, func() {
+		// transition the subject to tombstone
+		s.node.memberlist.MakeTombstone(subject.address(), subject.incarnation())
+	})
+	s.Unlock()
+}
+
+// ScheduleTombstoneToEvict starts the tombstone timer. After the Faulty timeout the node will be evicted
+func (s *stateTransitions) ScheduleTombstoneToEvict(subject subject) {
+	s.Lock()
+	s.schedule(subject, Tombstone, s.timeouts.Tombstone, func() {
+		// transition the subject to tombstone
+		s.node.memberlist.Evict(subject.address())
 	})
 	s.Unlock()
 }
@@ -110,7 +141,7 @@ func (s *stateTransitions) schedule(subject subject, state string, timeout time.
 		timer.Stop()
 	}
 
-	timer := time.AfterFunc(timeout, func() {
+	timer := s.clock.AfterFunc(timeout, func() {
 		s.logger.WithFields(bark.Fields{
 			"member": subject.address(),
 			"state":  state,
@@ -184,7 +215,7 @@ func (s *stateTransitions) Disable() {
 }
 
 // timer is a testing func to avoid data races
-func (s *stateTransitions) timer(address string) *time.Timer {
+func (s *stateTransitions) timer(address string) *clock.Timer {
 	s.Lock()
 	t, ok := s.timers[address]
 	s.Unlock()
