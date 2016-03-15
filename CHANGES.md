@@ -1,6 +1,12 @@
 ringpop-go changes
 ==================
 
+v0.4.1
+------
+
+* Reverting reaping faulty nodes feature temporarily while investigate backwards
+  compatibility issues.
+
 v0.4.0
 ------
 
