@@ -134,7 +134,7 @@ func (s *stateTransitions) schedule(subject subject, state string, timeout time.
 			s.logger.WithFields(bark.Fields{
 				"member": subject.address(),
 				"state":  state,
-			}).Warn("redundant call to schedule a state transition for memer, ignored")
+			}).Warn("redundant call to schedule a state transition for member, ignored")
 			return
 		}
 		// cancel the previously scheduled transition for the subject
