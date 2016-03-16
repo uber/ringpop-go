@@ -96,23 +96,26 @@ func (h *discoverProviderHealer) Probability() float64 {
 // Heal iterates over the hostList that the discoverProvider provider. If the
 // node encounters a host that is faulty or not in the membership, we pick that
 // node as a target to perform a partition heal with.
-func (h *discoverProviderHealer) Heal() {
+//
+// If heal was attempted, returns identities of the target nodes.
+func (h *discoverProviderHealer) Heal() []string {
 	h.node.emit(&AttemptHealEvent{})
 
 	// get list from discovery provider
 	if h.node.discoverProvider == nil {
-		return
+		return []string{}
 	}
 	hostList, err := h.node.discoverProvider.Hosts()
 	if err != nil {
 		// log discover provider failure
-		return
+		return []string{}
 	}
 
 	h.previousHostListSize = len(hostList)
 
 	// filter hosts that we already know about and attempt to heal nodes that
 	// are complementary to the membership of this node.
+	var ret []string
 	for _, target := range hostList {
 		m, ok := h.node.memberlist.Member(target)
 		if ok && m.Status != Faulty {
@@ -121,10 +124,12 @@ func (h *discoverProviderHealer) Heal() {
 
 		// try to heal partition
 		fmt.Println("REALLY HEAL")
+		ret = append(ret, target)
 		err = AttemptHeal(h.node, target)
 		if err != nil {
 			// TODO(wieger): log err
 		}
 		break
 	}
+	return ret
 }

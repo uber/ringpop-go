@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/discovery/statichosts"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim/test/mocks"
@@ -90,6 +91,29 @@ func (s *HandlerTestSuite) TestGossipStopHandler() {
 	s.NoError(err, "calling handler should not result in error")
 
 	s.True(s.testNode.node.gossip.Stopped())
+}
+
+// partitionHealerListener is used in TestPartitionHealerHandler
+type partitionHealerListener struct {
+	invoked bool
+}
+
+func (m *partitionHealerListener) HandleEvent(event events.Event) {
+	switch event.(type) {
+	case AttemptHealEvent:
+		m.invoked = true
+	}
+}
+
+func (s *HandlerTestSuite) TestPartitionHealerHandler() {
+	testhandler := &partitionHealerListener{false}
+	s.testNode.node.RegisterListener(testhandler)
+
+	_, err := s.testNode.node.partitionHealerHandler(s.ctx, &emptyArg{})
+	s.NoError(err, "calling handler should not result in error")
+
+	// check AttemptHealEvent was emitted.
+	s.Require().True(testhandler.invoked)
 }
 
 func (s *HandlerTestSuite) TestToggleGossipHandler() {
