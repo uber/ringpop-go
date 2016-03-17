@@ -24,35 +24,29 @@ import "time"
 
 // AttemptHeal attempts to heal a partition between the node and the target.
 // It is the responsibillity of the caller to detect that the node is indeed
-// separated from the target.
+// separated in two partitions. Let A be the partition that this node is part
+// of, and B be the partition that the target node is part of.
 //
-// The algorithm to heal the partition works as follows:
-// The goal is to first let every node reincarnate, we do this by declaring nodes
-// suspect. For members that are faulty in partition B, we fabricate updates with
-// a suspect in stead of faulty status and disseminate them through A. We also do
-// the reverse. We then create a connection from partition A to B and visa versa.
-// We do this by reincarnating this node and sending the respective update to the
-// target. The target has also been reincarnated due to previous actions, this
-// update is now applied on this node's membership to create the connection from
-// partition B to partition A.
+// The algorithm is as follows: First send a join request to the target and
+// compare its membership with the membership of this node. Any node that
+// is faulty in the target's membership and alive in this node's membership,
+// needs to be reincarnated. We force this by marking the respective nodes
+// as suspect in this node's membership. When the nodes receive the change
+// through dissemination they will reassert their aliveness and reincarnate.
+// Simmilarly for node that are faulty in this node's memberhsip and alive for
+// the target's membership. We force the reincarnation of those nodes by sending
+// a ping to the target in which we mark those nodes as suspect. Those nodes
+// will now also be disseminated and reincarnated.
 //
-// The heal alogrithm in more detail:
-// 1. send join request to the target, this tells us whether a partition exists
-// 2. collect changes for partition B:
-//    - collect all faulty members of this membership,
-//      now change the status of the updates from faulty to suspect;
-//    - reincarnate yourself and collect the respective change
-// 3. send the changes to the target, the changes will be disseminated
-//    through B automatically
-// 4. collect changes for partition A:
-//    - collect all faulty members from the join response of step 1,
-//      now change the statues of the update from faulty to suspect;
-//    - t has reincarnated itself upon receiving the ping from step 3,
-//      find that update from the ping response. If t has reincarnated
-//      for another reason the change might not be present. In this case
-//      we search for the change in the join response of step 1.
-// 5. apply the changes for partition A to the nodes membership,
-//    the changes will be disseminated through A automatically
+// When there are no nodes that are alive to one partition and faulty to the
+// other partition, we can safely merge the two partitions. We do this by
+// applying the membership from B to this node and by sending a ping with A's
+// membership to the target node. Dissemination will cause this information
+// to spread through the two partitions.
+//
+// Be mindfull that calling this function will not result in a heal when there
+// are nodes that need to be reincarated. A cluster may therefore need
+// multiple calls to this function with some time in between to heal.
 func AttemptHeal(node *Node, target string) error {
 	// If join request succeeds a partition is detected,
 	// this node will now coordinate the healing mechanism.
@@ -61,67 +55,71 @@ func AttemptHeal(node *Node, target string) error {
 		return err
 	}
 
-	// Create changes for partition B. Partition B is the partition the targets node is part of.
-	csForB := node.disseminator.FullSync()
-	// discard changes that are not faulty and change faulty to suspect
-	for i := 0; i < len(csForB); i++ {
-		// TODO (wieger): make filtering more precice
-		if csForB[i].Status != Faulty {
-			csForB[i] = csForB[len(csForB)-1]
-			csForB = csForB[:len(csForB)-1]
-			i--
-		} else {
-			csForB[i].Status = Suspect
+	A := node.disseminator.FullSync()
+	B := joinRes.Membership
+	var csForA, csForB []Change
+
+	// Find changes that are alive for B and faulty for A and visa versa.
+	for _, m2 := range B {
+		m1, ok := selectMember(A, m2.Address)
+		if !ok {
+			continue
+		}
+
+		// faulty for partition A, alive for partition B
+		// needs reincarnation in partition B.
+		if m1.Status == Faulty && m2.Status == Alive {
+			copy := m1
+			copy.Status = Suspect
+			csForB = append(csForB, copy)
+		}
+
+		// alive for partition A, faulty for partition B
+		// needs reincarnation in partition A.
+		if m1.Status == Alive && m2.Status == Faulty {
+			copy := m2
+			copy.Status = Suspect
+			csForA = append(csForA, copy)
 		}
 	}
 
-	// Bump inc no of this node and add that change for B.
-	bumpIncNoChange := node.memberlist.Reincarnate()
-	csForB = append(csForB, bumpIncNoChange...)
+	// Merge partitions if no node needs to reincarnate,
+	if len(csForA) == 0 && len(csForB) == 0 {
+		// TODO: send out event/log that we are merging
 
-	// Ping b with the changes that are just assembled.
-	res, err := sendPingWithChanges(node, target, csForB, time.Second)
+		// Add membership of B to this node, so that the membership
+		// information of B will be disseminated through A.
+		node.memberlist.Update(B)
+
+		// Send membership of A to the target node, so that the membership
+		// information of partition A will be disseminated through B.
+		_, err := sendPingWithChanges(node, target, A, time.Second)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// reincarnate all nodes by disseminating that they are suspect
+	// TODO: send out event/log that we are reincarnating
+	node.memberlist.Update(csForA)
+
+	_, err = sendPingWithChanges(node, target, csForB, time.Second)
 	if err != nil {
 		return err
 	}
 
-	// Create changes for partition A. Partition A is the partition this node is part of.
-	csForA := joinRes.Membership
-	// discard changes that are not faulty and change faulty to suspect
-	for i := 0; i < len(csForA); i++ {
-		if csForA[i].Status != Faulty {
-			csForA[i] = csForA[len(csForA)-1]
-			csForA = csForA[:len(csForA)-1]
-			i--
-		} else {
-			csForA[i].Status = Suspect
-		}
-	}
-
-	// target has reasserted that it is alive. We select this change so that A now has a bridge to B.
-	targetFound := false
-	for _, c := range res.Changes {
-		if c.Address == target {
-			csForA = append(csForA, c)
-			targetFound = true
-		}
-	}
-
-	// There is a chance that the target was already reincarnated due to a
-	// separate event. In this case we can find the status of the target node
-	// in the join response we received earlier.
-	for _, c := range joinRes.Membership {
-		if targetFound {
-			break
-		}
-		if c.Address == target {
-			csForA = append(csForA, c)
-			targetFound = true
-		}
-	}
-
-	// Add changes to membership of this node so that they will be dissemiated through partition A.
-	node.memberlist.Update(csForA)
-
 	return nil
+}
+
+// selectMember selects the member with the specified address from the partition.
+func selectMember(partition []Change, address string) (Change, bool) {
+	for _, m := range partition {
+		if m.Address == address {
+			return m, true
+		}
+	}
+
+	return Change{}, false
 }
