@@ -73,7 +73,7 @@ func defaultOptions() *Options {
 		RollupMaxUpdates:    250,
 
 		PartitionHealPeriod:           30 * time.Second,
-		PartitionHealBaseProbabillity: 3,
+		PartitionHealBaseProbabillity: 0,
 
 		Clock: clock.New(),
 	}
