@@ -68,7 +68,7 @@ func AttemptHeal(node *Node, target string) error {
 
 		// faulty for partition A, alive for partition B
 		// needs reincarnation in partition B.
-		if m1.Status == Faulty && m2.Status == Alive {
+		if m1.Status == Faulty && m2.Status == Alive && m1.Incarnation >= m2.Incarnation {
 			copy := m1
 			copy.Status = Suspect
 			csForB = append(csForB, copy)
@@ -76,13 +76,12 @@ func AttemptHeal(node *Node, target string) error {
 
 		// alive for partition A, faulty for partition B
 		// needs reincarnation in partition A.
-		if m1.Status == Alive && m2.Status == Faulty {
+		if m1.Status == Alive && m2.Status == Faulty && m1.Incarnation <= m2.Incarnation {
 			copy := m2
 			copy.Status = Suspect
 			csForA = append(csForA, copy)
 		}
 	}
-
 	// Merge partitions if no node needs to reincarnate,
 	if len(csForA) == 0 && len(csForB) == 0 {
 		// TODO: send out event/log that we are merging
@@ -93,7 +92,8 @@ func AttemptHeal(node *Node, target string) error {
 
 		// Send membership of A to the target node, so that the membership
 		// information of partition A will be disseminated through B.
-		_, err := sendPingWithChanges(node, target, A, time.Second)
+		A1 := node.disseminator.FullSync()
+		_, err := sendPingWithChanges(node, target, A1, time.Second)
 		if err != nil {
 			return err
 		}
