@@ -66,8 +66,15 @@ func handlePingRequest(node *Node, req *pingRequest) (*pingResponse, error) {
 	changes, fullSync :=
 		node.disseminator.IssueAsReceiver(req.Source, req.SourceIncarnation, req.Checksum)
 
+	// Bidirectional full sync.
 	if fullSync {
-		// TODO: something...
+		go func() {
+			res, err := sendJoinRequest(node, req.Source, time.Second)
+			if err != nil {
+				// TODO: log bidirectional full sync failed
+			}
+			node.memberlist.Update(res.Membership)
+		}()
 	}
 
 	return &pingResponse{
