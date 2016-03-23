@@ -27,8 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber/ringpop-go/discovery"
-
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
@@ -68,10 +66,6 @@ type joinOpts struct {
 	size              int
 	maxJoinDuration   time.Duration
 	parallelismFactor int
-
-	// discoverProvider is the DiscoverProvider that this joinSender will use to
-	// enumerate bootstrap hosts.
-	discoverProvider discovery.DiscoverProvider
 
 	// delayer delays repeated join attempts.
 	delayer joinDelayer
@@ -123,13 +117,13 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 		opts = &joinOpts{}
 	}
 
-	if opts.discoverProvider == nil {
+	if node.discoverProvider == nil {
 		return nil, errors.New("no discover provider")
 	}
 
 	// Resolve/retrieve bootstrap hosts from the provider specified in the
 	// join options.
-	bootstrapHosts, err := opts.discoverProvider.Hosts()
+	bootstrapHosts, err := node.discoverProvider.Hosts()
 	if err != nil {
 		return nil, err
 	}

@@ -136,6 +136,7 @@ type Node struct {
 	}
 
 	channel          shared.SubChannel
+	discoverProvider discovery.DiscoverProvider
 	memberlist       *memberlist
 	memberiter       memberIter
 	disseminator     *disseminator
@@ -343,12 +344,12 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	n.memberlist.Reincarnate()
 
+	n.discoverProvider = opts.DiscoverProvider
 	joinOpts := &joinOpts{
 		timeout:           opts.JoinTimeout,
 		size:              opts.JoinSize,
 		maxJoinDuration:   opts.MaxJoinDuration,
 		parallelismFactor: opts.ParallelismFactor,
-		discoverProvider:  opts.DiscoverProvider,
 	}
 
 	joined, err := sendJoin(n, joinOpts)
