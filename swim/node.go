@@ -54,6 +54,17 @@ type Options struct {
 
 	MaxReverseFullSyncJobs int
 
+	// When started, the partition healing algorithm attempts a partition heal
+	// every PartitionHealPeriod with a probability of:
+	// PartitionHealBaseProbabillity / # Nodes in discoverProvider.
+	//
+	// When in a 100 node cluster BaseProbabillity = 3 and Period = 30s,
+	// every 30 seconds a node will have a probability of 3/100 to start the
+	// partition healing procedure. This means that for the entire cluster
+	// the discover provider receives 6 calls per minute on average.
+	PartitionHealPeriod           time.Duration
+	PartitionHealBaseProbabillity float64
+
 	Clock clock.Clock
 }
 
@@ -73,6 +84,9 @@ func defaultOptions() *Options {
 
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
+
+		PartitionHealPeriod:           30 * time.Second,
+		PartitionHealBaseProbabillity: 3,
 
 		Clock: clock.New(),
 
@@ -95,6 +109,12 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.RollupMaxUpdates = util.SelectInt(opts.RollupMaxUpdates, def.RollupMaxUpdates)
 	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval, def.RollupFlushInterval)
+
+	opts.PartitionHealPeriod = util.SelectDuration(opts.PartitionHealPeriod,
+		def.PartitionHealPeriod)
+
+	opts.PartitionHealBaseProbabillity = util.SelectFloat(opts.PartitionHealBaseProbabillity,
+		def.PartitionHealBaseProbabillity)
 
 	opts.JoinTimeout = util.SelectDuration(opts.JoinTimeout, def.JoinTimeout)
 	opts.PingTimeout = util.SelectDuration(opts.PingTimeout, def.PingTimeout)
@@ -145,6 +165,9 @@ type Node struct {
 	gossip           *gossip
 	rollup           *updateRollup
 
+	// When we get more healer strategies we can abstract to a healer interface.
+	healer *discoverProviderHealer
+
 	joinTimeout, pingTimeout, pingRequestTimeout time.Duration
 
 	pingRequestSize int
@@ -194,6 +217,12 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
 	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
+
+	node.healer = newDiscoverProviderHealer(
+		node,
+		opts.PartitionHealBaseProbabillity,
+		opts.PartitionHealPeriod,
+	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
@@ -251,6 +280,7 @@ func (n *Node) RegisterListener(l EventListener) {
 func (n *Node) Start() {
 	n.gossip.Start()
 	n.stateTransitions.Enable()
+	n.healer.Start()
 
 	n.state.Lock()
 	n.state.stopped = false
@@ -261,6 +291,7 @@ func (n *Node) Start() {
 func (n *Node) Stop() {
 	n.gossip.Stop()
 	n.stateTransitions.Disable()
+	n.healer.Stop()
 
 	n.state.Lock()
 	n.state.stopped = true
@@ -278,6 +309,10 @@ func (n *Node) Stopped() bool {
 
 // Destroy stops the SWIM protocol and all sub-protocols.
 func (n *Node) Destroy() {
+	if n.state.destroyed {
+		return
+	}
+
 	n.Stop()
 	n.rollup.Destroy()
 
@@ -367,6 +402,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	if !opts.Stopped {
 		n.gossip.Start()
+		n.healer.Start()
 	}
 
 	n.state.Lock()

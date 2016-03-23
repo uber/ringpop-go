@@ -234,10 +234,49 @@ type RedundantReverseFullSyncEvent struct {
 	Target string `json:"target"`
 }
 
+// AttemptHealEvent is sent when the discover provider healer attempts to heal a partition
+type DiscoHealEvent struct{}
+
+// AttemptHealEvent is sent when the healer is triggered
+type AttemptHealEvent struct{}
+
+// EventRegistrar is an object that you can register EventListeners on.
+type EventRegistrar interface {
+	RegisterListener(EventListener)
+}
+
+// on is returns an EventListener that executes a function f upon receiving an
+// event of type t.
 func on(t interface{}, f func()) ListenerFunc {
 	return ListenerFunc(func(e events.Event) {
 		if reflect.TypeOf(t) == reflect.TypeOf(e) {
 			f()
 		}
 	})
+}
+
+// ExecuteThenWaitFor executes a function and then waits for a specific type
+// of event to occur.
+//
+// Often we want to execute some code and then wait for an event be emitted due
+// to the code being executed. However in order to not miss the event we must
+// first register an event handler before we can execute the code:
+// - register listener that signals we can continue on receiving the correct event;
+// - execute the code that will lead to an event being emitted;
+// - wait for the continue signal.
+//
+// This can be quite hard to follow. Ideally we want it to look like
+// - execute the code that will lead to an event being emitted;
+// - and then wait for a specific event.
+//
+// This function helps with making the code read like the latter.
+func ExecuteThenWaitFor(f func(), er EventRegistrar, t interface{}) {
+	block := make(chan struct{})
+
+	er.RegisterListener(on(t, func() {
+		close(block)
+	}))
+
+	f()
+	<-block
 }

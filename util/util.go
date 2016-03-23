@@ -217,6 +217,15 @@ func SelectInt(opt, def int) int {
 	return opt
 }
 
+// SelectFloat takes an option and a default value and returns the default value if
+// the option is equal to zero, and the option otherwise.
+func SelectFloat(opt, def float64) float64 {
+	if opt == 0 {
+		return def
+	}
+	return opt
+}
+
 // SelectDuration takes an option and a default value and returns the default value if
 // the option is equal to zero, and the option otherwise.
 func SelectDuration(opt, def time.Duration) time.Duration {

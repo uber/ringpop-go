@@ -373,8 +373,8 @@ func TestBidirectionalFullSync(t *testing.T) {
 	b := newChannelNode(t)
 	defer b.Destroy()
 
-	// after bootstrap a's memberlist contains a and b,
-	// but b's membership only contains b.
+	// After bootstrap, a's memberlist contains a and b, but b's membership
+	// only contains b.
 	bootstrapNodes(t, b, a)
 
 	// clear changes so that a full sync will be issued

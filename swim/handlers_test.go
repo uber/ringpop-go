@@ -92,6 +92,13 @@ func (s *HandlerTestSuite) TestGossipStopHandler() {
 	s.True(s.testNode.node.gossip.Stopped())
 }
 
+func (s *HandlerTestSuite) TestPartitionHealerHandler() {
+	ExecuteThenWaitFor(func() {
+		_, err := s.testNode.node.partitionHealerHandler(s.ctx, &emptyArg{})
+		s.NoError(err, "calling handler should not result in error")
+	}, s.testNode.node, DiscoHealEvent{})
+}
+
 func (s *HandlerTestSuite) TestToggleGossipHandler() {
 	s.Require().True(s.testNode.node.gossip.Stopped())
 

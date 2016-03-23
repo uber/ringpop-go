@@ -64,8 +64,8 @@ fetch-ringpop-common() {
     fi
 
     run cd "$ringpop_common_dir"
-    #run git checkout master
-    run git pull
+    run git checkout ws-partition-healing
+    # run git pull
     run cd - >/dev/null
 
     run cd "${ringpop_common_dir}/test"
