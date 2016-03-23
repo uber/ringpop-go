@@ -543,7 +543,11 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 		}
 	}
 
+	start := time.Now()
 	rp.ring.AddRemoveServers(serversToAdd, serversToRemove)
+	treeConstructionTime := time.Now().Sub(start)
+	rp.statter.RecordTimer(rp.getStatKey("tree"), nil, treeConstructionTime)
+
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
