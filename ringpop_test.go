@@ -204,6 +204,18 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), stats.vals["ringpop.127_0_0_1_3001.num-members"], "missing num-members stats for member being set to unknown")
 	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
+	s.ringpop.HandleEvent(swim.FullSyncEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync"], "missing stats for full sync")
+
+	s.ringpop.HandleEvent(swim.StartReverseFullSyncEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync.reverse"], "missing stats for reverse full sync")
+
+	s.ringpop.HandleEvent(swim.OmitReverseFullSyncEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync.reverse-omitted"], "missing stats for omitted reverse full sync")
+
+	s.ringpop.HandleEvent(swim.RedundantReverseFullSyncEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync.redundant-reverse"], "missing stats for redundant reverse full sync")
+
 	s.ringpop.HandleEvent(swim.MaxPAdjustedEvent{NewPCount: 100})
 	s.Equal(int64(100), stats.vals["ringpop.127_0_0_1_3001.max-piggyback"], "missing stats for piggyback adjustment")
 	// expected listener to record 1 event
@@ -372,7 +384,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(42, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(46, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {

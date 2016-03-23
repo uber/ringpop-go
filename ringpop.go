@@ -415,6 +415,15 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
+	case swim.StartReverseFullSyncEvent:
+		rp.statter.IncCounter(rp.getStatKey("full-sync.reverse"), nil, 1)
+
+	case swim.OmitReverseFullSyncEvent:
+		rp.statter.IncCounter(rp.getStatKey("full-sync.reverse-omitted"), nil, 1)
+
+	case swim.RedundantReverseFullSyncEvent:
+		rp.statter.IncCounter(rp.getStatKey("full-sync.redundant-reverse"), nil, 1)
+
 	case swim.MaxPAdjustedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("max-piggyback"), nil, int64(event.NewPCount))
 

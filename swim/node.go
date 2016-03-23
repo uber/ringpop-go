@@ -52,6 +52,8 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
+	MaxReverseFullSyncJobs int
+
 	Clock clock.Clock
 }
 
@@ -73,6 +75,8 @@ func defaultOptions() *Options {
 		RollupMaxUpdates:    250,
 
 		Clock: clock.New(),
+
+		MaxReverseFullSyncJobs: 5,
 	}
 
 	return opts
@@ -87,21 +91,18 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.StateTimeouts = mergeStateTimeouts(opts.StateTimeouts, def.StateTimeouts)
 
-	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod,
-		def.MinProtocolPeriod)
+	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod, def.MinProtocolPeriod)
 
-	opts.RollupMaxUpdates = util.SelectInt(opts.RollupMaxUpdates,
-		def.RollupMaxUpdates)
-	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval,
-		def.RollupFlushInterval)
+	opts.RollupMaxUpdates = util.SelectInt(opts.RollupMaxUpdates, def.RollupMaxUpdates)
+	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval, def.RollupFlushInterval)
 
 	opts.JoinTimeout = util.SelectDuration(opts.JoinTimeout, def.JoinTimeout)
 	opts.PingTimeout = util.SelectDuration(opts.PingTimeout, def.PingTimeout)
-	opts.PingRequestTimeout = util.SelectDuration(opts.PingRequestTimeout,
-		def.PingRequestTimeout)
+	opts.PingRequestTimeout = util.SelectDuration(opts.PingRequestTimeout, def.PingRequestTimeout)
 
-	opts.PingRequestSize = util.SelectInt(opts.PingRequestSize,
-		def.PingRequestSize)
+	opts.PingRequestSize = util.SelectInt(opts.PingRequestSize, def.PingRequestSize)
+
+	opts.MaxReverseFullSyncJobs = util.SelectInt(opts.MaxReverseFullSyncJobs, def.MaxReverseFullSyncJobs)
 
 	if opts.Clock == nil {
 		opts.Clock = def.Clock
@@ -148,6 +149,8 @@ type Node struct {
 
 	pingRequestSize int
 
+	maxReverseFullSyncJobs int
+
 	listeners []EventListener
 
 	clientRate metrics.Meter
@@ -179,6 +182,8 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		pingRequestTimeout: opts.PingRequestTimeout,
 
 		pingRequestSize: opts.PingRequestSize,
+
+		maxReverseFullSyncJobs: opts.MaxReverseFullSyncJobs,
 
 		clientRate: metrics.NewMeter(),
 		serverRate: metrics.NewMeter(),
