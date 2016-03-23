@@ -434,13 +434,13 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	return responses.successes, responses.failures
 }
 
-func (j *joinSender) MakeCall(ctx json.Context, node string, res *joinResponse) <-chan error {
+func (j *joinSender) MakeCall(ctx json.Context, target string, res *joinResponse) <-chan error {
 	errC := make(chan error)
 
 	go func() {
 		defer close(errC)
 
-		peer := j.node.channel.Peers().GetOrAdd(node)
+		peer := j.node.channel.Peers().GetOrAdd(target)
 
 		req := joinRequest{
 			App:         j.node.app,
@@ -462,6 +462,23 @@ func (j *joinSender) MakeCall(ctx json.Context, node string, res *joinResponse) 
 	}()
 
 	return errC
+}
+
+func sendJoinRequest(node *Node, target string, timeout time.Duration) (*joinResponse, error) {
+	ctx, cancel := shared.NewTChannelContext(timeout)
+	defer cancel()
+
+	peer := node.channel.Peers().GetOrAdd(target)
+
+	req := joinRequest{
+		App:         node.app,
+		Source:      node.address,
+		Incarnation: node.Incarnation(),
+		Timeout:     timeout,
+	}
+	res := &joinResponse{}
+	err := json.CallPeer(ctx, peer, node.service, "/protocol/join", req, res)
+	return res, err
 }
 
 // SendJoin creates a new JoinSender and attempts to join the cluster defined by
