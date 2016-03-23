@@ -157,7 +157,7 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 }
 
 func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
-	timeoutCh := time.After(timeout)
+	deadline := time.Now().Add(timeout)
 
 	nodes := testNodesToNodes(testNodes)
 
@@ -166,27 +166,27 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 	// check that all nodes have the same checksum for the memberlist, this means
 	// that the cluster is converged.
 Tick:
-	for {
-		select {
-		case <-timeoutCh:
-			t.Errorf("timeout during wait for convergence")
-			return
-		default:
-			for _, node := range nodes {
-				node.gossip.ProtocolPeriod()
-			}
-			for _, node := range nodes {
-				if node.HasChanges() {
-					continue Tick
-				}
-			}
+	// return when deadline is reached
+	if time.Now().After(deadline) {
+		t.Errorf("timeout during wait for convergence")
+		return
+	}
 
-			if !nodesConverged(nodes) {
-				t.Errorf("nodes did not converge to 1 checksum")
-			}
+	// tick all the nodes
+	for _, node := range nodes {
+		node.gossip.ProtocolPeriod()
+	}
 
-			return
+	// repeat if we stil have changes
+	for _, node := range nodes {
+		if node.HasChanges() {
+			goto Tick
 		}
+	}
+
+	// check for convergence if there are no changes left
+	if !nodesConverged(nodes) {
+		t.Errorf("nodes did not converge to 1 checksum")
 	}
 }
 
