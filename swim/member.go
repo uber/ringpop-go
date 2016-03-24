@@ -129,7 +129,7 @@ type Change struct {
 	Address           string `json:"address"`
 	Incarnation       int64  `json:"incarnationNumber"`
 	Status            string `json:"status"`
-	Tombstone         bool   `json:"tombstone"`
+	Tombstone         bool   `json:"tombstone,omitempty"`
 	// Use util.Timestamp for bi-direction binding to time encoded as
 	// integer Unix timestamp in JSON
 	Timestamp util.Timestamp `json:"timestamp"`
