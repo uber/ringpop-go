@@ -84,6 +84,11 @@ type JoinCompleteEvent struct {
 	Joined    []string      `json:"joined"`
 }
 
+// AddJoinListEvent is sent when a join list is added to the membership
+type AddJoinListEvent struct {
+	Duration time.Duration `json:"duration"`
+}
+
 // JoinFailedReason indicates the reason a join failed
 type JoinFailedReason string
 

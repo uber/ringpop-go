@@ -410,8 +410,9 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			start := time.Now()
 			j.node.memberlist.AddJoinList(res.Membership)
 
-			addJoinListTime := time.Now().Sub(start)
-			rp.statter.RecordTimer(rp.getStatKey("join.add-join-list"), nil, addJoinListTime)
+			j.node.emit(AddJoinListEvent{
+				Duration: time.Now().Sub(start),
+			})
 		}(target)
 	}
 
