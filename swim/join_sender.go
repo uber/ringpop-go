@@ -52,6 +52,8 @@ const (
 	defaultParallelismFactor = 2
 )
 
+var errJoinTimeout = errors.New("join timed out")
+
 // A joinRequest is used to request a join to a remote node
 type joinRequest struct {
 	App         string        `json:"app"`
@@ -373,49 +375,38 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	j.numTries++
 	j.node.emit(JoinTriesUpdateEvent{j.numTries})
 
-	for _, node := range group {
+	for _, target := range group {
 		wg.Add(1)
-		go func(n string) {
-			ctx, cancel := shared.NewTChannelContext(j.timeout)
-			defer cancel()
 
-			var res joinResponse
-			var failed bool
+		go func(target string) {
+			defer wg.Done()
 
-			select {
-			case err := <-j.MakeCall(ctx, n, &res):
-				if err != nil {
-					j.logger.WithFields(log.Fields{
-						"remote":  n,
-						"timeout": j.timeout,
-					}).Debug("attempt to join node failed")
-					failed = true
-					break
+			res, err := sendJoinRequest(j.node, target, j.timeout)
+
+			if err != nil {
+				msg := "attempt to join node failed"
+				if err == errJoinTimeout {
+					msg = "attempt to join node timed out"
 				}
 
-				j.node.memberlist.AddJoinList(res.Membership)
-
-			case <-ctx.Done():
 				j.logger.WithFields(log.Fields{
-					"remote":  n,
+					"remote":  target,
 					"timeout": j.timeout,
-				}).Debug("attempt to join node timed out")
-				failed = true
+				}).Debug(msg)
+
+				responses.Lock()
+				responses.failures = append(responses.failures, target)
+				responses.Unlock()
+				return
 			}
 
-			if !failed {
-				responses.Lock()
-				responses.successes = append(responses.successes, n)
-				responses.Unlock()
-			} else {
-				responses.Lock()
-				responses.failures = append(responses.failures, n)
-				responses.Unlock()
-			}
-
-			wg.Done()
-		}(node)
+			responses.Lock()
+			responses.successes = append(responses.successes, target)
+			responses.Unlock()
+			j.node.memberlist.AddJoinList(res.Membership)
+		}(target)
 	}
+
 	// wait for joins to complete
 	wg.Wait()
 
@@ -434,36 +425,6 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	return responses.successes, responses.failures
 }
 
-func (j *joinSender) MakeCall(ctx json.Context, target string, res *joinResponse) <-chan error {
-	errC := make(chan error)
-
-	go func() {
-		defer close(errC)
-
-		peer := j.node.channel.Peers().GetOrAdd(target)
-
-		req := joinRequest{
-			App:         j.node.app,
-			Source:      j.node.address,
-			Incarnation: j.node.Incarnation(),
-			Timeout:     j.timeout,
-		}
-
-		err := json.CallPeer(ctx, peer, j.node.service, "/protocol/join", req, res)
-		if err != nil {
-			j.logger.WithFields(log.Fields{
-				"error": err,
-			}).Debug("could not complete join")
-			errC <- err
-			return
-		}
-
-		errC <- nil
-	}()
-
-	return errC
-}
-
 func sendJoinRequest(node *Node, target string, timeout time.Duration) (*joinResponse, error) {
 	ctx, cancel := shared.NewTChannelContext(timeout)
 	defer cancel()
@@ -477,7 +438,30 @@ func sendJoinRequest(node *Node, target string, timeout time.Duration) (*joinRes
 		Timeout:     timeout,
 	}
 	res := &joinResponse{}
-	err := json.CallPeer(ctx, peer, node.service, "/protocol/join", req, res)
+
+	// make request
+	errC := make(chan error)
+	go func() {
+		errC <- json.CallPeer(ctx, peer, node.service, "/protocol/join", req, res)
+	}()
+
+	// wait for result or timeout
+	var err error
+	select {
+	case err = <-errC:
+	case <-ctx.Done():
+		err = errJoinTimeout
+	}
+
+	if err != nil {
+		logging.Logger("join").WithFields(log.Fields{
+			"local": node.Address(),
+			"error": err,
+		}).Debug("could not complete join")
+
+		return nil, err
+	}
+
 	return res, err
 }
 

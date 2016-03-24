@@ -26,7 +26,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/discovery/statichosts"
-	"github.com/uber/tchannel-go/json"
 )
 
 type JoinSenderTestSuite struct {
@@ -147,16 +146,9 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
-	ctx, cancel := json.NewContext(joiner.timeout)
-	defer cancel()
-
-	var res joinResponse
-	select {
-	case err := <-joiner.MakeCall(ctx, peer.node.Address(), &res):
-		s.Error(err, "expected join to fail for different apps")
-	case <-ctx.Done():
-		s.Fail("expected join to not timeout")
-	}
+	res, err := sendJoinRequest(s.node, peer.node.Address(), joiner.timeout)
+	s.Nil(res, "expected err, not a response")
+	s.Error(err, "expected join to fail for different apps")
 }
 
 func (s *JoinSenderTestSuite) TestJoinSelf() {
@@ -173,16 +165,9 @@ func (s *JoinSenderTestSuite) TestJoinSelf() {
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
-	ctx, cancel := json.NewContext(joiner.timeout)
-	defer cancel()
-
-	var res joinResponse
-	select {
-	case err := <-joiner.MakeCall(ctx, s.node.Address(), &res):
-		s.Error(err, "expected join to fail for different apps")
-	case <-ctx.Done():
-		s.Fail("expected join to not timeout")
-	}
+	res, err := sendJoinRequest(s.node, s.node.Address(), joiner.timeout)
+	s.Nil(res, "expected err, not a response")
+	s.Error(err, "expected join to fail when joining yourself")
 }
 
 func (s *JoinSenderTestSuite) TestCustomDelayer() {
