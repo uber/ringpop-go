@@ -113,7 +113,8 @@ func statePrecedence(s string) int {
 	case Tombstone:
 		return 4
 	default:
-		panic("invalid state")
+		// unknown states will never have precedence
+		return -1
 	}
 }
 
