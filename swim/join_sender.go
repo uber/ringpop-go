@@ -358,6 +358,9 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 	return nodesJoined, nil
 }
 
+// JoinGroup collects a number of nodes to join and sends join requests to them.
+// nodesJoined contains the nodes that are already joined. The method returns
+// the nodes that are succesfully joined, and the nodes that failed respond.
 func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	group := j.SelectGroup(nodesJoined)
 
@@ -403,7 +406,12 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			responses.Lock()
 			responses.successes = append(responses.successes, target)
 			responses.Unlock()
+
+			start := time.Now()
 			j.node.memberlist.AddJoinList(res.Membership)
+
+			addJoinListTime := time.Now().Sub(start)
+			rp.statter.RecordTimer(rp.getStatKey("join.add-join-list"), nil, addJoinListTime)
 		}(target)
 	}
 
@@ -425,6 +433,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	return responses.successes, responses.failures
 }
 
+// sendJoinRequest sends a join request to the specified target.
 func sendJoinRequest(node *Node, target string, timeout time.Duration) (*joinResponse, error) {
 	ctx, cancel := shared.NewTChannelContext(timeout)
 	defer cancel()
