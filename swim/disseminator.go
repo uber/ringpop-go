@@ -110,7 +110,7 @@ func (d *disseminator) FullSync() (changes []Change) {
 			Source:            d.node.Address(),
 			SourceIncarnation: d.node.Incarnation(),
 			Status:            member.Status,
-		})
+		}.validateOutgoing())
 	}
 
 	d.Unlock()
@@ -200,7 +200,7 @@ func (d *disseminator) issueChanges() []Change {
 	// To make JSON output [] instead of null on empty change list
 	result := []Change{}
 	for _, change := range d.changes {
-		result = append(result, change.Change)
+		result = append(result, change.Change.validateOutgoing())
 	}
 
 	d.Unlock()

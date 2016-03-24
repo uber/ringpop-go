@@ -129,9 +129,25 @@ type Change struct {
 	Address           string `json:"address"`
 	Incarnation       int64  `json:"incarnationNumber"`
 	Status            string `json:"status"`
+	Tombstone         bool   `json:"tombstone"`
 	// Use util.Timestamp for bi-direction binding to time encoded as
 	// integer Unix timestamp in JSON
 	Timestamp util.Timestamp `json:"timestamp"`
+}
+
+func (c Change) validateIncomming() Change {
+	if c.Status == Faulty && c.Tombstone {
+		c.Status = Tombstone
+	}
+	return c
+}
+
+func (c Change) validateOutgoing() Change {
+	if c.Status == Tombstone {
+		c.Status = Faulty
+		c.Tombstone = true
+	}
+	return c
 }
 
 // suspect interface
