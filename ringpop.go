@@ -426,6 +426,9 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 		rp.statter.IncCounter(rp.getStatKey("join.succeeded"), nil, 1)
 		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
 
+	case swim.AddJoinListEvent:
+		rp.statter.RecordTimer(rp.getStatKey("join.add-join-list"), nil, event.Duration)
+
 	case swim.PingSendEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping.send"), nil, 1)
 
