@@ -23,6 +23,8 @@ package swim
 import (
 	"time"
 
+	"reflect"
+
 	"github.com/uber/ringpop-go/events"
 )
 
@@ -213,3 +215,29 @@ type RequestBeforeReadyEvent struct {
 
 // A RefuteUpdateEvent is sent when a node detects gossip about its own state that needs to be corrected
 type RefuteUpdateEvent struct{}
+
+// A StartReverseFullSyncEvent is sent when a node starts the reverse full sync procedure
+type StartReverseFullSyncEvent struct {
+	Target string `json:"target"`
+}
+
+// OmitReverseFullSyncEvent is sent when a node omits the reverse full sync
+// prodedure because there are already the max number of reverse full sync
+// processes running.
+type OmitReverseFullSyncEvent struct {
+	Target string `json:"target"`
+}
+
+// RedundantReverseFullSyncEvent is sent when no new changes were added due
+// to the reverse full sync.
+type RedundantReverseFullSyncEvent struct {
+	Target string `json:"target"`
+}
+
+func on(t interface{}, f func()) ListenerFunc {
+	return ListenerFunc(func(e events.Event) {
+		if reflect.TypeOf(t) == reflect.TypeOf(e) {
+			f()
+		}
+	})
+}
