@@ -304,9 +304,9 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		return nil
 	}
 
-	// validate incomming changes
+	// validate incoming changes
 	for i, change := range changes {
-		changes[i] = change.validateIncomming()
+		changes[i] = change.validateIncoming()
 	}
 
 	m.node.emit(MemberlistChangesReceivedEvent{changes})

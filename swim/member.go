@@ -135,7 +135,7 @@ type Change struct {
 	Timestamp util.Timestamp `json:"timestamp"`
 }
 
-func (c Change) validateIncomming() Change {
+func (c Change) validateIncoming() Change {
 	if c.Status == Faulty && c.Tombstone {
 		c.Status = Tombstone
 	}
