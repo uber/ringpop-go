@@ -190,7 +190,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 		})
 	}()
 
-	// bootstrap b then add a to it's bootstrap provider after
+	// bootstrap b then add a to its bootstrap provider
 	bootstrapNodes(t, b)
 	b.node.discoverProvider = discoProvider
 	b.node.disseminator.ClearChanges()
@@ -208,7 +208,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	_, has = b.node.memberlist.Member(a.node.Address())
 	assert.True(t, has, "expected that a is now part of b's membership")
 
-	// make sure that a is still not bootstrapped, this causes a to be suspect to be
+	// make sure that a is still not bootstrapped, this causes a to be suspect to b
 	ExecuteThenWaitFor(func() {
 		b.node.pingNextMember()
 	}, a.node, RequestBeforeReadyEvent{})
@@ -256,8 +256,8 @@ func (p partition) ProgressTime(T time.Duration) {
 	}
 }
 
-// HasPartitionAs checks that every node from A, contains every node from B in its
-// membership. It also checks that the members from B have the correct
+// HasPartitionAs checks that every node from A contains every node from B in
+// its membership. It also checks that the members from B have the correct
 // incarnation number and status.
 func (p partition) HasPartitionAs(t *testing.T, B partition, incarnation int64, status string) {
 	for _, a := range p {
