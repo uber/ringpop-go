@@ -229,6 +229,41 @@ func (s *MemberlistTestSuite) TestUpdateEmpty() {
 	s.Empty(applied, "expected no updates to be applied")
 }
 
+func (s *MemberlistTestSuite) TestUpdateWithTombstoneState() {
+	target := "127.0.0.1:3002"
+	s.m.MakeAlive(target, s.incarnation)
+
+	s.m.Update([]Change{
+		Change{
+			Address:     target,
+			Incarnation: s.incarnation,
+			Status:      Tombstone,
+		},
+	})
+
+	member := s.m.members.byAddress[target]
+
+	s.Assert().Equal(Tombstone, member.Status, "expected the member with tombstone state")
+}
+
+func (s *MemberlistTestSuite) TestUpdateWithTombstoneFlag() {
+	target := "127.0.0.1:3002"
+	s.m.MakeAlive(target, s.incarnation)
+
+	s.m.Update([]Change{
+		Change{
+			Address:     target,
+			Incarnation: s.incarnation,
+			Status:      Faulty,
+			Tombstone:   true,
+		},
+	})
+
+	member := s.m.members.byAddress[target]
+
+	s.Assert().Equal(Tombstone, member.Status, "expected the member with tombstone state")
+}
+
 func (s *MemberlistTestSuite) TestRandomPingable() {
 	s.m.MakeAlive("127.0.0.1:3002", testInc)
 	s.m.MakeAlive("127.0.0.1:3003", testInc)
