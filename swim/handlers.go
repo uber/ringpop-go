@@ -48,7 +48,7 @@ type Status struct {
 	Status string `json:"status"`
 }
 
-// HealStatus contains a list of nodes where healing was attempted
+// HealResponse contains a list of nodes where healing was attempted
 type HealResponse struct {
 	Targets []string `json:"targets"`
 }

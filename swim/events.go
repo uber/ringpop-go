@@ -234,7 +234,7 @@ type RedundantReverseFullSyncEvent struct {
 	Target string `json:"target"`
 }
 
-// AttemptHealEvent is sent when the discover provider healer attempts to heal a partition
+// DiscoHealEvent is sent when the discover provider healer attempts to heal a partition
 type DiscoHealEvent struct{}
 
 // AttemptHealEvent is sent when the healer is triggered

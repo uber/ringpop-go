@@ -289,8 +289,9 @@ func (p partition) Hosts() []string {
 
 func (p partition) String() string {
 	r := ""
-	for _, m := range p[0].node.memberlist.GetMembers() {
-		r += fmt.Sprintln(m.Address, m.Incarnation, m.Status)
+	mems := p[0].node.memberlist.GetMembers()
+	for i := range mems {
+		r += fmt.Sprintln(mems[i].Address, mems[i].Incarnation, mems[i].Status)
 	}
 	r += fmt.Sprintln()
 	return r
