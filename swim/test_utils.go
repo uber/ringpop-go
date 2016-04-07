@@ -156,15 +156,14 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 	return hostports
 }
 
+// waitForConvergence let's the nodes gossip and returns when the nodes are converged.
+// After the cluster finished gossipping we double check that all nodes have the
+// same checksum for the memberlist, this means that the cluster is converged.
 func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
 	deadline := time.Now().Add(timeout)
 
 	nodes := testNodesToNodes(testNodes)
 
-	// To get the cluster to a converged state we will let the nodes gossip until
-	// there are no more changes. After the cluster finished gossipping we double
-	// check that all nodes have the same checksum for the memberlist, this means
-	// that the cluster is converged.
 Tick:
 	// return when deadline is reached
 	if time.Now().After(deadline) {

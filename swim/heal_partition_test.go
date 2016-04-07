@@ -100,9 +100,7 @@ func TestPartitionHealWithFaultyAndMissing(t *testing.T) {
 	A.ProgressTime(time.Millisecond * 3)
 	B.ProgressTime(time.Millisecond * 5)
 
-	// A.AddPartitionWithStatus(B1, Suspect)
 	A.AddPartitionWithStatus(B1, Faulty)
-	// B.AddPartitionWithStatus(A1, Suspect)
 	B.AddPartitionWithStatus(A1, Faulty)
 
 	waitForConvergence(t, 3*time.Second, A...)
@@ -165,9 +163,8 @@ func TestPartitionHealWithTime(t *testing.T) {
 // TestHealBeforeBootstrap tests that we can heal with a node that is still
 // bootstrapping. We put a node in the bootstrapping phase by giving it a
 // host-list that is impossible to join. When it is in this phase, we trigger
-// a heal attempt from another node. The heal should succeed from b's
-// perspective. Healing from bootstrap is very similar to joining a node that
-// is in the bootstrapping phase.
+// a heal attempt from another node. The heal should succeed from the other
+// node's perspective.
 func TestHealBeforeBootstrap(t *testing.T) {
 	a := newChannelNode(t)
 	defer a.Destroy()
@@ -306,8 +303,10 @@ func (p partition) Contains(address string) bool {
 	return false
 }
 
-// waitForPartitionHeal is same as waitForConvergence but unlike that function,
-// waitForPatitionHeal doesn't stop when no dissemination is detected.
+// waitForPartitionHeal let's the nodes of all partitions gossip and returns
+// when the nodes are converged. After the cluster finished gossipping we
+// double check that all nodes have the same checksum for the memberlist,
+// this means that the cluster is converged and healed.
 func waitForPartitionHeal(t *testing.T, timeout time.Duration, ps ...partition) {
 	var nodes []*Node
 	for _, p := range ps {

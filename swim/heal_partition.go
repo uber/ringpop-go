@@ -70,7 +70,7 @@ func AttemptHeal(node *Node, target string) error {
 	}
 	// Merge partitions if no node needs to reincarnate,
 	if len(csForA) == 0 && len(csForB) == 0 {
-		// TODO: send out event/log that we are merging
+		node.healer.logger.WithField("target", target).Info("merge two partitions")
 
 		// Add membership of B to this node, so that the membership
 		// information of B will be disseminated through A.
@@ -88,7 +88,7 @@ func AttemptHeal(node *Node, target string) error {
 	}
 
 	// reincarnate all nodes by disseminating that they are suspect
-	// TODO: send out event/log that we are reincarnating
+	node.healer.logger.WithField("target", target).Info("reincarnate nodes before we can merge the partitions")
 	node.memberlist.Update(csForA)
 
 	_, err = sendPingWithChanges(node, target, csForB, time.Second)
