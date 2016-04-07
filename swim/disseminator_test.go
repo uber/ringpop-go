@@ -135,6 +135,37 @@ func (s *DisseminatorTestSuite) TestIssueChangesAsSender() {
 	s.Len(changes, 3, "expected three changes to be issued")
 }
 
+func (s *DisseminatorTestSuite) TestIssueChangesAsSenderForTombstone() {
+	s.d.ClearChanges()
+
+	tombstoneAddr := "127.0.0.1:3002"
+	// tombstones are only applied when the member is in the list, via MakeAlive
+	// we ensure that the member is in the list before we declare it as a tombstone
+	s.m.MakeAlive(tombstoneAddr, s.incarnation)
+	s.m.MakeTombstone(tombstoneAddr, s.incarnation)
+
+	changes, _ := s.d.IssueAsSender()
+	s.Require().Len(changes, 1, "required to only have the tombstone change")
+	s.Assert().Equal("faulty", changes[0].Status, "expected tombstone to be gossiped as a faulty state")
+	s.Assert().Equal(true, changes[0].Tombstone, "expected tombstone to be gossiped with a tombstone flag")
+}
+
+func (s *DisseminatorTestSuite) TestIssueChangesAsReceiverForTombstone() {
+	s.d.ClearChanges()
+
+	tombstoneAddr := "127.0.0.1:3002"
+	otherAddr := "127.0.0.1:3003"
+	// tombstones are only applied when the member is in the list, via MakeAlive
+	// we ensure that the member is in the list before we declare it as a tombstone
+	s.m.MakeAlive(tombstoneAddr, s.incarnation)
+	s.m.MakeTombstone(tombstoneAddr, s.incarnation)
+
+	changes, _ := s.d.IssueAsReceiver(otherAddr, s.node.Incarnation(), s.m.Checksum())
+	s.Require().Len(changes, 1, "required to only have the tombstone change")
+	s.Assert().Equal("faulty", changes[0].Status, "expected tombstone to be gossiped as a faulty state")
+	s.Assert().Equal(true, changes[0].Tombstone, "expected tombstone to be gossiped with a tombstone flag")
+}
+
 func (s *DisseminatorTestSuite) TestIssueChangesAsReceiver() {
 	s.d.ClearChanges()
 
