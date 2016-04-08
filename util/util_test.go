@@ -95,6 +95,13 @@ func TestUtilSelectOptInt(t *testing.T) {
 	assert.Equal(t, def, SelectInt(zopt, def), "expected to get default")
 }
 
+func TestUtilSelectOptFloat(t *testing.T) {
+	opt, zopt, def := 1.0, 0.0, 2.0
+
+	assert.Equal(t, opt, SelectFloat(opt, def), "expected to get option")
+	assert.Equal(t, def, SelectFloat(zopt, def), "expected to get default")
+}
+
 func TestUtilsSelectOptDuration(t *testing.T) {
 	opt, zopt, def := time.Duration(1), time.Duration(0), time.Duration(2)
 

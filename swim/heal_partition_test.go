@@ -48,8 +48,8 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, 3*time.Second, A...)
-	waitForConvergence(t, 3*time.Second, B...)
+	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, time.Second, B...)
 
 	A.HasPartitionAs(t, A, 3, "alive")
 	A.HasPartitionAs(t, B, 0, "faulty")
@@ -60,7 +60,7 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second*3, A, B)
+	waitForPartitionHeal(t, time.Second, A, B)
 
 	A.HasPartitionAs(t, A, 3, "alive")
 	A.HasPartitionAs(t, B, 5, "alive")
@@ -80,7 +80,7 @@ func TestPartitionHealWithMissing(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second*3, A, B)
+	waitForPartitionHeal(t, time.Second, A, B)
 
 	A.HasPartitionAs(t, A, 0, "alive")
 	A.HasPartitionAs(t, B, 0, "alive")
@@ -88,7 +88,61 @@ func TestPartitionHealWithMissing(t *testing.T) {
 	B.HasPartitionAs(t, A, 0, "alive")
 }
 
-func TestPartitionHealWithFaultyAndMissing(t *testing.T) {
+func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
+	A := newPartition(t, 5)
+	B := newPartition(t, 5)
+	defer destroyNodes(A...)
+	defer destroyNodes(B...)
+
+	A.AddPartitionWithStatus(B, Faulty)
+
+	A.ProgressTime(time.Millisecond * 3)
+	B.ProgressTime(time.Millisecond * 5)
+
+	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
+
+	targets := A[0].node.healer.Heal()
+	assert.Len(t, targets, 1, "expected correct amount of targets")
+	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
+
+	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, time.Second, B...)
+
+	targets = A[0].node.healer.Heal()
+	assert.Len(t, targets, 1, "expected correct amount of targets")
+	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
+
+	waitForPartitionHeal(t, time.Second, A, B)
+}
+
+func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
+	A := newPartition(t, 5)
+	B := newPartition(t, 5)
+	defer destroyNodes(A...)
+	defer destroyNodes(B...)
+
+	B.AddPartitionWithStatus(A, Faulty)
+
+	A.ProgressTime(time.Millisecond * 3)
+	B.ProgressTime(time.Millisecond * 5)
+
+	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
+
+	targets := A[0].node.healer.Heal()
+	assert.Len(t, targets, 1, "expected correct amount of targets")
+	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
+
+	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, time.Second, B...)
+
+	targets = A[0].node.healer.Heal()
+	assert.Len(t, targets, 1, "expected correct amount of targets")
+	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
+
+	waitForPartitionHeal(t, time.Second, A, B)
+}
+
+func TestPartitionHealWithFaultyAndMissing3(t *testing.T) {
 	A := newPartition(t, 6)
 	A1 := partition(A[0:3])
 	defer destroyNodes(A...)
@@ -103,16 +157,16 @@ func TestPartitionHealWithFaultyAndMissing(t *testing.T) {
 	A.AddPartitionWithStatus(B1, Faulty)
 	B.AddPartitionWithStatus(A1, Faulty)
 
-	waitForConvergence(t, 3*time.Second, A...)
-	waitForConvergence(t, 3*time.Second, B...)
+	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, time.Second, B...)
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 	A[0].node.healer.Heal()
-	waitForConvergence(t, 3*time.Second, A...)
-	waitForConvergence(t, 3*time.Second, B...)
+	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, time.Second, B...)
 
 	A[0].node.healer.Heal()
-	waitForPartitionHeal(t, time.Second*3, A, B)
+	waitForPartitionHeal(t, time.Second, A, B)
 }
 
 // TestPartitionHealSemiPartition checks if the ring cluster automatically
@@ -128,7 +182,51 @@ func TestPartitionHealSemiParition(t *testing.T) {
 
 	A.AddPartitionWithStatus(B, Alive)
 
-	waitForPartitionHeal(t, time.Second*3, A, B)
+	waitForPartitionHeal(t, time.Second, A, B)
+}
+
+func TestPartitionHealWithMultiplePartitions(t *testing.T) {
+	A := newPartition(t, 5)
+	Bs := []partition{
+		newPartition(t, 1),
+		newPartition(t, 1),
+		newPartition(t, 1),
+		newPartition(t, 2),
+		newPartition(t, 2),
+	}
+
+	for _, B := range Bs {
+		A.AddPartitionWithStatus(B, Faulty)
+	}
+
+	A.ProgressTime(time.Millisecond * 3)
+	for _, B := range Bs {
+		B.ProgressTime(time.Millisecond * 5)
+	}
+
+	A.AddPartitionWithStatus(Bs[0], Faulty)
+	A.AddPartitionWithStatus(Bs[1], Faulty)
+	A.AddPartitionWithStatus(Bs[2], Faulty)
+	A.AddPartitionWithStatus(Bs[3], Faulty)
+
+	hosts := A.Hosts()
+	for _, B := range Bs {
+		hosts = append(hosts, B.Hosts()...)
+	}
+	A[0].node.discoverProvider = statichosts.New(hosts...)
+
+	targets := A[0].node.healer.Heal()
+	assert.Len(t, targets, 5, "expected correct amount of targets")
+
+	waitForConvergence(t, time.Second, A...)
+	for _, B := range Bs {
+		waitForConvergence(t, time.Second, B...)
+	}
+
+	targets = A[0].node.healer.Heal()
+	assert.Len(t, targets, 5, "expected correct amount of targets")
+
+	waitForPartitionHeal(t, time.Second, append(Bs, A)...)
 }
 
 func TestPartitionHealWithTime(t *testing.T) {
@@ -220,7 +318,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	c.Add(time.Millisecond)
 	a.node.clock = c
 
-	waitForConvergence(t, time.Second*3, a, b)
+	waitForConvergence(t, time.Second, a, b)
 }
 
 type partition []*testNode
@@ -229,6 +327,7 @@ func newPartition(t *testing.T, n int) partition {
 	p := partition(genChannelNodes(t, n))
 	bootstrapNodes(t, p...)
 	waitForConvergence(t, 500*time.Millisecond, p...)
+	p.ClearChanges()
 	return p
 }
 
@@ -239,6 +338,10 @@ func (p partition) AddPartitionWithStatus(B partition, status string) {
 		}
 	}
 
+	p.ClearChanges()
+}
+
+func (p partition) ClearChanges() {
 	for _, n := range p {
 		n.node.disseminator.ClearChanges()
 	}
@@ -317,6 +420,7 @@ func waitForPartitionHeal(t *testing.T, timeout time.Duration, ps ...partition) 
 
 Tick:
 	for {
+
 		// check deadline
 		if time.Now().After(deadline) {
 			t.Errorf("timeout during wait for convergence")
@@ -332,6 +436,13 @@ Tick:
 		for _, node := range nodes {
 			if node.HasChanges() {
 				continue Tick
+			}
+		}
+
+		// continue until all members are reachable
+		for _, node := range nodes {
+			if node.memberlist.CountReachableMembers() != len(nodes) {
+				continue
 			}
 		}
 

@@ -135,8 +135,8 @@ func genChannelNodes(t *testing.T, n int) (nodes []*testNode) {
 func memberlistHasMembers(t *testing.T, m *memberlist, members []Member) {
 	for _, expected := range members {
 		member, ok := m.Member(expected.Address)
-		require.NotNil(t, member, "member cannot be nil")
 		assert.True(t, ok, "expected member to be in memberlist")
+		require.NotNil(t, member, "member cannot be nil")
 		assert.Equal(t, expected.Status, member.Status, "expected statuses to be the same")
 	}
 }
@@ -163,6 +163,13 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 	deadline := time.Now().Add(timeout)
 
 	nodes := testNodesToNodes(testNodes)
+
+	// 1 node is a special case because it can't drain its changes since it
+	// cannot ping or be pinged by another member
+	if len(nodes) == 1 {
+		nodes[0].disseminator.ClearChanges()
+		return
+	}
 
 Tick:
 	// return when deadline is reached

@@ -30,7 +30,10 @@ import "time"
 // need multiple calls to this function with some time in between to heal.
 //
 // Check out ringpop-common/docs for a full description of the algorithm.
-func AttemptHeal(node *Node, target string) error {
+func AttemptHeal(node *Node, targets []string) ([]string, error) {
+	target := targets[0]
+	targets = del(targets, target)
+
 	node.emit(AttemptHealEvent{})
 	node.logger.WithField("target", target).Info("attempt heal")
 
@@ -38,13 +41,16 @@ func AttemptHeal(node *Node, target string) error {
 	// this node will now coordinate the healing mechanism.
 	joinRes, err := sendJoinRequest(node, target, time.Second)
 	if err != nil {
-		return err
+		return targets, err
 	}
 
 	A := node.disseminator.FullSync()
 	B := joinRes.Membership
 	var csForA, csForB []Change
 
+	for _, b := range B {
+		targets = del(targets, b.Address)
+	}
 	// Find changes that are alive for B and faulty for A and visa versa.
 	for _, m2 := range B {
 		m1, ok := selectMember(A, m2.Address)
@@ -55,19 +61,26 @@ func AttemptHeal(node *Node, target string) error {
 		// faulty for partition A, alive for partition B
 		// needs reincarnation in partition B.
 		if m1.Status == Faulty && m2.Status == Alive && m1.Incarnation >= m2.Incarnation {
-			copy := m1
-			copy.Status = Suspect
-			csForB = append(csForB, copy)
+			// copy := m1
+			// copy.Status = Suspect
+			csForB = append(csForB, Change{
+				Address:     m1.Address,
+				Incarnation: m1.Incarnation,
+				Status:      Suspect,
+			})
 		}
 
 		// alive for partition A, faulty for partition B
 		// needs reincarnation in partition A.
 		if m1.Status == Alive && m2.Status == Faulty && m1.Incarnation <= m2.Incarnation {
-			copy := m2
-			copy.Status = Suspect
-			csForA = append(csForA, copy)
+			csForA = append(csForA, Change{
+				Address:     m2.Address,
+				Incarnation: m2.Incarnation,
+				Status:      Suspect,
+			})
 		}
 	}
+
 	// Merge partitions if no node needs to reincarnate,
 	if len(csForA) == 0 && len(csForB) == 0 {
 		node.healer.logger.WithField("target", target).Info("merge two partitions")
@@ -81,22 +94,25 @@ func AttemptHeal(node *Node, target string) error {
 		A1 := node.disseminator.FullSync()
 		_, err := sendPingWithChanges(node, target, A1, time.Second)
 		if err != nil {
-			return err
+			return targets, err
 		}
 
-		return nil
+		return targets, nil
 	}
 
 	// reincarnate all nodes by disseminating that they are suspect
 	node.healer.logger.WithField("target", target).Info("reincarnate nodes before we can merge the partitions")
 	node.memberlist.Update(csForA)
 
-	_, err = sendPingWithChanges(node, target, csForB, time.Second)
-	if err != nil {
-		return err
+	if len(csForB) != 0 {
+		_, err = sendPingWithChanges(node, target, csForB, time.Second)
+		if err != nil {
+			return targets, err
+		}
+
 	}
 
-	return nil
+	return targets, nil
 }
 
 // selectMember selects the member with the specified address from the partition.
@@ -108,4 +124,18 @@ func selectMember(partition []Change, address string) (Change, bool) {
 	}
 
 	return Change{}, false
+}
+
+// del returns a slice where all ocurences of s are filtered out. This modifies
+// the original slice.
+func del(strs []string, s string) []string {
+	for i := 0; i < len(strs); i++ {
+		if strs[i] != s {
+			continue
+		}
+		strs[i] = strs[len(strs)-1]
+		strs = strs[:len(strs)-1]
+		i--
+	}
+	return strs
 }
