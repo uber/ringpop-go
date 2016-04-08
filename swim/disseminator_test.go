@@ -390,7 +390,7 @@ func TestBidirectionalFullSync(t *testing.T) {
 
 	// only when a reverse full sync is issued the membership of b changes
 	// we listen for a membership change and continue the main thread of the test
-	b.node.RegisterListener(on(MemberlistChangesAppliedEvent{}, func() {
+	b.node.RegisterListener(on(MemberlistChangesAppliedEvent{}, func(e Event) {
 		cont <- struct{}{}
 	}))
 
@@ -431,14 +431,14 @@ func TestThrottleBidirectionalFullSyncs(t *testing.T) {
 	total := int64(0)
 
 	// Block the reverse full sync procedure to test if we throttle correctly.
-	tnode.node.RegisterListener(on(StartReverseFullSyncEvent{}, func() {
+	tnode.node.RegisterListener(on(StartReverseFullSyncEvent{}, func(e Event) {
 		atomic.AddInt64(&total, 1)
 		<-block
 	}))
 
 	// Listen for a reverse full sync that is omitted because the max number of
 	// reverse full sync routines are running.
-	tnode.node.RegisterListener(on(OmitReverseFullSyncEvent{}, func() {
+	tnode.node.RegisterListener(on(OmitReverseFullSyncEvent{}, func(e Event) {
 		go func() {
 			for i := 0; i < maxJobs; i++ {
 				block <- struct{}{}
@@ -493,7 +493,7 @@ func TestRedundantFullSync(t *testing.T) {
 	waitForConvergence(t, time.Second, tnodes...)
 
 	quit := make(chan struct{})
-	tnodes[0].node.RegisterListener(on(RedundantReverseFullSyncEvent{}, func() {
+	tnodes[0].node.RegisterListener(on(RedundantReverseFullSyncEvent{}, func(e Event) {
 		close(quit)
 	}))
 

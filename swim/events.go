@@ -28,6 +28,8 @@ import (
 	"github.com/uber/ringpop-go/events"
 )
 
+type Event interface{}
+
 // An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
 type EventListener interface {
 	HandleEvent(events.Event)
@@ -247,10 +249,10 @@ type EventRegistrar interface {
 
 // on is returns an EventListener that executes a function f upon receiving an
 // event of type t.
-func on(t interface{}, f func()) ListenerFunc {
+func on(t interface{}, f func(e Event)) ListenerFunc {
 	return ListenerFunc(func(e events.Event) {
 		if reflect.TypeOf(t) == reflect.TypeOf(e) {
-			f()
+			f(e)
 		}
 	})
 }
@@ -273,7 +275,7 @@ func on(t interface{}, f func()) ListenerFunc {
 func ExecuteThenWaitFor(f func(), er EventRegistrar, t interface{}) {
 	block := make(chan struct{})
 
-	er.RegisterListener(on(t, func() {
+	er.RegisterListener(on(t, func(e Event) {
 		close(block)
 	}))
 

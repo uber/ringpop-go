@@ -272,7 +272,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 
 	// block a from completing bootstrap
 	block := make(chan struct{})
-	a.node.RegisterListener(on(JoinTriesUpdateEvent{}, func() {
+	a.node.RegisterListener(on(JoinTriesUpdateEvent{}, func(e Event) {
 		<-block
 	}))
 
