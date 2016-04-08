@@ -43,15 +43,25 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 
 	A := node.disseminator.MembershipAsChanges()
 	B := joinRes.Membership
-	var csForA, csForB []Change
 
-	var addressesOfB []string
-	for _, b := range B {
-		if b.Status == Alive {
-			addressesOfB = append(addressesOfB, b.Address)
-		}
+	// Get the nodes that aren't mergeable and need to reincarnate
+	csForA, csForB := nodesThatNeedToReincarnate(A, B)
+
+	// Reincarnate the nodes that need to reincarnate
+	if len(csForA) != 0 || len(csForB) != 0 {
+		err = reincarnateNodes(node, target, csForA, csForB)
+		return aliveHosts(B), err
 	}
 
+	// Merge partitions if no node needs to reincarnate
+	err = mergePartitions(node, target, A, B)
+	return aliveHosts(B), err
+}
+
+// nodesThatNeedToReincarnate finds all nodes would become faulty when
+// membership A gets merged with membership B. These need to reincarnate
+// first, before we can heal the partition with a merge.
+func nodesThatNeedToReincarnate(A, B []Change) (csForA, csForB []Change) {
 	// Find changes that are alive for B and faulty for A and visa versa.
 	for _, b := range B {
 		a, ok := selectMember(A, b.Address)
@@ -80,43 +90,47 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 		}
 	}
 
-	// Merge partitions if no node needs to reincarnate,
-	if len(csForA) == 0 && len(csForB) == 0 {
-		node.healer.logger.WithField("target", target).Info("merge two partitions")
+	return csForA, csForB
+}
 
-		// Add membership of B to this node, so that the membership
-		// information of B will be disseminated through A.
-		node.memberlist.Update(B)
-
-		// Send membership of A to the target node, so that the membership
-		// information of partition A will be disseminated through B.
-		A1 := node.disseminator.MembershipAsChanges()
-		_, err := sendPingWithChanges(node, target, A1, time.Second)
-		if err != nil {
-			return nil, err
-		}
-
-		return addressesOfB, nil
-	}
-
+// reincarnateNodes applies csForA to this nodes membership, and sends a ping
+// with csForB to B's membership, so that B will apply those changes in its
+// ping handler.
+func reincarnateNodes(node *Node, target string, csForA, csForB []Change) error {
 	// reincarnate all nodes by disseminating that they are suspect
 	node.healer.logger.WithField("target", target).Info("reincarnate nodes before we can merge the partitions")
 	node.memberlist.Update(csForA)
 
+	var err error
 	if len(csForB) != 0 {
 		_, err = sendPingWithChanges(node, target, csForB, time.Second)
-		if err != nil {
-			return nil, err
-		}
-
 	}
 
-	return addressesOfB, nil
+	return err
 }
 
-func Addresses(cs []Change) (ret []string) {
-	for _, c := range cs {
-		ret = append(ret, c.Address)
+// mergePartitions applies the membership of B to a and send the membership
+// A to B piggybacked on top of a ping.
+func mergePartitions(node *Node, target string, A, B []Change) error {
+	node.healer.logger.WithField("target", target).Info("merge two partitions")
+
+	// Add membership of B to this node, so that the membership
+	// information of B will be disseminated through A.
+	node.memberlist.Update(B)
+
+	// Send membership of A to the target node, so that the membership
+	// information of partition A will be disseminated through B.
+	// A1 := node.disseminator.MembershipAsChanges()
+	_, err := sendPingWithChanges(node, target, A, time.Second)
+	return err
+}
+
+// aliveHosts returns the address of those changes that have the Alive status.
+func aliveHosts(cs []Change) (ret []string) {
+	for _, b := range cs {
+		if b.Status == Alive {
+			ret = append(ret, b.Address)
+		}
 	}
 	return
 }
@@ -130,18 +144,4 @@ func selectMember(partition []Change, address string) (Change, bool) {
 	}
 
 	return Change{}, false
-}
-
-// del returns a slice where all ocurences of s are filtered out. This modifies
-// the original slice.
-func del(strs []string, s string) []string {
-	for i := 0; i < len(strs); i++ {
-		if strs[i] != s {
-			continue
-		}
-		strs[i] = strs[len(strs)-1]
-		strs = strs[:len(strs)-1]
-		i--
-	}
-	return strs
 }

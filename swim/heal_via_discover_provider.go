@@ -148,3 +148,17 @@ func (h *discoverProviderHealer) Heal() []string {
 
 	return ret
 }
+
+// del returns a slice where all ocurences of s are filtered out. This modifies
+// the original slice.
+func del(strs []string, s string) []string {
+	for i := 0; i < len(strs); i++ {
+		if strs[i] != s {
+			continue
+		}
+		strs[i] = strs[len(strs)-1]
+		strs = strs[:len(strs)-1]
+		i--
+	}
+	return strs
+}
