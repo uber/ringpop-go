@@ -30,10 +30,7 @@ import "time"
 // need multiple calls to this function with some time in between to heal.
 //
 // Check out ringpop-common/docs for a full description of the algorithm.
-func AttemptHeal(node *Node, targets []string) ([]string, error) {
-	target := targets[0]
-	targets = del(targets, target)
-
+func AttemptHeal(node *Node, target string) ([]string, error) {
 	node.emit(AttemptHealEvent{})
 	node.logger.WithField("target", target).Info("attempt heal")
 
@@ -41,41 +38,43 @@ func AttemptHeal(node *Node, targets []string) ([]string, error) {
 	// this node will now coordinate the healing mechanism.
 	joinRes, err := sendJoinRequest(node, target, time.Second)
 	if err != nil {
-		return targets, err
+		return nil, err
 	}
 
-	A := node.disseminator.FullSync()
+	A := node.disseminator.MembershipAsChanges()
 	B := joinRes.Membership
 	var csForA, csForB []Change
 
+	var addressesOfB []string
 	for _, b := range B {
-		targets = del(targets, b.Address)
+		if b.Status == Alive {
+			addressesOfB = append(addressesOfB, b.Address)
+		}
 	}
+
 	// Find changes that are alive for B and faulty for A and visa versa.
-	for _, m2 := range B {
-		m1, ok := selectMember(A, m2.Address)
+	for _, b := range B {
+		a, ok := selectMember(A, b.Address)
 		if !ok {
 			continue
 		}
 
 		// faulty for partition A, alive for partition B
 		// needs reincarnation in partition B.
-		if m1.Status == Faulty && m2.Status == Alive && m1.Incarnation >= m2.Incarnation {
-			// copy := m1
-			// copy.Status = Suspect
+		if a.Status == Faulty && b.Status == Alive && a.Incarnation >= b.Incarnation {
 			csForB = append(csForB, Change{
-				Address:     m1.Address,
-				Incarnation: m1.Incarnation,
+				Address:     a.Address,
+				Incarnation: a.Incarnation,
 				Status:      Suspect,
 			})
 		}
 
 		// alive for partition A, faulty for partition B
 		// needs reincarnation in partition A.
-		if m1.Status == Alive && m2.Status == Faulty && m1.Incarnation <= m2.Incarnation {
+		if a.Status == Alive && b.Status == Faulty && a.Incarnation <= b.Incarnation {
 			csForA = append(csForA, Change{
-				Address:     m2.Address,
-				Incarnation: m2.Incarnation,
+				Address:     b.Address,
+				Incarnation: b.Incarnation,
 				Status:      Suspect,
 			})
 		}
@@ -91,13 +90,13 @@ func AttemptHeal(node *Node, targets []string) ([]string, error) {
 
 		// Send membership of A to the target node, so that the membership
 		// information of partition A will be disseminated through B.
-		A1 := node.disseminator.FullSync()
+		A1 := node.disseminator.MembershipAsChanges()
 		_, err := sendPingWithChanges(node, target, A1, time.Second)
 		if err != nil {
-			return targets, err
+			return nil, err
 		}
 
-		return targets, nil
+		return addressesOfB, nil
 	}
 
 	// reincarnate all nodes by disseminating that they are suspect
@@ -107,12 +106,19 @@ func AttemptHeal(node *Node, targets []string) ([]string, error) {
 	if len(csForB) != 0 {
 		_, err = sendPingWithChanges(node, target, csForB, time.Second)
 		if err != nil {
-			return targets, err
+			return nil, err
 		}
 
 	}
 
-	return targets, nil
+	return addressesOfB, nil
+}
+
+func Addresses(cs []Change) (ret []string) {
+	for _, c := range cs {
+		ret = append(ret, c.Address)
+	}
+	return
 }
 
 // selectMember selects the member with the specified address from the partition.

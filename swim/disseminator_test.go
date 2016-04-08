@@ -119,7 +119,7 @@ func (s *DisseminatorTestSuite) TestFullSync() {
 		s.m.MakeAlive(address, s.incarnation)
 	}
 
-	changes := s.d.FullSync()
+	changes := s.d.MembershipAsChanges()
 
 	s.Len(changes, 4, "expected to get change for each member")
 }
@@ -508,7 +508,7 @@ func TestRedundantFullSync(t *testing.T) {
 }
 
 // TestReverseFullSyncJoinFailure test the code path for when the join in the
-// reverseFullSync fails. If the app doesn't crash, the test has passed.
+// reverseFullSync fails.
 func TestReverseFullSyncJoinFailure(t *testing.T) {
 	tnodes := genChannelNodes(t, 5)
 	bootstrapNodes(t, tnodes...)

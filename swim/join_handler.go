@@ -69,7 +69,7 @@ func handleJoin(node *Node, req *joinRequest) (*joinResponse, error) {
 	res := &joinResponse{
 		App:         node.app,
 		Coordinator: node.address,
-		Membership:  node.disseminator.FullSync(),
+		Membership:  node.disseminator.MembershipAsChanges(),
 		Checksum:    node.memberlist.Checksum(),
 	}
 

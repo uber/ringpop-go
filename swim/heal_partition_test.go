@@ -296,8 +296,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 
 	// start heal
 	targets := b.node.healer.Heal()
-	assert.Len(t, targets, 1, "expected that b healed with node node a")
-	assert.Equal(t, a.node.Address(), targets[0], "expected b healed with node a")
+	assert.Len(t, targets, 0, "expected that b cannot completely heal with a")
 
 	// a is now part of b's membership
 	_, has = b.node.memberlist.Member(a.node.Address())

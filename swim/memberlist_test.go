@@ -72,7 +72,7 @@ func (s *MemberlistTestSuite) TestAddJoinList() {
 
 	// We add all the members of this node to the joinList because we want
 	// the joinList to contain the change for the local member.
-	mems := s.node.disseminator.FullSync()
+	mems := s.node.disseminator.MembershipAsChanges()
 	for _, mem := range mems {
 		joinList = append(joinList, mem)
 	}

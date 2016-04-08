@@ -116,24 +116,34 @@ func (h *discoverProviderHealer) Heal() []string {
 
 	h.previousHostListSize = len(hostList)
 
+	var targets []string
+	for _, address := range hostList {
+		m, ok := h.node.memberlist.Member(address)
+		if !ok || m.Status == Faulty {
+			targets = append(targets, address)
+		}
+	}
+
 	// filter hosts that we already know about and attempt to heal nodes that
 	// are complementary to the membership of this node.
 	var ret []string
 
-	for len(hostList) != 0 {
-		target := hostList[0]
-		m, ok := h.node.memberlist.Member(target)
-		if ok && m.Status != Faulty {
-			hostList = del(hostList, target)
+	for len(targets) != 0 {
+		target := targets[0]
+		targets = del(targets, target)
+
+		// try to heal partition
+		hostsOnOtherSide, err := AttemptHeal(h.node, target)
+		if err != nil {
+			h.logger.WithField("error", err.Error()).Warn("heal failed")
 			continue
 		}
 
-		// try to heal partition
-		ret = append(ret, hostList[0])
-		hostList, err = AttemptHeal(h.node, hostList)
-		if err != nil {
-			h.logger.WithField("error", err.Error()).Warn("heal failed")
+		for _, host := range hostsOnOtherSide {
+			targets = del(targets, host)
 		}
+
+		ret = append(ret, target)
 	}
 
 	return ret
