@@ -28,6 +28,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 )
 
+// Event interface
 type Event interface{}
 
 // An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.

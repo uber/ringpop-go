@@ -62,9 +62,7 @@ func (h *discoverProviderHealer) Start() {
 	go func() {
 		for {
 			// attempt heal with the pro
-			p := rand.Float64()
-			P := h.Probability()
-			if p < P {
+			if rand.Float64() < h.Probability() {
 				h.Heal()
 			}
 
