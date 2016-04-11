@@ -42,7 +42,7 @@ type discoverProviderHealer struct {
 	period           time.Duration
 
 	previousHostListSize int
-	quit                 chan bool
+	quit                 chan struct{}
 
 	logger log.Logger
 }
@@ -52,7 +52,7 @@ func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Dur
 		node:             n,
 		baseProbabillity: baseProbability,
 		period:           period,
-		quit:             make(chan bool, 1),
+		quit:             make(chan struct{}),
 		logger:           logging.Logger("healer").WithField("local", n.Address()),
 	}
 }
@@ -78,9 +78,13 @@ func (h *discoverProviderHealer) Start() {
 	}()
 }
 
-// Stop the partition healing loop
+// Stop the partition healing loop.
 func (h *discoverProviderHealer) Stop() {
-	h.quit <- true
+	select {
+	case <-h.quit:
+	default:
+		close(h.quit)
+	}
 }
 
 // Probability returns the probability when a heal should be attempted

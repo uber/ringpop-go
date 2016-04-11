@@ -21,6 +21,7 @@
 package swim
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -29,6 +30,10 @@ import (
 	"github.com/uber/ringpop-go/discovery/statichosts"
 )
 
+// TestPartitionHealWithFaulties creates two partitions A and B where A sees B
+// as faulty and visa versa. This test asserts that two calls to heal the
+// partition mechanism are needed, one to start the reincarnation phase, the
+// other to merge the partitions to a single healed cluster.
 func TestPartitionHealWithFaulties(t *testing.T) {
 	A := newPartition(t, 5)
 	B := newPartition(t, 5)
@@ -67,6 +72,9 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	B.HasPartitionAs(t, A, 3, "alive")
 }
 
+// TestPartitionHealWithMissing creates two partitions A and B where A doesn't
+// know about B and visa versa. This test asserts that one call to heal
+// partition mechanism is needed because no nodes need to reincarnate.
 func TestPartitionHealWithMissing(t *testing.T) {
 	A := newPartition(t, 5)
 	B := newPartition(t, 5)
@@ -87,6 +95,10 @@ func TestPartitionHealWithMissing(t *testing.T) {
 	B.HasPartitionAs(t, A, 0, "alive")
 }
 
+// TestPartitionHealWithFaultyAndMissing1 creates two partitions A and B where
+// A sees B as faulty and B doesn't know about A. This test asserts that two
+// calls to heal the partition mechanism are needed, one to start the reincarnation
+// phase, the other to merge the partitions to a single healed cluster.
 func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
 	A := newPartition(t, 5)
 	B := newPartition(t, 5)
@@ -114,6 +126,10 @@ func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
 	waitForPartitionHeal(t, time.Second, A, B)
 }
 
+// TestPartitionHealWithFaultyAndMissing2 creates two partitions A and B where
+// B sees A as faulty and A doesn't know about B. This test asserts that two
+// calls to heal the partition mechanism are needed, one to start the reincarnation
+// phase, the other to merge the partitions to a single healed cluster.
 func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
 	A := newPartition(t, 5)
 	B := newPartition(t, 5)
@@ -141,6 +157,11 @@ func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
 	waitForPartitionHeal(t, time.Second, A, B)
 }
 
+// TestPartitionHealWithFaultyAndMissing2 creates two partitions A and B where
+// A sees part of B as faulty and doesn't know about the other part and visa
+// versa. This test asserts that two calls to heal the partition mechanism are
+// needed, one to start the reincarnation phase, the other to merge the
+// partitions to a single healed cluster.
 func TestPartitionHealWithFaultyAndMissing3(t *testing.T) {
 	A := newPartition(t, 6)
 	A1 := partition(A[0:3])
@@ -184,6 +205,11 @@ func TestPartitionHealSemiParition(t *testing.T) {
 	waitForPartitionHeal(t, time.Second, A, B)
 }
 
+// TestPartitionHealWithMultiplePartitions checks if the heal mechanism heals
+// a cluster that is partitioned into multiple partitions. A does not know
+// about one of the five partitions. A is able to heal with that partition
+// immediately because no reincarnation is required. The other four partitions
+// do need two calls to the partition heal mechanism.
 func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	A := newPartition(t, 5)
 	Bs := []partition{
@@ -194,19 +220,16 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 		newPartition(t, 2),
 	}
 
-	for _, B := range Bs {
-		A.AddPartitionWithStatus(B, Faulty)
-	}
+	A.AddPartitionWithStatus(Bs[0], Faulty)
+	A.AddPartitionWithStatus(Bs[1], Faulty)
+	A.AddPartitionWithStatus(Bs[2], Faulty)
+	A.AddPartitionWithStatus(Bs[3], Faulty)
+	// A doesn't know about Bs[4]
 
 	A.ProgressTime(time.Millisecond * 3)
 	for _, B := range Bs {
 		B.ProgressTime(time.Millisecond * 5)
 	}
-
-	A.AddPartitionWithStatus(Bs[0], Faulty)
-	A.AddPartitionWithStatus(Bs[1], Faulty)
-	A.AddPartitionWithStatus(Bs[2], Faulty)
-	A.AddPartitionWithStatus(Bs[3], Faulty)
 
 	hosts := A.Hosts()
 	for _, B := range Bs {
@@ -215,19 +238,27 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	A[0].node.discoverProvider = statichosts.New(hosts...)
 
 	targets := A[0].node.healer.Heal()
+	fmt.Println(targets)
 	assert.Len(t, targets, 5, "expected correct amount of targets")
 
 	waitForConvergence(t, time.Second, A...)
 	for _, B := range Bs {
 		waitForConvergence(t, time.Second, B...)
 	}
+	waitForConvergence(t, time.Second, A...)
+	for _, B := range Bs {
+		waitForConvergence(t, time.Second, B...)
+	}
 
 	targets = A[0].node.healer.Heal()
-	assert.Len(t, targets, 5, "expected correct amount of targets")
+	fmt.Println(targets)
+	assert.Len(t, targets, 4, "expected correct amount of targets")
 
 	waitForPartitionHeal(t, time.Second, append(Bs, A)...)
 }
 
+// TestPartitionHealWithTime tests whether partitions are healed over time
+// automatically.
 func TestPartitionHealWithTime(t *testing.T) {
 	A := newPartition(t, 5)
 	B := newPartition(t, 5)
@@ -319,8 +350,12 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	waitForConvergence(t, time.Second, a, b)
 }
 
+// partition is a slice of testNodes. It is used to manipulate the membership
+// of all nodes at the same time. This makes it easy to create a partition
+// where all the nodes of the partition have the same membership view.
 type partition []*testNode
 
+// newPartition creates and bootstraps n new nodes and let's them form a cluster.
 func newPartition(t *testing.T, n int) partition {
 	p := partition(genChannelNodes(t, n))
 	bootstrapNodes(t, p...)
@@ -329,6 +364,10 @@ func newPartition(t *testing.T, n int) partition {
 	return p
 }
 
+// AddPartitionWithStatus adds B to the membership of all nodes in this
+// partition, with the specified status.
+// e.g. after A.AddPartitionWithStatus(B, Faulty), every node of A will
+// now have all nodes of B in its membership as Faulty.
 func (p partition) AddPartitionWithStatus(B partition, status string) {
 	for _, n := range p {
 		for _, n2 := range B {
@@ -339,12 +378,15 @@ func (p partition) AddPartitionWithStatus(B partition, status string) {
 	p.ClearChanges()
 }
 
+// ClearChanges clears all changes from the disseminators for every node in the
+// partition.
 func (p partition) ClearChanges() {
 	for _, n := range p {
 		n.node.disseminator.ClearChanges()
 	}
 }
 
+// Progresses the clock of all the nodes of the partition by T.
 func (p partition) ProgressTime(T time.Duration) {
 	for _, n := range p {
 		now := n.node.clock.Now()
@@ -368,16 +410,6 @@ func (p partition) HasPartitionAs(t *testing.T, B partition, incarnation int64, 
 	}
 }
 
-//
-// func (p partition) DoesNotContain(t *testing.T, B partition) {
-// 	for _, a := range p {
-// 		for _, b := range B {
-// 			_, ok := a.node.memberlist.Member(b.node.Address())
-// 			assert.False(t, ok, "expected memberlist to not contain member")
-// 		}
-// 	}
-// }
-
 // Hosts the string slice of addresses for all the nodes in the partition.
 func (p partition) Hosts() []string {
 	var res []string
@@ -399,7 +431,7 @@ func (p partition) Contains(address string) bool {
 }
 
 // waitForPartitionHeal lets the nodes of all partitions gossip and returns
-// when the nodes are converged. After the cluster finished gossipping we
+// when the nodes are converged. After the cluster finished gossiping we
 // double check that all nodes have the same checksum for the memberlist,
 // this means that the cluster is converged and healed.
 func waitForPartitionHeal(t *testing.T, timeout time.Duration, ps ...partition) {

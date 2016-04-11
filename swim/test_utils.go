@@ -157,7 +157,7 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 }
 
 // waitForConvergence let's the nodes gossip and returns when the nodes are converged.
-// After the cluster finished gossipping we double check that all nodes have the
+// After the cluster finished gossiping we double check that all nodes have the
 // same checksum for the memberlist, this means that the cluster is converged.
 func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
 	deadline := time.Now().Add(timeout)

@@ -103,7 +103,10 @@ run-test-for-cluster-size() {
     # if the test fails. This avoids interleaving of output to the terminal
     # when tests are running in parallel.
     node "${ringpop_common_dir}/test/it-tests.js" \
-        -s "[$1]" "${project_root}/testpop" &>$output_file || err=$?
+        -s "[$1]" \
+        --enable-feature bidirectional-full-syncs \
+        --enable-feature partition-healing \
+        "${project_root}/testpop" &>$output_file || err=$?
 
     if [ $PIPESTATUS -gt 0 ]; then
         echo "ERROR: Test errored for cluster size $cluster_size" | \
