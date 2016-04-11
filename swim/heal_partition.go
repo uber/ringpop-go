@@ -54,7 +54,7 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 	}
 
 	// Merge partitions if no node needs to reincarnate
-	err = mergePartitions(node, target, A, B)
+	err = mergePartitions(node, target, B)
 	return aliveHosts(B), err
 }
 
@@ -111,7 +111,7 @@ func reincarnateNodes(node *Node, target string, csForA, csForB []Change) error 
 
 // mergePartitions applies the membership of B to a and send the membership
 // A to B piggybacked on top of a ping.
-func mergePartitions(node *Node, target string, A, B []Change) error {
+func mergePartitions(node *Node, target string, B []Change) error {
 	node.healer.logger.WithField("target", target).Info("merge two partitions")
 
 	// Add membership of B to this node, so that the membership
@@ -120,8 +120,8 @@ func mergePartitions(node *Node, target string, A, B []Change) error {
 
 	// Send membership of A to the target node, so that the membership
 	// information of partition A will be disseminated through B.
-	// A1 := node.disseminator.MembershipAsChanges()
-	_, err := sendPingWithChanges(node, target, A, time.Second)
+	A1 := node.disseminator.MembershipAsChanges()
+	_, err := sendPingWithChanges(node, target, A1, time.Second)
 	return err
 }
 

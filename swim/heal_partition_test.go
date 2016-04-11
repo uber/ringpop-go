@@ -21,7 +21,6 @@
 package swim
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -369,15 +368,17 @@ func (p partition) HasPartitionAs(t *testing.T, B partition, incarnation int64, 
 	}
 }
 
-func (p partition) DoesNotContain(t *testing.T, B partition) {
-	for _, a := range p {
-		for _, b := range B {
-			_, ok := a.node.memberlist.Member(b.node.Address())
-			assert.False(t, ok, "expected memberlist to not contain member")
-		}
-	}
-}
+//
+// func (p partition) DoesNotContain(t *testing.T, B partition) {
+// 	for _, a := range p {
+// 		for _, b := range B {
+// 			_, ok := a.node.memberlist.Member(b.node.Address())
+// 			assert.False(t, ok, "expected memberlist to not contain member")
+// 		}
+// 	}
+// }
 
+// Hosts the string slice of addresses for all the nodes in the partition.
 func (p partition) Hosts() []string {
 	var res []string
 	for _, a := range p {
@@ -386,16 +387,8 @@ func (p partition) Hosts() []string {
 	return res
 }
 
-func (p partition) String() string {
-	r := ""
-	mems := p[0].node.memberlist.GetMembers()
-	for i := range mems {
-		r += fmt.Sprintln(mems[i].Address, mems[i].Incarnation, mems[i].Status)
-	}
-	r += fmt.Sprintln()
-	return r
-}
-
+// Contains tells whether a node with the specified address is part of the
+// partition.
 func (p partition) Contains(address string) bool {
 	for _, a := range p {
 		if a.node.Address() == address {
@@ -405,7 +398,7 @@ func (p partition) Contains(address string) bool {
 	return false
 }
 
-// waitForPartitionHeal let's the nodes of all partitions gossip and returns
+// waitForPartitionHeal lets the nodes of all partitions gossip and returns
 // when the nodes are converged. After the cluster finished gossipping we
 // double check that all nodes have the same checksum for the memberlist,
 // this means that the cluster is converged and healed.
