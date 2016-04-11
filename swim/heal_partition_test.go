@@ -21,7 +21,6 @@
 package swim
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -238,7 +237,6 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	A[0].node.discoverProvider = statichosts.New(hosts...)
 
 	targets := A[0].node.healer.Heal()
-	fmt.Println(targets)
 	assert.Len(t, targets, 5, "expected correct amount of targets")
 
 	waitForConvergence(t, time.Second, A...)
@@ -251,7 +249,6 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	}
 
 	targets = A[0].node.healer.Heal()
-	fmt.Println(targets)
 	assert.Len(t, targets, 4, "expected correct amount of targets")
 
 	waitForPartitionHeal(t, time.Second, append(Bs, A)...)
