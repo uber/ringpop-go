@@ -69,7 +69,7 @@ func (n *Node) registerHandlers() error {
 		"/admin/gossip":              n.gossipHandler, // Deprecated
 		"/admin/gossip/start":        n.gossipHandlerStart,
 		"/admin/gossip/stop":         n.gossipHandlerStop,
-		"/admin/healpartition/disco": n.partitionHealerHandler,
+		"/admin/healpartition/disco": n.discoverProviderHealerHandler,
 		"/admin/tick":                n.tickHandler, // Deprecated
 		"/admin/gossip/tick":         n.tickHandler,
 		"/admin/member/leave":        n.adminLeaveHandler,
@@ -121,7 +121,7 @@ func (n *Node) gossipHandlerStop(ctx json.Context, req *emptyArg) (*emptyArg, er
 	return &emptyArg{}, nil
 }
 
-func (n *Node) partitionHealerHandler(ctx json.Context, req *emptyArg) (*HealResponse, error) {
+func (n *Node) discoverProviderHealerHandler(ctx json.Context, req *emptyArg) (*HealResponse, error) {
 	return &HealResponse{n.healer.Heal()}, nil
 }
 
