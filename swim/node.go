@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/uber/ringpop-go/discovery"
+	"github.com/uber/ringpop-go/events"
 
 	"github.com/benbjohnson/clock"
 	"github.com/rcrowley/go-metrics"
@@ -110,11 +111,9 @@ func mergeDefaultOptions(opts *Options) *Options {
 	opts.RollupMaxUpdates = util.SelectInt(opts.RollupMaxUpdates, def.RollupMaxUpdates)
 	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval, def.RollupFlushInterval)
 
-	opts.PartitionHealPeriod = util.SelectDuration(opts.PartitionHealPeriod,
-		def.PartitionHealPeriod)
+	opts.PartitionHealPeriod = util.SelectDuration(opts.PartitionHealPeriod, def.PartitionHealPeriod)
 
-	opts.PartitionHealBaseProbabillity = util.SelectFloat(opts.PartitionHealBaseProbabillity,
-		def.PartitionHealBaseProbabillity)
+	opts.PartitionHealBaseProbabillity = util.SelectFloat(opts.PartitionHealBaseProbabillity, def.PartitionHealBaseProbabillity)
 
 	opts.JoinTimeout = util.SelectDuration(opts.JoinTimeout, def.JoinTimeout)
 	opts.PingTimeout = util.SelectDuration(opts.PingTimeout, def.PingTimeout)
@@ -142,7 +141,7 @@ type NodeInterface interface {
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
-	RegisterListener(l EventListener)
+	RegisterListener(l events.EventListener)
 }
 
 // A Node is a SWIM member
@@ -174,7 +173,7 @@ type Node struct {
 
 	maxReverseFullSyncJobs int
 
-	listeners []EventListener
+	listeners []events.EventListener
 
 	clientRate metrics.Meter
 	serverRate metrics.Meter
@@ -272,7 +271,7 @@ func (n *Node) emit(event interface{}) {
 // emitted, l.HandleEvent(e) is called for every registered listener l.
 // Attention, all listeners are called synchronously. Be careful with
 // registering blocking and other slow calls.
-func (n *Node) RegisterListener(l EventListener) {
+func (n *Node) RegisterListener(l events.EventListener) {
 	n.listeners = append(n.listeners, l)
 }
 
@@ -309,16 +308,16 @@ func (n *Node) Stopped() bool {
 
 // Destroy stops the SWIM protocol and all sub-protocols.
 func (n *Node) Destroy() {
+	n.state.Lock()
 	if n.state.destroyed {
+		n.state.Unlock()
 		return
 	}
+	n.state.destroyed = true
+	n.state.Unlock()
 
 	n.Stop()
 	n.rollup.Destroy()
-
-	n.state.Lock()
-	n.state.destroyed = true
-	n.state.Unlock()
 }
 
 // Destroyed returns whether or not the node has been destroyed.

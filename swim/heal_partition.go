@@ -45,11 +45,11 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 	B := joinRes.Membership
 
 	// Get the nodes that aren't mergeable and need to reincarnate
-	csForA, csForB := nodesThatNeedToReincarnate(A, B)
+	changesForA, changesForB := nodesThatNeedToReincarnate(A, B)
 
 	// Reincarnate the nodes that need to reincarnate
-	if len(csForA) != 0 || len(csForB) != 0 {
-		err = reincarnateNodes(node, target, csForA, csForB)
+	if len(changesForA) != 0 || len(changesForB) != 0 {
+		err = reincarnateNodes(node, target, changesForA, changesForB)
 		return aliveHosts(B), err
 	}
 
@@ -61,7 +61,7 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 // nodesThatNeedToReincarnate finds all nodes would become faulty when
 // membership A gets merged with membership B. These need to reincarnate
 // first, before we can heal the partition with a merge.
-func nodesThatNeedToReincarnate(A, B []Change) (csForA, csForB []Change) {
+func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Change) {
 	// Find changes that are alive for B and faulty for A and visa versa.
 	for _, b := range B {
 		a, ok := selectMember(A, b.Address)
@@ -72,7 +72,7 @@ func nodesThatNeedToReincarnate(A, B []Change) (csForA, csForB []Change) {
 		// faulty for partition A, alive for partition B
 		// needs reincarnation in partition B.
 		if a.Status == Faulty && b.Status == Alive && a.Incarnation >= b.Incarnation {
-			csForB = append(csForB, Change{
+			changesForB = append(changesForB, Change{
 				Address:     a.Address,
 				Incarnation: a.Incarnation,
 				Status:      Suspect,
@@ -82,7 +82,7 @@ func nodesThatNeedToReincarnate(A, B []Change) (csForA, csForB []Change) {
 		// alive for partition A, faulty for partition B
 		// needs reincarnation in partition A.
 		if a.Status == Alive && b.Status == Faulty && a.Incarnation <= b.Incarnation {
-			csForA = append(csForA, Change{
+			changesForA = append(changesForA, Change{
 				Address:     b.Address,
 				Incarnation: b.Incarnation,
 				Status:      Suspect,
@@ -90,20 +90,20 @@ func nodesThatNeedToReincarnate(A, B []Change) (csForA, csForB []Change) {
 		}
 	}
 
-	return csForA, csForB
+	return changesForA, changesForB
 }
 
-// reincarnateNodes applies csForA to this nodes membership, and sends a ping
-// with csForB to B's membership, so that B will apply those changes in its
+// reincarnateNodes applies changesForA to this nodes membership, and sends a ping
+// with changesForB to B's membership, so that B will apply those changes in its
 // ping handler.
-func reincarnateNodes(node *Node, target string, csForA, csForB []Change) error {
+func reincarnateNodes(node *Node, target string, changesForA, changesForB []Change) error {
 	// reincarnate all nodes by disseminating that they are suspect
 	node.healer.logger.WithField("target", target).Info("reincarnate nodes before we can merge the partitions")
-	node.memberlist.Update(csForA)
+	node.memberlist.Update(changesForA)
 
 	var err error
-	if len(csForB) != 0 {
-		_, err = sendPingWithChanges(node, target, csForB, time.Second)
+	if len(changesForB) != 0 {
+		_, err = sendPingWithChanges(node, target, changesForB, time.Second)
 	}
 
 	return err
@@ -120,14 +120,14 @@ func mergePartitions(node *Node, target string, B []Change) error {
 
 	// Send membership of A to the target node, so that the membership
 	// information of partition A will be disseminated through B.
-	A1 := node.disseminator.MembershipAsChanges()
-	_, err := sendPingWithChanges(node, target, A1, time.Second)
+	A := node.disseminator.MembershipAsChanges()
+	_, err := sendPingWithChanges(node, target, A, time.Second)
 	return err
 }
 
 // aliveHosts returns the address of those changes that have the Alive status.
-func aliveHosts(cs []Change) (ret []string) {
-	for _, b := range cs {
+func aliveHosts(changes []Change) (ret []string) {
+	for _, b := range changes {
 		if b.Status == Alive {
 			ret = append(ret, b.Address)
 		}

@@ -70,7 +70,6 @@ func (s *BootstrapTestSuite) TestBootstrapJoinsTimeOut() {
 }
 
 func (s *BootstrapTestSuite) TestBootstrapDestroy() {
-	// node := newChannelNode(s.T()).node
 	s.tnode.Destroy()
 
 	_, err := s.node.Bootstrap(&BootstrapOptions{

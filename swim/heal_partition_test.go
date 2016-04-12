@@ -27,6 +27,7 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 	"github.com/uber/ringpop-go/discovery/statichosts"
+	"github.com/uber/ringpop-go/events"
 )
 
 // TestPartitionHealWithFaulties creates two partitions A and B where A sees B
@@ -299,7 +300,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 
 	// block a from completing bootstrap
 	block := make(chan struct{})
-	a.node.RegisterListener(on(JoinTriesUpdateEvent{}, func(e Event) {
+	a.node.RegisterListener(on(JoinTriesUpdateEvent{}, func(e events.Event) {
 		<-block
 	}))
 
@@ -307,7 +308,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 
 	// bootstrap a and wait for it to be in bootstrap phase
 	go func() {
-		_, _ = a.node.Bootstrap(&BootstrapOptions{
+		a.node.Bootstrap(&BootstrapOptions{
 			DiscoverProvider: discoProvider,
 		})
 	}()
@@ -463,7 +464,7 @@ Tick:
 		// continue until all members are reachable
 		for _, node := range nodes {
 			if node.memberlist.CountReachableMembers() != len(nodes) {
-				continue
+				continue Tick
 			}
 		}
 

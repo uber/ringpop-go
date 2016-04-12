@@ -25,7 +25,6 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/discovery"
 	"github.com/uber/ringpop-go/logging"
 )
 
@@ -37,7 +36,6 @@ import (
 type discoverProviderHealer struct {
 	node *Node
 
-	discoverProvider *discovery.DiscoverProvider
 	baseProbabillity float64
 	period           time.Duration
 
@@ -112,7 +110,7 @@ func (h *discoverProviderHealer) Heal() []string {
 	}
 	hostList, err := h.node.discoverProvider.Hosts()
 	if err != nil {
-		h.logger.Warn("unable to receive host list from discover provider")
+		h.logger.Warn("healer unable to receive host list from discover provider")
 		return []string{}
 	}
 
