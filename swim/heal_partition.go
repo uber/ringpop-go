@@ -71,7 +71,11 @@ func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Chang
 
 		// faulty for partition A, alive for partition B
 		// needs reincarnation in partition B.
-		if a.Status == Faulty && b.Status == Alive && a.Incarnation >= b.Incarnation {
+
+		if statePrecedence(a.Status) >= statePrecedence(Faulty) &&
+			b.Status == Alive &&
+			a.Incarnation >= b.Incarnation {
+
 			changesForB = append(changesForB, Change{
 				Address:     a.Address,
 				Incarnation: a.Incarnation,
@@ -81,7 +85,10 @@ func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Chang
 
 		// alive for partition A, faulty for partition B
 		// needs reincarnation in partition A.
-		if a.Status == Alive && b.Status == Faulty && a.Incarnation <= b.Incarnation {
+		if a.Status == Alive &&
+			statePrecedence(b.Status) >= statePrecedence(Faulty) &&
+			a.Incarnation <= b.Incarnation {
+
 			changesForA = append(changesForA, Change{
 				Address:     b.Address,
 				Incarnation: b.Incarnation,
