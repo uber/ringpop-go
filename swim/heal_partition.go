@@ -44,22 +44,22 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 	A := node.disseminator.MembershipAsChanges()
 	B := joinRes.Membership
 
-	// Get the nodes that aren't mergeable and need to reincarnate
+	// Get the nodes that aren't mergeable and need to be reincarnated
 	changesForA, changesForB := nodesThatNeedToReincarnate(A, B)
 
-	// Reincarnate the nodes that need to reincarnate
+	// Reincarnate the nodes that need to be reincarnated
 	if len(changesForA) != 0 || len(changesForB) != 0 {
 		err = reincarnateNodes(node, target, changesForA, changesForB)
 		return aliveHosts(B), err
 	}
 
-	// Merge partitions if no node needs to reincarnate
+	// Merge partitions if no node needs to be reincarnated
 	err = mergePartitions(node, target, B)
 	return aliveHosts(B), err
 }
 
 // nodesThatNeedToReincarnate finds all nodes would become faulty when
-// membership A gets merged with membership B. These need to reincarnate
+// membership A gets merged with membership B. These need to be reincarnated
 // first, before we can heal the partition with a merge.
 func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Change) {
 	// Find changes that are alive for B and faulty for A and visa versa.
