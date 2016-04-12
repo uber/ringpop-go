@@ -50,13 +50,13 @@ func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Dur
 		node:             n,
 		baseProbabillity: baseProbability,
 		period:           period,
-		quit:             make(chan struct{}),
 		logger:           logging.Logger("healer").WithField("local", n.Address()),
 	}
 }
 
 // Start the partition healing loop
 func (h *discoverProviderHealer) Start() {
+	h.quit = make(chan struct{})
 	go func() {
 		for {
 			// attempt heal with the pro
@@ -76,8 +76,12 @@ func (h *discoverProviderHealer) Start() {
 
 // Stop the partition healing loop.
 func (h *discoverProviderHealer) Stop() {
+	if h.quit == nil {
+		return
+	}
+
 	select {
-	case <-h.quit:
+	case <-h.quit: // channel already closed, do nothing
 	default:
 		close(h.quit)
 	}
@@ -119,7 +123,7 @@ func (h *discoverProviderHealer) Heal() []string {
 	var targets []string
 	for _, address := range hostList {
 		m, ok := h.node.memberlist.Member(address)
-		if !ok || m.Status == Faulty {
+		if !ok || statePrecedence(m.Status) >= statePrecedence(Faulty) {
 			targets = append(targets, address)
 		}
 	}

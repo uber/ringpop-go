@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/uber/ringpop-go/discovery/statichosts"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -335,4 +336,35 @@ func (c *swimCluster) Destroy() {
 // Nodes returns a slice of all nodes in the cluster.
 func (c *swimCluster) Nodes() []*Node {
 	return c.nodes
+}
+
+// ExecuteThenWaitFor executes a function and then waits for a specific type
+// of event to occur. This function shouldn't be used outside tests because
+// there is no way to unsubscribe the event handler.
+//
+// Often we want to execute some code and then wait for an event be emitted due
+// to the code being executed. However in order to not miss the event we must
+// first register an event handler before we can execute the code:
+// - register listener that signals we can continue on receiving the correct event;
+// - execute the code that will lead to an event being emitted;
+// - wait for the continue signal.
+//
+// This can be quite hard to follow. Ideally we want it to look like
+// - execute the code that will lead to an event being emitted;
+// - and then wait for a specific event.
+//
+// This function helps with making the code read like the latter.
+func ExecuteThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
+	block := make(chan struct{})
+
+	er.RegisterListener(on(t, func(e events.Event) {
+		select {
+		case <-block: // channel is closed, do nothing
+		default:
+			close(block)
+		}
+	}))
+
+	f()
+	<-block
 }
