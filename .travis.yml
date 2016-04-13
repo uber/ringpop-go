@@ -11,7 +11,7 @@ before_install:
 before_script:
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
-  - go get github.com/vektra/mockery/.../
+  - ./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
   - go get github.com/golang/lint/golint
 
 env:
