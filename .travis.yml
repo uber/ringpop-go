@@ -18,10 +18,11 @@ env:
   - RUN="make lint"
   - RUN="make test-unit"
   - RUN="make test-integration"
+  - RUN="make test-race"
 
 matrix:
   allow_failures:
-    - env: RUN=test/update-coveralls
+    - env: RUN="make test-race"
   fast_finish: true
 
 script:
