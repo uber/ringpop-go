@@ -50,17 +50,17 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 	// Reincarnate the nodes that need to be reincarnated
 	if len(changesForA) != 0 || len(changesForB) != 0 {
 		err = reincarnateNodes(node, target, changesForA, changesForB)
-		return aliveHosts(B), err
+		return pingableHosts(B), err
 	}
 
 	// Merge partitions if no node needs to be reincarnated
 	err = mergePartitions(node, target, B)
-	return aliveHosts(B), err
+	return pingableHosts(B), err
 }
 
-// nodesThatNeedToReincarnate finds all nodes would become faulty when
-// membership A gets merged with membership B. These need to be reincarnated
-// first, before we can heal the partition with a merge.
+// nodesThatNeedToReincarnate finds all nodes would become unpingable (>=faulty)
+// when membership A gets merged with membership B and visa versa. These nodes
+// need to be reincarnated, before we can heal the partition with a merge.
 func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Change) {
 	// Find changes that are alive for B and faulty for A and visa versa.
 	for _, b := range B {
@@ -69,13 +69,9 @@ func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Chang
 			continue
 		}
 
-		// faulty for partition A, alive for partition B
-		// needs reincarnation in partition B.
-
-		if statePrecedence(a.Status) >= statePrecedence(Faulty) &&
-			b.Status == Alive &&
-			a.Incarnation >= b.Incarnation {
-
+		// If a node would be overwritten and would stop being pingable, it is
+		// not suited for merging.
+		if b.isPingable() && a.overrides(b) && !a.isPingable() {
 			changesForB = append(changesForB, Change{
 				Address:     a.Address,
 				Incarnation: a.Incarnation,
@@ -83,12 +79,7 @@ func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Chang
 			})
 		}
 
-		// alive for partition A, faulty for partition B
-		// needs reincarnation in partition A.
-		if a.Status == Alive &&
-			statePrecedence(b.Status) >= statePrecedence(Faulty) &&
-			a.Incarnation <= b.Incarnation {
-
+		if a.isPingable() && b.overrides(a) && !b.isPingable() {
 			changesForA = append(changesForA, Change{
 				Address:     b.Address,
 				Incarnation: b.Incarnation,
@@ -132,10 +123,10 @@ func mergePartitions(node *Node, target string, B []Change) error {
 	return err
 }
 
-// aliveHosts returns the address of those changes that have the Alive status.
-func aliveHosts(changes []Change) (ret []string) {
+// pingableHosts returns the address of those changes that are pingable.
+func pingableHosts(changes []Change) (ret []string) {
 	for _, b := range changes {
-		if b.Status == Alive {
+		if b.isPingable() {
 			ret = append(ret, b.Address)
 		}
 	}

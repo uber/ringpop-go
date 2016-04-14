@@ -184,7 +184,8 @@ func ShuffleStrings(strings []string) []string {
 	return newStrings
 }
 
-// ShuffleStrings uses the Fisher–Yates shuffle to randomize the strings in place.
+// ShuffleStringsInPlace uses the Fisher–Yates shuffle to randomize the strings
+// in place.
 func ShuffleStringsInPlace(strings []string) {
 	for i := range strings {
 		j := rand.Intn(i + 1)
