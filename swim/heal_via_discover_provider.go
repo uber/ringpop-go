@@ -21,11 +21,13 @@
 package swim
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/util"
 )
 
 // discoverProviderHealer attempts to heal a ringpop partition by consulting
@@ -114,21 +116,23 @@ func (h *discoverProviderHealer) Probability() float64 {
 // node as a target to perform a partition heal with.
 //
 // If heal was attempted, returns identities of the target nodes.
-func (h *discoverProviderHealer) Heal() []string {
+func (h *discoverProviderHealer) Heal() ([]string, error) {
 	h.node.emit(DiscoHealEvent{})
 	// get list from discovery provider
 	if h.node.discoverProvider == nil {
-		return []string{}
+		return []string{}, errors.New("discoverProvider not available to healer")
 	}
 
 	hostList, err := h.node.discoverProvider.Hosts()
 	if err != nil {
 		h.logger.Warn("healer unable to receive host list from discover provider")
-		return []string{}
+		return []string{}, err
 	}
 
 	h.previousHostListSize = len(hostList)
+	util.ShuffleStringsInPlace(hostList)
 
+	// collect the targets this node might want to heal with
 	var targets []string
 	for _, address := range hostList {
 		m, ok := h.node.memberlist.Member(address)
@@ -140,16 +144,22 @@ func (h *discoverProviderHealer) Heal() []string {
 	// filter hosts that we already know about and attempt to heal nodes that
 	// are complementary to the membership of this node.
 	var ret []string
-
-	for len(targets) != 0 {
+	failures := 0
+	maxFailures := 10
+	for len(targets) != 0 && failures < maxFailures {
 		target := targets[0]
 		targets = del(targets, target)
 
 		// try to heal partition
 		hostsOnOtherSide, err := AttemptHeal(h.node, target)
+
 		if err != nil {
-			h.logger.WithField("error", err.Error()).Warn("heal failed")
-			break
+			h.logger.WithFields(log.Fields{
+				"error":   err.Error(),
+				"failure": failures,
+			}).Warn("heal attempt failed (10 in total)")
+			failures++
+			continue
 		}
 
 		for _, host := range hostsOnOtherSide {
@@ -159,7 +169,10 @@ func (h *discoverProviderHealer) Heal() []string {
 		ret = append(ret, target)
 	}
 
-	return ret
+	if failures == maxFailures {
+		h.logger.WithField("reachedNodes", len(ret)).Warn("healer reached max failures")
+	}
+	return ret, nil
 }
 
 // del returns a slice where all ocurences of s are filtered out. This modifies

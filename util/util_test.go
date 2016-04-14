@@ -21,6 +21,8 @@
 package util
 
 import (
+	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -238,4 +240,36 @@ func TestMin(t *testing.T) {
 
 func TestTimeZero(t *testing.T) {
 	assert.True(t, TimeZero().IsZero())
+}
+
+func TestShuffleStringsInPlace(t *testing.T) {
+	strs := make([]string, 1000)
+	strs2 := make([]string, 1000)
+	for i := range strs {
+		strs[i] = fmt.Sprint(i)
+		strs2[i] = strs[i]
+	}
+
+	ShuffleStringsInPlace(strs)
+
+	collisions := 0
+	for i := range strs {
+		if strs[i] == strs2[i] {
+			collisions++
+		}
+	}
+
+	// expected probability of 1/1000 for every index so the expected number of
+	// collisions is 1. We add some slack and expect smaller or equal than 3.
+	assert.True(t, collisions <= 3, "expected that array is shuffled")
+
+	sort.Strings(strs)
+	sort.Strings(strs2)
+	assert.Equal(t, len(strs), len(strs2), "expected size of slice did not change")
+	for i := range strs {
+		if strs[i] != strs2[i] {
+			assert.Fail(t, "expected contents of slice did not change")
+			break
+		}
+	}
 }

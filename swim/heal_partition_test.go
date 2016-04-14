@@ -21,6 +21,8 @@
 package swim
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -48,7 +50,8 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 
-	targets := A[0].node.healer.Heal()
+	targets, err := A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
@@ -60,7 +63,8 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	B.HasPartitionAs(t, B, 5, "alive")
 	B.HasPartitionAs(t, A, 0, "faulty")
 
-	targets = A[0].node.healer.Heal()
+	targets, err = A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
@@ -83,7 +87,8 @@ func TestPartitionHealWithMissing(t *testing.T) {
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 
-	targets := A[0].node.healer.Heal()
+	targets, err := A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
@@ -112,14 +117,16 @@ func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 
-	targets := A[0].node.healer.Heal()
+	targets, err := A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
 	waitForConvergence(t, time.Second, A...)
 	waitForConvergence(t, time.Second, B...)
 
-	targets = A[0].node.healer.Heal()
+	targets, err = A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
@@ -143,14 +150,16 @@ func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 
-	targets := A[0].node.healer.Heal()
+	targets, err := A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
 	waitForConvergence(t, time.Second, A...)
 	waitForConvergence(t, time.Second, B...)
 
-	targets = A[0].node.healer.Heal()
+	targets, err = A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
@@ -237,7 +246,8 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	}
 	A[0].node.discoverProvider = statichosts.New(hosts...)
 
-	targets := A[0].node.healer.Heal()
+	targets, err := A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 5, "expected correct amount of targets")
 
 	waitForConvergence(t, time.Second, A...)
@@ -249,7 +259,8 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 		waitForConvergence(t, time.Second, B...)
 	}
 
-	targets = A[0].node.healer.Heal()
+	targets, err = A[0].node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 4, "expected correct amount of targets")
 
 	waitForPartitionHeal(t, time.Second, append(Bs, A)...)
@@ -325,7 +336,8 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	assert.False(t, has, "expected that a is not yet part of b's membership")
 
 	// start heal
-	targets := b.node.healer.Heal()
+	targets, err := b.node.healer.Heal()
+	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 0, "expected that b cannot completely heal with a")
 
 	// a is now part of b's membership
@@ -348,6 +360,51 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	a.node.clock = c
 
 	waitForConvergence(t, time.Second, a, b)
+}
+
+func TestPartitionHealFail(t *testing.T) {
+	A := newPartition(t, 2)
+	defer destroyNodes(A...)
+	A[0].node.discoverProvider = nil
+	targets, err := A[0].node.healer.Heal()
+	assert.Len(t, targets, 0, "expected error, no targets")
+	assert.Error(t, err, "expected an error")
+}
+
+func TestPartitionHealFail2(t *testing.T) {
+	A := newPartition(t, 2)
+	defer destroyNodes(A...)
+	A[0].node.discoverProvider = &BrokenDiscoverProvider{}
+	targets, err := A[0].node.healer.Heal()
+	assert.Len(t, targets, 0, "expected error, no targets")
+	assert.Error(t, err, "expected an error")
+}
+
+type BrokenDiscoverProvider struct{}
+
+func (p *BrokenDiscoverProvider) Hosts() ([]string, error) {
+	return nil, errors.New("broken discover provider is broken")
+}
+
+func TestPartitionHealMaxFails(t *testing.T) {
+	A := newPartition(t, 2)
+	defer destroyNodes(A...)
+	brokenHosts := make([]string, 20)
+	for i := range brokenHosts {
+		brokenHosts[i] = "invalid host" + fmt.Sprint(i)
+	}
+
+	A[0].node.discoverProvider = statichosts.New(brokenHosts...)
+
+	heals := 0
+	A[0].node.RegisterListener(on(AttemptHealEvent{}, func(e events.Event) {
+		heals++
+	}))
+
+	targets, err := A[0].node.healer.Heal()
+	assert.Len(t, targets, 0, "expected no nodes are reached during heal")
+	assert.NoError(t, err, "expected no error")
+	assert.Equal(t, 10, heals, "expected that healer stops after 10 failed heal attempts")
 }
 
 // partition is a slice of testNodes. It is used to manipulate the membership
