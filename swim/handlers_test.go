@@ -95,7 +95,7 @@ func (s *HandlerTestSuite) TestGossipStopHandler() {
 func (s *HandlerTestSuite) TestPartitionHealerHandler() {
 	done := make(chan struct{})
 	go func() {
-		ExecuteThenWaitFor(func() {
+		DoThenWaitFor(func() {
 			_, err := s.testNode.node.discoverProviderHealerHandler(s.ctx, &emptyArg{})
 			s.NoError(err, "calling handler should not result in error")
 		}, s.testNode.node, DiscoHealEvent{})

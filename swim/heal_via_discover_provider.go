@@ -41,6 +41,7 @@ type discoverProviderHealer struct {
 
 	previousHostListSize int
 	quit                 chan struct{}
+	started              chan struct{}
 
 	logger log.Logger
 }
@@ -51,12 +52,21 @@ func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Dur
 		baseProbabillity: baseProbability,
 		period:           period,
 		logger:           logging.Logger("healer").WithField("local", n.Address()),
+		started:          make(chan struct{}, 1),
+		quit:             make(chan struct{}),
 	}
 }
 
 // Start the partition healing loop
 func (h *discoverProviderHealer) Start() {
-	h.quit = make(chan struct{})
+	// check if started channel is already filled
+	// if not, we start a new loop
+	select {
+	case h.started <- struct{}{}:
+	default:
+		return
+	}
+
 	go func() {
 		for {
 			// attempt heal with the pro
@@ -76,14 +86,12 @@ func (h *discoverProviderHealer) Start() {
 
 // Stop the partition healing loop.
 func (h *discoverProviderHealer) Stop() {
-	if h.quit == nil {
-		return
-	}
-
+	// if started, consume and send quit signal
+	// if not started this is noop
 	select {
-	case <-h.quit: // channel already closed, do nothing
+	case <-h.started:
+		h.quit <- struct{}{}
 	default:
-		close(h.quit)
 	}
 }
 
@@ -112,6 +120,7 @@ func (h *discoverProviderHealer) Heal() []string {
 	if h.node.discoverProvider == nil {
 		return []string{}
 	}
+
 	hostList, err := h.node.discoverProvider.Hosts()
 	if err != nil {
 		h.logger.Warn("healer unable to receive host list from discover provider")
@@ -140,7 +149,7 @@ func (h *discoverProviderHealer) Heal() []string {
 		hostsOnOtherSide, err := AttemptHeal(h.node, target)
 		if err != nil {
 			h.logger.WithField("error", err.Error()).Warn("heal failed")
-			continue
+			break
 		}
 
 		for _, host := range hostsOnOtherSide {

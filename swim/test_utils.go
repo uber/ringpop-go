@@ -23,6 +23,7 @@ package swim
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -338,7 +339,7 @@ func (c *swimCluster) Nodes() []*Node {
 	return c.nodes
 }
 
-// ExecuteThenWaitFor executes a function and then waits for a specific type
+// DoThenWaitFor executes a function and then waits for a specific type
 // of event to occur. This function shouldn't be used outside tests because
 // there is no way to unsubscribe the event handler.
 //
@@ -354,17 +355,20 @@ func (c *swimCluster) Nodes() []*Node {
 // - and then wait for a specific event.
 //
 // This function helps with making the code read like the latter.
-func ExecuteThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
-	block := make(chan struct{})
+func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
+	block := make(chan struct{}, 1)
+
+	var once sync.Once
 
 	er.RegisterListener(on(t, func(e events.Event) {
-		select {
-		case <-block: // channel is closed, do nothing
-		default:
-			close(block)
-		}
+		once.Do(func() {
+			block <- struct{}{}
+		})
 	}))
 
 	f()
+
+	// wait for first occurence of the event, close thereafter
 	<-block
+	close(block)
 }

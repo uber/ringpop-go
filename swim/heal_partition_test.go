@@ -275,11 +275,13 @@ func TestPartitionHealWithTime(t *testing.T) {
 
 	// Progress time in a background thread. This will cause the node to
 	// attempt a heal periodically.
+
 	c := clock.NewMock()
 	A[0].node.clock = c
 	go func() {
 		for {
-			c.Add(time.Second)
+			c.Add(A[0].node.healer.period)
+			time.Sleep(time.Millisecond)
 		}
 	}()
 
@@ -331,12 +333,12 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	assert.True(t, has, "expected that a is now part of b's membership")
 
 	// make sure that a is still not bootstrapped, this causes a to be suspect to b
-	ExecuteThenWaitFor(func() {
+	DoThenWaitFor(func() {
 		b.node.pingNextMember()
 	}, a.node, RequestBeforeReadyEvent{})
 
 	// allows a to bootstrap
-	ExecuteThenWaitFor(func() {
+	DoThenWaitFor(func() {
 		close(block)
 	}, a.node, JoinCompleteEvent{})
 
