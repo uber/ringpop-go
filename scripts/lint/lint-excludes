@@ -6,6 +6,7 @@
 ./swim/ping_request_sender.go:*: func passes Lock by value: swim.Member
 ./swim/stats_test.go:*: range var member copies Lock: swim.Member
 ./swim/test_utils.go:*: range var expected copies Lock: swim.Member
+./swim/handlers.go:*: range var member copies Lock: swim.Member
 # go 1.6 travis - "Lock" is now lowercase "lock":
 ./swim/disseminator.go:*: range var member copies lock: swim.Member
 ./swim/member.go:*: address passes lock by value: swim.Member
@@ -19,3 +20,4 @@
 ./swim/stats.go:*: assignment copies lock value to (\*s)\[j\]: swim.Member
 ./swim/stats_test.go:*: range var member copies lock: swim.Member
 ./swim/test_utils.go:*: range var expected copies lock: swim.Member
+./swim/handlers.go:*: range var member copies lock: swim.Member
