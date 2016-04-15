@@ -492,6 +492,12 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.RequestBeforeReadyEvent:
 		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
 
+	case swim.DiscoHealEvent:
+		rp.statter.IncCounter(rp.getStatKey("heal.triggered"), nil, 1)
+
+	case swim.AttemptHealEvent:
+		rp.statter.IncCounter(rp.getStatKey("heal.attempt"), nil, 1)
+
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
 

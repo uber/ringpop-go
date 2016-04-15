@@ -51,7 +51,7 @@ type Status struct {
 // HealResponse contains a list of nodes where healing was attempted
 type HealResponse struct {
 	Targets []string `json:"targets"`
-	Error   error    `json:"error"`
+	Error   string   `json:"error"`
 }
 
 // notImplementedHandler is a dummy handler that returns an error explaining
@@ -124,7 +124,7 @@ func (n *Node) gossipHandlerStop(ctx json.Context, req *emptyArg) (*emptyArg, er
 
 func (n *Node) discoverProviderHealerHandler(ctx json.Context, req *emptyArg) (*HealResponse, error) {
 	targets, err := n.healer.Heal()
-	return &HealResponse{Targets: targets, Error: err}, nil
+	return &HealResponse{Targets: targets, Error: err.Error()}, nil
 }
 
 func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {

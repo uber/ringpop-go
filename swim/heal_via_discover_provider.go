@@ -61,6 +61,7 @@ func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Dur
 
 // Start the partition healing loop
 func (h *discoverProviderHealer) Start() {
+	rand.Seed(time.Now().UnixNano())
 	// check if started channel is already filled
 	// if not, we start a new loop
 	select {

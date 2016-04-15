@@ -41,30 +41,30 @@ func AttemptHeal(node *Node, target string) ([]string, error) {
 		return nil, err
 	}
 
-	A := node.disseminator.MembershipAsChanges()
-	B := joinRes.Membership
+	MA := node.disseminator.MembershipAsChanges()
+	MB := joinRes.Membership
 
 	// Get the nodes that aren't mergeable and need to be reincarnated
-	changesForA, changesForB := nodesThatNeedToReincarnate(A, B)
+	changesForA, changesForB := nodesThatNeedToReincarnate(MA, MB)
 
 	// Reincarnate the nodes that need to be reincarnated
 	if len(changesForA) != 0 || len(changesForB) != 0 {
 		err = reincarnateNodes(node, target, changesForA, changesForB)
-		return pingableHosts(B), err
+		return pingableHosts(MB), err
 	}
 
 	// Merge partitions if no node needs to be reincarnated
-	err = mergePartitions(node, target, B)
-	return pingableHosts(B), err
+	err = mergePartitions(node, target, MB)
+	return pingableHosts(MB), err
 }
 
 // nodesThatNeedToReincarnate finds all nodes would become unpingable (>=faulty)
 // when membership A gets merged with membership B and visa versa. These nodes
 // need to be reincarnated, before we can heal the partition with a merge.
-func nodesThatNeedToReincarnate(A, B []Change) (changesForA, changesForB []Change) {
+func nodesThatNeedToReincarnate(MA, MB []Change) (changesForA, changesForB []Change) {
 	// Find changes that are alive for B and faulty for A and visa versa.
-	for _, b := range B {
-		a, ok := selectMember(A, b.Address)
+	for _, b := range MB {
+		a, ok := selectMember(MA, b.Address)
 		if !ok {
 			continue
 		}
@@ -109,17 +109,17 @@ func reincarnateNodes(node *Node, target string, changesForA, changesForB []Chan
 
 // mergePartitions applies the membership of B to a and send the membership
 // A to B piggybacked on top of a ping.
-func mergePartitions(node *Node, target string, B []Change) error {
+func mergePartitions(node *Node, target string, MB []Change) error {
 	node.healer.logger.WithField("target", target).Info("merge two partitions")
 
 	// Add membership of B to this node, so that the membership
 	// information of B will be disseminated through A.
-	node.memberlist.Update(B)
+	node.memberlist.Update(MB)
 
 	// Send membership of A to the target node, so that the membership
 	// information of partition A will be disseminated through B.
-	A := node.disseminator.MembershipAsChanges()
-	_, err := sendPingWithChanges(node, target, A, time.Second)
+	MA := node.disseminator.MembershipAsChanges()
+	_, err := sendPingWithChanges(node, target, MA, time.Second)
 	return err
 }
 
