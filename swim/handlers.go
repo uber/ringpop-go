@@ -124,7 +124,11 @@ func (n *Node) gossipHandlerStop(ctx json.Context, req *emptyArg) (*emptyArg, er
 
 func (n *Node) discoverProviderHealerHandler(ctx json.Context, req *emptyArg) (*HealResponse, error) {
 	targets, err := n.healer.Heal()
-	return &HealResponse{Targets: targets, Error: err.Error()}, nil
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	return &HealResponse{Targets: targets, Error: msg}, nil
 }
 
 func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {
