@@ -60,13 +60,12 @@ prefix() {
 #
 fetch-ringpop-common() {
     if [ ! -e "$ringpop_common_dir" ]; then
-        run git clone -b ws-partition-healing --depth=1 https://github.com/uber/ringpop-common.git "$ringpop_common_dir"
+        run git clone --depth=1 https://github.com/uber/ringpop-common.git "$ringpop_common_dir"
     fi
 
     run cd "$ringpop_common_dir"
+    #run git checkout master
     run git pull
-    run git checkout ws-partition-healing
-    # run git pull
     run cd - >/dev/null
 
     run cd "${ringpop_common_dir}/test"
