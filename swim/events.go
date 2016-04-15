@@ -28,11 +28,6 @@ import (
 	"github.com/uber/ringpop-go/events"
 )
 
-// An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
-type EventListener interface {
-	HandleEvent(events.Event)
-}
-
 // The ListenerFunc type is an adapter to allow the use of ordinary functions
 // as EventListeners.
 type ListenerFunc func(events.Event)
@@ -234,10 +229,18 @@ type RedundantReverseFullSyncEvent struct {
 	Target string `json:"target"`
 }
 
-func on(t interface{}, f func()) ListenerFunc {
+// DiscoHealEvent is sent when the discover provider healer attempts to heal a partition
+type DiscoHealEvent struct{}
+
+// AttemptHealEvent is sent when the healer is triggered
+type AttemptHealEvent struct{}
+
+// on is returns an EventListener that executes a function f upon receiving an
+// event of type t.
+func on(t interface{}, f func(e events.Event)) ListenerFunc {
 	return ListenerFunc(func(e events.Event) {
 		if reflect.TypeOf(t) == reflect.TypeOf(e) {
-			f()
+			f(e)
 		}
 	})
 }

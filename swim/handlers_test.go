@@ -92,6 +92,23 @@ func (s *HandlerTestSuite) TestGossipStopHandler() {
 	s.True(s.testNode.node.gossip.Stopped())
 }
 
+func (s *HandlerTestSuite) TestPartitionHealerHandler() {
+	done := make(chan struct{})
+	go func() {
+		DoThenWaitFor(func() {
+			_, err := s.testNode.node.discoverProviderHealerHandler(s.ctx, &emptyArg{})
+			s.NoError(err, "calling handler should not result in error")
+		}, s.testNode.node, DiscoHealEvent{})
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		s.Fail("test timed out")
+	}
+}
+
 func (s *HandlerTestSuite) TestToggleGossipHandler() {
 	s.Require().True(s.testNode.node.gossip.Stopped())
 

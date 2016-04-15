@@ -267,6 +267,12 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.join.retries"], "join tries didn't update")
 	// expected listener to record 1 event
 
+	s.ringpop.HandleEvent(swim.DiscoHealEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.triggered"], "missing stats for received pings")
+
+	s.ringpop.HandleEvent(swim.AttemptHealEvent{})
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.attempt"], "missing stats for received pings")
+
 	s.ringpop.HandleEvent(events.LookupEvent{
 		Key:      "hello",
 		Duration: time.Second,
@@ -384,7 +390,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(46, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(48, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {

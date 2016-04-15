@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -112,14 +113,14 @@ func (s *DisseminatorTestSuite) TestChangesAreCleared() {
 	s.Equal(0, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 }
 
-func (s *DisseminatorTestSuite) TestFullSync() {
+func (s *DisseminatorTestSuite) TestMembershipAsChanges() {
 	addresses := fakeHostPorts(1, 1, 2, 4)
 
 	for _, address := range addresses {
 		s.m.MakeAlive(address, s.incarnation)
 	}
 
-	changes := s.d.FullSync()
+	changes := s.d.MembershipAsChanges()
 
 	s.Len(changes, 4, "expected to get change for each member")
 }
@@ -373,8 +374,8 @@ func TestBidirectionalFullSync(t *testing.T) {
 	b := newChannelNode(t)
 	defer b.Destroy()
 
-	// after bootstrap a's memberlist contains a and b,
-	// but b's membership only contains b.
+	// After bootstrap, a's memberlist contains a and b, but b's membership
+	// only contains b.
 	bootstrapNodes(t, b, a)
 
 	// clear changes so that a full sync will be issued
@@ -390,7 +391,7 @@ func TestBidirectionalFullSync(t *testing.T) {
 
 	// only when a reverse full sync is issued the membership of b changes
 	// we listen for a membership change and continue the main thread of the test
-	b.node.RegisterListener(on(MemberlistChangesAppliedEvent{}, func() {
+	b.node.RegisterListener(on(MemberlistChangesAppliedEvent{}, func(e events.Event) {
 		cont <- struct{}{}
 	}))
 
@@ -431,14 +432,14 @@ func TestThrottleBidirectionalFullSyncs(t *testing.T) {
 	total := int64(0)
 
 	// Block the reverse full sync procedure to test if we throttle correctly.
-	tnode.node.RegisterListener(on(StartReverseFullSyncEvent{}, func() {
+	tnode.node.RegisterListener(on(StartReverseFullSyncEvent{}, func(e events.Event) {
 		atomic.AddInt64(&total, 1)
 		<-block
 	}))
 
 	// Listen for a reverse full sync that is omitted because the max number of
 	// reverse full sync routines are running.
-	tnode.node.RegisterListener(on(OmitReverseFullSyncEvent{}, func() {
+	tnode.node.RegisterListener(on(OmitReverseFullSyncEvent{}, func(e events.Event) {
 		go func() {
 			for i := 0; i < maxJobs; i++ {
 				block <- struct{}{}
@@ -493,7 +494,7 @@ func TestRedundantFullSync(t *testing.T) {
 	waitForConvergence(t, time.Second, tnodes...)
 
 	quit := make(chan struct{})
-	tnodes[0].node.RegisterListener(on(RedundantReverseFullSyncEvent{}, func() {
+	tnodes[0].node.RegisterListener(on(RedundantReverseFullSyncEvent{}, func(e events.Event) {
 		close(quit)
 	}))
 
@@ -508,7 +509,7 @@ func TestRedundantFullSync(t *testing.T) {
 }
 
 // TestReverseFullSyncJoinFailure test the code path for when the join in the
-// reverseFullSync fails. If the app doesn't crash, the test has passed.
+// reverseFullSync fails.
 func TestReverseFullSyncJoinFailure(t *testing.T) {
 	tnodes := genChannelNodes(t, 5)
 	bootstrapNodes(t, tnodes...)

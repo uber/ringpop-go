@@ -104,7 +104,7 @@ func (d *disseminator) HasChanges() bool {
 	return result
 }
 
-func (d *disseminator) FullSync() (changes []Change) {
+func (d *disseminator) MembershipAsChanges() (changes []Change) {
 	d.Lock()
 
 	for _, member := range d.node.memberlist.GetMembers() {
@@ -177,7 +177,7 @@ func (d *disseminator) IssueAsReceiver(
 		"remoteChecksum": senderChecksum,
 	}).Info("full sync")
 
-	return d.FullSync(), true
+	return d.MembershipAsChanges(), true
 }
 
 // filterChangesFromSender returns changes that didn't originate at the sender.
