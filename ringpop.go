@@ -537,9 +537,9 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 
 	for _, change := range changes {
 		switch change.Status {
-		case swim.Alive:
+		case swim.Alive, swim.Suspect:
 			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave:
+		case swim.Faulty, swim.Leave, swim.Tombstone:
 			serversToRemove = append(serversToRemove, change.Address)
 		}
 	}
