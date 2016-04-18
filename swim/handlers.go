@@ -147,6 +147,10 @@ func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, erro
 	return &Status{Status: "ok"}, nil
 }
 
+// reapFaultyMembersHandler iterates through the local members of this nodes and
+// declares all the members marked as faulty as a tombstone. This will clean all
+// these members from the membership in the complete cluster due to the gossipy
+// nature of swim
 func (n *Node) reapFaultyMembersHandler(ctx json.Context, req *emptyArg) (*Status, error) {
 	members := n.memberlist.GetMembers()
 	for _, member := range members {
