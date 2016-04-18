@@ -139,6 +139,8 @@ func (s *DisseminatorTestSuite) TestIssueChangesAsSender() {
 	s.Len(changes, 3, "expected three changes to be issued")
 }
 
+// TestIssueChangesAsSenderForTombstone tests that tombstones are issued as tombstone
+// flags when changes are issued when the node is the sender of a ping(-req)
 func (s *DisseminatorTestSuite) TestIssueChangesAsSenderForTombstone() {
 	s.d.ClearChanges()
 
@@ -154,6 +156,8 @@ func (s *DisseminatorTestSuite) TestIssueChangesAsSenderForTombstone() {
 	s.Assert().Equal(true, changes[0].Tombstone, "expected tombstone to be gossiped with a tombstone flag")
 }
 
+// TestIssueChangesAsReceiverForTombstone tests that tombstones are issued as tombstone
+// flags when changes are issued when the node is the receiver of a ping(-req)
 func (s *DisseminatorTestSuite) TestIssueChangesAsReceiverForTombstone() {
 	s.d.ClearChanges()
 
