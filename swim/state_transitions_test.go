@@ -163,9 +163,8 @@ func (s *StateTransitionsSuite) TestTimerCreated() {
 	s.NotEqual(old, s.stateTransitions.timer(member.Address), "expected timer to change")
 }
 
-// TestTimerCreated tests that starting suspicion for a node creates a
-// countdown timer that is responsible for marking a node as faulty at the end
-// of the timeout.
+// TestTimerCanceled makes sure that the timer is removed from the state transition
+// and has not been executed when it is canceled for a member.
 func (s *StateTransitionsSuite) TestTimerCanceled() {
 	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
@@ -179,6 +178,9 @@ func (s *StateTransitionsSuite) TestTimerCanceled() {
 
 	s.stateTransitions.Cancel(*member)
 	s.Require().Nil(s.stateTransitions.timer(member.Address), "expected timer to have been canceled")
+
+	s.clock.Add(5 * time.Second)
+	s.NotEqual(Faulty, member.Status, "didn't expect the member to be marked as faulty when the timer was canceled")
 }
 
 func (s *StateTransitionsSuite) TestSuspicionDisableStopsTimers() {
