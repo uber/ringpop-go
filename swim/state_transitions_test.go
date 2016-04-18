@@ -115,7 +115,7 @@ func (s *StateTransitionsSuite) TestSuspectBecomesFaulty() {
 	s.stateTransitions.ScheduleSuspectToFaulty(*member)
 	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
 
-	s.clock.Add(5*time.Second + 1)
+	s.clock.Add(5 * time.Second)
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 }
 
