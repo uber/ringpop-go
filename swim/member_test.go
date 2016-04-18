@@ -21,8 +21,11 @@
 package swim
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
@@ -118,4 +121,20 @@ func (s *MemberTestSuite) TestLocalOverride() {
 
 func TestMemberTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberTestSuite))
+}
+
+func TestChangeOmitTombstone(t *testing.T) {
+	change := Change{
+		Address:     "192.0.2.100:1234",
+		Incarnation: 42,
+		Status:      Alive,
+	}
+
+	data, err := json.Marshal(&change)
+	require.NoError(t, err)
+
+	parsedMap := make(map[string]interface{})
+	json.Unmarshal(data, &parsedMap)
+	_, has := parsedMap["tombstone"]
+	assert.False(t, has, "don't expect the tombstone field to be serialized when it is")
 }
