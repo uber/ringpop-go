@@ -313,6 +313,21 @@ func (s *MemberlistTestSuite) TestCountReachableMembers() {
 	s.Equal(3, reachableMemberCount, "expected 3 reachable members")
 }
 
+func (s *MemberlistTestSuite) TestRemoveMember() {
+	// seed the membership with more members
+	s.m.Update(s.changes)
+
+	var removed bool
+
+	// remove an unknown member
+	removed = s.m.RemoveMember("192.0.2.123:1234")
+	s.Assert().False(removed, "expect to not remove an unknown member")
+
+	// remove a known member
+	removed = s.m.RemoveMember(s.changes[0].Address)
+	s.Assert().True(removed, "expect to remove a member that was added before")
+}
+
 func TestMemberlistTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberlistTestSuite))
 }
