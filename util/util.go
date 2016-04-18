@@ -184,6 +184,15 @@ func ShuffleStrings(strings []string) []string {
 	return newStrings
 }
 
+// ShuffleStringsInPlace uses the Fisher–Yates shuffle to randomize the strings
+// in place.
+func ShuffleStringsInPlace(strings []string) {
+	for i := range strings {
+		j := rand.Intn(i + 1)
+		strings[i], strings[j] = strings[j], strings[i]
+	}
+}
+
 // TakeNode takes an element from nodes at the given index, or at a random index if
 // index < 0. Mutates nodes.
 func TakeNode(nodes *[]string, index int) string {
@@ -211,6 +220,15 @@ func TakeNode(nodes *[]string, index int) string {
 // SelectInt takes an option and a default value and returns the default value if
 // the option is equal to zero, and the option otherwise.
 func SelectInt(opt, def int) int {
+	if opt == 0 {
+		return def
+	}
+	return opt
+}
+
+// SelectFloat takes an option and a default value and returns the default value if
+// the option is equal to zero, and the option otherwise.
+func SelectFloat(opt, def float64) float64 {
 	if opt == 0 {
 		return def
 	}

@@ -21,9 +21,13 @@
 package swim
 
 import (
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -109,14 +113,14 @@ func (s *DisseminatorTestSuite) TestChangesAreCleared() {
 	s.Equal(0, s.d.ChangesCount(), "expected no problems deleting non-existent changes")
 }
 
-func (s *DisseminatorTestSuite) TestFullSync() {
+func (s *DisseminatorTestSuite) TestMembershipAsChanges() {
 	addresses := fakeHostPorts(1, 1, 2, 4)
 
 	for _, address := range addresses {
 		s.m.MakeAlive(address, s.incarnation)
 	}
 
-	changes := s.d.FullSync()
+	changes := s.d.MembershipAsChanges()
 
 	s.Len(changes, 4, "expected to get change for each member")
 }
@@ -386,4 +390,160 @@ func contains(cs []Change, address string) bool {
 
 func TestDisseminatorTestSuite(t *testing.T) {
 	suite.Run(t, new(DisseminatorTestSuite))
+}
+
+// TestBidirectionalFullSync creates two nodes a and b. The nodes are set up
+// such that a has b in its memberlist, but b doesn't have a in its memberlist.
+// Next we let a ping b, b issues a full sync but that doesn't help much
+// because a already knows about b. If bidirectional full syncs is implemented
+// b will also become aware of a's memberlist and thus the ring converges
+func TestBidirectionalFullSync(t *testing.T) {
+	// create two nodes: a and b
+	a := newChannelNode(t)
+	defer a.Destroy()
+
+	b := newChannelNode(t)
+	defer b.Destroy()
+
+	// After bootstrap, a's memberlist contains a and b, but b's membership
+	// only contains b.
+	bootstrapNodes(t, b, a)
+
+	// clear changes so that a full sync will be issued
+	a.node.disseminator.ClearChanges()
+	b.node.disseminator.ClearChanges()
+
+	// check that indeed b's memberlist doesn't contain a
+	addrA := a.node.Address()
+	_, has := b.node.memberlist.Member(addrA)
+	assert.False(t, has, "expected that a is not yet part of b's membership")
+
+	cont := make(chan struct{})
+
+	// only when a reverse full sync is issued the membership of b changes
+	// we listen for a membership change and continue the main thread of the test
+	b.node.RegisterListener(on(MemberlistChangesAppliedEvent{}, func(e events.Event) {
+		cont <- struct{}{}
+	}))
+
+	// this forces a to ping b, b will respond with a full sync and
+	// perform a reverse full sync subsequently
+	a.node.pingNextMember()
+
+	// wait until the membership has changed and the cont channel is sent a signal
+	select {
+	case <-time.After(time.Second):
+		assert.Fail(t, "Test timed out, memberships did not converge")
+	case <-cont:
+	}
+
+	// check that b has indeed added a to its membership
+	_, has = b.node.memberlist.Member(addrA)
+	assert.True(t, has, "expected that a is part of b's membership now")
+}
+
+// TestThrottleBidirectionalFullSyncs tests if we throttle the maximum number
+// of reverse full syncs running at the same time. In this test, we start
+// maxReverseFullSyncJobs+1 reverse full syncs and we block these routines midway
+// by waiting for the block channel. The last reverse full sync will be omitted
+// because the max number of reverse full syncs is in process (albeit blocked).
+// We wait and listen for the OmitReverseFullSyncEvent. When it fires, we
+// continue the test and count if the number of started reverse full syncs is
+// indeed equal to the maxBidirectionalFullSync variable.
+func TestThrottleBidirectionalFullSyncs(t *testing.T) {
+	tnode := newChannelNode(t)
+	maxJobs := tnode.node.maxReverseFullSyncJobs
+
+	tnodes := genChannelNodes(t, maxJobs+1)
+
+	bootstrapNodes(t, append(tnodes, tnode)...)
+	waitForConvergence(t, time.Second, append(tnodes, tnode)...)
+	block := make(chan struct{})
+	quit := make(chan struct{})
+	total := int64(0)
+
+	// Block the reverse full sync procedure to test if we throttle correctly.
+	tnode.node.RegisterListener(on(StartReverseFullSyncEvent{}, func(e events.Event) {
+		atomic.AddInt64(&total, 1)
+		<-block
+	}))
+
+	// Listen for a reverse full sync that is omitted because the max number of
+	// reverse full sync routines are running.
+	tnode.node.RegisterListener(on(OmitReverseFullSyncEvent{}, func(e events.Event) {
+		go func() {
+			for i := 0; i < maxJobs; i++ {
+				block <- struct{}{}
+			}
+			close(quit)
+		}()
+	}))
+
+	// Start the reverse full syncs.
+	for _, tn := range tnodes {
+		target := tn.node.Address()
+		tnode.node.disseminator.tryStartReverseFullSync(target, time.Second)
+	}
+
+	// The last tryStartReverseFullSync should fail to start a reverse full
+	// sync because the max number of reverse full sync routines are running.
+	// The OmitReverseFullSync event is handled above, when it fires the
+	// handler unblocks all the running reverse full syncs, thereafter it
+	// closes the quit channel so that the test continue and pass.
+	select {
+	case <-quit:
+	case <-time.After(time.Second):
+		assert.Fail(t, "test timed out, onOmitReverseFullSync listener didn't close quit channel")
+	}
+
+	assert.Equal(t, int64(maxJobs), total, "expected a throttled amount of concurrent jobs")
+}
+
+// TestReverseFullSync starts two partitions and checks if reverseFullSync
+// merges them.
+func TestReverseFullSync(t *testing.T) {
+	A := genChannelNodes(t, 5)
+	bootstrapNodes(t, A...)
+	waitForConvergence(t, time.Second, A...)
+
+	B := genChannelNodes(t, 5)
+	bootstrapNodes(t, B...)
+	waitForConvergence(t, time.Second, B...)
+
+	target := B[0].node.Address()
+	A[0].node.disseminator.reverseFullSync(target, time.Second)
+
+	waitForConvergence(t, time.Second, append(A, B...)...)
+}
+
+// TestRedundantFullSync tests wether a RudundantReverseFullSyncEvent is fired
+// when the reverseFullSync didn't apply any changes to the memberlist. We test
+// this by starting a reverseFullSync on a converged healthy cluster.
+func TestRedundantFullSync(t *testing.T) {
+	tnodes := genChannelNodes(t, 5)
+	bootstrapNodes(t, tnodes...)
+	waitForConvergence(t, time.Second, tnodes...)
+
+	quit := make(chan struct{})
+	tnodes[0].node.RegisterListener(on(RedundantReverseFullSyncEvent{}, func(e events.Event) {
+		close(quit)
+	}))
+
+	target := tnodes[1].node.Address()
+	tnodes[0].node.disseminator.reverseFullSync(target, time.Second)
+
+	select {
+	case <-quit:
+	case <-time.After(time.Second):
+		assert.Fail(t, "test timed out")
+	}
+}
+
+// TestReverseFullSyncJoinFailure test the code path for when the join in the
+// reverseFullSync fails.
+func TestReverseFullSyncJoinFailure(t *testing.T) {
+	tnodes := genChannelNodes(t, 5)
+	bootstrapNodes(t, tnodes...)
+	waitForConvergence(t, time.Second, tnodes...)
+	tnodes[0].node.disseminator.reverseFullSync("XXX", time.Second)
 }

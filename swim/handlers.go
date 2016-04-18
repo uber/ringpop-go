@@ -48,6 +48,12 @@ type Status struct {
 	Status string `json:"status"`
 }
 
+// HealResponse contains a list of nodes where healing was attempted
+type HealResponse struct {
+	Targets []string `json:"targets"`
+	Error   string   `json:"error"`
+}
+
 // notImplementedHandler is a dummy handler that returns an error explaining
 // this method is not implemented.
 func notImplementedHandler(ctx json.Context, req *emptyArg) (*emptyArg, error) {
@@ -56,19 +62,20 @@ func notImplementedHandler(ctx json.Context, req *emptyArg) (*emptyArg, error) {
 
 func (n *Node) registerHandlers() error {
 	handlers := map[string]interface{}{
-		"/protocol/join":      n.joinHandler,
-		"/protocol/ping":      n.pingHandler,
-		"/protocol/ping-req":  n.pingRequestHandler,
-		"/admin/debugSet":     notImplementedHandler,
-		"/admin/debugClear":   notImplementedHandler,
-		"/admin/gossip":       n.gossipHandler, // Deprecated
-		"/admin/gossip/start": n.gossipHandlerStart,
-		"/admin/gossip/stop":  n.gossipHandlerStop,
-		"/admin/tick":         n.tickHandler, // Deprecated
-		"/admin/gossip/tick":  n.tickHandler,
-		"/admin/member/leave": n.adminLeaveHandler,
-		"/admin/member/join":  n.adminJoinHandler,
-		"/admin/reap":         n.reapFaultyMembersHandler,
+		"/protocol/join":             n.joinHandler,
+		"/protocol/ping":             n.pingHandler,
+		"/protocol/ping-req":         n.pingRequestHandler,
+		"/admin/debugSet":            notImplementedHandler,
+		"/admin/debugClear":          notImplementedHandler,
+		"/admin/gossip":              n.gossipHandler, // Deprecated
+		"/admin/gossip/start":        n.gossipHandlerStart,
+		"/admin/gossip/stop":         n.gossipHandlerStop,
+		"/admin/healpartition/disco": n.discoverProviderHealerHandler,
+		"/admin/tick":                n.tickHandler, // Deprecated
+		"/admin/gossip/tick":         n.tickHandler,
+		"/admin/member/leave":        n.adminLeaveHandler,
+		"/admin/member/join":         n.adminJoinHandler,
+		"/admin/reap":                n.reapFaultyMembersHandler,
 	}
 
 	return json.Register(n.channel, handlers, n.errorHandler)
@@ -114,6 +121,15 @@ func (n *Node) gossipHandlerStart(ctx json.Context, req *emptyArg) (*emptyArg, e
 func (n *Node) gossipHandlerStop(ctx json.Context, req *emptyArg) (*emptyArg, error) {
 	n.gossip.Stop()
 	return &emptyArg{}, nil
+}
+
+func (n *Node) discoverProviderHealerHandler(ctx json.Context, req *emptyArg) (*HealResponse, error) {
+	targets, err := n.healer.Heal()
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	return &HealResponse{Targets: targets, Error: msg}, nil
 }
 
 func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {

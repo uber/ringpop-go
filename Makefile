@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks testpop lint mocks out setup test test-integration test-unit
+.PHONY: clean clean-mocks testpop lint mocks out setup test test-integration test-unit test-race
 
 SHELL = /bin/bash
 
@@ -65,6 +65,10 @@ test-integration:
 test-unit:
 	go generate ./...
 	test/go-test-prettify ./...
+
+test-race:
+	go generate ./...
+	test/go-test-prettify -race ./...
 
 testpop:	clean
 	go build scripts/testpop/testpop.go

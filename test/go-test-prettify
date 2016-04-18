@@ -29,10 +29,15 @@ _prettify() {
 	local -i failed=0
 	local -i skipped=0
 	local -i errors=0
+	local -i races=0
 
 	if [[ $1 == "-v"* ]]; then
 		verbose=true
 	fi
+
+	# Context is a buffer used to store the last test line, so we can print it
+	# to give context about the current output.
+	local context=
 
 	while IFS= read -r line; do
 		case $line in
@@ -56,6 +61,7 @@ _prettify() {
 			# Skip output of "RUN" lines by default
 			"=== RUN"*)
 				run=$(($run+1))
+				context="$line"
 				;;
 
 			# Skip output of mock.go success lines (unicode char is the green tick)
@@ -67,6 +73,16 @@ _prettify() {
 				errors=$(($errors+1))
 
 				if ! $verbose; then
+					echo "$line"
+				fi
+				;;
+
+			# Data races
+			"WARNING: DATA RACE"*)
+				races=$(($races+1))
+				if ! $verbose; then
+					echo "$context"
+					echo "==="
 					echo "$line"
 				fi
 				;;
@@ -95,6 +111,7 @@ _prettify() {
 	[ $failed -ne 0 ] && echo "# failed: $failed"
 	[ $skipped -ne 0 ] && echo "# skipped: $skipped"
 	[ $errors -ne 0 ] && echo "# errors: $errors"
+	[ $races -ne 0 ] && echo "# races: $races"
 	echo
 }
 

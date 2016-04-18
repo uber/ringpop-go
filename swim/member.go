@@ -158,3 +158,18 @@ func (c Change) address() string {
 func (c Change) incarnation() int64 {
 	return c.Incarnation
 }
+
+func (c Change) overrides(c2 Change) bool {
+	if c.Incarnation > c2.Incarnation {
+		return true
+	}
+	if c.Incarnation < c2.Incarnation {
+		return false
+	}
+
+	return statePrecedence(c.Status) > statePrecedence(c2.Status)
+}
+
+func (c Change) isPingable() bool {
+	return c.Status == Alive || c.Status == Suspect
+}
