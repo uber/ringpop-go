@@ -135,6 +135,9 @@ type Change struct {
 	Timestamp util.Timestamp `json:"timestamp"`
 }
 
+// validateIncoming validates incoming changes before they are passed into the
+// swim state machine. This is usefull to make late adjustments to incoming
+// changes to transform some legacy wire protocol changes into new swim terminology
 func (c Change) validateIncoming() Change {
 	if c.Status == Faulty && c.Tombstone {
 		c.Status = Tombstone
@@ -142,6 +145,10 @@ func (c Change) validateIncoming() Change {
 	return c
 }
 
+// validateOutgoing validates outgoing changes before they are passed to the module
+// responsible for sending the change to the other side. This can be used to make sure
+// that our changes are parsable by older version of ringpop-go to prevent unwanted
+// behavior when incompatible changes are sent to older versions.
 func (c Change) validateOutgoing() Change {
 	if c.Status == Tombstone {
 		c.Status = Faulty
