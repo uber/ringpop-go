@@ -243,7 +243,7 @@ func (s *HandlerTestSuite) TestPingRequestHandlerFail() {
 	s.Nil(res)
 }
 
-func (s *HandlerTestSuite) TestAdminReadHandler() {
+func (s *HandlerTestSuite) TestAdminReapHandler() {
 	memberAddr := "192.0.2.100:1234"
 	s.cluster.nodes[0].memberlist.MakeFaulty(memberAddr, 42)
 	err := s.cluster.WaitForConvergence(time.Second)
