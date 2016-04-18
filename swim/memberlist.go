@@ -255,6 +255,12 @@ func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Leave)
 }
 
+// MakeTombstone declares the node with the provided address in the tombstone state
+// on the given incarnation number. If the incarnation number in the local memberlist
+// is already higher than the incartation number provided in this function it is
+// essentially a no-op. The list of changes that is returned is the actual list of
+// changes that have been applied to the memberlist. It can be used to test if the
+// tombstone declaration has been executed atleast to the local memberlist.
 func (m *memberlist) MakeTombstone(address string, incarnation int64) []Change {
 	m.node.emit(MakeNodeStatusEvent{Tombstone})
 	return m.MakeChange(address, incarnation, Tombstone)
