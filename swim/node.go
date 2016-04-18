@@ -189,7 +189,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
-	node.stateTransitions = newStateTransitions(node, node.clock, opts.StateTimeouts)
+	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,

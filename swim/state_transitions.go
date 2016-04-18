@@ -48,7 +48,6 @@ type stateTransitions struct {
 	sync.Mutex
 
 	node     *Node
-	clock    clock.Clock
 	timeouts StateTimeouts
 	timers   map[string]*transitionTimer
 	enabled  bool
@@ -77,10 +76,9 @@ func mergeStateTimeouts(one StateTimeouts, two StateTimeouts) StateTimeouts {
 }
 
 // newStateTransitions returns a new state transition controller that can be used to schedule state transitions for nodes
-func newStateTransitions(n *Node, clock clock.Clock, timeouts StateTimeouts) *stateTransitions {
+func newStateTransitions(n *Node, timeouts StateTimeouts) *stateTransitions {
 	return &stateTransitions{
 		node:     n,
-		clock:    clock,
 		timeouts: timeouts,
 		timers:   make(map[string]*transitionTimer),
 		enabled:  true,
@@ -141,7 +139,7 @@ func (s *stateTransitions) schedule(subject subject, state string, timeout time.
 		timer.Stop()
 	}
 
-	timer := s.clock.AfterFunc(timeout, func() {
+	timer := s.node.clock.AfterFunc(timeout, func() {
 		s.logger.WithFields(bark.Fields{
 			"member": subject.address(),
 			"state":  state,
