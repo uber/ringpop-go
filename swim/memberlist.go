@@ -266,6 +266,8 @@ func (m *memberlist) MakeTombstone(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Tombstone)
 }
 
+// Evict evicts a member from the memberlist. It prevents the local node to be evicted
+// since that is undesired behavior.
 func (m *memberlist) Evict(address string) {
 	if m.local.Address == address {
 		// We should not evict ourselves from the memberlist. This should not be reached, but we will make noise in the logs
