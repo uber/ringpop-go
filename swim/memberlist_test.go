@@ -328,6 +328,11 @@ func (s *MemberlistTestSuite) TestRemoveMember() {
 	s.Assert().True(removed, "expect to remove a member that was added before")
 }
 
+func (s *MemberlistTestSuite) TestApplyUnknownTombstone() {
+	applied := s.m.MakeTombstone("192.0.2.123:1234", 42)
+	s.Assert().Len(applied, 0, "expected that the declaration of a tombstone for an unknown member is not applied")
+}
+
 func TestMemberlistTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberlistTestSuite))
 }
