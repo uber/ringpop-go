@@ -317,14 +317,14 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.refuted-update"], "missing refuted-update stat")
 
 	// double check the counts before the event
-	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "incorrect count for ring.server-added before RingChangedEvent")
+	s.Equal(int64(11), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "incorrect count for ring.server-added before RingChangedEvent")
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.ring.server-removed"], "incorrect count for ring.server-removed before RingChangedEvent")
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.ring.changed"], "incorrect count for ring.changed before RingChangedEvent")
 	s.ringpop.HandleEvent(events.RingChangedEvent{
 		ServersAdded:   genAddresses(1, 2, 5),
 		ServersRemoved: genAddresses(1, 6, 8),
 	})
-	s.Equal(int64(14), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "missing ring.server-added stat")
+	s.Equal(int64(15), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "missing ring.server-added stat")
 	s.Equal(int64(5), stats.vals["ringpop.127_0_0_1_3001.ring.server-removed"], "missing ring.server-removed stat")
 	s.Equal(int64(3), stats.vals["ringpop.127_0_0_1_3001.ring.changed"], "missing ring.changed stat")
 
