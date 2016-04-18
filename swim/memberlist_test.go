@@ -318,14 +318,18 @@ func (s *MemberlistTestSuite) TestRemoveMember() {
 	s.m.Update(s.changes)
 
 	var removed bool
+	var count int
 
+	count = s.m.NumMembers()
 	// remove an unknown member
 	removed = s.m.RemoveMember("192.0.2.123:1234")
 	s.Assert().False(removed, "expect to not remove an unknown member")
+	s.Assert().Equal(count, s.m.NumMembers(), "expected an unchanged count")
 
 	// remove a known member
 	removed = s.m.RemoveMember(s.changes[0].Address)
 	s.Assert().True(removed, "expect to remove a member that was added before")
+	s.Assert().Equal(count-1, s.m.NumMembers(), "expected that there is exactly one member less")
 }
 
 func (s *MemberlistTestSuite) TestApplyUnknownTombstone() {
