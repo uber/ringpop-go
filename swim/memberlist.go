@@ -405,7 +405,7 @@ func (m *memberlist) getJoinPosition() int {
 	return rand.Intn(l)
 }
 
-// applies a change directly to the member list
+// Apply tries to apply the change to the memberlsist. Returns true when the change was applied
 func (m *memberlist) Apply(change Change) bool {
 	member, ok := m.members.byAddress[change.Address]
 
