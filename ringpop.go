@@ -164,7 +164,8 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Clock: rp.clock,
+		StateTimeouts: rp.config.StateTimeouts,
+		Clock:         rp.clock,
 	})
 	rp.node.RegisterListener(rp)
 
@@ -554,9 +555,9 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 
 	for _, change := range changes {
 		switch change.Status {
-		case swim.Alive:
+		case swim.Alive, swim.Suspect:
 			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave:
+		case swim.Faulty, swim.Leave, swim.Tombstone:
 			serversToRemove = append(serversToRemove, change.Address)
 		}
 	}

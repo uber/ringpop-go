@@ -75,6 +75,7 @@ func (n *Node) registerHandlers() error {
 		"/admin/gossip/tick":         n.tickHandler,
 		"/admin/member/leave":        n.adminLeaveHandler,
 		"/admin/member/join":         n.adminJoinHandler,
+		"/admin/reap":                n.reapFaultyMembersHandler,
 	}
 
 	return json.Register(n.channel, handlers, n.errorHandler)
@@ -143,6 +144,21 @@ func (n *Node) adminJoinHandler(ctx json.Context, req *emptyArg) (*Status, error
 
 func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, error) {
 	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
+	return &Status{Status: "ok"}, nil
+}
+
+// reapFaultyMembersHandler iterates through the local members of this nodes and
+// declares all the members marked as faulty as a tombstone. This will clean all
+// these members from the membership in the complete cluster due to the gossipy
+// nature of swim
+func (n *Node) reapFaultyMembersHandler(ctx json.Context, req *emptyArg) (*Status, error) {
+	members := n.memberlist.GetMembers()
+	for _, member := range members {
+		if member.Status == Faulty {
+			// declare all faulty members as tombstone
+			n.memberlist.MakeTombstone(member.Address, member.Incarnation)
+		}
+	}
 	return &Status{Status: "ok"}, nil
 }
 

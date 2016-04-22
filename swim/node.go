@@ -72,7 +72,9 @@ type Options struct {
 func defaultOptions() *Options {
 	opts := &Options{
 		StateTimeouts: StateTimeouts{
-			Suspect: 5000 * time.Millisecond,
+			Suspect:   5 * time.Second,
+			Faulty:    24 * time.Hour,
+			Tombstone: 1 * time.Minute,
 		},
 
 		MinProtocolPeriod: 200 * time.Millisecond,
@@ -420,24 +422,26 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (n *Node) handleChanges(changes []Change) {
+	n.disseminator.AdjustMaxPropagations()
 	for _, change := range changes {
 		n.disseminator.RecordChange(change)
 
 		switch change.Status {
 		case Alive:
 			n.stateTransitions.Cancel(change)
-			n.disseminator.AdjustMaxPropagations()
-
-		case Faulty:
-			n.stateTransitions.Cancel(change)
 
 		case Suspect:
 			n.stateTransitions.ScheduleSuspectToFaulty(change)
-			n.disseminator.AdjustMaxPropagations()
+
+		case Faulty:
+			n.stateTransitions.ScheduleFaultyToTombstone(change)
 
 		case Leave:
+			// XXX: should this also reap?
 			n.stateTransitions.Cancel(change)
-			n.disseminator.AdjustMaxPropagations()
+
+		case Tombstone:
+			n.stateTransitions.ScheduleTombstoneToEvict(change)
 		}
 	}
 }

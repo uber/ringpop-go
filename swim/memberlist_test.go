@@ -229,6 +229,41 @@ func (s *MemberlistTestSuite) TestUpdateEmpty() {
 	s.Empty(applied, "expected no updates to be applied")
 }
 
+func (s *MemberlistTestSuite) TestUpdateWithTombstoneState() {
+	target := "127.0.0.1:3002"
+	s.m.MakeAlive(target, s.incarnation)
+
+	s.m.Update([]Change{
+		Change{
+			Address:     target,
+			Incarnation: s.incarnation,
+			Status:      Tombstone,
+		},
+	})
+
+	member := s.m.members.byAddress[target]
+
+	s.Assert().Equal(Tombstone, member.Status, "expected the member with tombstone state")
+}
+
+func (s *MemberlistTestSuite) TestUpdateWithTombstoneFlag() {
+	target := "127.0.0.1:3002"
+	s.m.MakeAlive(target, s.incarnation)
+
+	s.m.Update([]Change{
+		Change{
+			Address:     target,
+			Incarnation: s.incarnation,
+			Status:      Faulty,
+			Tombstone:   true,
+		},
+	})
+
+	member := s.m.members.byAddress[target]
+
+	s.Assert().Equal(Tombstone, member.Status, "expected the member with tombstone state")
+}
+
 func (s *MemberlistTestSuite) TestRandomPingable() {
 	s.m.MakeAlive("127.0.0.1:3002", testInc)
 	s.m.MakeAlive("127.0.0.1:3003", testInc)
@@ -276,6 +311,30 @@ func (s *MemberlistTestSuite) TestCountReachableMembers() {
 	reachableMemberCount := nodeA.CountReachableMembers()
 
 	s.Equal(3, reachableMemberCount, "expected 3 reachable members")
+}
+
+func (s *MemberlistTestSuite) TestRemoveMember() {
+	// seed the membership with more members
+	s.m.Update(s.changes)
+
+	var removed bool
+	var count int
+
+	count = s.m.NumMembers()
+	// remove an unknown member
+	removed = s.m.RemoveMember("192.0.2.123:1234")
+	s.Assert().False(removed, "expect to not remove an unknown member")
+	s.Assert().Equal(count, s.m.NumMembers(), "expected an unchanged count")
+
+	// remove a known member
+	removed = s.m.RemoveMember(s.changes[0].Address)
+	s.Assert().True(removed, "expect to remove a member that was added before")
+	s.Assert().Equal(count-1, s.m.NumMembers(), "expected that there is exactly one member less")
+}
+
+func (s *MemberlistTestSuite) TestApplyUnknownTombstone() {
+	applied := s.m.MakeTombstone("192.0.2.123:1234", 42)
+	s.Assert().Len(applied, 0, "expected that the declaration of a tombstone for an unknown member is not applied")
 }
 
 func TestMemberlistTestSuite(t *testing.T) {
