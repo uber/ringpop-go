@@ -300,7 +300,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 	if len(changes) > 0 {
 		m.logger.WithFields(bark.Fields{
 			"update": changes[0],
-		}).Debugf("ringpop member declares other member %s", changes[0].Status)
+		}).Infof("ringpop member declares other member %s", changes[0].Status)
 	}
 
 	return changes
