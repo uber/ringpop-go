@@ -7,7 +7,7 @@ v0.5.0
 * Feature: Automatic healing of fully partitioned rings that could be cause by
   temporary network failure. #135 #128 #129
 * Fix: Fullsyncs are now executed in both directions to prevent persistent
-  asymetrical partitions. #134
+  asymmetrical partitions. #134
 * Fix: Overcome protocol incompatibilities in the dissemination of tombstones
   for the reaping of faulty nodes. #133 #132
 * Maintainability: Refactor of internal use of the Discovery Provider. #130
