@@ -1,6 +1,19 @@
 ringpop-go changes
 ==================
 
+v0.5.0
+------
+
+* Feature: Automatic healing of fully partitioned rings that could be cause by
+  temporary network failure. #135 #128 #129
+* Fix: Fullsyncs are now executed in both directions to prevent persistent
+  asymetrical partitions. #134
+* Fix: Overcome protocol incompatibilities in the dissemination of tombstones
+  for the reaping of faulty nodes. #133 #132
+* Maintainability: Refactor of internal use of the Discovery Provider. #130
+* Testing: Pin mockery to a specific version for testing stability. #136
+* Testing: Add Go race detector on CI. #137
+
 v0.4.1
 ------
 
