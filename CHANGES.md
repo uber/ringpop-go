@@ -10,6 +10,7 @@ v0.5.0
   asymmetrical partitions. #134
 * Fix: Overcome protocol incompatibilities in the dissemination of tombstones
   for the reaping of faulty nodes. #133 #132
+* Fix: Leaking goroutines on an error response after a timeout. #140
 * Maintainability: Refactor of internal use of the Discovery Provider. #130
 * Testing: Pin mockery to a specific version for testing stability. #136
 * Testing: Add Go race detector on CI. #137
