@@ -84,7 +84,7 @@ func sendPingWithChanges(node *Node, target string, changes []Change, timeout ti
 	startTime := time.Now()
 
 	// send the ping
-	errC := make(chan error)
+	errC := make(chan error, 1)
 	res := &ping{}
 	go func() {
 		errC <- json.CallPeer(ctx, peer, node.service, "/protocol/ping", req, res)
