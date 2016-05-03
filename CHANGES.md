@@ -27,7 +27,8 @@ faulty nodes) 24 hours after the deploy. If older versions of ringpop run in a
 cluster that starts declaring these `tombstones` the cluster will jump in endless
 fullsyncs mode. Ringpop operates normally under these conditions but extra load
 on both network and CPU are in effect during this time. The fullsyncs will
-automatically resolve as soon as all members are upgraded to this version.
+automatically resolve as soon as all members are upgraded to this version. Same
+might happen during a partial rollback that operates for a longer period of time.
 
 v0.4.1
 ------
