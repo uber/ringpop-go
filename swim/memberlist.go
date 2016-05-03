@@ -33,6 +33,7 @@ import (
 	"github.com/dgryski/go-farm"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -246,6 +247,32 @@ func (m *memberlist) MakeSuspect(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
+	m.logger.WithFields(bark.Fields{"address": address}).Info("making faulty")
+
+	if m.node != nil && m.node.channel != nil && m.node.channel.Peers() != nil {
+		peer := m.node.channel.Peers().GetOrAdd(address)
+		ctx, cancel := shared.NewTChannelContext(1 * time.Nanosecond)
+		defer cancel()
+
+		conn, err := peer.GetConnection(ctx)
+		if err != nil {
+			m.logger.WithFields(bark.Fields{
+				"error": err,
+			}).Warn("Error getting connection, probably timeout")
+		} else {
+			err = conn.Close()
+			if err != nil {
+				m.logger.WithFields(bark.Fields{
+					"error": err,
+				}).Warn("Error closing connection")
+			} else {
+				m.logger.WithFields(bark.Fields{
+					"address": address,
+				}).Info("Closed connection to faulty remote host")
+			}
+		}
+	}
+
 	m.node.emit(MakeNodeStatusEvent{Faulty})
 	return m.MakeChange(address, incarnation, Faulty)
 }

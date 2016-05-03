@@ -300,7 +300,7 @@ func defaultLogLevels(r *Ringpop) error {
 		"dissemination": logging.Error,
 		"gossip":        logging.Error,
 		"join":          logging.Warn,
-		"membership":    logging.Error,
+		"membership":    logging.Info,
 		"ring":          logging.Error,
 		"suspicion":     logging.Error,
 	})(r)
