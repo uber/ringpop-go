@@ -1,6 +1,35 @@
 ringpop-go changes
 ==================
 
+v0.5.0
+------
+
+* Feature: Automatic healing of fully partitioned rings that could be cause by
+  temporary network failure. #135 #128 #129
+* Fix: Fullsyncs are now executed in both directions to prevent persistent
+  asymmetrical partitions. #134
+* Fix: Overcome protocol incompatibilities in the dissemination of tombstones
+  for the reaping of faulty nodes. #133 #132
+* Fix: Leaking goroutines on an error response after a timeout. #140
+* Maintainability: Refactor of internal use of the Discovery Provider. #130
+* Testing: Pin mockery to a specific version for testing stability. #136
+* Testing: Add Go race detector on CI. #137
+
+### Release notes
+
+#### Deploying from older versions
+
+It is advised to complete the deployment of this version within 24 hours after
+the first node is upgraded. Since the reaping of faulty nodes is added to this
+release a node that upgraded to this version will mark all the faulty members of
+the ringpop cluster as tombstones (the new state introduced for the reaping of
+faulty nodes) 24 hours after the deploy. If older versions of ringpop run in a
+cluster that starts declaring these `tombstones` the cluster will jump in endless
+fullsyncs mode. Ringpop operates normally under these conditions but extra load
+on both network and CPU are in effect during this time. The fullsyncs will
+automatically resolve as soon as all members are upgraded to this version. Same
+might happen during a partial rollback that operates for a longer period of time.
+
 v0.4.1
 ------
 
