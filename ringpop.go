@@ -164,7 +164,8 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		Clock: rp.clock,
+		StateTimeouts: rp.config.StateTimeouts,
+		Clock:         rp.clock,
 	})
 	rp.node.RegisterListener(rp)
 
@@ -415,6 +416,15 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
+	case swim.StartReverseFullSyncEvent:
+		rp.statter.IncCounter(rp.getStatKey("full-sync.reverse"), nil, 1)
+
+	case swim.OmitReverseFullSyncEvent:
+		rp.statter.IncCounter(rp.getStatKey("full-sync.reverse-omitted"), nil, 1)
+
+	case swim.RedundantReverseFullSyncEvent:
+		rp.statter.IncCounter(rp.getStatKey("full-sync.redundant-reverse"), nil, 1)
+
 	case swim.MaxPAdjustedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("max-piggyback"), nil, int64(event.NewPCount))
 
@@ -425,6 +435,9 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
 		rp.statter.IncCounter(rp.getStatKey("join.succeeded"), nil, 1)
 		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
+
+	case swim.AddJoinListEvent:
+		rp.statter.RecordTimer(rp.getStatKey("join.add-join-list"), nil, event.Duration)
 
 	case swim.PingSendEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping.send"), nil, 1)
@@ -479,6 +492,12 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 
 	case swim.RequestBeforeReadyEvent:
 		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
+
+	case swim.DiscoHealEvent:
+		rp.statter.IncCounter(rp.getStatKey("heal.triggered"), nil, 1)
+
+	case swim.AttemptHealEvent:
+		rp.statter.IncCounter(rp.getStatKey("heal.attempt"), nil, 1)
 
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
@@ -536,9 +555,9 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 
 	for _, change := range changes {
 		switch change.Status {
-		case swim.Alive:
+		case swim.Alive, swim.Suspect:
 			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave:
+		case swim.Faulty, swim.Leave, swim.Tombstone:
 			serversToRemove = append(serversToRemove, change.Address)
 		}
 	}

@@ -31,6 +31,11 @@ type EventListener interface {
 	HandleEvent(event Event)
 }
 
+// EventRegistrar is an object that you can register EventListeners on.
+type EventRegistrar interface {
+	RegisterListener(EventListener)
+}
+
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
 type RingChangedEvent struct {
 	ServersAdded   []string

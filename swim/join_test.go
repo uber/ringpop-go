@@ -26,7 +26,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/discovery/statichosts"
-	"github.com/uber/tchannel-go/json"
 )
 
 type JoinSenderTestSuite struct {
@@ -52,9 +51,9 @@ func (s *JoinSenderTestSuite) TestSelectGroup() {
 	fakeHosts := fakeHostPorts(1, 1, 2, 3)
 	bootstrapHosts := append(fakeHosts, s.node.Address())
 
-	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: statichosts.New(bootstrapHosts...),
-	})
+	s.node.discoverProvider = statichosts.New(bootstrapHosts...)
+	joiner, err := newJoinSender(s.node, nil)
+
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -68,9 +67,9 @@ func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
 	bootstrapHosts := append(fakeHostPorts(1, 1, 2, 3), s.node.Address())
 	expected := fakeHostPorts(1, 1, 2, 3)
 
-	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: statichosts.New(bootstrapHosts...),
-	})
+	s.node.discoverProvider = statichosts.New(bootstrapHosts...)
+	joiner, err := newJoinSender(s.node, nil)
+
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -87,9 +86,9 @@ func (s *JoinSenderTestSuite) TestSelectMultipleGroups() {
 func (s *JoinSenderTestSuite) TestSelectGroupExcludes() {
 	bootstrapHosts := fakeHostPorts(1, 1, 1, 5)
 
-	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: statichosts.New(bootstrapHosts...),
-	})
+	s.node.discoverProvider = statichosts.New(bootstrapHosts...)
+	joiner, err := newJoinSender(s.node, nil)
+
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
@@ -104,8 +103,8 @@ func (s *JoinSenderTestSuite) TestSelectGroupExcludes() {
 func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
 	bootstrapHosts := append(fakeHostPorts(1, 4, 1, 1), fakeHostPorts(1, 1, 2, 4)...)
 
+	s.node.discoverProvider = statichosts.New(bootstrapHosts...)
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider:  statichosts.New(bootstrapHosts...),
 		parallelismFactor: 1,
 	})
 	s.Require().NoError(err, "cannot have an error")
@@ -120,8 +119,8 @@ func (s *JoinSenderTestSuite) TestSelectGroupPrioritizes() {
 func (s *JoinSenderTestSuite) TestSelectGroupMixes() {
 	bootstrapHosts := append(fakeHostPorts(1, 2, 1, 1), fakeHostPorts(1, 1, 2, 3)...)
 
+	s.node.discoverProvider = statichosts.New(bootstrapHosts...)
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider:  statichosts.New(bootstrapHosts...),
 		parallelismFactor: 1,
 	})
 	s.Require().NoError(err, "cannot have an error")
@@ -141,56 +140,44 @@ func (s *JoinSenderTestSuite) TestJoinDifferentApp() {
 	bootstrapNodes(s.T(), s.tnode)
 	bootstrapNodes(s.T(), peer)
 
-	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 1)...),
-	})
+	s.node.discoverProvider = statichosts.New(fakeHostPorts(1, 1, 1, 1)...)
+	joiner, err := newJoinSender(s.node, nil)
+
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
-	ctx, cancel := json.NewContext(joiner.timeout)
-	defer cancel()
-
-	var res joinResponse
-	select {
-	case err := <-joiner.MakeCall(ctx, peer.node.Address(), &res):
-		s.Error(err, "expected join to fail for different apps")
-	case <-ctx.Done():
-		s.Fail("expected join to not timeout")
-	}
+	res, err := sendJoinRequest(s.node, peer.node.Address(), joiner.timeout)
+	s.Nil(res, "expected err, not a response")
+	s.Error(err, "expected join to fail for different apps")
 }
 
 func (s *JoinSenderTestSuite) TestJoinSelf() {
 	// Set up a real listening channel
+	s.tnode.Destroy()
 	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
-	defer s.tnode.Destroy()
 
 	bootstrapNodes(s.T(), s.tnode)
 
-	joiner, err := newJoinSender(s.node, &joinOpts{
-		discoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 1)...),
-	})
+	s.node.discoverProvider = statichosts.New(fakeHostPorts(1, 1, 1, 1)...)
+	joiner, err := newJoinSender(s.node, nil)
+
 	s.Require().NoError(err, "cannot have an error")
 	s.Require().NotNil(joiner, "joiner cannot be nil")
 
-	ctx, cancel := json.NewContext(joiner.timeout)
-	defer cancel()
-
-	var res joinResponse
-	select {
-	case err := <-joiner.MakeCall(ctx, s.node.Address(), &res):
-		s.Error(err, "expected join to fail for different apps")
-	case <-ctx.Done():
-		s.Fail("expected join to not timeout")
-	}
+	res, err := sendJoinRequest(s.node, s.node.Address(), joiner.timeout)
+	s.Nil(res, "expected err, not a response")
+	s.Error(err, "expected join to fail when joining yourself")
 }
 
 func (s *JoinSenderTestSuite) TestCustomDelayer() {
 	delayer := &nullDelayer{}
+
+	s.node.discoverProvider = statichosts.New(fakeHostPorts(1, 1, 1, 1)...)
 	joiner, err := newJoinSender(s.node, &joinOpts{
-		delayer:          delayer,
-		discoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 1)...),
+		delayer: delayer,
 	})
+
 	s.NoError(err, "expected valid joiner")
 	s.Equal(delayer, joiner.delayer, "custom delayer was set")
 }

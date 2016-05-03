@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/uber/ringpop-go/discovery"
+	"github.com/uber/ringpop-go/events"
 
 	"github.com/benbjohnson/clock"
 	"github.com/rcrowley/go-metrics"
@@ -52,13 +53,28 @@ type Options struct {
 	RollupFlushInterval time.Duration
 	RollupMaxUpdates    int
 
+	MaxReverseFullSyncJobs int
+
+	// When started, the partition healing algorithm attempts a partition heal
+	// every PartitionHealPeriod with a probability of:
+	// PartitionHealBaseProbabillity / # Nodes in discoverProvider.
+	//
+	// When in a 100 node cluster BaseProbabillity = 3 and Period = 30s,
+	// every 30 seconds a node will have a probability of 3/100 to start the
+	// partition healing procedure. This means that for the entire cluster
+	// the discover provider receives 6 calls per minute on average.
+	PartitionHealPeriod           time.Duration
+	PartitionHealBaseProbabillity float64
+
 	Clock clock.Clock
 }
 
 func defaultOptions() *Options {
 	opts := &Options{
 		StateTimeouts: StateTimeouts{
-			Suspect: 5000 * time.Millisecond,
+			Suspect:   5 * time.Second,
+			Faulty:    24 * time.Hour,
+			Tombstone: 1 * time.Minute,
 		},
 
 		MinProtocolPeriod: 200 * time.Millisecond,
@@ -72,7 +88,12 @@ func defaultOptions() *Options {
 		RollupFlushInterval: 5000 * time.Millisecond,
 		RollupMaxUpdates:    250,
 
+		PartitionHealPeriod:           30 * time.Second,
+		PartitionHealBaseProbabillity: 3,
+
 		Clock: clock.New(),
+
+		MaxReverseFullSyncJobs: 5,
 	}
 
 	return opts
@@ -87,21 +108,22 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.StateTimeouts = mergeStateTimeouts(opts.StateTimeouts, def.StateTimeouts)
 
-	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod,
-		def.MinProtocolPeriod)
+	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod, def.MinProtocolPeriod)
 
-	opts.RollupMaxUpdates = util.SelectInt(opts.RollupMaxUpdates,
-		def.RollupMaxUpdates)
-	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval,
-		def.RollupFlushInterval)
+	opts.RollupMaxUpdates = util.SelectInt(opts.RollupMaxUpdates, def.RollupMaxUpdates)
+	opts.RollupFlushInterval = util.SelectDuration(opts.RollupFlushInterval, def.RollupFlushInterval)
+
+	opts.PartitionHealPeriod = util.SelectDuration(opts.PartitionHealPeriod, def.PartitionHealPeriod)
+
+	opts.PartitionHealBaseProbabillity = util.SelectFloat(opts.PartitionHealBaseProbabillity, def.PartitionHealBaseProbabillity)
 
 	opts.JoinTimeout = util.SelectDuration(opts.JoinTimeout, def.JoinTimeout)
 	opts.PingTimeout = util.SelectDuration(opts.PingTimeout, def.PingTimeout)
-	opts.PingRequestTimeout = util.SelectDuration(opts.PingRequestTimeout,
-		def.PingRequestTimeout)
+	opts.PingRequestTimeout = util.SelectDuration(opts.PingRequestTimeout, def.PingRequestTimeout)
 
-	opts.PingRequestSize = util.SelectInt(opts.PingRequestSize,
-		def.PingRequestSize)
+	opts.PingRequestSize = util.SelectInt(opts.PingRequestSize, def.PingRequestSize)
+
+	opts.MaxReverseFullSyncJobs = util.SelectInt(opts.MaxReverseFullSyncJobs, def.MaxReverseFullSyncJobs)
 
 	if opts.Clock == nil {
 		opts.Clock = def.Clock
@@ -121,7 +143,7 @@ type NodeInterface interface {
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
-	RegisterListener(l EventListener)
+	RegisterListener(l events.EventListener)
 }
 
 // A Node is a SWIM member
@@ -136,6 +158,7 @@ type Node struct {
 	}
 
 	channel          shared.SubChannel
+	discoverProvider discovery.DiscoverProvider
 	memberlist       *memberlist
 	memberiter       memberIter
 	disseminator     *disseminator
@@ -143,11 +166,16 @@ type Node struct {
 	gossip           *gossip
 	rollup           *updateRollup
 
+	// When we get more healer strategies we can abstract to a healer interface.
+	healer *discoverProviderHealer
+
 	joinTimeout, pingTimeout, pingRequestTimeout time.Duration
 
 	pingRequestSize int
 
-	listeners []EventListener
+	maxReverseFullSyncJobs int
+
+	listeners []events.EventListener
 
 	clientRate metrics.Meter
 	serverRate metrics.Meter
@@ -179,6 +207,8 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 
 		pingRequestSize: opts.PingRequestSize,
 
+		maxReverseFullSyncJobs: opts.MaxReverseFullSyncJobs,
+
 		clientRate: metrics.NewMeter(),
 		serverRate: metrics.NewMeter(),
 		totalRate:  metrics.NewMeter(),
@@ -188,6 +218,12 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
 	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
+
+	node.healer = newDiscoverProviderHealer(
+		node,
+		opts.PartitionHealBaseProbabillity,
+		opts.PartitionHealPeriod,
+	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
@@ -237,7 +273,7 @@ func (n *Node) emit(event interface{}) {
 // emitted, l.HandleEvent(e) is called for every registered listener l.
 // Attention, all listeners are called synchronously. Be careful with
 // registering blocking and other slow calls.
-func (n *Node) RegisterListener(l EventListener) {
+func (n *Node) RegisterListener(l events.EventListener) {
 	n.listeners = append(n.listeners, l)
 }
 
@@ -245,6 +281,7 @@ func (n *Node) RegisterListener(l EventListener) {
 func (n *Node) Start() {
 	n.gossip.Start()
 	n.stateTransitions.Enable()
+	n.healer.Start()
 
 	n.state.Lock()
 	n.state.stopped = false
@@ -255,6 +292,7 @@ func (n *Node) Start() {
 func (n *Node) Stop() {
 	n.gossip.Stop()
 	n.stateTransitions.Disable()
+	n.healer.Stop()
 
 	n.state.Lock()
 	n.state.stopped = true
@@ -272,12 +310,16 @@ func (n *Node) Stopped() bool {
 
 // Destroy stops the SWIM protocol and all sub-protocols.
 func (n *Node) Destroy() {
-	n.Stop()
-	n.rollup.Destroy()
-
 	n.state.Lock()
+	if n.state.destroyed {
+		n.state.Unlock()
+		return
+	}
 	n.state.destroyed = true
 	n.state.Unlock()
+
+	n.Stop()
+	n.rollup.Destroy()
 }
 
 // Destroyed returns whether or not the node has been destroyed.
@@ -343,12 +385,12 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	n.memberlist.Reincarnate()
 
+	n.discoverProvider = opts.DiscoverProvider
 	joinOpts := &joinOpts{
 		timeout:           opts.JoinTimeout,
 		size:              opts.JoinSize,
 		maxJoinDuration:   opts.MaxJoinDuration,
 		parallelismFactor: opts.ParallelismFactor,
-		discoverProvider:  opts.DiscoverProvider,
 	}
 
 	joined, err := sendJoin(n, joinOpts)
@@ -361,6 +403,7 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 
 	if !opts.Stopped {
 		n.gossip.Start()
+		n.healer.Start()
 	}
 
 	n.state.Lock()
@@ -379,24 +422,26 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 func (n *Node) handleChanges(changes []Change) {
+	n.disseminator.AdjustMaxPropagations()
 	for _, change := range changes {
 		n.disseminator.RecordChange(change)
 
 		switch change.Status {
 		case Alive:
 			n.stateTransitions.Cancel(change)
-			n.disseminator.AdjustMaxPropagations()
-
-		case Faulty:
-			n.stateTransitions.Cancel(change)
 
 		case Suspect:
 			n.stateTransitions.ScheduleSuspectToFaulty(change)
-			n.disseminator.AdjustMaxPropagations()
+
+		case Faulty:
+			n.stateTransitions.ScheduleFaultyToTombstone(change)
 
 		case Leave:
+			// XXX: should this also reap?
 			n.stateTransitions.Cancel(change)
-			n.disseminator.AdjustMaxPropagations()
+
+		case Tombstone:
+			n.stateTransitions.ScheduleTombstoneToEvict(change)
 		}
 	}
 }
