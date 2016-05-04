@@ -58,12 +58,13 @@ func (p Ping) Bytes() []byte {
 type Pong struct {
 	Message string `json:"message"`
 	From    string `json:"from"`
+	Headers map[string]string
 }
 
 func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Channel) {
 	hmap := map[string]interface{}{
 		"/ping": func(ctx json.Context, ping *Ping) (*Pong, error) {
-			return &Pong{"Hello, world!", address}, nil
+			return &Pong{"Hello, world!", address, ctx.Headers()}, nil
 		},
 		"/error": func(ctx json.Context, ping *Ping) (*Pong, error) {
 			return nil, errors.New("remote error")
@@ -132,13 +133,15 @@ func (s *ForwarderTestSuite) TestForwardJSON() {
 	dest, err := s.sender.Lookup("reachable")
 	s.NoError(err)
 
+	headerBytes := []byte(`{"hdr1": "val1"}`)
 	res, err := s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"reachable"},
-		tchannel.JSON, nil)
+		tchannel.JSON, &Options{Headers: headerBytes})
 	s.NoError(err, "expected request to be forwarded")
 
 	s.NoError(json2.Unmarshal(res, &pong))
 	s.Equal("correct pinging host", pong.From)
 	s.Equal("Hello, world!", pong.Message)
+	s.Equal(map[string]string{"hdr1": "val1"}, pong.Headers)
 }
 
 func (s *ForwarderTestSuite) TestForwardJSONErrorResponse() {

@@ -58,6 +58,8 @@ type requestSender struct {
 	retrySchedule       []time.Duration
 	rerouteRetries      bool
 
+	headers []byte
+
 	startTime, retryStartTime time.Time
 
 	logger log.Logger
@@ -86,6 +88,7 @@ func newRequestSender(sender Sender, emitter eventEmitter, channel shared.SubCha
 		maxRetries:     opts.MaxRetries,
 		retrySchedule:  opts.RetrySchedule,
 		rerouteRetries: opts.RerouteRetries,
+		headers:        opts.Headers,
 		logger:         logger,
 	}
 }
@@ -159,11 +162,15 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *err
 		}
 
 		var arg3 []byte
+		headers := s.headers
 		if s.format == tchannel.Thrift {
-			_, arg3, _, err = raw.WriteArgs(call, []byte{0, 0}, s.request)
+			if headers == nil {
+				headers = []byte{0, 0}
+			}
+			_, arg3, _, err = raw.WriteArgs(call, headers, s.request)
 		} else {
 			var resp *tchannel.OutboundCallResponse
-			_, arg3, resp, err = raw.WriteArgs(call, nil, s.request)
+			_, arg3, resp, err = raw.WriteArgs(call, headers, s.request)
 
 			// check if the response is an application level error
 			if err == nil && resp.ApplicationError() {
