@@ -50,6 +50,7 @@ type Options struct {
 	RerouteRetries bool
 	RetrySchedule  []time.Duration
 	Timeout        time.Duration
+	Headers        []byte
 }
 
 func (f *Forwarder) defaultOptions() *Options {
@@ -77,6 +78,7 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 	if opts.RetrySchedule == nil {
 		merged.RetrySchedule = def.RetrySchedule
 	}
+	merged.Headers = opts.Headers
 
 	return &merged
 }

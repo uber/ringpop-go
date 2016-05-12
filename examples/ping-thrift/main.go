@@ -21,17 +21,18 @@
 package main
 
 import (
-	json2 "encoding/json"
+	"bytes"
 	"flag"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/discovery/jsonfile"
+	gen "github.com/uber/ringpop-go/examples/ping-thrift/gen-go/ping"
+	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
-	"github.com/uber/tchannel-go/json"
-	"golang.org/x/net/context"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 var (
@@ -45,56 +46,52 @@ type worker struct {
 	logger  *log.Logger
 }
 
-// Ping is a request
-type Ping struct {
-	Key string `json:"key"`
+func (w *worker) RegisterPing() error {
+	server := thrift.NewServer(w.channel)
+	server.Register(gen.NewTChanPingPongServiceServer(w))
+	return nil
 }
 
-// Bytes returns the byets for a ping
-func (p Ping) Bytes() []byte {
-	data, _ := json2.Marshal(p)
-	return data
-}
-
-// Pong is a ping response
-type Pong struct {
-	Message string `json:"message"`
-	From    string `json:"from"`
-}
-
-func (w *worker) RegisterPong() error {
-	hmap := map[string]interface{}{"/ping": w.PingHandler}
-
-	return json.Register(w.channel, hmap, func(ctx context.Context, err error) {
-		w.logger.Debug("error occured: %v", err)
-	})
-}
-
-func (w *worker) PingHandler(ctx json.Context, ping *Ping) (*Pong, error) {
-	var pong Pong
+func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) {
+	var pongResult gen.PingPongServicePingResult
 	var res []byte
 
-	handle, err := w.ringpop.HandleOrForward(ping.Key, ping.Bytes(), &res, "ping", "/ping", tchannel.JSON, nil)
+	headers := ctx.Headers()
+	var marshaledHeaders bytes.Buffer
+	err := thrift.WriteHeaders(&marshaledHeaders, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	pingArgs := &gen.PingPongServicePingArgs{request}
+	req, err := ringpop.SerializeThrift(pingArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	forwardOptions := &forward.Options{Headers: marshaledHeaders.Bytes()}
+	handle, err := w.ringpop.HandleOrForward(request.Key, req, &res, "pingchannel", "PingPongService::Ping", tchannel.Thrift, forwardOptions)
 	if handle {
 		identity, err := w.ringpop.WhoAmI()
 		if err != nil {
 			return nil, err
 		}
-		return &Pong{"Hello, world!", identity}, nil
+		pHeader := headers["p"]
+		return &gen.Pong{"Hello, world!", identity, &pHeader}, nil
 	}
 
-	if err := json2.Unmarshal(res, &pong); err != nil {
+	if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
 		return nil, err
 	}
 
 	// else request was forwarded
-	return &pong, err
+	return pongResult.Success, err
 }
 
 func main() {
 	flag.Parse()
 
-	ch, err := tchannel.NewChannel("ping", nil)
+	ch, err := tchannel.NewChannel("pingchannel", nil)
 	if err != nil {
 		log.Fatalf("channel did not create successfully: %v", err)
 	}
@@ -116,8 +113,8 @@ func main() {
 		logger:  logger,
 	}
 
-	if err := worker.RegisterPong(); err != nil {
-		log.Fatalf("could not register pong handler: %v", err)
+	if err := worker.RegisterPing(); err != nil {
+		log.Fatalf("could not register ping handler: %v", err)
 	}
 
 	if err := worker.channel.ListenAndServe(*hostport); err != nil {
