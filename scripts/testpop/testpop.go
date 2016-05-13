@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/discovery/jsonfile"
@@ -37,7 +38,9 @@ import (
 var (
 	hostport        = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
 	hostfile        = flag.String("hosts", "./hosts.json", "path to hosts file")
+	stats           = flag.String("stats", "", "enable stats emitting, destination can be a host-port (e.g. localhost:8125) or a file-name (e.g. ./stats.log); if unset, no stats are emitted")
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
+	statsPattern    = regexp.MustCompile(`^(.+):(\d+)$`)
 )
 
 func main() {
@@ -57,14 +60,33 @@ func main() {
 	if *verbose {
 		logger.Level = log.DebugLevel
 	}
-	rp, _ := ringpop.New("ringpop",
-		ringpop.Channel(ch),
+
+	options := []ringpop.Option{ringpop.Channel(ch),
 		ringpop.Identity(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
-		ringpop.SuspectPeriod(5*time.Second),
-		ringpop.FaultyPeriod(5*time.Second),
-		ringpop.TombstonePeriod(5*time.Second),
-	)
+		ringpop.SuspectPeriod(5 * time.Second),
+		ringpop.FaultyPeriod(5 * time.Second),
+		ringpop.TombstonePeriod(5 * time.Second)}
+
+	if *stats != "" {
+		var statsdClient statsd.Statter
+		var err error
+		if statsPattern.MatchString(*stats) {
+			statsdClient, err = statsd.New(*stats, "")
+			if err != nil {
+				log.Fatalf("colud not open stats connection: %v", err)
+			}
+		} else {
+			statsdClient, err = NewFileStatsd(*stats)
+			if err != nil {
+				log.Fatalf("colud not open stats file: %v", err)
+			}
+		}
+		statter := bark.NewStatsReporterFromCactus(statsdClient)
+		options = append(options, ringpop.Statter(statter))
+	}
+
+	rp, _ := ringpop.New("ringpop", options...)
 
 	if err := ch.ListenAndServe(*hostport); err != nil {
 		log.Fatalf("could not listen on %s: %v", *hostport, err)
