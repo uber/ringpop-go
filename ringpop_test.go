@@ -268,10 +268,10 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.DiscoHealEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.triggered"], "missing stats for received pings")
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.triggered.discover_provider"], "missing stats for heal trigger through discover provider")
 
 	s.ringpop.HandleEvent(swim.AttemptHealEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.attempt"], "missing stats for received pings")
+	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.attempt"], "missing stats for heal attempt")
 
 	s.ringpop.HandleEvent(events.LookupEvent{
 		Key:      "hello",
