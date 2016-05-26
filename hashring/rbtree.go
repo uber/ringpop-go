@@ -119,19 +119,16 @@ func (t *redBlackTree) Insert(val int, str string) (ret bool) {
 				}
 			}
 
-			cmp := node.val - val
-
 			// stop if found
-			if cmp == 0 {
-				if str < node.str {
-					node.str = str
-					ret = true
-				}
+			if node.val == val && node.str == str {
 				break
 			}
 
 			last = dir
-			dir = cmp < 0
+			dir = node.val < val
+			if node.val == val {
+				dir = node.str < str
+			}
 
 			// update helpers
 			if gparent != nil {
@@ -181,12 +178,13 @@ func (t *redBlackTree) Delete(val int, str string) bool {
 		parent = node
 		node = node.Child(dir)
 
-		cmp := node.val - val
-
-		dir = cmp < 0
+		dir = node.val < val
+		if node.val == val {
+			dir = node.str < str
+		}
 
 		// save node if found
-		if cmp == 0 && node.str == str {
+		if node.val == val && node.str == str {
 			found = node
 		}
 
@@ -240,7 +238,11 @@ func (t *redBlackTree) Delete(val int, str string) bool {
 
 func (n *redBlackNode) search(val int) (string, bool) {
 	if n.val == val {
-		return n.str, true
+		m := n
+		for m.left != nil && m.val == val {
+			m = m.left
+		}
+		return m.str, true
 	} else if val < n.val {
 		if n.left != nil {
 			return n.left.search(val)

@@ -581,7 +581,7 @@ func TestCollision(t *testing.T) {
 	var ok bool
 
 	// "seven"<"seven-two" so "seven" remains in tree
-	assert.False(t, tree.Insert(7, "seven-two"))
+	assert.True(t, tree.Insert(7, "seven-two"))
 	str, ok = tree.Search(7)
 	assert.True(t, ok)
 	assert.Equal(t, str, "seven")
@@ -599,13 +599,19 @@ func TestCollision(t *testing.T) {
 	assert.Equal(t, str, "seve")
 
 	// "seven" is not in tree "seve" is, so no removal
-	assert.False(t, tree.Delete(7, "seven"))
+	assert.True(t, tree.Delete(7, "seven"))
 	str, ok = tree.Search(7)
 	assert.True(t, ok)
 	assert.Equal(t, str, "seve")
 
 	// remove "seve" from tree
 	assert.True(t, tree.Delete(7, "seve"))
+	str, ok = tree.Search(7)
+	assert.True(t, ok)
+	assert.Equal(t, str, "seven-two")
+
+	// remove "seven-two" from tree
+	assert.True(t, tree.Delete(7, "seven-two"))
 	str, ok = tree.Search(7)
 	assert.False(t, ok)
 	assert.Equal(t, str, "")

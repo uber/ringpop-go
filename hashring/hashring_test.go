@@ -368,3 +368,23 @@ func TestConsistentOnCollision(t *testing.T) {
 
 	assert.Equal(t, m1, m2, "hashring isn't consistent due to hash collisions")
 }
+
+func TestConsistentOnCollision2(t *testing.T) {
+	// make 11 replica points so that 127.0.0.1:3010 collides
+	r1 := New(farm.Fingerprint32, 11)
+	r2 := New(farm.Fingerprint32, 11)
+
+	r1.AddServer("127.0.0.1:30")
+	r1.AddServer("127.0.0.1:301")
+	r1.AddServer("127.0.0.1:4006")
+	r1.RemoveServer("127.0.0.1:30")
+
+	r2.AddServer("127.0.0.1:301")
+	r2.AddServer("127.0.0.1:4000")
+	r2.AddServer("127.0.0.1:4006")
+
+	m1, _ := r1.Lookup("127.0.0.1:3010")
+	m2, _ := r2.Lookup("127.0.0.1:3010")
+
+	assert.Equal(t, m1, m2, "hashring isn't consistent due to hash collisions")
+}
