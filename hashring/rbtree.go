@@ -123,6 +123,10 @@ func (t *redBlackTree) Insert(val int, str string) (ret bool) {
 
 			// stop if found
 			if cmp == 0 {
+				if str < node.str {
+					node.str = str
+					ret = true
+				}
 				break
 			}
 
@@ -154,7 +158,7 @@ func (t *redBlackTree) Insert(val int, str string) (ret bool) {
 
 // Delete removes a value from the redBlackTree
 // Returns true on succesful deletion, false if val is not in tree
-func (t *redBlackTree) Delete(val int) bool {
+func (t *redBlackTree) Delete(val int, str string) bool {
 	if t.root == nil {
 		return false
 	}
@@ -182,7 +186,7 @@ func (t *redBlackTree) Delete(val int) bool {
 		dir = cmp < 0
 
 		// save node if found
-		if cmp == 0 {
+		if cmp == 0 && node.str == str {
 			found = node
 		}
 
