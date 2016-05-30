@@ -43,7 +43,7 @@ type FormattedSender struct {
 
 // Send implements the statsd.Sender interface
 func (fs *FormattedSender) Send(data []byte) (int, error) {
-	line := fmt.Sprintf("%s: %s\n", time.Now().Format(time.StampMicro), data)
+	line := fmt.Sprintf("%s: %s\n", time.Now().UTC().Format(time.RFC3339Nano), data)
 	_, err := fs.s.Send([]byte(line))
 	// Because we're changing the undelying bytes sent, make sure:
 	//   written == len(data) on success

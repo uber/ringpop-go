@@ -71,4 +71,4 @@ test-race:
 	test/go-test-prettify -race ./...
 
 testpop:	clean
-	go build scripts/testpop/testpop.go
+	go build ./scripts/testpop/

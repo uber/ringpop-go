@@ -38,9 +38,9 @@ import (
 var (
 	hostport        = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
 	hostfile        = flag.String("hosts", "./hosts.json", "path to hosts file")
-	stats           = flag.String("stats", "", "enable stats emitting, destination can be a host-port (e.g. localhost:8125) or a file-name (e.g. ./stats.log); if unset, no stats are emitted")
+	statsFile       = flag.String("stats-file", "", "enable stats emitting to a file.")
+	statsUDP        = flag.String("stats-udp", "", "enable stats emitting over udp.")
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
-	statsPattern    = regexp.MustCompile(`^(.+):(\d+)$`)
 )
 
 func main() {
@@ -68,22 +68,29 @@ func main() {
 		ringpop.FaultyPeriod(5 * time.Second),
 		ringpop.TombstonePeriod(5 * time.Second)}
 
-	if *stats != "" {
+	if *statsUDP  != "" && *statsFile != "" {
+		log.Fatalf("-stats-udp and stats-file are mutually exclusive.")
+	}
+
+	if *statsUDP != "" || *statsFile != "" {
 		var statsdClient statsd.Statter
-		var err error
-		if statsPattern.MatchString(*stats) {
-			statsdClient, err = statsd.New(*stats, "")
+		if *statsUDP != "" {
+			var err error
+			statsdClient, err = statsd.New(*statsUDP, "")
 			if err != nil {
 				log.Fatalf("colud not open stats connection: %v", err)
 			}
-		} else {
-			statsdClient, err = NewFileStatsd(*stats)
+		}
+
+		if *statsFile != "" {
+			statsdClient, err = NewFileStatsd(*statsFile)
 			if err != nil {
 				log.Fatalf("colud not open stats file: %v", err)
 			}
 		}
-		statter := bark.NewStatsReporterFromCactus(statsdClient)
-		options = append(options, ringpop.Statter(statter))
+
+		stattter := bark.NewStatsReporterFromCactus(statsdClient)
+		options = append(options, ringpop.Statter(stattter))
 	}
 
 	rp, _ := ringpop.New("ringpop", options...)
