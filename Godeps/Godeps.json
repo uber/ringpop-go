@@ -21,8 +21,8 @@
 		},
 		{
 			"ImportPath": "github.com/cactus/go-statsd-client/statsd",
-			"Comment": "v3.0.3-21-g95cb85a",
-			"Rev": "95cb85a8d6b2d1ccfce95fa58d1ca3445779d8af"
+			"Comment": "v3.1.0",
+			"Rev": "91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
