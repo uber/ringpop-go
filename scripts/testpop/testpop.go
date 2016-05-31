@@ -38,9 +38,9 @@ var (
 	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
 	hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
 
-	suspectPeriod   = flag.Int("suspect-period", 5000, "suspect period in ms")
-	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "faulty period in ms")
-	tombstonePeriod = flag.Int("tombstone-period", 5000, "tombstone period in ms")
+	suspectPeriod   = flag.Int("suspect-period", 5000, "The lifetime of a suspect member in ms. After that the member becomes faulty.")
+	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "The lifetime of a faulty member in ms. After that the member becomes a tombstone.")
+	tombstonePeriod = flag.Int("tombstone-period", 5000, "The lifetime of a tombstone member in ms. After that the member is removed from the membership.")
 
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 )
