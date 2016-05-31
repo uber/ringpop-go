@@ -38,9 +38,9 @@ var (
 	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
 	hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
 
-	suspectPeriod   = flag.Int("suspect", 5, "suspect period in seconds")
-	faultyPeriod    = flag.Int("faulty", 24*60*60, "faulty period in seconds")
-	tombstonePeriod = flag.Int("tombstone", 5, "tombstone period in seconds")
+	suspectPeriod   = flag.Int("suspect-period", 5000, "suspect period in ms")
+	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "faulty period in ms")
+	tombstonePeriod = flag.Int("tombstone-period", 5000, "tombstone period in ms")
 
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 )
@@ -67,9 +67,9 @@ func main() {
 		ringpop.Identity(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 
-		ringpop.SuspectPeriod(time.Duration(*suspectPeriod)*time.Second),
-		ringpop.FaultyPeriod(time.Duration(*faultyPeriod)*time.Second),
-		ringpop.TombstonePeriod(time.Duration(*tombstonePeriod)*time.Second),
+		ringpop.SuspectPeriod(time.Duration(*suspectPeriod)*time.Millisecond),
+		ringpop.FaultyPeriod(time.Duration(*faultyPeriod)*time.Millisecond),
+		ringpop.TombstonePeriod(time.Duration(*tombstonePeriod)*time.Millisecond),
 	)
 
 	if err := ch.ListenAndServe(*hostport); err != nil {
