@@ -55,7 +55,7 @@ setup:
  		exit 1; \
 	fi
 
-	ln -s ../../scripts/pre-commit .git/hooks/pre-commit
+	ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
 
 test:	test-unit test-integration
 
