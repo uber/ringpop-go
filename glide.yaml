@@ -1,0 +1,24 @@
+package: github.com/uber/ringpop-go
+import:
+- package: github.com/Sirupsen/logrus
+- package: github.com/apache/thrift
+  subpackages:
+  - lib/go/thrift
+- package: github.com/benbjohnson/clock
+- package: github.com/dgryski/go-farm
+- package: github.com/rcrowley/go-metrics
+- package: github.com/stretchr/testify
+  subpackages:
+  - assert
+  - mock
+  - require
+- package: github.com/uber-common/bark
+- package: github.com/uber/tchannel-go
+  subpackages:
+  - json
+  - raw
+  - thrift
+  - thrift/thrift-gen
+- package: golang.org/x/net
+  subpackages:
+  - context

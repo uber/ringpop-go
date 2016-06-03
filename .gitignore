@@ -3,3 +3,4 @@ testpop
 hosts.json
 coverage.out
 lint.log
+/vendor/

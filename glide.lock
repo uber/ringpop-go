@@ -1,0 +1,60 @@
+hash: 8d6e9f0841ed09c79bf8b2514b52a12e74570480523e9462a8a4769fd5a8e0b9
+updated: 2016-06-06T15:26:39.744362484+02:00
+imports:
+- name: github.com/apache/thrift
+  version: 39a09ac5e49481d39dd1bcb6757ffe182e3df20a
+  subpackages:
+  - lib/go/thrift
+- name: github.com/benbjohnson/clock
+  version: a620c1cc9866f84a2550ad53f4f353ec030fa26b
+- name: github.com/cactus/go-statsd-client
+  version: 91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d
+  subpackages:
+  - statsd
+- name: github.com/davecgh/go-spew
+  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  subpackages:
+  - spew
+- name: github.com/dgryski/go-farm
+  version: f94e93e5a2b3a579af0f5367c84b54cb9aa00074
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
+- name: github.com/rcrowley/go-metrics
+  version: eeba7bd0dd01ace6e690fa833b3f22aaec29af43
+- name: github.com/Sirupsen/logrus
+  version: f3cfb454f4c209e6668c95216c4744b8fddb2356
+- name: github.com/stretchr/objx
+  version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
+- name: github.com/stretchr/testify
+  version: 8d64eb7173c7753d6419fd4a9caf057398611364
+  subpackages:
+  - assert
+  - mock
+  - require
+- name: github.com/uber-common/bark
+  version: d52ffa061726911f47fcd3d9e8b9b55f22794772
+- name: github.com/uber-go/atomic
+  version: e682c1008ac17bf26d2e4b5ad6cdd08520ed0b22
+- name: github.com/uber/tchannel-go
+  version: 6d2feae147d9f2c5142b335128e568b874adfd56
+  subpackages:
+  - json
+  - raw
+  - thrift
+  - thrift/thrift-gen
+  - relay
+  - tnet
+  - trand
+  - typed
+  - thrift/gen-go/meta
+- name: golang.org/x/net
+  version: c4c3ea71919de159c9e246d7be66deb7f0a39a58
+  subpackages:
+  - context
+- name: golang.org/x/sys
+  version: 076b546753157f758b316e59bcb51e6807c04057
+  subpackages:
+  - unix
+devImports: []
