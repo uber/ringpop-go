@@ -97,6 +97,13 @@ func (m *Member) localOverride(local string, change Change) bool {
 	if m.Address != local {
 		return false
 	}
+
+	// if the incarnation number of the change is smaller than the current
+	// incarnation number it is not overriding the change
+	if change.Incarnation < m.Incarnation {
+		return false
+	}
+
 	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
 }
 
