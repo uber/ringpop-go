@@ -200,6 +200,28 @@ func (s *MemberlistTestSuite) TestMultipleUpdates() {
 	s.Equal(Leave, member.Status, "expected member to be leave")
 }
 
+func (s *MemberlistTestSuite) TestUpdateTriggersReincarnation() {
+	applied := s.m.Update([]Change{
+		Change{
+			Source:            "192.0.2.1:1234",
+			SourceIncarnation: 1337,
+
+			Address:     s.m.local.Address,
+			Incarnation: s.m.local.Incarnation,
+			Status:      Suspect,
+		},
+	})
+
+	s.Len(applied, 1, "expected change to be applied")
+
+	change := applied[0]
+	s.NotNil(change, "expected change not to be nil")
+	s.Equal(Alive, change.Status, "expected change to be overwritten to alive")
+	s.Equal(s.m.local.Address, change.Source, "expected source to be the node that reincarnated its self")
+	s.Equal(s.m.local.Incarnation, change.Incarnation, "expected the new incarnation number to be the same as the one that is stored on the local node")
+	s.Equal(s.m.local.Incarnation, change.SourceIncarnation, "expected the source incarnation number to be the same as the one that is stored on the local node")
+}
+
 func (s *MemberlistTestSuite) TestAliveToFaulty() {
 	s.m.MakeAlive("127.0.0.1:3002", s.incarnation)
 
