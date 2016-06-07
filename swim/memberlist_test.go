@@ -201,12 +201,9 @@ func (s *MemberlistTestSuite) TestMultipleUpdates() {
 }
 
 func (s *MemberlistTestSuite) TestUpdateTriggersReincarnation() {
-	source := "192.0.2.1:1234"
-	s.NotEqual(source, s.m.local.Address, "this test relies on the source and the target of the change to be different")
-
 	applied := s.m.Update([]Change{
 		Change{
-			Source:            source,
+			Source:            "192.0.2.1:1234",
 			SourceIncarnation: 1337,
 
 			Address:     s.m.local.Address,
