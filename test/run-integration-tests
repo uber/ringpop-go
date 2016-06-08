@@ -6,7 +6,7 @@ set -eo pipefail
 
 declare project_root="${0%/*}/.."
 declare ringpop_common_dir="${0%/*}/ringpop-common"
-declare ringpop_common_branch="master"
+declare ringpop_common_branch="fix/double-reincarnation"
 declare tap_filter="${ringpop_common_dir}/test/tap-filter"
 
 declare test_cluster_sizes="1 2 3 4 5 10"
@@ -109,6 +109,7 @@ run-test-for-cluster-size() {
         --enable-feature reaping-faulty-nodes \
         --enable-feature bidirectional-full-syncs \
         --enable-feature partition-healing \
+        --enable-feature double-reincarnation \
         "${project_root}/testpop" &>$output_file || err=$?
 
     if [ $PIPESTATUS -gt 0 ]; then
