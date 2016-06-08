@@ -36,7 +36,7 @@ func (fs *fileSender) Close() error {
 	return err
 }
 
-// NewWriteCloserToSender returns a new WriteCloserToSender adapter
+// newFileSender returns a new fileSender
 func newFileSender(wc io.WriteCloser) *fileSender {
 	return &fileSender{
 		bufWriter: bufio.NewWriter(wc),
