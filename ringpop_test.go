@@ -34,7 +34,6 @@ import (
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
-	"fmt"
 )
 
 type destroyable interface {
@@ -550,7 +549,7 @@ func (s *RingpopTestSuite) TestLookupEmitStat() {
 	s.ringpop.statter = stats
 
 	_, _ = s.ringpop.Lookup("foo")
-	
+
 	_, ok := stats.vals["ringpop.127_0_0_1_3001.lookup"]
 	s.True(ok, "missing lookup timer")
 }
