@@ -10,14 +10,14 @@ import (
 	"github.com/cactus/go-statsd-client/statsd"
 )
 
-// WriteCloserToSender is an adapter from io.WriteCloser to statsd.Sender
-type FileSender struct {
+// fileSender is an adapter from io.WriteCloser to statsd.Sender
+type fileSender struct {
 	bufWriter *bufio.Writer
 	closer    io.Closer
 }
 
 // Send implements the statsd.Sender interface
-func (fs *FileSender) Send(data []byte) (int, error) {
+func (fs *fileSender) Send(data []byte) (int, error) {
 	line := fmt.Sprintf("%s: %s\n", time.Now().UTC().Format(time.RFC3339Nano), data)
 	_, err := fs.bufWriter.Write([]byte(line))
 	// Because we're changing the underlying bytes sent, make sure:
@@ -30,15 +30,15 @@ func (fs *FileSender) Send(data []byte) (int, error) {
 }
 
 // Close implements the statsd.Sender interface
-func (fs *FileSender) Close() error {
+func (fs *fileSender) Close() error {
 	err := fs.bufWriter.Flush()
 	fs.closer.Close()
 	return err
 }
 
 // NewWriteCloserToSender returns a new WriteCloserToSender adapter
-func newFileSender(wc io.WriteCloser) *FileSender {
-	return &FileSender{
+func newFileSender(wc io.WriteCloser) *fileSender {
+	return &fileSender{
 		bufWriter: bufio.NewWriter(wc),
 		closer:    wc}
 }
