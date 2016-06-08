@@ -554,6 +554,22 @@ func (s *RingpopTestSuite) TestLookupEmitStat() {
 	s.True(ok, "missing lookup timer")
 }
 
+func (s *RingpopTestSuite) TestLookupNEmitStat() {
+	createSingleNodeCluster(s.ringpop)
+
+	stats := newDummyStats()
+	s.ringpop.statter = stats
+
+	_, _ = s.ringpop.LookupN("foo", 3)
+	_, _ = s.ringpop.LookupN("foo", 5)
+
+	_, ok := stats.vals["ringpop.127_0_0_1_3001.lookupn.3"]
+	s.True(ok, "missing lookupn.3 timer")
+
+	_, ok = stats.vals["ringpop.127_0_0_1_3001.lookupn.5"]
+	s.True(ok, "missing lookupn.5 timer")
+}
+
 // TestLookupNNotReady tests that LookupN fails when Ringpop is not ready.
 func (s *RingpopTestSuite) TestLookupNNotReady() {
 	result, err := s.ringpop.LookupN("foo", 3)

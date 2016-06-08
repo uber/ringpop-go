@@ -612,7 +612,20 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
-	return rp.ring.LookupN(key, n), nil
+	startTime := time.Now()
+
+	destinations := rp.ring.LookupN(key, n)
+
+	duration := time.Now().Sub(startTime)
+	rp.statter.RecordTimer(rp.getStatKey(fmt.Sprintf("lookupn.%d", n)), nil, duration)
+
+	if len(destinations) == 0 {
+		err := errors.New("could not find destinations for key")
+		rp.logger.WithField("key", key).Warn(err)
+		return destinations, err
+	}
+
+	return destinations, nil
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {
