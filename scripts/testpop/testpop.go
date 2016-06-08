@@ -89,8 +89,8 @@ func main() {
 			}
 		}
 
-		stattter := bark.NewStatsReporterFromCactus(statsdClient)
-		options = append(options, ringpop.Statter(stattter))
+		statter := bark.NewStatsReporterFromCactus(statsdClient)
+		options = append(options, ringpop.Statter(statter))
 	}
 
 	rp, _ := ringpop.New("ringpop", options...)
