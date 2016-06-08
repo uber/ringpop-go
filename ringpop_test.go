@@ -34,6 +34,7 @@ import (
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
+	"fmt"
 )
 
 type destroyable interface {
@@ -273,11 +274,6 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.ringpop.HandleEvent(swim.AttemptHealEvent{})
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.attempt"], "missing stats for received pings")
 
-	s.ringpop.HandleEvent(events.LookupEvent{
-		Key:      "hello",
-		Duration: time.Second,
-	})
-	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.lookup"], "missing lookup timer")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Alive})
@@ -390,7 +386,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(48, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(47, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
@@ -545,6 +541,18 @@ func (s *RingpopTestSuite) TestLookupNotReady() {
 	result, err := s.ringpop.Lookup("foo")
 	s.Error(err)
 	s.Empty(result)
+}
+
+func (s *RingpopTestSuite) TestLookupEmitStat() {
+	createSingleNodeCluster(s.ringpop)
+
+	stats := newDummyStats()
+	s.ringpop.statter = stats
+
+	_, _ = s.ringpop.Lookup("foo")
+	
+	_, ok := stats.vals["ringpop.127_0_0_1_3001.lookup"]
+	s.True(ok, "missing lookup timer")
 }
 
 // TestLookupNNotReady tests that LookupN fails when Ringpop is not ready.

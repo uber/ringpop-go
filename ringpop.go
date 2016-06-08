@@ -484,9 +484,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.JoinTriesUpdateEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
 
-	case events.LookupEvent:
-		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
-
 	case swim.MakeNodeStatusEvent:
 		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
 
@@ -591,9 +588,12 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	dest, success := rp.ring.Lookup(key)
 
+	duration := time.Now().Sub(startTime)
+	rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, duration)
+
 	rp.emit(events.LookupEvent{
 		Key:      key,
-		Duration: time.Now().Sub(startTime),
+		Duration: duration,
 	})
 
 	if !success {
