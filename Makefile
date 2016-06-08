@@ -49,9 +49,6 @@ dev_deps:
 
 setup: dev_deps
 	glide --debug install --cache
-	for cmd in $(DEV_DEPS); do \
-		$$cmd; \
-	done
 	@if ! which thrift | grep -q /; then \
 		echo "thrift not in PATH. (brew install thrift?)" >&2; \
  		exit 1; \
