@@ -24,7 +24,7 @@ First make certain that `thrift` is in your path. (OSX: `brew install thrift`). 
 make setup
 ```
 
-to install remaining golang dependencies.
+to install remaining golang dependencies and install the pre-commit hook.
 
 Finally, run the tests by doing:
 
