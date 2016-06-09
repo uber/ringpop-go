@@ -98,11 +98,12 @@ func (s *MemberTestSuite) TestNonLocalOverride() {
 }
 
 func (s *MemberTestSuite) TestLocalOverride() {
-	// LocalOverride aggressively marks updates as overrides, even if the
-	// incarnation number of the update is lower than the incarnation
-	// number of the local member. The Update function reincarnates the node
-	// when LocalOverride returns true. This very aggressive approach is likely
-	// to change in the near future.
+	// LocalOverride marks updates as overrides when the change will be applied
+	// to the status of this node. It follows the rules of SWIM with regards to
+	// the incarnation number, but is hardcoded to states that the node will
+	// never declare itself to. Meaning that it will allow the node to be in any
+	// of Alive or Leave state.
+	// The Update function reincarnates the node when LocalOverride returns true.
 	for _, s1 := range s.states {
 		for _, s2 := range s.states {
 			m := newMember(s.localAddr, s1)
