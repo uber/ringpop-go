@@ -47,7 +47,7 @@ func (s *MemberTestSuite) SetupTest() {
 	s.nonLocalAddr = "non-local address"
 
 	incNumStart := util.TimeNowMS()
-	statuses := []string{Alive, Suspect, Faulty, Leave}
+	statuses := []string{Alive, Suspect, Faulty, Leave, Tombstone}
 
 	// Add incNo, status combinations of ever increasing precedence.
 	s.states = nil
@@ -107,7 +107,7 @@ func (s *MemberTestSuite) TestLocalOverride() {
 		for _, s2 := range s.states {
 			m := newMember(s.localAddr, s1)
 			c := newChange(s.localAddr, s2)
-			expected := c.Status == Suspect || c.Status == Faulty
+			expected := (c.Status == Suspect || c.Status == Faulty || c.Status == Tombstone) && c.Incarnation >= m.Incarnation
 			got := m.localOverride(s.localAddr, c)
 			s.Equal(expected, got, "expected override when change.Status is suspect or faulty")
 
