@@ -109,7 +109,6 @@ run-test-for-cluster-size() {
         --enable-feature reaping-faulty-nodes \
         --enable-feature bidirectional-full-syncs \
         --enable-feature partition-healing \
-        --enable-feature double-reincarnation \
         "${project_root}/testpop" &>$output_file || err=$?
 
     if [ $PIPESTATUS -gt 0 ]; then
