@@ -484,9 +484,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.JoinTriesUpdateEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
 
-	case events.LookupEvent:
-		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
-
 	case swim.MakeNodeStatusEvent:
 		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
 
@@ -591,9 +588,12 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	dest, success := rp.ring.Lookup(key)
 
+	duration := time.Now().Sub(startTime)
+	rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, duration)
+
 	rp.emit(events.LookupEvent{
 		Key:      key,
-		Duration: time.Now().Sub(startTime),
+		Duration: duration,
 	})
 
 	if !success {
@@ -612,7 +612,26 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
-	return rp.ring.LookupN(key, n), nil
+	startTime := time.Now()
+
+	destinations := rp.ring.LookupN(key, n)
+
+	duration := time.Now().Sub(startTime)
+	rp.statter.RecordTimer(rp.getStatKey(fmt.Sprintf("lookupn.%d", n)), nil, duration)
+
+	rp.emit(events.LookupNEvent{
+		Key:      key,
+		N:        n,
+		Duration: duration,
+	})
+
+	if len(destinations) == 0 {
+		err := errors.New("could not find destinations for key")
+		rp.logger.WithField("key", key).Warn(err)
+		return destinations, err
+	}
+
+	return destinations, nil
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {

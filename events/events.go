@@ -55,6 +55,13 @@ type LookupEvent struct {
 	Duration time.Duration
 }
 
+// A LookupNEvent is sent when a lookupN is performed on the Ringpop's ring
+type LookupNEvent struct {
+	Key      string
+	N        int
+	Duration time.Duration
+}
+
 // Ready is fired when ringpop has successfully bootstrapped and is ready to receive requests and other method calls.
 type Ready struct{}
 
