@@ -619,6 +619,12 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	duration := time.Now().Sub(startTime)
 	rp.statter.RecordTimer(rp.getStatKey(fmt.Sprintf("lookupn.%d", n)), nil, duration)
 
+	rp.emit(events.LookupNEvent{
+		Key:      key,
+		N: n,
+		Duration: duration,
+	})
+
 	if len(destinations) == 0 {
 		err := errors.New("could not find destinations for key")
 		rp.logger.WithField("key", key).Warn(err)
