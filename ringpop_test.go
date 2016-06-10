@@ -605,7 +605,7 @@ func (s *RingpopTestSuite) TestLookupN() {
 	result, err := s.ringpop.LookupN("foo", 5)
 
 	s.Nil(err)
-	s.Equal(1, len(result), "LookupN returns not more results then number of nodes")
+	s.Equal(1, len(result), "LookupN returns not more results than number of nodes")
 
 	addresses := genAddresses(1, 10, 20)
 	s.ringpop.ring.AddRemoveServers(addresses, nil)
