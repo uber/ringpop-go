@@ -58,7 +58,7 @@ type LookupEvent struct {
 // A LookupNEvent is sent when a lookupN is performed on the Ringpop's ring
 type LookupNEvent struct {
 	Key      string
-	N 		 int
+	N        int
 	Duration time.Duration
 }
 

@@ -621,7 +621,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 
 	rp.emit(events.LookupNEvent{
 		Key:      key,
-		N: n,
+		N:        n,
 		Duration: duration,
 	})
 

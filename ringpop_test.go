@@ -545,7 +545,7 @@ func (s *RingpopTestSuite) TestLookupNotReady() {
 func (s *RingpopTestSuite) TestLookupNoDestination() {
 	createSingleNodeCluster(s.ringpop)
 
-	address,_ := s.ringpop.identity()
+	address, _ := s.ringpop.identity()
 	s.ringpop.ring.RemoveServer(address)
 
 	result, err := s.ringpop.Lookup("foo")
