@@ -542,6 +542,17 @@ func (s *RingpopTestSuite) TestLookupNotReady() {
 	s.Empty(result)
 }
 
+func (s *RingpopTestSuite) TestLookupNoDestination() {
+	createSingleNodeCluster(s.ringpop)
+
+	address,_ := s.ringpop.identity()
+	s.ringpop.ring.RemoveServer(address)
+
+	result, err := s.ringpop.Lookup("foo")
+	s.Equal("", result)
+	s.Error(err)
+}
+
 func (s *RingpopTestSuite) TestLookupEmitStat() {
 	createSingleNodeCluster(s.ringpop)
 
@@ -575,6 +586,33 @@ func (s *RingpopTestSuite) TestLookupNNotReady() {
 	result, err := s.ringpop.LookupN("foo", 3)
 	s.Error(err)
 	s.Nil(result)
+}
+
+func (s *RingpopTestSuite) TestLookupNNoDestinations() {
+	createSingleNodeCluster(s.ringpop)
+
+	address, _ := s.ringpop.identity()
+	s.ringpop.ring.RemoveServer(address)
+
+	result, err := s.ringpop.LookupN("foo", 5)
+	s.Nil(result)
+	s.Error(err)
+}
+
+func (s *RingpopTestSuite) TestLookupN() {
+	createSingleNodeCluster(s.ringpop)
+
+	result, err := s.ringpop.LookupN("foo", 5)
+
+	s.Nil(err)
+	s.Equal(1, len(result), "LookupN returns not more results then number of nodes")
+
+	addresses := genAddresses(1, 10, 20)
+	s.ringpop.ring.AddRemoveServers(addresses, nil)
+
+	result, err = s.ringpop.LookupN("foo", 5)
+	s.Nil(err)
+	s.Equal(5, len(result), "LookupN returns N number of results")
 }
 
 // TestGetReachableMembersNotReady tests that GetReachableMembers fails when
