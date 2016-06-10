@@ -1,3 +1,7 @@
+// Copyright (c) 2012-2016 Eli Janssen
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
+
 package statsd
 
 import (
@@ -5,6 +9,7 @@ import (
 	"net"
 )
 
+// The Sender interface wraps a Send and Close
 type Sender interface {
 	Send(data []byte) (int, error)
 	Close() error
@@ -32,13 +37,14 @@ func (s *SimpleSender) Send(data []byte) (int, error) {
 	return n, nil
 }
 
-// Closes SimpleSender
+// Close closes the SimpleSender
 func (s *SimpleSender) Close() error {
 	err := s.c.Close()
 	return err
 }
 
-// Returns a new SimpleSender for sending to the supplied addresss.
+// NewSimpleSender returns a new SimpleSender for sending to the supplied
+// addresss.
 //
 // addr is a string of the format "hostname:port", and must be parsable by
 // net.ResolveUDPAddr.
