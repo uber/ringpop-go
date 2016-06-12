@@ -2,13 +2,13 @@ hash: 8d6e9f0841ed09c79bf8b2514b52a12e74570480523e9462a8a4769fd5a8e0b9
 updated: 2016-06-06T15:26:39.744362484+02:00
 imports:
 - name: github.com/apache/thrift
-  version: 39a09ac5e49481d39dd1bcb6757ffe182e3df20a
+  version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
   subpackages:
   - lib/go/thrift
 - name: github.com/benbjohnson/clock
   version: a620c1cc9866f84a2550ad53f4f353ec030fa26b
 - name: github.com/cactus/go-statsd-client
-  version: 91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d
+  version: 8947bd0d9e04e8c27671c33753340b51b835efdc
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
@@ -16,19 +16,19 @@ imports:
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
-  version: f94e93e5a2b3a579af0f5367c84b54cb9aa00074
+  version: fc41e106ee0e4394f69a56046e5c5adbaf29d912
 - name: github.com/pmezard/go-difflib
-  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  version: e8554b8641db39598be7f6342874b958f12ae1d4
   subpackages:
   - difflib
 - name: github.com/rcrowley/go-metrics
-  version: eeba7bd0dd01ace6e690fa833b3f22aaec29af43
+  version: dee209f2455f101a5e4e593dea94872d2c62d85d
 - name: github.com/Sirupsen/logrus
-  version: f3cfb454f4c209e6668c95216c4744b8fddb2356
+  version: 82c8de1af23b25ba5a468d801f29077f4f483bce
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: 8d64eb7173c7753d6419fd4a9caf057398611364
+  version: e3a8ff8ce36581f87a15341206f205b1da467059
   subpackages:
   - assert
   - mock
@@ -38,7 +38,7 @@ imports:
 - name: github.com/uber-go/atomic
   version: e682c1008ac17bf26d2e4b5ad6cdd08520ed0b22
 - name: github.com/uber/tchannel-go
-  version: 6d2feae147d9f2c5142b335128e568b874adfd56
+  version: 6ea263463a946c89e6565a12110aa424175155c3
   subpackages:
   - json
   - raw
@@ -50,7 +50,7 @@ imports:
   - typed
   - thrift/gen-go/meta
 - name: golang.org/x/net
-  version: c4c3ea71919de159c9e246d7be66deb7f0a39a58
+  version: 5aa7325eaa14d7ed4b520f40d58adf2834c8de01
   subpackages:
   - context
 - name: golang.org/x/sys
