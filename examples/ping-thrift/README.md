@@ -14,7 +14,7 @@ thrift-gen --generateThrift --outputDir gen-go --inputFile ping.thrift
 
 Build the example binary:
 ```bash
-godep go build
+go build
 ```
 
 Start a custer of 5 nodes using [tick-cluster][1]:
