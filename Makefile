@@ -62,12 +62,12 @@ test-integration:
 	test/run-integration-tests
 
 test-unit:
-	go generate $(shell glide nv)
-	test/go-test-prettify $(shell glide nv)
+	go generate $(shell glide novendor)
+	test/go-test-prettify $(shell glide novendor)
 
 test-race:
-	go generate $(shell glide nv)
-	test/go-test-prettify -race $(shell glide nv)
+	go generate $(shell glide novendor)
+	test/go-test-prettify -race $(shell glide novendor)
 
 testpop:	clean
 	go build scripts/testpop/testpop.go
