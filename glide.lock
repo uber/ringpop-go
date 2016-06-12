@@ -35,8 +35,6 @@ imports:
   - require
 - name: github.com/uber-common/bark
   version: d52ffa061726911f47fcd3d9e8b9b55f22794772
-- name: github.com/uber-go/atomic
-  version: e682c1008ac17bf26d2e4b5ad6cdd08520ed0b22
 - name: github.com/uber/tchannel-go
   version: 6ea263463a946c89e6565a12110aa424175155c3
   subpackages:
@@ -53,8 +51,4 @@ imports:
   version: 5aa7325eaa14d7ed4b520f40d58adf2834c8de01
   subpackages:
   - context
-- name: golang.org/x/sys
-  version: 076b546753157f758b316e59bcb51e6807c04057
-  subpackages:
-  - unix
 devImports: []
