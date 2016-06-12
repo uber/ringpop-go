@@ -1,6 +1,11 @@
 ringpop-go changes
 ==================
 
+Next Release
+------------
+* Feature: testpop takes an additional -stats-udp or -stats-file flag that can be used to emit
+  statsd messages to a file or over the network. #144
+
 v0.5.0
 ------
 

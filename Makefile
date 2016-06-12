@@ -70,4 +70,4 @@ test-race:
 	test/go-test-prettify -race $(shell glide novendor)
 
 testpop:	clean
-	go build scripts/testpop/testpop.go
+	go build ./scripts/testpop/

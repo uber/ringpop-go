@@ -8,7 +8,7 @@ imports:
 - name: github.com/benbjohnson/clock
   version: a620c1cc9866f84a2550ad53f4f353ec030fa26b
 - name: github.com/cactus/go-statsd-client
-  version: 8947bd0d9e04e8c27671c33753340b51b835efdc
+  version: 91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew

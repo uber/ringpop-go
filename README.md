@@ -25,7 +25,7 @@ in your path (above). Then,
 make setup
 ```
 
-to install remaining golang dependencies.
+to install remaining golang dependencies and install the pre-commit hook.
 
 Finally, run the tests by doing:
 

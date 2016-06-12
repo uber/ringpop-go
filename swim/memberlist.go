@@ -336,11 +336,12 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		// if change is local override, reassert member is alive
 		if member.localOverride(m.node.Address(), change) {
 			m.node.emit(RefuteUpdateEvent{})
+			newIncNo := nowInMillis(m.node.clock)
 			overrideChange := Change{
-				Source:            change.Source,
-				SourceIncarnation: change.SourceIncarnation,
+				Source:            m.node.Address(),
+				SourceIncarnation: newIncNo,
 				Address:           change.Address,
-				Incarnation:       nowInMillis(m.node.clock),
+				Incarnation:       newIncNo,
 				Status:            Alive,
 				Timestamp:         util.Timestamp(time.Now()),
 			}
