@@ -92,11 +92,20 @@ func (m *Member) nonLocalOverride(change Change) bool {
 	return statePrecedence(change.Status) > statePrecedence(m.Status)
 }
 
-// localOverride returns whether a change should be applied to to the member
+// localOverride returns whether the change will override the state of the local
+// member. When it will override the state the member should reincarnate itself
+// to make sure that other members see this node in a correct state.
 func (m *Member) localOverride(local string, change Change) bool {
 	if m.Address != local {
 		return false
 	}
+
+	// if the incarnation number of the change is smaller than the current
+	// incarnation number it is not overriding the change
+	if change.Incarnation < m.Incarnation {
+		return false
+	}
+
 	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
 }
 
