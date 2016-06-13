@@ -7,6 +7,8 @@ This example it's different than the others because it uses ringpop specific gen
 All commands are relative to this directory:
 ```bash
 cd examples/ping-thrift-gen
+cp ../../glide.{yaml,lock} .
+glide --cache install
 ```
 
 (optional, the files are already included) Generate the thrift code:
