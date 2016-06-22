@@ -5,7 +5,6 @@ A simple ping-pong service implementation that that integrates ringpop to forwar
 All commands are relative to this directory:
 ```bash
 cd examples/ping-json
-glide install --cache
 ```
 
 Build the example binary:
