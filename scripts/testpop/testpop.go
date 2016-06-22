@@ -36,10 +36,10 @@ import (
 )
 
 var (
-	hostport        = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
-	hostfile        = flag.String("hosts", "./hosts.json", "path to hosts file")
-	statsFile       = flag.String("stats-file", "", "enable stats emitting to a file.")
-	statsUDP        = flag.String("stats-udp", "", "enable stats emitting over udp.")
+	hostport  = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
+	hostfile  = flag.String("hosts", "./hosts.json", "path to hosts file")
+	statsFile = flag.String("stats-file", "", "enable stats emitting to a file.")
+	statsUDP  = flag.String("stats-udp", "", "enable stats emitting over udp.")
 
 	suspectPeriod   = flag.Int("suspect-period", 5000, "The lifetime of a suspect member in ms. After that the member becomes faulty.")
 	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "The lifetime of a faulty member in ms. After that the member becomes a tombstone.")
@@ -75,7 +75,7 @@ func main() {
 		ringpop.TombstonePeriod(time.Duration(*tombstonePeriod) * time.Millisecond),
 	}
 
-	if *statsUDP  != "" && *statsFile != "" {
+	if *statsUDP != "" && *statsFile != "" {
 		log.Fatalf("-stats-udp and stats-file are mutually exclusive.")
 	}
 
