@@ -5,8 +5,7 @@ A simple ping-pong service implementation that that integrates ringpop to forwar
 All commands are relative to this directory:
 ```bash
 cd examples/ping-thrift
-cp ../../glide.{yaml,lock} .
-glide --cache install
+glide install --cache
 ```
 
 (optional, the files are already included) Generate the thrift code:
