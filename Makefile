@@ -3,6 +3,7 @@
 SHELL = /bin/bash
 
 export GO15VENDOREXPERIMENT=1
+NOVENDOR = $(shell GO15VENDOREXPERIMENT=1 glide novendor)
 
 export PATH := $(shell pwd)/scripts/travis/thrift-release/linux-x86_64:$(PATH)
 export PATH := $(shell pwd)/scripts/travis/thrift-gen-release/linux-x86_64:$(PATH)
@@ -62,12 +63,12 @@ test-integration:
 	test/run-integration-tests
 
 test-unit:
-	go generate $(shell glide novendor)
-	test/go-test-prettify $(shell glide novendor)
+	go generate $(NOVENDOR)
+	test/go-test-prettify $(NOVENDOR)
 
 test-race:
-	go generate $(shell glide novendor)
-	test/go-test-prettify -race $(shell glide novendor)
+	go generate $(NOVENDOR)
+	test/go-test-prettify -race $(NOVENDOR)
 
 testpop:	clean
 	go build ./scripts/testpop/
