@@ -9,7 +9,7 @@ cd examples/ping-json
 
 Build the example binary:
 ```bash
-godep go build
+go build
 ```
 
 Start a custer of 5 nodes using [tick-cluster][1]:

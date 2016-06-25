@@ -18,7 +18,8 @@ go get github.com/uber/ringpop-go
 Developing
 ----------
 
-First make certain that `thrift` is in your path. (OSX: `brew install thrift`). Then,
+First make certain that `thrift` (OSX: `brew install thrift`) and `glide` are
+in your path (above). Then,
 
 ```
 make setup
