@@ -1,0 +1,45 @@
+#!/bin/bash -x
+#
+# Generate mocks for ringpop and subpackages.
+#
+set -eo pipefail
+
+mock_directory="${0%/*}/mocks"
+thrift_directory="${0%/*}/thrift"
+
+thrift-gen -generateThrift -inputFile "$thrift_directory"/pingpong.thrift -outputDir "$thrift_directory"
+mockery -case=underscore -dir "$thrift_directory" -recursive -inpkg -name TChanPingPong
+
+
+# Generate mocks for dependencies
+mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
+mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name StatsReporter
+mockery -case=underscore -dir "$GOPATH"/src/github.com/uber/tchannel-go/thrift -recursive -output "$mock_directory" -name TChanClient
+
+# Generate mock file for ringpop.Interface, but rename the mocked object to
+# mocks.Ringpop
+mockery -name Interface -print \
+    |sed 's/_m \*Interface/_m \*Ringpop/g' \
+    |sed 's/type Interface/type Ringpop/g' \
+    > "$mock_directory"/ringpop.go
+
+mockery -name NodeInterface -recursive -print \
+    |sed 's/_m \*NodeInterface/_m \*SwimNode/g' \
+    |sed 's/type NodeInterface/type SwimNode/g' \
+    > "$mock_directory"/swim_node.go
+
+mockery -case=underscore -dir router -recursive -output "$mock_directory" -name ClientFactory
+
+# make a EventListenerMock for forward (can't use on from $mock_directory because of circular dependency)
+mockery -name EventListener -dir events -recursive -print \
+    |sed 's/package mocks/package forward/g' \
+    > "${0%/*}/../forward/mock_event_listener_test.go"
+mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -print \
+    | sed 's/package mocks/package forward/g' \
+    > "${0%/*}/../forward/mock_logger_test.go"
+
+# mocks used in forward cannot go into test/mocks because circular dependency
+mockery -name Sender -dir forward -recursive -testonly -case=underscore -inpkg
+
+# Mocks for events need to go in the events package to avoid circular deps
+mockery -case=underscore -dir events -output "${0%/*}/../events/test/mocks" -name EventListener

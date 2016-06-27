@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# Runs `go test -v`, parses the output and prints a summary at the end. Also
+# only outputs errors by default unless -v is specified.
+#
+set -o pipefail
+
+declare -a go_args
+declare prettify_args=
+
+# Collect args for go but ignore -v and pass it through to prettify instead.
+for arg in "$@"; do
+	if [ "$arg" == "-v" ]; then
+		prettify_args="-v"
+	else
+		go_args+=("$arg")
+	fi
+done
+
+#
+# Takes the output of "go test -v", only displays errors by default and prints
+# a summary at the bottom.
+#
+_prettify() {
+	local verbose=false
+
+	local -i run=0
+	local -i passed=0
+	local -i failed=0
+	local -i skipped=0
+	local -i errors=0
+
+	if [[ $1 == "-v"* ]]; then
+		verbose=true
+	fi
+
+	while IFS= read -r line; do
+		case $line in
+			"--- PASS:"*)
+				passed=$(($passed+1))
+				;;
+
+			"--- FAIL:"*)
+				failed=$(($failed+1))
+
+				# Output fail lines
+				if ! $verbose; then
+					echo "$line"
+				fi
+				;;
+
+			"--- SKIP:"*)
+				skipped=$(($skipped+1))
+				;;
+
+			# Skip output of "RUN" lines by default
+			"=== RUN"*)
+				run=$(($run+1))
+				;;
+
+			# Skip output of mock.go success lines (unicode char is the green tick)
+			*mock*$(echo -e "\xe2\x9c\x85")*)
+				;;
+
+			# Compile errors
+			FAIL*)
+				errors=$(($errors+1))
+
+				if ! $verbose; then
+					echo "$line"
+				fi
+				;;
+
+			# Skip and ignore printing junk
+			PASS|FAIL|\?*)
+				;;
+
+			*)
+				# Output unknown lines
+				if ! $verbose; then
+					echo "$line"
+				fi
+				;;
+		esac
+
+		if $verbose; then
+			echo "$line"
+		fi
+
+	done
+
+	echo
+	echo "# tests: $run"
+	[ $passed -ne 0 ] && echo "# passed: $passed"
+	[ $failed -ne 0 ] && echo "# failed: $failed"
+	[ $skipped -ne 0 ] && echo "# skipped: $skipped"
+	[ $errors -ne 0 ] && echo "# errors: $errors"
+	echo
+}
+
+go test -v "${go_args[@]}" |_prettify $prettify_args
+
+# Exit with return code from go
+exit $PIPESTATUS

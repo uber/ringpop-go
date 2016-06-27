@@ -1,0 +1,141 @@
+{{ define "arguments" }}ctx {{ contextType }}{{ range .Arguments }}, {{ .Name }} {{ .Type | goType }}{{ end }}{{ end}}
+{{ define "call" }}ctx {{ range .Arguments }}, {{ .Name }}{{ end }}{{ end}}
+{{ define "returnType" }}{{ if .ReturnType }}r {{ .ReturnType | goType }}, {{ end }}err error{{ end}}
+
+{{ $Root := . }}
+package {{ .Package }}
+
+import (
+    "errors"
+    "fmt"
+
+    "github.com/uber/ringpop-go"
+    "github.com/uber/ringpop-go/forward"
+    "github.com/uber/ringpop-go/router"
+    "github.com/uber/tchannel-go"
+    "github.com/uber/tchannel-go/thrift"
+)
+
+{{ range .AST.Services }}
+{{ $Service := . }}
+{{ $TChanInterface :=  print "TChan" $Service.Name }}
+{{ $Adapter :=  (print "Ringpop" $Service.Name "Adapter") | goPrivateName }}
+{{ $EndpointConfigurations :=  print $Service.Name "Configuration" }}
+
+type {{ $Adapter }} struct {
+    impl        {{ $TChanInterface }}
+    ringpop     ringpop.Interface
+    ch          *tchannel.Channel
+    config      {{ $EndpointConfigurations }}
+    router      router.Router
+}
+
+// {{ $EndpointConfigurations }} contains the forwarding configuration for the {{ $Service.Name }} service. It has a field for every endpoint defined in the service. In this field the endpoint specific forward configuration can be stored. Populating these fields is optional, default behaviour is to call the service implementation locally to the process where the call came in.
+type {{ $EndpointConfigurations }} struct {
+    {{ range .Methods }}
+        // {{ .Name | goPublicName }} holds the forwarding configuration for the {{ .Name | goPublicName }} endpoint defined in the service
+        {{ .Name | goPublicName }} *{{ $Service.Name }}{{ .Name | goPublicName }}Configuration
+    {{ end }}
+}
+
+func (c *{{ $EndpointConfigurations }}) validate() error {
+    {{ range .Methods }}
+        if c.{{ .Name | goPublicName }} != nil {
+            if c.{{ .Name | goPublicName }}.Key == nil {
+                return errors.New("configuration for endpoint {{ .Name | goPublicName }} is missing a Key function")
+            }
+        }
+    {{ end }}
+    return nil
+}
+
+// New{{ $Adapter }} creates an implementation of the {{ $TChanInterface }} interface. This specific implementation will use to configuration provided during construction to deterministically route calls to nodes from a ringpop cluster. The channel should be the channel on which the service exposes its endpoints. Forwarded calls, calls to unconfigured endpoints and calls that already were executed on the right machine will be passed on the the implementation passed in during construction.
+//
+// Example usage:
+//  import "github.com/uber/tchannel-go/thrift"
+//
+//  var server thrift.Server
+//  server = ...
+//
+//  var handler {{ $TChanInterface }}
+//  handler = &YourImplementation{}
+//
+//  adapter, _ := New{{ $Adapter }}(handler, ringpop, channel,
+//    {{ $EndpointConfigurations }}{ {{ range .Methods }}
+//      {{ .Name | goPublicName }}: &{{ print ($Service.Name | goPublicName) (.Name | goPublicName) "Configuration" }}: {
+//        Key: func({{ template "arguments" .}}) (shardKey string, err error) {
+//          return "calculated-shard-key", nil
+//        },
+{{ end }}//      },
+//    },
+//  )
+//  server.Register(New{{ $TChanInterface }}Server(adapter))
+func New{{ $Adapter }}(
+    impl   {{ $TChanInterface }},
+    rp     ringpop.Interface,
+    ch     *tchannel.Channel,
+    config {{ $EndpointConfigurations }},
+) ({{ $TChanInterface }}, error) {
+    err := config.validate()
+    if err != nil {
+        return nil, err
+    }
+
+    adapter := &{{ $Adapter }}{
+        impl:    impl,
+        ringpop: rp,
+        ch:      ch,
+        config:  config,
+    }
+    // create ringpop router for routing based on ring membership
+    adapter.router = router.New(rp, adapter, ch)
+
+    return adapter, nil
+}
+
+// GetLocalClient satisfies the ClientFactory interface of ringpop-go/router
+func (a *{{ $Adapter }}) GetLocalClient() interface{} {
+    return a.impl
+}
+
+// MakeRemoteClient satisfies the ClientFactory interface of ringpop-go/router
+func (a *{{ $Adapter }}) MakeRemoteClient(client thrift.TChanClient) interface{} {
+    return New{{ $TChanInterface }}Client(client)
+}
+
+{{ range .Methods }}
+{{ $Method := .}}
+{{ $PublicName := $Method.Name | goPublicName }}
+{{ $cfg := print "config." $PublicName }}
+{{ $RingpopRouterConfiguration := print ($Service.Name | goPublicName) $PublicName "Configuration"}}
+
+// {{ $RingpopRouterConfiguration }} contains the configuration on how to route calls to the thrift endpoint {{ $Service.Name }}::{{ $PublicName }}.
+type {{ $RingpopRouterConfiguration }} struct {
+    // Key is a closure that generates a routable key based on the parameters of the incomming request.
+    Key     func({{ template "arguments" $Method}}) (string, error)
+}
+
+// {{ $PublicName }} satisfies the {{ $TChanInterface }} interface. This function uses the configuration for {{ $PublicName }} to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
+func (a *{{ $Adapter }}) {{ $PublicName }} ({{ template "arguments" $Method }}) ({{ template "returnType" $Method }}) {
+    // check if the function should be called locally
+    if a.{{ $cfg }} == nil || forward.HasForwardedHeader(ctx) {
+        return a.impl.{{ $PublicName }}({{ template "call" $Method }})
+    }
+
+    // find the key to shard on
+    ringpopKey, err := a.{{ $cfg }}.Key({{ template "call" $Method }})
+    if err != nil {
+        return {{ if $Method.ReturnType }}r, {{ end }}fmt.Errorf("could not get key: %q", err)
+    }
+
+    clientInterface, err := a.router.GetClient(ringpopKey)
+    if err != nil {
+        return {{ if $Method.ReturnType }}r, {{ end }}err
+    }
+
+    client := clientInterface.({{ $TChanInterface }})
+    ctx = forward.SetForwardedHeader(ctx)
+    return client.{{ $PublicName }}({{ template "call" $Method }})
+}
+{{ end}}
+{{ end}}

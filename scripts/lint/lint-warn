@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+# lint-warn takes the output of `go tool vet` and matches lines against an
+# exclude file. If an output line matches an exclude, it is printed to stdout,
+# otherwise it is printed to stderr.
+#
+# If anything is printed to stderr, the program exits with exit code 1.
+set -ueo pipefail
+
+if [ $# -lt 1 ]; then
+	echo "ERROR: Expect lint exclude file as argument" >&2
+	exit 1
+fi
+
+# Load exclude patterns
+lint_exclude_patterns="$(cat $1)"
+
+declare buf=
+declare exit_code=0
+
+while IFS= read -r line; do
+	buf=""
+
+	IFS=$'\n'
+	for exclude in $lint_exclude_patterns; do
+		if [[ "$line" == $exclude ]]; then
+			buf="WARNING: $line"
+			break
+		fi
+	done
+
+	if [ -z "$buf" ]; then
+		# Print the error
+		echo "ERROR: $line" >&2
+		exit_code=1
+	else
+		# Print the warning
+		echo "$buf"
+	fi
+done
+
+exit $exit_code

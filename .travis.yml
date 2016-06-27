@@ -1,0 +1,31 @@
+language: go
+go:
+  - 1.6
+  - 1.5
+
+before_install:
+  - go get -u github.com/axw/gocov/gocov
+  - go get -u github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
+
+before_script:
+  - ./scripts/travis/get-thrift.sh
+  - ./scripts/travis/get-thrift-gen.sh
+  - go get github.com/vektra/mockery/.../
+  - go get github.com/golang/lint/golint
+
+env:
+  - RUN="make lint"
+  - RUN="make test-unit"
+  - RUN="make test-integration"
+
+matrix:
+  allow_failures:
+    - env: RUN=test/update-coveralls
+  fast_finish: true
+
+script:
+  - test/travis
+
+after_success:
+  - test/update-coveralls

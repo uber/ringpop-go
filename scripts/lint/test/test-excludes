@@ -1,0 +1,3 @@
+./swim/member.go:*: address passes Lock by value: swim.Member
+./swim/member.go:*: incarnation passes Lock by value: swim.Member
+./swim/test_utils.go:*: range var expected copies Lock: swim.Member
