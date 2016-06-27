@@ -27,6 +27,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
+	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
@@ -74,7 +76,11 @@ func (w *worker) PingHandler(ctx json.Context, ping *Ping) (*Pong, error) {
 
 	handle, err := w.ringpop.HandleOrForward(ping.Key, ping.Bytes(), &res, "ping", "/ping", tchannel.JSON, nil)
 	if handle {
-		return &Pong{"Hello, world!", w.ringpop.WhoAmI()}, nil
+		identity, err := w.ringpop.WhoAmI()
+		if err != nil {
+			return nil, err
+		}
+		return &Pong{"Hello, world!", identity}, nil
 	}
 
 	if err := json2.Unmarshal(res, &pong); err != nil {
@@ -95,12 +101,19 @@ func main() {
 
 	logger := log.StandardLogger()
 
+	rp, err := ringpop.New("ping-app",
+		ringpop.Channel(ch),
+		ringpop.Identity(*hostport),
+		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
+	)
+	if err != nil {
+		log.Fatalf("Unable to create Ringpop: %v", err)
+	}
+
 	worker := &worker{
 		channel: ch,
-		ringpop: ringpop.NewRingpop("ping-app", *hostport, ch, &ringpop.Options{
-			Logger: bark.NewLoggerFromLogrus(logger),
-		}),
-		logger: logger,
+		ringpop: rp,
+		logger:  logger,
 	}
 
 	if err := worker.RegisterPong(); err != nil {
@@ -111,8 +124,8 @@ func main() {
 		log.Fatalf("could not listen on given hostport: %v", err)
 	}
 
-	opts := new(ringpop.BootstrapOptions)
-	opts.File = *hostfile
+	opts := new(swim.BootstrapOptions)
+	opts.DiscoverProvider = jsonfile.New(*hostfile)
 
 	if _, err := worker.ringpop.Bootstrap(opts); err != nil {
 		log.Fatalf("ringpop bootstrap failed: %v", err)

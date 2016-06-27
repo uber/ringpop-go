@@ -24,13 +24,13 @@ package replica
 
 import (
 	"errors"
-	"io/ioutil"
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/forward"
-	"github.com/uber/ringpop-go/replica/util"
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/shared"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
 )
 
@@ -59,13 +59,13 @@ const (
 // A Sender is used to lookup the destinations for requests given a key.
 type Sender interface {
 	// Lookup should return a server address
-	Lookup(string) string
+	Lookup(string) (string, error)
 
 	// LookupN should return n server addresses
-	LookupN(string, int) []string
+	LookupN(string, int) ([]string, error)
 
 	// WhoAmI should return the local address of the sender
-	WhoAmI() string
+	WhoAmI() (string, error)
 }
 
 // A Response is a response from a replicator read/write request.
@@ -87,13 +87,14 @@ type callOptions struct {
 	Request    []byte
 	KeysByDest map[string][]string
 	Operation  string
+	Format     tchannel.Format
 }
 
 // A Replicator is used to replicate a request across nodes such that they share
 // ownership of some data.
 type Replicator struct {
 	sender    Sender
-	channel   tchannel.Registrar
+	channel   shared.SubChannel
 	forwarder *forward.Forwarder
 	logger    log.Logger
 	defaults  *Options
@@ -126,18 +127,17 @@ func mergeDefaultOptions(opts *Options, def *Options) *Options {
 // NewReplicator returns a new Replicator instance that makes calls with the given
 // SubChannel to the service defined by SubChannel.GetServiceName(). The given n/w/r
 // values will be used as defaults for the replicator when none are provided
-func NewReplicator(s Sender, channel tchannel.Registrar, logger log.Logger,
+// Deprecation: logger is no longer used.
+func NewReplicator(s Sender, channel shared.SubChannel, logger log.Logger,
 	opts *Options) *Replicator {
 
-	if logger == nil {
-		logger = log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		})
-	}
-
-	f := forward.NewForwarder(s, channel, logger)
+	f := forward.NewForwarder(s, channel)
 
 	opts = mergeDefaultOptions(opts, &Options{3, 1, 3, Parallel})
+	logger = logging.Logger("replicator")
+	if identity, err := s.WhoAmI(); err == nil {
+		logger = logger.WithField("local", identity)
+	}
 	return &Replicator{s, channel, f, logger, opts}
 }
 
@@ -174,7 +174,7 @@ func (r *Replicator) groupReplicas(keys []string, n int) (map[string][]string,
 	keysByDest := make(map[string][]string)
 
 	for _, key := range keys {
-		dests := r.sender.LookupN(key, n)
+		dests, _ := r.sender.LookupN(key, n)
 		destsByKey[key] = dests
 
 		if len(dests) == 0 {
@@ -299,7 +299,7 @@ func (r *Replicator) serial(rwValue int, copts *callOptions,
 	var errors []error
 
 	if opts.FanoutMode == SerialBalanced {
-		copts.Dests = util.Shuffle(copts.Dests)
+		copts.Dests = util.ShuffleStrings(copts.Dests)
 	}
 
 	for _, dest := range copts.Dests {
@@ -319,7 +319,7 @@ func (r *Replicator) forwardRequest(dest string, copts *callOptions, fopts *forw
 	var keys = copts.KeysByDest[dest]
 
 	res, err := r.forwarder.ForwardRequest(copts.Request, dest, r.channel.ServiceName(),
-		copts.Operation, keys, fopts)
+		copts.Operation, keys, copts.Format, fopts)
 
 	if err != nil {
 		r.logger.WithFields(log.Fields{

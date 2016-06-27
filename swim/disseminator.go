@@ -25,44 +25,50 @@ import (
 	"sync"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 )
 
 var log10 = math.Log(10)
 
+// defaultPFactor is the piggyback factor value, described in the swim paper.
+const defaultPFactor int = 15
+
 // A pChange is a change with a p count representing the number of times the
-// change has been propogated to other nodes.
+// change has been propagated to other nodes.
 type pChange struct {
 	Change
 	p int
 }
 
-// A Disseminator propogates changes to other nodes
+// A disseminator propagates changes to other nodes.
 type disseminator struct {
 	node    *Node
 	changes map[string]*pChange
+
+	// maxP indicates how many times a change is disseminated. It is declared
+	// in the swim paper as piggybackfactor * log(# nodes).
 	maxP    int
 	pFactor int
 
 	sync.RWMutex
+
+	logger log.Logger
 }
 
-// NewDisseminator returns a new Disseminator instance
+// newDisseminator returns a new Disseminator instance.
 func newDisseminator(n *Node) *disseminator {
 	d := &disseminator{
 		node:    n,
 		changes: make(map[string]*pChange),
-		maxP:    1,
-		pFactor: 15,
+		maxP:    defaultPFactor,
+		pFactor: defaultPFactor,
+		logger:  logging.Logger("disseminator").WithField("local", n.Address()),
 	}
 
 	return d
 }
 
-func (d *disseminator) AdjustMaxPropogations() {
-	if !d.node.Ready() {
-		return
-	}
-
+func (d *disseminator) AdjustMaxPropagations() {
 	d.Lock()
 
 	numPingable := d.node.memberlist.NumPingableMembers()
@@ -75,15 +81,23 @@ func (d *disseminator) AdjustMaxPropogations() {
 
 		d.node.emit(MaxPAdjustedEvent{prevMaxP, newMaxP})
 
-		d.node.log.WithFields(log.Fields{
+		d.logger.WithFields(log.Fields{
 			"newMax":            newMaxP,
 			"prevMax":           prevMaxP,
-			"propogationFactor": d.pFactor,
+			"propagationFactor": d.pFactor,
 			"numPingable":       numPingable,
-		}).Debug("adjusted max propogation count")
+		}).Debug("adjusted max propagation count")
 	}
 
 	d.Unlock()
+}
+
+// HasChanges reports whether disseminator has changes to disseminate.
+func (d *disseminator) HasChanges() bool {
+	d.RLock()
+	result := len(d.changes) > 0
+	d.RUnlock()
+	return result
 }
 
 func (d *disseminator) FullSync() (changes []Change) {
@@ -104,61 +118,96 @@ func (d *disseminator) FullSync() (changes []Change) {
 	return changes
 }
 
-func (d *disseminator) IssueAsSender() []Change {
-	return d.issueChanges(nil)
+// IssueAsSender collects all changes a node needs when sending a ping or
+// ping-req. The second return value is a callback that raises the piggyback
+// counters of the given changes.
+func (d *disseminator) IssueAsSender() (changes []Change, bumpPiggybackCounters func()) {
+	changes = d.issueChanges()
+	return changes, func() {
+		d.bumpPiggybackCounters(changes)
+	}
 }
 
-func (d *disseminator) IssueAsReceiver(senderAddress string,
-	senderIncarnation int64, senderChecksum uint32) ([]Change, bool) {
+func (d *disseminator) bumpPiggybackCounters(changes []Change) {
+	d.Lock()
+	for _, change := range changes {
+		c, ok := d.changes[change.Address]
+		if !ok {
+			continue
+		}
 
-	filter := func(c *pChange) bool {
-		return senderIncarnation == c.SourceIncarnation &&
-			senderAddress == c.Source
+		c.p++
+		if c.p >= d.maxP {
+			delete(d.changes, c.Address)
+		}
 	}
+	d.Unlock()
+}
 
-	changes := d.issueChanges(filter)
+// IssueAsReceiver collects all changes a node needs when responding to a ping
+// or ping-req. Unlike IssueAsSender, IssueAsReceiver automatically increments
+// the piggyback counters because it's difficult to find out whether a response
+// reaches the client. The second return value indicates whether a full sync
+// is triggered.
+func (d *disseminator) IssueAsReceiver(
+	senderAddress string,
+	senderIncarnation int64,
+	senderChecksum uint32) (changes []Change, fullSync bool) {
 
-	if len(changes) > 0 {
+	changes = d.issueChanges()
+
+	// filter out changes that came from the sender previously
+	changes = d.filterChangesFromSender(changes, senderAddress, senderIncarnation)
+
+	d.bumpPiggybackCounters(changes)
+
+	if len(changes) > 0 || d.node.memberlist.Checksum() == senderChecksum {
 		return changes, false
-	} else if d.node.memberlist.Checksum() != senderChecksum {
-		d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
-
-		d.node.log.WithFields(log.Fields{
-			"localChecksum":  d.node.memberlist.Checksum(),
-			"remote":         senderAddress,
-			"remoteChecksum": senderChecksum,
-		}).Info("full sync")
-
-		return d.FullSync(), true
 	}
 
-	return []Change{}, false
+	d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
+
+	d.node.logger.WithFields(log.Fields{
+		"localChecksum":  d.node.memberlist.Checksum(),
+		"remote":         senderAddress,
+		"remoteChecksum": senderChecksum,
+	}).Info("full sync")
+
+	return d.FullSync(), true
 }
 
-func (d *disseminator) issueChanges(filter func(*pChange) bool) (changes []Change) {
+// filterChangesFromSender returns changes that didn't originate at the sender.
+// Attention, this function reorders the underlaying input array.
+func (d *disseminator) filterChangesFromSender(cs []Change, source string, incarnation int64) []Change {
+	for i := 0; i < len(cs); i++ {
+		if incarnation == cs[i].SourceIncarnation && source == cs[i].Source {
+			d.node.emit(ChangeFilteredEvent{cs[i]})
+
+			// swap, and not just overwrite, so that in the end only the order
+			// of the underlying array has changed.
+			cs[i], cs[len(cs)-1] = cs[len(cs)-1], cs[i]
+
+			cs = cs[:len(cs)-1]
+			i--
+		}
+	}
+	return cs
+}
+
+func (d *disseminator) issueChanges() []Change {
 	d.Lock()
 
 	// To make JSON output [] instead of null on empty change list
-	changes = make([]Change, 0)
+	result := []Change{}
 	for _, change := range d.changes {
-		if filter != nil && filter(change) {
-			// TODO: stat - filtered-change - increment
-			continue
-		}
-
-		change.p++
-
-		if change.p > d.maxP {
-			delete(d.changes, change.Address)
-			continue
-		}
-
-		changes = append(changes, change.Change)
+		result = append(result, change.Change)
 	}
 
 	d.Unlock()
 
-	return changes
+	d.node.emit(ChangesCalculatedEvent{result})
+
+	return result
 }
 
 func (d *disseminator) ClearChanges() {
@@ -171,4 +220,28 @@ func (d *disseminator) RecordChange(change Change) {
 	d.Lock()
 	d.changes[change.Address] = &pChange{change, 0}
 	d.Unlock()
+}
+
+func (d *disseminator) ClearChange(address string) {
+	d.Lock()
+	delete(d.changes, address)
+	d.Unlock()
+}
+
+func (d *disseminator) ChangesByAddress(address string) (Change, bool) {
+	d.RLock()
+	change, ok := d.changes[address]
+	var c Change
+	if ok {
+		c = change.Change
+	}
+	d.RUnlock()
+	return c, ok
+}
+
+func (d *disseminator) ChangesCount() int {
+	d.RLock()
+	c := len(d.changes)
+	d.RUnlock()
+	return c
 }

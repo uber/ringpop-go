@@ -33,9 +33,11 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	servers := rp.ring.GetServers()
+	servers := rp.ring.Servers()
 
 	type stats map[string]interface{}
+
+	uptime, _ := rp.Uptime()
 
 	return stats{
 		"hooks":      nil,
@@ -55,7 +57,7 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 		},
 		"version":         "???", // TODO: version!
 		"timestamp":       time.Now().Unix(),
-		"uptime":          rp.Uptime(),
+		"uptime":          uptime,
 		"tchannelVersion": strconv.Itoa(tchannel.CurrentProtocolVersion), // get proper version
 	}
 }

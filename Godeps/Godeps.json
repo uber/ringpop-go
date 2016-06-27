@@ -15,25 +15,53 @@
 			"Rev": "5bc8b5a3a5da507b6f87436ca629be664496a69f"
 		},
 		{
+			"ImportPath": "github.com/benbjohnson/clock",
+			"Rev": "a620c1cc9866f84a2550ad53f4f353ec030fa26b"
+		},
+		{
 			"ImportPath": "github.com/cactus/go-statsd-client/statsd",
 			"Comment": "v2.0.1-3-g8947bd0",
 			"Rev": "8947bd0d9e04e8c27671c33753340b51b835efdc"
+		},
+		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
 			"ImportPath": "github.com/dgryski/go-farm",
 			"Rev": "fc41e106ee0e4394f69a56046e5c5adbaf29d912"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "e8554b8641db39598be7f6342874b958f12ae1d4"
+		},
+		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "dee209f2455f101a5e4e593dea94872d2c62d85d"
 		},
 		{
+			"ImportPath": "github.com/stretchr/objx",
+			"Rev": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
+		},
+		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/mock",
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Rev": "dab07ac62d4905d3e48d17dc549c684ac3b7c15a"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/suite",
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/uber-common/bark",
@@ -41,7 +69,8 @@
 		},
 		{
 			"ImportPath": "github.com/uber/tchannel-go",
-			"Rev": "507b03bdd9eb65a49672006473454d76d1277304"
+			"Comment": "v1.0.3",
+			"Rev": "6ea263463a946c89e6565a12110aa424175155c3"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

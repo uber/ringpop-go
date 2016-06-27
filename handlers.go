@@ -33,7 +33,7 @@ import (
 type Arg struct{}
 
 func (rp *Ringpop) registerHandlers() error {
-	tapring := fmt.Sprintf("/%s/tapring", rp.app)
+	tapring := fmt.Sprintf("/%s/tapring", rp.App())
 	handlers := map[string]interface{}{
 		"/health":       rp.health,
 		"/admin/stats":  rp.adminStatsHandler,
@@ -41,8 +41,8 @@ func (rp *Ringpop) registerHandlers() error {
 		tapring:         rp.tapRingHandler,
 	}
 
-	return json.Register(rp.channel, handlers, func(ctx context.Context, err error) {
-		rp.log.WithField("error", err).Info("error occured")
+	return json.Register(rp.subChannel, handlers, func(ctx context.Context, err error) {
+		rp.logger.WithField("error", err).Info("register error occured")
 	})
 }
 
@@ -67,7 +67,11 @@ type lookupResponse struct {
 }
 
 func (rp *Ringpop) adminLookupHandler(ctx json.Context, req *lookupRequest) (*lookupResponse, error) {
-	return &lookupResponse{Dest: rp.Lookup(req.Key)}, nil
+	dest, err := rp.Lookup(req.Key)
+	if err != nil {
+		return nil, err
+	}
+	return &lookupResponse{Dest: dest}, nil
 }
 
 func (rp *Ringpop) adminReloadHandler(ctx json.Context, req *Arg) (*Arg, error) {

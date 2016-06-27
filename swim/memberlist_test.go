@@ -21,10 +21,11 @@
 package swim
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 type MemberlistTestSuite struct {
@@ -63,6 +64,34 @@ func (s *MemberlistTestSuite) SetupTest() {
 			Incarnation: s.incarnation,
 		},
 	}
+}
+
+func (s *MemberlistTestSuite) TestAddJoinList() {
+
+	joinList := s.changes
+
+	// We add all the members of this node to the joinList because we want
+	// the joinList to contain the change for the local member.
+	mems := s.node.disseminator.FullSync()
+	for _, mem := range mems {
+		joinList = append(joinList, mem)
+	}
+
+	// We make sure that the joinList contains a change for the local member.
+	var localMember *Change
+	for _, mem := range joinList {
+		if mem.Address == s.node.Address() {
+			localMember = &mem
+		}
+	}
+	s.NotNil(localMember, "expected joinList to contain a change for the local member")
+
+	// Add join list to the membership and see that its only stored change is
+	// for the local member.
+	s.m.AddJoinList(joinList)
+	s.Equal(1, s.node.disseminator.ChangesCount(), "expected to only have one change")
+	_, ok := s.node.disseminator.ChangesByAddress(s.node.Address())
+	s.True(ok, "expected to only have the local member as a change")
 }
 
 func (s *MemberlistTestSuite) TearDownTest() {
@@ -214,6 +243,39 @@ func (s *MemberlistTestSuite) TestRandomPingable() {
 
 	members = s.m.RandomPingableMembers(1, excluding)
 	s.Len(members, 1, "expected only one member")
+}
+
+func (s *MemberlistTestSuite) TestGetReachableMembers() {
+	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
+	defer nodeA.Destroy()
+
+	nodeA.memberlist.MakeAlive("127.0.0.1:3001", s.incarnation)
+	nodeA.memberlist.MakeAlive("127.0.0.1:3002", s.incarnation)
+	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
+	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
+
+	activeMembers := nodeA.GetReachableMembers()
+	sort.Strings(activeMembers)
+
+	s.Equal([]string{
+		"127.0.0.1:3001",
+		"127.0.0.1:3002",
+		"127.0.0.1:3003",
+	}, activeMembers, "expected a list of 3 specific nodes")
+}
+
+func (s *MemberlistTestSuite) TestCountReachableMembers() {
+	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
+	defer nodeA.Destroy()
+
+	nodeA.memberlist.MakeAlive("127.0.0.1:3001", s.incarnation)
+	nodeA.memberlist.MakeAlive("127.0.0.1:3002", s.incarnation)
+	nodeA.memberlist.MakeSuspect("127.0.0.1:3003", s.incarnation)
+	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
+
+	reachableMemberCount := nodeA.CountReachableMembers()
+
+	s.Equal(3, reachableMemberCount, "expected 3 reachable members")
 }
 
 func TestMemberlistTestSuite(t *testing.T) {

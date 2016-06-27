@@ -22,6 +22,7 @@ package swim
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -36,7 +37,7 @@ type GossipTestSuite struct {
 }
 
 func (s *GossipTestSuite) SetupTest() {
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
 
 	s.g = s.node.gossip
@@ -74,12 +75,13 @@ func (s *GossipTestSuite) StopWhileStopped() {
 	s.True(s.g.Stopped(), "expected gossip to still be stopped")
 }
 
-func (s *GossipTestSuite) TestUpdatesArePropogated() {
-	peer := newChannelNode(s.T(), "127.0.0.1:3002")
+func (s *GossipTestSuite) TestUpdatesArePropagated() {
+	peer := newChannelNode(s.T())
 	defer peer.Destroy()
 	defer peer.channel.Close()
 
 	bootstrapNodes(s.T(), s.tnode, peer)
+	waitForConvergence(s.T(), 500*time.Millisecond, peer)
 	s.True(s.g.Stopped())
 	s.True(peer.node.gossip.Stopped())
 
@@ -107,7 +109,7 @@ func (s *GossipTestSuite) TestUpdatesArePropogated() {
 
 // TODO: move this test to node_test?
 func (s *GossipTestSuite) TestSuspicionStarted() {
-	peers := genChannelNodes(s.T(), genAddresses(1, 2, 4))
+	peers := genChannelNodes(s.T(), 3)
 	defer destroyNodes(peers...)
 
 	bootstrapNodes(s.T(), append(peers, s.tnode)...)
@@ -116,7 +118,7 @@ func (s *GossipTestSuite) TestSuspicionStarted() {
 
 	s.g.ProtocolPeriod()
 
-	s.NotNil(s.node.suspicion.Timer("127.0.0.1:3010"), "expected suspicion timer to be set")
+	s.NotNil(s.node.stateTransitions.timer("127.0.0.1:3010"), "expected state timer to be set")
 }
 
 func TestGossipTestSuite(t *testing.T) {

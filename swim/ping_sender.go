@@ -26,6 +26,8 @@ import (
 
 	log "github.com/uber-common/bark"
 
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -42,6 +44,7 @@ type pingSender struct {
 	node    *Node
 	target  string
 	timeout time.Duration
+	logger  log.Logger
 }
 
 // NewPingSender returns a new PingSender that can be used to send a ping to target node
@@ -50,19 +53,24 @@ func newPingSender(node *Node, target string, timeout time.Duration) *pingSender
 		node:    node,
 		target:  target,
 		timeout: timeout,
+		logger:  logging.Logger("ping").WithField("local", node.Address()),
 	}
 
 	return ps
 }
 
 func (p *pingSender) SendPing() (*ping, error) {
-	ctx, cancel := json.NewContext(p.timeout)
+	ctx, cancel := shared.NewTChannelContext(p.timeout)
+
 	defer cancel()
 
 	var res ping
 	select {
 	case err := <-p.MakeCall(ctx, &res):
-		return &res, err
+		if err != nil {
+			return nil, err
+		}
+		return &res, nil
 
 	case <-ctx.Done(): // ping timed out
 		return nil, errors.New("ping timed out")
@@ -77,9 +85,10 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 
 		peer := p.node.channel.Peers().GetOrAdd(p.target)
 
+		changes, bumpPiggybackCounters := p.node.disseminator.IssueAsSender()
 		req := ping{
 			Checksum:          p.node.memberlist.Checksum(),
-			Changes:           p.node.disseminator.IssueAsSender(),
+			Changes:           changes,
 			Source:            p.node.Address(),
 			SourceIncarnation: p.node.Incarnation(),
 		}
@@ -90,7 +99,7 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 			Changes: req.Changes,
 		})
 
-		p.node.log.WithFields(log.Fields{
+		p.logger.WithFields(log.Fields{
 			"remote":  p.target,
 			"changes": req.Changes,
 		}).Debug("ping send")
@@ -99,13 +108,16 @@ func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
 
 		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, res)
 		if err != nil {
-			p.node.log.WithFields(log.Fields{
+			p.logger.WithFields(log.Fields{
 				"remote": p.target,
 				"error":  err,
 			}).Debug("ping failed")
 			errC <- err
 			return
 		}
+
+		// when ping was successful
+		bumpPiggybackCounters()
 
 		p.node.emit(PingSendCompleteEvent{
 			Local:    p.node.Address(),

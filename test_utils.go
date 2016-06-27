@@ -23,14 +23,12 @@ package ringpop
 import (
 	"fmt"
 	"sync"
-	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/swim"
-	"github.com/uber/ringpop-go/swim/util"
-	"github.com/uber/tchannel-go"
+	"github.com/uber/ringpop-go/util"
 )
 
 // fake stats
@@ -47,7 +45,7 @@ func (s *dummmyStats) IncCounter(key string, tags bark.Tags, val int64) {
 }
 
 func (s *dummmyStats) UpdateGauge(key string, tags bark.Tags, val int64) {
-	s.vals[key] += val
+	s.vals[key] = val
 }
 
 func (s *dummmyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
@@ -67,24 +65,10 @@ func (d *dummyListener) EventCount() int {
 	return d.events
 }
 
-func (d *dummyListener) HandleEvent(event interface{}) {
+func (d *dummyListener) HandleEvent(event events.Event) {
 	d.l.Lock()
 	d.events++
 	d.l.Unlock()
-}
-
-func testPop(t *testing.T, hostport string) (*Ringpop, func()) {
-	ch, err := tchannel.NewChannel("test-app", nil)
-	require.NoError(t, err, "cannot have error when creating channel")
-
-	ringpop := NewRingpop("test-app", hostport, ch, nil)
-
-	destroy := func() {
-		ringpop.Destroy()
-		ch.Close()
-	}
-
-	return ringpop, destroy
 }
 
 func genAddresses(host, fromPort, toPort int) []string {
@@ -97,14 +81,16 @@ func genAddresses(host, fromPort, toPort int) []string {
 	return addresses
 }
 
-func genChanges(addresses []string, status string) []swim.Change {
+func genChanges(addresses []string, statuses ...string) []swim.Change {
 	var changes []swim.Change
 
 	for _, address := range addresses {
-		changes = append(changes, swim.Change{
-			Address: address,
-			Status:  status,
-		})
+		for _, status := range statuses {
+			changes = append(changes, swim.Change{
+				Address: address,
+				Status:  status,
+			})
+		}
 	}
 
 	return changes

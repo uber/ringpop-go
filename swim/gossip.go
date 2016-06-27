@@ -28,6 +28,7 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
 )
 
 // Gossip handles the protocol period of the SWIM protocol
@@ -48,6 +49,8 @@ type gossip struct {
 		timing     metrics.Histogram
 		sync.RWMutex
 	}
+
+	logger log.Logger
 }
 
 // newGossip returns a new gossip SWIM sub-protocol with the given protocol period
@@ -55,6 +58,7 @@ func newGossip(node *Node, minProtocolPeriod time.Duration) *gossip {
 	gossip := &gossip{
 		node:              node,
 		minProtocolPeriod: minProtocolPeriod,
+		logger:            logging.Logger("gossip").WithField("local", node.Address()),
 	}
 
 	gossip.SetStopped(true)
@@ -104,10 +108,10 @@ func (g *gossip) ProtocolRate() time.Duration {
 
 // computes a ProtocolRate for the Gossip
 func (g *gossip) AdjustProtocolRate() {
-	g.protocol.RLock()
+	g.protocol.Lock()
 	observed := g.protocol.timing.Percentile(0.5) * 2.0
 	g.protocol.lastRate = time.Duration(math.Max(observed, float64(g.minProtocolPeriod)))
-	g.protocol.RUnlock()
+	g.protocol.Unlock()
 }
 
 func (g *gossip) ProtocolTiming() metrics.Histogram {
@@ -121,7 +125,7 @@ func (g *gossip) ProtocolTiming() metrics.Histogram {
 // start the gossip protocol
 func (g *gossip) Start() {
 	if !g.Stopped() {
-		g.node.log.Warn("gossip already started")
+		g.logger.Warn("gossip already started")
 		return
 	}
 
@@ -129,18 +133,18 @@ func (g *gossip) Start() {
 	g.RunProtocolRateLoop()
 	g.RunProtocolPeriodLoop()
 
-	g.node.log.Debug("started gossip protocol")
+	g.logger.Debug("started gossip protocol")
 }
 
 // stop the gossip protocol
 func (g *gossip) Stop() {
 	if g.Stopped() {
-		g.node.log.Warn("gossip already stopped")
+		g.logger.Warn("gossip already stopped")
 		return
 	}
 
 	g.SetStopped(true)
-	g.node.log.Debug("stopped gossip protocol")
+	g.logger.Debug("stopped gossip protocol")
 }
 
 // run the gossip protocol period loop
@@ -163,7 +167,7 @@ func (g *gossip) RunProtocolPeriodLoop() {
 			})
 		}
 
-		g.node.log.WithFields(log.Fields{
+		g.logger.WithFields(log.Fields{
 			"start": startTime,
 			"end":   time.Now(),
 		}).Debug("stopped protocol period loop")

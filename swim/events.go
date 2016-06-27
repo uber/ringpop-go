@@ -20,14 +20,27 @@
 
 package swim
 
-import "time"
+import (
+	"time"
+
+	"github.com/uber/ringpop-go/events"
+)
 
 // An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
 type EventListener interface {
-	HandleEvent(interface{})
+	HandleEvent(events.Event)
 }
 
-// A MaxPAdjustedEvent occurs when the disseminator adjusts the max propogation
+// The ListenerFunc type is an adapter to allow the use of ordinary functions
+// as EventListeners.
+type ListenerFunc func(events.Event)
+
+// HandleEvent calls f(e).
+func (f ListenerFunc) HandleEvent(e events.Event) {
+	f(e)
+}
+
+// A MaxPAdjustedEvent occurs when the disseminator adjusts the max propagation
 // count for changes
 type MaxPAdjustedEvent struct {
 	OldPCount int `json:"oldPCount"`
@@ -71,6 +84,23 @@ type JoinCompleteEvent struct {
 	Joined    []string      `json:"joined"`
 }
 
+// JoinFailedReason indicates the reason a join failed
+type JoinFailedReason string
+
+const (
+	// Error as a JoinFailedReason indicates that the join failed because of an error
+	Error JoinFailedReason = "err"
+
+	// Destroyed as a JoinFailedReason indicates that the join failed because ringpop was destroyed during the join
+	Destroyed = "destroyed"
+)
+
+// A JoinFailedEvent is sent when a join request to remote node did not successfully
+type JoinFailedEvent struct {
+	Reason JoinFailedReason
+	Error  error
+}
+
 // A PingSendEvent is sent when the node sends a ping to a remote node
 type PingSendEvent struct {
 	Local   string   `json:"local"`
@@ -100,11 +130,20 @@ type PingRequestsSendEvent struct {
 	Peers  []string `json:"peers"`
 }
 
+// A PingRequestSendErrorEvent is sent when the node can't get a response sending ping requests to remote nodes
+type PingRequestSendErrorEvent struct {
+	Local  string   `json:"local"`
+	Target string   `json:"target"`
+	Peers  []string `json:"peers"`
+	Peer   string   `json:"peer"`
+}
+
 // A PingRequestsSendCompleteEvent is sent when the node finished sending ping requests to remote nodes
 type PingRequestsSendCompleteEvent struct {
 	Local    string        `json:"local"`
 	Target   string        `json:"target"`
 	Peers    []string      `json:"peers"`
+	Peer     string        `json:"peer"`
 	Duration time.Duration `json:"duration"`
 }
 
@@ -137,6 +176,35 @@ type ProtocolFrequencyEvent struct {
 
 // A ChecksumComputeEvent is sent when a the rings checksum is computed
 type ChecksumComputeEvent struct {
-	Duration time.Duration `json:"duration"`
-	Checksum uint32        `json:"checksum"`
+	Duration    time.Duration `json:"duration"`
+	Checksum    uint32        `json:"checksum"`
+	OldChecksum uint32        `json:"oldchecksum"`
 }
+
+// A ChangesCalculatedEvent is sent when the disseminator generated the list of changes to send in a ping or its response
+type ChangesCalculatedEvent struct {
+	Changes []Change
+}
+
+// A ChangeFilteredEvent is sent when a change has been filtered from the list to be disseminated
+type ChangeFilteredEvent struct {
+	Change Change
+}
+
+// A JoinTriesUpdateEvent is sent when the joiner tries to join a group
+type JoinTriesUpdateEvent struct {
+	Retries int
+}
+
+// A MakeNodeStatusEvent is sent when Make[Status] is called on member list
+type MakeNodeStatusEvent struct {
+	Status string
+}
+
+// A RequestBeforeReadyEvent is sent if a remote request came in for a ringpop endpoint while ringpop was not ready to process requests
+type RequestBeforeReadyEvent struct {
+	Endpoint Endpoint
+}
+
+// A RefuteUpdateEvent is sent when a node detects gossip about its own state that needs to be corrected
+type RefuteUpdateEvent struct{}

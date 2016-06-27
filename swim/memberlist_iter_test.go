@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/util"
 )
 
 type MemberlistIterTestSuite struct {
@@ -58,7 +58,7 @@ func (s *MemberlistIterTestSuite) TestNoneUseable() {
 }
 
 func (s *MemberlistIterTestSuite) TestIterOverFive() {
-	addresses := genAddresses(1, 2, 6)
+	addresses := fakeHostPorts(1, 1, 2, 6)
 
 	for _, address := range addresses {
 		s.m.MakeAlive(address, s.incarnation)

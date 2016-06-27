@@ -24,8 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/util"
 )
 
 var timeZero = time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -41,7 +43,7 @@ type updateRollup struct {
 	}
 
 	flushTimer struct {
-		t *time.Timer
+		t *clock.Timer
 		sync.Mutex
 	}
 
@@ -51,6 +53,8 @@ type updateRollup struct {
 		lastUpdate  time.Time
 		sync.RWMutex
 	}
+
+	logger log.Logger
 }
 
 func newUpdateRollup(node *Node, flushInterval time.Duration, maxUpdates int) *updateRollup {
@@ -58,6 +62,7 @@ func newUpdateRollup(node *Node, flushInterval time.Duration, maxUpdates int) *u
 		node:          node,
 		maxUpdates:    maxUpdates,
 		flushInterval: flushInterval,
+		logger:        logging.Logger("rollup").WithField("local", node.Address()),
 	}
 
 	rollup.buffer.updates = make(map[string][]Change)
@@ -124,7 +129,7 @@ func (r *updateRollup) RenewFlushTimer() {
 		r.flushTimer.t.Stop()
 	}
 
-	r.flushTimer.t = time.AfterFunc(r.flushInterval, func() {
+	r.flushTimer.t = r.node.clock.AfterFunc(r.flushInterval, func() {
 		r.FlushBuffer()
 		r.RenewFlushTimer()
 	})
@@ -144,7 +149,7 @@ func (r *updateRollup) FlushBuffer() {
 	r.buffer.Lock()
 
 	if len(r.buffer.updates) == 0 {
-		r.node.log.Debug("no updates flushed")
+		r.logger.Debug("no updates flushed")
 		r.buffer.Unlock()
 		return
 	}
@@ -163,7 +168,7 @@ func (r *updateRollup) FlushBuffer() {
 		sinceLastFlush = now.Sub(r.timings.lastFlush)
 	}
 
-	r.node.log.WithFields(log.Fields{
+	r.logger.WithFields(log.Fields{
 		"checksum":         r.node.memberlist.Checksum(),
 		"sinceFirstUpdate": sinceFirstUpdate,
 		"sinceLastFlush":   sinceLastFlush,
@@ -181,7 +186,7 @@ func (r *updateRollup) FlushBuffer() {
 }
 
 // testing func to avoid data races
-func (r *updateRollup) FlushTimer() *time.Timer {
+func (r *updateRollup) FlushTimer() *clock.Timer {
 	r.flushTimer.Lock()
 	timer := r.flushTimer.t
 	r.flushTimer.Unlock()

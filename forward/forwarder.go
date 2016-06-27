@@ -22,23 +22,26 @@
 package forward
 
 import (
-	"io/ioutil"
+	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/shared"
+	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 // A Sender is used to route the request to the proper destination,
 // the server returned by Lookup(key)
 type Sender interface {
 	// WhoAmI should return the address of the local sender
-	WhoAmI() string
+	WhoAmI() (string, error)
 
 	// Lookup should return the server the request belongs to
-	Lookup(string) string
+	Lookup(string) (string, error)
 }
 
 // Options for the creation of a forwarder
@@ -47,7 +50,6 @@ type Options struct {
 	RerouteRetries bool
 	RetrySchedule  []time.Duration
 	Timeout        time.Duration
-	Logger         log.Logger
 }
 
 func (f *Forwarder) defaultOptions() *Options {
@@ -55,7 +57,6 @@ func (f *Forwarder) defaultOptions() *Options {
 		MaxRetries:    3,
 		RetrySchedule: []time.Duration{3 * time.Second, 6 * time.Second, 12 * time.Second},
 		Timeout:       3 * time.Second,
-		Logger:        f.logger,
 	}
 }
 
@@ -77,27 +78,27 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 		merged.RetrySchedule = def.RetrySchedule
 	}
 
-	merged.Logger = opts.Logger
-	if opts.Logger == nil {
-		merged.Logger = def.Logger
-	}
-
 	return &merged
 }
 
 // A Forwarder is used to forward requests to their destinations
 type Forwarder struct {
 	sender  Sender
-	channel tchannel.Registrar
+	channel shared.SubChannel
 	logger  log.Logger
+
+	inflightLock sync.Mutex
+	inflight     int64
+
+	listeners []events.EventListener
 }
 
 // NewForwarder returns a new forwarder
-func NewForwarder(s Sender, ch tchannel.Registrar, logger log.Logger) *Forwarder {
-	if logger == nil {
-		logger = log.NewLoggerFromLogrus(&logrus.Logger{
-			Out: ioutil.Discard,
-		})
+func NewForwarder(s Sender, ch shared.SubChannel) *Forwarder {
+
+	logger := logging.Logger("forwarder")
+	if identity, err := s.WhoAmI(); err == nil {
+		logger = logger.WithField("local", identity)
 	}
 
 	return &Forwarder{
@@ -107,13 +108,94 @@ func NewForwarder(s Sender, ch tchannel.Registrar, logger log.Logger) *Forwarder
 	}
 }
 
+func (f *Forwarder) emit(event events.Event) {
+	for _, listener := range f.listeners {
+		go listener.HandleEvent(event)
+	}
+}
+
+// RegisterListener adds a listener to the forwarder. The listener's HandleEvent
+// will be called for every emit on Forwarder. The HandleEvent method must be thread safe
+func (f *Forwarder) RegisterListener(l events.EventListener) {
+	f.listeners = append(f.listeners, l)
+}
+
+func (f *Forwarder) incrementInflight() {
+	f.inflightLock.Lock()
+	f.inflight++
+	inflight := f.inflight
+	f.inflightLock.Unlock()
+
+	f.emit(InflightRequestsChangedEvent{inflight})
+}
+
+func (f *Forwarder) decrementInflight() {
+	f.inflightLock.Lock()
+	pre := f.inflight
+	f.inflight--
+
+	// make sure that we do not decrement below 0
+	if f.inflight < 0 {
+		f.inflight = 0
+		f.emit(InflightRequestsMiscountEvent{InflightDecrement})
+	}
+
+	inflight := f.inflight
+	f.inflightLock.Unlock()
+
+	if pre != inflight {
+		f.emit(InflightRequestsChangedEvent{inflight})
+	}
+}
+
 // ForwardRequest forwards a request to the given service and endpoint returns the response.
 // Keys are used by the sender to lookup the destination on retry. If you have multiple keys
 // and their destinations diverge on a retry then the call is aborted.
 func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoint string,
 	keys []string, format tchannel.Format, opts *Options) ([]byte, error) {
 
+	f.emit(RequestForwardedEvent{})
+
+	f.incrementInflight()
 	opts = f.mergeDefaultOptions(opts)
-	rs := newRequestSender(f.sender, f.channel, request, keys, destination, service, endpoint, format, opts)
-	return rs.Send()
+	rs := newRequestSender(f.sender, f, f.channel, request, keys, destination, service, endpoint, format, opts)
+	b, err := rs.Send()
+	f.decrementInflight()
+
+	if err != nil {
+		f.emit(FailedEvent{})
+	} else {
+		f.emit(SuccessEvent{})
+	}
+
+	return b, err
+}
+
+var (
+	forwardedHeaderName  = "ringpop-forwarded"
+	staticForwardHeaders = map[string]string{forwardedHeaderName: "true"}
+)
+
+// SetForwardedHeader adds a header to the current thrift context indicating
+// that the call has been forwarded by another node in the ringpop ring.
+// This header is used when a remote call is received to determine if forwarding
+// checks needs to be applied. By not forwarding already forwarded calls we
+// prevent unbound forwarding in the ring in case of memebership disagreement.
+func SetForwardedHeader(ctx thrift.Context) thrift.Context {
+	headers := ctx.Headers()
+	if len(headers) == 0 {
+		return thrift.WithHeaders(ctx, staticForwardHeaders)
+	}
+
+	headers[forwardedHeaderName] = "true"
+	return thrift.WithHeaders(ctx, headers)
+}
+
+// HasForwardedHeader takes the headers that came in via TChannel and looks for
+// the precense of a specific ringpop header to see if ringpop already forwarded
+// the message. When a message has already been forwarded by ringpop the
+// forwarding logic should not be used to prevent unbound forwarding.
+func HasForwardedHeader(ctx thrift.Context) bool {
+	_, ok := ctx.Headers()[forwardedHeaderName]
+	return ok
 }

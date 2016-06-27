@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"golang.org/x/net/context"
@@ -43,16 +44,16 @@ type dummySender struct {
 	lookupN []string
 }
 
-func (d dummySender) WhoAmI() string {
-	return d.local
+func (d dummySender) WhoAmI() (string, error) {
+	return d.local, nil
 }
 
-func (d dummySender) Lookup(key string) string {
-	return d.lookup
+func (d dummySender) Lookup(key string) (string, error) {
+	return d.lookup, nil
 }
 
-func (d dummySender) LookupN(key string, n int) []string {
-	return d.lookupN
+func (d dummySender) LookupN(key string, n int) ([]string, error) {
+	return d.lookupN, nil
 }
 
 type ReplicatorTestSuite struct {
@@ -113,7 +114,7 @@ func (s *ReplicatorTestSuite) ResetLookupN() {
 	s.sender.lookupN = lookupN
 }
 
-func (s *ReplicatorTestSuite) RegisterHandler(ch tchannel.Registrar, address string) {
+func (s *ReplicatorTestSuite) RegisterHandler(ch shared.SubChannel, address string) {
 	handler := map[string]interface{}{
 		"/ping": func(ctx json.Context, ping *Ping) (*Pong, error) {
 			s.Equal(ping.From, "127.0.0.1:3001")
@@ -137,7 +138,8 @@ func (s *ReplicatorTestSuite) TestRead() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var dests = s.sender.LookupN("key", 3)
+	var dests, err = s.sender.LookupN("key", 3)
+	s.NoError(err)
 
 	// parallel
 	responses, err := s.replicator.Read([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, nil)
@@ -177,7 +179,8 @@ func (s *ReplicatorTestSuite) TestMultipleKeys() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var dests = s.sender.LookupN("key", 3)
+	var dests, err = s.sender.LookupN("key", 3)
+	s.NoError(err)
 
 	// parallel
 	responses, err := s.replicator.Read([]string{"key1", "key2"}, ping.Bytes(), "/ping", foptsTimeout, nil)
@@ -197,7 +200,8 @@ func (s *ReplicatorTestSuite) TestWrite() {
 	s.ResetLookupN()
 
 	var ping = Ping{From: "127.0.0.1:3001"}
-	var dests = s.sender.LookupN("key", 3)
+	var dests, err = s.sender.LookupN("key", 3)
+	s.NoError(err)
 
 	// parallel
 	responses, err := s.replicator.Write([]string{"key"}, ping.Bytes(), "/ping", foptsTimeout, nil)

@@ -26,6 +26,8 @@ import (
 	"time"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -44,6 +46,7 @@ type pingRequestSender struct {
 	peer    string
 	target  string
 	timeout time.Duration
+	logger  log.Logger
 }
 
 // NewPingRequestSender returns a new PingRequestSender
@@ -53,23 +56,27 @@ func newPingRequestSender(node *Node, peer, target string, timeout time.Duration
 		peer:    peer,
 		target:  target,
 		timeout: timeout,
+		logger:  logging.Logger("ping").WithField("local", node.Address()),
 	}
 
 	return p
 }
 
 func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
-	p.node.log.WithFields(log.Fields{
+	p.logger.WithFields(log.Fields{
 		"peer":   p.peer,
 		"target": p.target,
 	}).Debug("ping request send")
 
-	ctx, cancel := json.NewContext(p.timeout)
+	ctx, cancel := shared.NewTChannelContext(p.timeout)
 	defer cancel()
 
 	var res pingResponse
 	select {
 	case err := <-p.MakeCall(ctx, &res):
+		if err == nil {
+			p.node.memberlist.Update(res.Changes)
+		}
 		return &res, err
 
 	case <-ctx.Done(): // call timed out
@@ -84,18 +91,19 @@ func (p *pingRequestSender) MakeCall(ctx json.Context, res *pingResponse) <-chan
 	go func() {
 		defer close(errC)
 
-		peer := p.node.channel.Peers().GetOrAdd(p.peer)
-
+		changes, bumpPiggybackCounters := p.node.disseminator.IssueAsSender()
 		req := &pingRequest{
 			Source:            p.node.Address(),
 			SourceIncarnation: p.node.Incarnation(),
 			Checksum:          p.node.memberlist.Checksum(),
-			Changes:           p.node.disseminator.IssueAsSender(),
+			Changes:           changes,
 			Target:            p.target,
 		}
 
+		peer := p.node.channel.Peers().GetOrAdd(p.peer)
 		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping-req", req, &res)
 		if err != nil {
+			bumpPiggybackCounters()
 			errC <- err
 			return
 		}
@@ -104,6 +112,29 @@ func (p *pingRequestSender) MakeCall(ctx json.Context, res *pingResponse) <-chan
 	}()
 
 	return errC
+}
+
+// indirectPing is used to check if a target node can be reached indirectly.
+// The indirectPing is performed by sending a specifiable amount of ping
+// requests nodes in n's membership.
+func indirectPing(n *Node, target string, amount int, timeout time.Duration) (reached bool, errs []error) {
+	resCh := sendPingRequests(n, target, amount, timeout)
+
+	// wait for responses from the ping-reqs
+	for result := range resCh {
+		switch res := result.(type) {
+		case *pingResponse:
+			if res.Ok {
+				return true, errs
+			}
+			// If the ping to the target was not-ok we want to wait for more results.
+
+		case error:
+			errs = append(errs, res)
+		}
+	}
+
+	return false, errs
 }
 
 // sendPingRequests sends ping requests to the target address and returns a channel
@@ -131,28 +162,39 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 		wg.Add(1)
 
 		go func(peer Member) {
+			defer wg.Done()
+
 			p := newPingRequestSender(node, peer.Address, target, timeout)
 
-			p.node.log.WithFields(log.Fields{
+			p.logger.WithFields(log.Fields{
 				"peer":   peer.Address,
 				"target": p.target,
 			}).Debug("sending ping request")
 
 			var startTime = time.Now()
 			res, err := p.SendPingRequest()
+
 			if err != nil {
-				resC <- err
-			} else {
-				node.emit(PingRequestsSendCompleteEvent{
-					Local:    node.Address(),
-					Target:   target,
-					Peers:    peerAddresses,
-					Duration: time.Now().Sub(startTime),
+				node.emit(PingRequestSendErrorEvent{
+					Local:  node.Address(),
+					Target: target,
+					Peers:  peerAddresses,
+					Peer:   peer.Address,
 				})
-				resC <- res
+
+				resC <- err
+				return
 			}
 
-			wg.Done()
+			node.emit(PingRequestsSendCompleteEvent{
+				Local:    node.Address(),
+				Target:   target,
+				Peers:    peerAddresses,
+				Peer:     peer.Address,
+				Duration: time.Now().Sub(startTime),
+			})
+
+			resC <- res
 		}(*peer)
 	}
 

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go/json"
 )
 
@@ -41,7 +42,7 @@ type tapResponse struct {
 
 // tapRemoteRing taps on the ring and gets the info from the remote node
 func tapRemoteRing(host string, remoteApp string, rp *Ringpop) ([]string, uint32, error) {
-	ctx, cancel := json.NewContext(3 * time.Second)
+	ctx, cancel := shared.NewTChannelContext(5 * time.Second)
 	defer cancel()
 
 	var resp tapResponse
@@ -63,13 +64,13 @@ func sendTap(ctx json.Context, rp *Ringpop, remoteNode string, remoteAppName str
 	go func() {
 		defer close(errC)
 
-		peer := rp.channel.Peers().GetOrAdd(remoteNode)
+		peer := rp.subChannel.Peers().GetOrAdd(remoteNode)
 
 		req := &tapRequest{
 			Checksum: rp.ring.Checksum(),
 		}
 
-		err := json.CallPeer(ctx, peer, rp.channel.ServiceName(), fmt.Sprintf("/%s/tapring", remoteAppName), req, res)
+		err := json.CallPeer(ctx, peer, rp.subChannel.ServiceName(), fmt.Sprintf("/%s/tapring", remoteAppName), req, res)
 		if err != nil {
 			errC <- err
 			return
@@ -91,7 +92,7 @@ func handleTapRing(rp *Ringpop, req *tapRequest) *tapResponse {
 	}
 	if req.Checksum != rp.ring.Checksum() {
 		res.Checksum = rp.ring.Checksum()
-		res.Servers = rp.ring.GetServers()
+		res.Servers = rp.ring.Servers()
 	}
 	return res
 }

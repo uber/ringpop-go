@@ -29,8 +29,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
-	"github.com/uber/ringpop-go/swim/util"
+	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/util"
 )
 
 // A memberlist contains the membership for a node
@@ -44,12 +47,23 @@ type memberlist struct {
 		checksum  uint32
 		sync.RWMutex
 	}
+
+	logger bark.Logger
+
+	// TODO: rework locking in ringpop-go (see #113). Required for Update().
+
+	// Updates to membership list and hash ring should happen atomically. We
+	// could use members lock for that, but that introduces more deadlocks, so
+	// making a short-term fix instead by adding another lock. Like said, this
+	// is short-term, see github#113.
+	sync.Mutex
 }
 
 // newMemberlist returns a new member list
 func newMemberlist(n *Node) *memberlist {
 	m := &memberlist{
-		node: n,
+		node:   n,
+		logger: logging.Logger("membership").WithField("local", n.address),
 	}
 
 	m.members.byAddress = make(map[string]*Member)
@@ -70,11 +84,21 @@ func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
 	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
+	oldChecksum := m.members.checksum
 	m.members.checksum = checksum
 	m.members.Unlock()
+
+	if oldChecksum != checksum {
+		m.logger.WithFields(bark.Fields{
+			"checksum":    checksum,
+			"oldChecksum": oldChecksum,
+		}).Debug("ringpop membership computed new checksum")
+	}
+
 	m.node.emit(ChecksumComputeEvent{
-		Duration: time.Now().Sub(startTime),
-		Checksum: checksum,
+		Duration:    time.Now().Sub(startTime),
+		Checksum:    checksum,
+		OldChecksum: oldChecksum,
 	})
 }
 
@@ -175,19 +199,29 @@ func (m *memberlist) GetMembers() (members []Member) {
 	return
 }
 
+// Reincarnate sets the status of the node to Alive and updates the incarnation
+// number. It adds the change to the disseminator as well.
+func (m *memberlist) Reincarnate() []Change {
+	return m.MakeAlive(m.node.address, nowInMillis(m.node.clock))
+}
+
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Alive})
 	return m.MakeChange(address, incarnation, Alive)
 }
 
 func (m *memberlist) MakeSuspect(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Suspect})
 	return m.MakeChange(address, incarnation, Suspect)
 }
 
 func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Faulty})
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
 func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
+	m.node.emit(MakeNodeStatusEvent{Leave})
 	return m.MakeChange(address, incarnation, Leave)
 }
 
@@ -201,7 +235,7 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		}
 	}
 
-	return m.Update([]Change{Change{
+	changes := m.Update([]Change{Change{
 		Source:            m.local.Address,
 		SourceIncarnation: m.local.Incarnation,
 		Address:           address,
@@ -209,6 +243,14 @@ func (m *memberlist) MakeChange(address string, incarnation int64, status string
 		Status:            status,
 		Timestamp:         util.Timestamp(time.Now()),
 	}})
+
+	if len(changes) > 0 {
+		m.logger.WithFields(bark.Fields{
+			"update": changes[0],
+		}).Debugf("ringpop member declares other member %s", changes[0].Status)
+	}
+
+	return changes
 }
 
 // updates the member list with the slice of changes, applying selectively
@@ -219,6 +261,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
+	m.Lock()
 	m.members.Lock()
 
 	for _, change := range changes {
@@ -233,11 +276,12 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 		// if change is local override, reassert member is alive
 		if member.localOverride(m.node.Address(), change) {
+			m.node.emit(RefuteUpdateEvent{})
 			overrideChange := Change{
 				Source:            change.Source,
 				SourceIncarnation: change.SourceIncarnation,
 				Address:           change.Address,
-				Incarnation:       util.TimeNowMS(),
+				Incarnation:       nowInMillis(m.node.clock),
 				Status:            Alive,
 				Timestamp:         util.Timestamp(time.Now()),
 			}
@@ -259,6 +303,15 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	if len(applied) > 0 {
 		oldChecksum := m.Checksum()
 		m.ComputeChecksum()
+
+		for _, change := range applied {
+			if change.Source != m.node.address {
+				m.logger.WithFields(bark.Fields{
+					"remote": change.Source,
+				}).Debug("ringpop applied remote update")
+			}
+		}
+
 		m.node.emit(MemberlistChangesAppliedEvent{
 			Changes:     applied,
 			OldChecksum: oldChecksum,
@@ -269,7 +322,24 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		m.node.rollup.TrackUpdates(applied)
 	}
 
+	m.Unlock()
 	return applied
+}
+
+// AddJoinList adds the list to the membership with the Update
+// function. However, as a side effect, Update adds changes to
+// the disseminator as well. Since we don't want to disseminate
+// the potentially very large join lists, we clear all the
+// changes from the disseminator, except for the one change
+// that refers to the make-alive of this node.
+func (m *memberlist) AddJoinList(list []Change) {
+	applied := m.Update(list)
+	for _, member := range applied {
+		if member.Address == m.node.Address() {
+			continue
+		}
+		m.node.disseminator.ClearChange(member.Address)
+	}
 }
 
 // gets a random position in [0, length of member list)
@@ -301,8 +371,10 @@ func (m *memberlist) Apply(change Change) {
 		m.members.list = append(m.members.list[:i], append([]*Member{member}, m.members.list[i:]...)...)
 	}
 
+	member.Lock()
 	member.Status = change.Status
 	member.Incarnation = change.Incarnation
+	member.Unlock()
 }
 
 // shuffles the member list
@@ -323,4 +395,38 @@ func (m *memberlist) String() string {
 // Iter returns a MemberlistIter for the Memberlist
 func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
+}
+
+func (m *memberlist) GetReachableMembers() []string {
+	var active []string
+
+	m.members.RLock()
+	for _, member := range m.members.list {
+		if member.isReachable() {
+			active = append(active, member.Address)
+		}
+	}
+	m.members.RUnlock()
+
+	return active
+}
+
+func (m *memberlist) CountReachableMembers() int {
+	count := 0
+
+	m.members.RLock()
+	for _, member := range m.members.list {
+		if member.isReachable() {
+			count++
+		}
+	}
+	m.members.RUnlock()
+
+	return count
+}
+
+// nowInMillis is a utility function that call Now on the clock and converts it
+// to milliseconds.
+func nowInMillis(c clock.Clock) int64 {
+	return c.Now().UnixNano() / int64(time.Millisecond)
 }

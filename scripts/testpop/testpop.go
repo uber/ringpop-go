@@ -26,6 +26,8 @@ import (
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
+	"github.com/uber/ringpop-go/swim"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber/tchannel-go"
@@ -54,16 +56,18 @@ func main() {
 	if *verbose {
 		logger.Level = log.DebugLevel
 	}
-	rp := ringpop.NewRingpop("ringpop", *hostport, ch, &ringpop.Options{
-		Logger: bark.NewLoggerFromLogrus(logger),
-	})
+	rp, _ := ringpop.New("ringpop",
+		ringpop.Channel(ch),
+		ringpop.Identity(*hostport),
+		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
+	)
 
-	if err := ch.ListenAndServe(rp.WhoAmI()); err != nil {
-		log.Fatalf("could not listen on %s: %v", rp.WhoAmI(), err)
+	if err := ch.ListenAndServe(*hostport); err != nil {
+		log.Fatalf("could not listen on %s: %v", *hostport, err)
 	}
 
-	opts := &ringpop.BootstrapOptions{}
-	opts.File = *hostfile
+	opts := &swim.BootstrapOptions{}
+	opts.DiscoverProvider = jsonfile.New(*hostfile)
 
 	_, err = rp.Bootstrap(opts)
 	if err != nil {

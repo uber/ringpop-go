@@ -18,101 +18,70 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Package ringpop brings cooperation and coordination to applications that would
-// otherwise run as a set of independent worker processes.
-//
-// Ringpop implements a membership protocol that allows those workers to discover
-// one another and use the communication channels established between them as a
-// means of disseminating information, detecting failure, and ultimately converging
-// on a consistent membership list. Consistent hashing is then applied on top of
-// that list and gives an application the ability to define predictable behavior
-// and data storage facilities within a custom keyspace. The keyspace is partitioned
-// and evenly assigned to the individual instances of an application. Clients of
-// the application remain simple and need not know of the underlying cooperation
-// between workers nor chosen partitioning scheme. A request can be sent to any
-// instance, and Ringpop intelligently forwards the request to the “correct” instance
-// as defined by a hash ring lookup.
-//
-// Ringpop makes it possible to build extremely scalable and fault-tolerant distributed
-// systems with 3 main capabilities: membership protocol, consistent hashing, and forwarding.
+// Package ringpop is a library that maintains a consistent hash ring atop a
+// gossip-based membership protocol. It can be used by applications to
+// arbitrarily shard data in a scalable and fault-tolerant manner.
 package ringpop
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/apache/thrift/lib/go/thrift"
+	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 )
 
-// Options to create a Ringpop with
-type Options struct {
-	Logger        log.Logger
-	Statter       log.StatsReporter
-	ReplicaPoints int
+// Interface specifies the public facing methods a user of ringpop is able to
+// use.
+type Interface interface {
+	Destroy()
+	App() string
+	WhoAmI() (string, error)
+	Uptime() (time.Duration, error)
+	RegisterListener(l events.EventListener)
+	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
+	Checksum() (uint32, error)
+	Lookup(key string) (string, error)
+	LookupN(key string, n int) ([]string, error)
+	GetReachableMembers() ([]string, error)
+	CountReachableMembers() (int, error)
+
+	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
+	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
 }
 
-func defaultOptions() *Options {
-	logger := log.NewLoggerFromLogrus(&logrus.Logger{
-		Out: ioutil.Discard,
-	})
-
-	opts := &Options{
-		Logger:        logger,
-		Statter:       new(noopStatsReporter),
-		ReplicaPoints: 100,
-	}
-
-	return opts
-}
-
-func mergeDefault(opts *Options) *Options {
-	def := defaultOptions()
-
-	if opts == nil {
-		return def
-	}
-
-	if opts.Logger == nil {
-		opts.Logger = def.Logger
-	}
-
-	if opts.Statter == nil {
-		opts.Statter = def.Statter
-	}
-
-	if opts.ReplicaPoints <= 0 {
-		opts.ReplicaPoints = def.ReplicaPoints
-	}
-
-	return opts
-}
-
-// Ringpop is a consistent hash-ring that uses a gossip prtocol to disseminate changes around the
-// ring
+// Ringpop is a consistent hashring that uses a gossip protocol to disseminate
+// changes around the ring.
 type Ringpop struct {
-	app     string
-	address string
+	config         *configuration
+	configHashRing *hashring.Configuration
 
-	state struct {
-		read, destroyed bool
-		sync.RWMutex
-	}
+	identityResolver IdentityResolver
 
-	channel   tchannel.Registrar
-	node      *swim.Node
-	ring      *hashRing
-	forwarder *forward.Forwarder
+	state      state
+	stateMutex sync.RWMutex
 
-	listeners []EventListener
+	clock clock.Clock
+
+	channel    shared.TChannel
+	subChannel shared.SubChannel
+	node       swim.NodeInterface
+	ring       *hashring.HashRing
+	forwarder  *forward.Forwarder
+
+	listeners []events.EventListener
 
 	statter log.StatsReporter
 	stats   struct {
@@ -124,75 +93,208 @@ type Ringpop struct {
 	}
 
 	logger log.Logger
-	log    log.Logger
 
+	tickers   chan *clock.Ticker
 	startTime time.Time
 }
 
-// NewRingpop returns a new Ringpop instance
-func NewRingpop(app, address string, channel *tchannel.Channel, opts *Options) *Ringpop {
-	opts = mergeDefault(opts)
+// state represents the internal state of a Ringpop instance.
+type state uint
+
+const (
+	// created means the Ringpop instance has been created but the swim node,
+	// stats and hasring haven't been set up. The listen address has not been
+	// resolved yet either.
+	created state = iota
+	// initialized means the listen address has been resolved and the swim
+	// node, stats and hashring have been instantiated onto the Ringpop
+	// instance.
+	initialized
+	// ready means Bootstrap has been called, the ring has successfully
+	// bootstrapped and is now ready to receive requests.
+	ready
+	// destroyed means the Ringpop instance has been shut down, is no longer
+	// ready for requests and cannot be revived.
+	destroyed
+)
+
+// New returns a new Ringpop instance.
+func New(app string, opts ...Option) (*Ringpop, error) {
+	var err error
 
 	ringpop := &Ringpop{
-		app:     app,
-		address: address,
-		logger:  opts.Logger,
-		log:     opts.Logger.WithField("local", address),
-		statter: opts.Statter,
+		config: &configuration{
+			App: app,
+		},
+		logger: logging.Logger("ringpop"),
 	}
 
-	if channel != nil {
-		ringpop.channel = channel.GetSubChannel("ringpop", tchannel.Isolated)
-		ringpop.registerHandlers()
+	err = applyOptions(ringpop, defaultOptions)
+	if err != nil {
+		panic(fmt.Errorf("Error applying default Ringpop options: %v", err))
 	}
 
-	ringpop.node = swim.NewNode(app, address, ringpop.channel, &swim.Options{
-		Logger: ringpop.logger,
+	err = applyOptions(ringpop, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	errs := checkOptions(ringpop)
+	if len(errs) != 0 {
+		return nil, fmt.Errorf("%v", errs)
+	}
+
+	ringpop.setState(created)
+
+	return ringpop, nil
+}
+
+// init configures a Ringpop instance and makes it ready to do comms.
+func (rp *Ringpop) init() error {
+	if rp.channel == nil {
+		return errors.New("Missing channel")
+	}
+
+	address, err := rp.identity()
+	if err != nil {
+		return err
+	}
+
+	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
+
+	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
+		Clock: rp.clock,
 	})
-	ringpop.node.RegisterListener(ringpop)
+	rp.node.RegisterListener(rp)
 
-	ringpop.ring = newHashRing(ringpop, farm.Fingerprint32, opts.ReplicaPoints)
+	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	rp.ring.RegisterListener(rp)
 
-	ringpop.stats.hostport = genStatsHostport(ringpop.address)
-	ringpop.stats.prefix = fmt.Sprintf("ringpop.%s", ringpop.stats.hostport)
-	ringpop.stats.keys = make(map[string]string)
+	rp.stats.hostport = genStatsHostport(address)
+	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
+	rp.stats.keys = make(map[string]string)
 
-	ringpop.forwarder = forward.NewForwarder(ringpop, ringpop.channel, ringpop.logger)
+	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
+	rp.forwarder.RegisterListener(rp)
 
-	return ringpop
+	rp.startTimers()
+	rp.setState(initialized)
+
+	return nil
 }
 
-// Destroy Ringpop
+// initHandlers is used to initialize the handlers
+func (rp *Ringpop) initHandlers() {
+	rp.registerHandlers()
+}
+
+// Starts periodic timers in a single goroutine. Can be turned back off via
+// stopTimers. At present, only 1 timer exists, to emit ring.checksum-periodic.
+func (rp *Ringpop) startTimers() {
+	if rp.tickers != nil {
+		return
+	}
+	rp.tickers = make(chan *clock.Ticker, 32) // 32 == max number of tickers
+
+	if rp.config.MembershipChecksumStatPeriod != StatPeriodNever {
+		ticker := rp.clock.Ticker(rp.config.MembershipChecksumStatPeriod)
+		rp.tickers <- ticker
+		go func() {
+			for _ = range ticker.C {
+				rp.statter.UpdateGauge(
+					rp.getStatKey("membership.checksum-periodic"),
+					nil,
+					int64(rp.node.GetChecksum()))
+			}
+		}()
+	}
+
+	if rp.config.RingChecksumStatPeriod != StatPeriodNever {
+		ticker := rp.clock.Ticker(rp.config.RingChecksumStatPeriod)
+		rp.tickers <- ticker
+		go func() {
+			for _ = range ticker.C {
+				rp.statter.UpdateGauge(
+					rp.getStatKey("ring.checksum-periodic"),
+					nil,
+					int64(rp.ring.Checksum()))
+			}
+		}()
+	}
+}
+
+func (rp *Ringpop) stopTimers() {
+	if rp.tickers != nil {
+		close(rp.tickers)
+		for ticker := range rp.tickers {
+			ticker.Stop()
+		}
+		rp.tickers = nil
+	}
+}
+
+// identity returns a host:port string of the address that Ringpop should
+// use as its identifier.
+func (rp *Ringpop) identity() (string, error) {
+	return rp.identityResolver()
+}
+
+// r.channelIdentityResolver resolves the hostport identity from the current
+// TChannel object on the Ringpop instance.
+func (rp *Ringpop) channelIdentityResolver() (string, error) {
+	peerInfo := rp.channel.PeerInfo()
+	// Check that TChannel is listening on a real hostport. By default,
+	// TChannel listens on an ephemeral host/port. The real port is then
+	// assigned by the OS when ListenAndServe is called. If the hostport is
+	// ephemeral, it means TChannel is not yet listening and the hostport
+	// cannot be resolved.
+	if peerInfo.IsEphemeralHostPort() {
+		return "", ErrEphemeralIdentity
+	}
+	return peerInfo.HostPort, nil
+}
+
+// Destroy stops all communication. Note that this does not close the TChannel
+// instance that was passed to Ringpop in the constructor. Once an instance is
+// destroyed, it cannot be restarted.
 func (rp *Ringpop) Destroy() {
-	rp.node.Destroy()
+	if rp.node != nil {
+		rp.node.Destroy()
+	}
 
-	rp.state.Lock()
-	rp.state.destroyed = true
-	rp.state.Unlock()
+	rp.stopTimers()
+
+	rp.setState(destroyed)
 }
 
-// Destroyed returns
-func (rp *Ringpop) Destroyed() bool {
-	rp.state.Lock()
-	destroyed := rp.state.destroyed
-	rp.state.Unlock()
-
-	return destroyed
+// destroyed returns
+func (rp *Ringpop) destroyed() bool {
+	return rp.getState() == destroyed
 }
 
-// App returns the app the ringpop belongs to
+// App returns the name of the application this Ringpop instance belongs to.
+// The application name is set in the constructor when the Ringpop instance is
+// created.
 func (rp *Ringpop) App() string {
-	return rp.app
+	return rp.config.App
 }
 
-// WhoAmI returns the local address of the Ringpop node
-func (rp *Ringpop) WhoAmI() string {
-	return rp.address
+// WhoAmI returns the address of the current/local Ringpop node. It returns an
+// error if Ringpop is not yet initialized/bootstrapped.
+func (rp *Ringpop) WhoAmI() (string, error) {
+	if !rp.Ready() {
+		return "", ErrNotBootstrapped
+	}
+	return rp.identity()
 }
 
-// Uptime returns the amount of time that the ringpop has been running for
-func (rp *Ringpop) Uptime() time.Duration {
-	return time.Now().Sub(rp.startTime)
+// Uptime returns the amount of time that this Ringpop instance has been
+// bootstrapped for.
+func (rp *Ringpop) Uptime() (time.Duration, error) {
+	if !rp.Ready() {
+		return 0, ErrNotBootstrapped
+	}
+	return time.Now().Sub(rp.startTime), nil
 }
 
 func (rp *Ringpop) emit(event interface{}) {
@@ -202,9 +304,24 @@ func (rp *Ringpop) emit(event interface{}) {
 }
 
 // RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
-// should be thread safe
-func (rp *Ringpop) RegisterListener(l EventListener) {
+// should be thread safe.
+func (rp *Ringpop) RegisterListener(l events.EventListener) {
 	rp.listeners = append(rp.listeners, l)
+}
+
+// getState gets the state of the current Ringpop instance.
+func (rp *Ringpop) getState() state {
+	rp.stateMutex.RLock()
+	r := rp.state
+	rp.stateMutex.RUnlock()
+	return r
+}
+
+// setState sets the state of the current Ringpop instance.
+func (rp *Ringpop) setState(s state) {
+	rp.stateMutex.Lock()
+	rp.state = s
+	rp.stateMutex.Unlock()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -213,21 +330,58 @@ func (rp *Ringpop) RegisterListener(l EventListener) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// BootstrapOptions are used to bootstrap the ringpop
-type BootstrapOptions struct {
-	swim.BootstrapOptions
-}
+// Bootstrap starts communication for this Ringpop instance.
+//
+// When Bootstrap is called, this Ringpop instance will attempt to contact
+// other instances from the DiscoverProvider.
+//
+// If no seed hosts are provided, a single-node cluster will be created.
+func (rp *Ringpop) Bootstrap(bootstrapOpts *swim.BootstrapOptions) ([]string, error) {
+	if rp.getState() < initialized {
+		err := rp.init()
+		rp.initHandlers()
+		if err != nil {
+			return nil, err
+		}
+	}
 
-// Bootstrap starts the Ringpop
-func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
-	joined, err := rp.node.Bootstrap(&opts.BootstrapOptions)
+	joined, err := rp.node.Bootstrap(bootstrapOpts)
 	if err != nil {
-		rp.log.WithField("error", err).Info("bootstrap failed")
+		rp.logger.WithField("error", err).Info("bootstrap failed")
+		rp.setState(initialized)
 		return nil, err
 	}
 
-	rp.log.WithField("joined", joined).Info("bootstrap complete")
+	rp.setState(ready)
+
+	rp.logger.WithField("joined", joined).Info("bootstrap complete")
 	return joined, nil
+}
+
+// Ready returns whether or not ringpop is bootstrapped and ready to receive
+// requests.
+func (rp *Ringpop) Ready() bool {
+	if rp.getState() != ready {
+		return false
+	}
+	return rp.node.Ready()
+}
+
+// TapRingInit is the routine which is used to initialize a tap ring instance
+func (rp *Ringpop) TapRingInit() error {
+	if rp.getState() < initialized {
+		err := rp.init()
+		if err != nil {
+			rp.logger.Errorf("error initing ring: %v", err)
+			return err
+		}
+	}
+
+	// set the state of ringpop instance and the SWIM instance as ready
+	rp.node.SetReady()
+	rp.setState(ready)
+
+	return nil
 }
 
 // TapRing attaches pulls the ring state from the given
@@ -236,13 +390,13 @@ func (rp *Ringpop) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 func (rp *Ringpop) TapRing(host string, remoteApp string) error {
 	servers, checksum, err := tapRemoteRing(host, remoteApp, rp)
 	if err != nil {
-		rp.log.WithFields(log.Fields{
+		rp.logger.WithFields(log.Fields{
 			"err":  err.Error(),
 			"host": host,
 		}).Info("tapring failed")
 		return err
 	}
-	rp.ring.updateServers(servers, checksum)
+	rp.ring.UpdateServers(servers, checksum)
 	return nil
 }
 
@@ -253,7 +407,7 @@ func (rp *Ringpop) TapRing(host string, remoteApp string) error {
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
 // HandleEvent is used to satisfy the swim.EventListener interface. No touchy.
-func (rp *Ringpop) HandleEvent(event interface{}) {
+func (rp *Ringpop) HandleEvent(event events.Event) {
 	rp.emit(event)
 
 	switch event := event.(type) {
@@ -269,18 +423,33 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
 		rp.handleChanges(event.Changes)
+		for _, change := range event.Changes {
+			status := change.Status
+			if len(status) == 0 {
+				status = "unknown"
+			}
+			rp.statter.IncCounter(rp.getStatKey("membership-set."+status), nil, 1)
+		}
+		mc, err := rp.CountReachableMembers()
+		if err != nil {
+			rp.logger.Errorf("unable to count members of the ring for statting: %q", err)
+		} else {
+			rp.statter.UpdateGauge(rp.getStatKey("num-members"), nil, int64(mc))
+		}
+		rp.statter.IncCounter(rp.getStatKey("updates"), nil, int64(len(event.Changes)))
 
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
 	case swim.MaxPAdjustedEvent:
-		rp.statter.UpdateGauge(rp.getStatKey("max-p"), nil, int64(event.NewPCount))
+		rp.statter.UpdateGauge(rp.getStatKey("max-piggyback"), nil, int64(event.NewPCount))
 
 	case swim.JoinReceiveEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.recv"), nil, 1)
 
 	case swim.JoinCompleteEvent:
 		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
+		rp.statter.IncCounter(rp.getStatKey("join.succeeded"), nil, 1)
 		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
 
 	case swim.PingSendEvent:
@@ -293,7 +462,8 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ping.recv"), nil, 1)
 
 	case swim.PingRequestsSendEvent:
-		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, int64(len(event.Peers)))
+		rp.statter.IncCounter(rp.getStatKey("ping-req.send"), nil, 1)
+		rp.statter.IncCounter(rp.getStatKey("ping-req.other-members"), nil, int64(len(event.Peers)))
 
 	case swim.PingRequestsSendCompleteEvent:
 		rp.statter.RecordTimer(rp.getStatKey("ping-req"), nil, event.Duration)
@@ -302,7 +472,7 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 		rp.statter.IncCounter(rp.getStatKey("ping-req.recv"), nil, 1)
 
 	case swim.PingRequestPingEvent:
-		rp.statter.RecordTimer(rp.getStatKey("ping-req.ping"), nil, event.Duration)
+		rp.statter.RecordTimer(rp.getStatKey("ping-req-ping"), nil, event.Duration)
 
 	case swim.ProtocolDelayComputeEvent:
 		rp.statter.RecordTimer(rp.getStatKey("protocol.delay"), nil, event.Duration)
@@ -313,6 +483,77 @@ func (rp *Ringpop) HandleEvent(event interface{}) {
 	case swim.ChecksumComputeEvent:
 		rp.statter.RecordTimer(rp.getStatKey("compute-checksum"), nil, event.Duration)
 		rp.statter.UpdateGauge(rp.getStatKey("checksum"), nil, int64(event.Checksum))
+		rp.statter.IncCounter(rp.getStatKey("membership.checksum-computed"), nil, 1)
+
+	case swim.ChangesCalculatedEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("changes.disseminate"), nil, int64(len(event.Changes)))
+
+	case swim.ChangeFilteredEvent:
+		rp.statter.IncCounter(rp.getStatKey("filtered-change"), nil, 1)
+
+	case swim.JoinFailedEvent:
+		rp.statter.IncCounter(rp.getStatKey("join.failed."+string(event.Reason)), nil, 1)
+
+	case swim.JoinTriesUpdateEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
+
+	case events.LookupEvent:
+		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
+
+	case swim.MakeNodeStatusEvent:
+		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
+
+	case swim.RequestBeforeReadyEvent:
+		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
+
+	case swim.RefuteUpdateEvent:
+		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
+
+	case events.RingChecksumEvent:
+		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
+		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))
+
+	case events.RingChangedEvent:
+		added := int64(len(event.ServersAdded))
+		removed := int64(len(event.ServersRemoved))
+		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
+		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
+		rp.statter.IncCounter(rp.getStatKey("ring.changed"), nil, 1)
+
+	case forward.RequestForwardedEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.egress"), nil, 1)
+
+	case forward.InflightRequestsChangedEvent:
+		rp.statter.UpdateGauge(rp.getStatKey("requestProxy.inflight"), nil, event.Inflight)
+
+	case forward.InflightRequestsMiscountEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.miscount."+string(event.Operation)), nil, 1)
+
+	case forward.FailedEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.send.error"), nil, 1)
+
+	case forward.SuccessEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.send.success"), nil, 1)
+
+	case forward.MaxRetriesEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.failed"), nil, 1)
+
+	case forward.RetryAttemptEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.attempted"), nil, 1)
+
+	case forward.RetryAbortEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.aborted"), nil, 1)
+
+	case forward.RerouteEvent:
+		me, _ := rp.WhoAmI()
+		if event.NewDestination == me {
+			rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.reroute.local"), nil, 1)
+		} else {
+			rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.reroute.remote"), nil, 1)
+		}
+
+	case forward.RetrySuccessEvent:
+		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.succeeded"), nil, 1)
 	}
 }
 
@@ -337,45 +578,70 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 //
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 
-// Checksum returns the checksum of the ringpop's hashring
-func (rp *Ringpop) Checksum() uint32 {
-	return rp.ring.Checksum()
+// Checksum returns the current checksum of this Ringpop instance's hashring.
+func (rp *Ringpop) Checksum() (uint32, error) {
+	if !rp.Ready() {
+		return 0, ErrNotBootstrapped
+	}
+	return rp.ring.Checksum(), nil
 }
 
-// Lookup hashes a key to a server in the ring
-func (rp *Ringpop) Lookup(key string) string {
+// Lookup returns the address of the server in the ring that is responsible
+// for the specified key. It returns an error if the Ringpop instance is not
+// yet initialized/bootstrapped.
+func (rp *Ringpop) Lookup(key string) (string, error) {
+	if !rp.Ready() {
+		return "", ErrNotBootstrapped
+	}
+
 	startTime := time.Now()
 
-	dest, ok := rp.ring.Lookup(key)
+	dest, success := rp.ring.Lookup(key)
 
-	rp.emit(LookupEvent{key, time.Now().Sub(startTime)})
+	rp.emit(events.LookupEvent{
+		Key:      key,
+		Duration: time.Now().Sub(startTime),
+	})
 
-	if !ok {
-		rp.log.WithField("key", key).Warn("could not find destination for key")
-		return rp.WhoAmI()
+	if !success {
+		err := errors.New("could not find destination for key")
+		rp.logger.WithField("key", key).Warn(err)
+		return "", err
 	}
 
-	return dest
+	return dest, nil
 }
 
-// LookupN hashes a key to N servers in the ring
-func (rp *Ringpop) LookupN(key string, n int) []string {
-	return rp.ring.LookupN(key, n)
-}
-
-func (rp *Ringpop) ringEvent(event interface{}) {
-	rp.emit(event)
-
-	switch event := event.(type) {
-	case RingChecksumEvent:
-		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
-
-	case RingChangedEvent:
-		added := int64(len(event.ServersAdded))
-		removed := int64(len(event.ServersRemoved))
-		rp.statter.IncCounter(rp.getStatKey("ring.server-added"), nil, added)
-		rp.statter.IncCounter(rp.getStatKey("ring.server-removed"), nil, removed)
+// LookupN returns the addresses of all the servers in the ring that are
+// responsible for the specified key. It returns an error if the Ringpop
+// instance is not yet initialized/bootstrapped.
+func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
 	}
+	return rp.ring.LookupN(key, n), nil
+}
+
+func (rp *Ringpop) ringEvent(e interface{}) {
+	rp.HandleEvent(e)
+}
+
+// GetReachableMembers returns a slice of members currently in this instance's
+// membership list that aren't faulty.
+func (rp *Ringpop) GetReachableMembers() ([]string, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
+	}
+	return rp.node.GetReachableMembers(), nil
+}
+
+// CountReachableMembers returns the number of members currently in this
+// instance's membership list that aren't faulty.
+func (rp *Ringpop) CountReachableMembers() (int, error) {
+	if !rp.Ready() {
+		return 0, ErrNotBootstrapped
+	}
+	return rp.node.CountReachableMembers(), nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -409,8 +675,21 @@ func (rp *Ringpop) getStatKey(key string) string {
 func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string,
 	format tchannel.Format, opts *forward.Options) (bool, error) {
 
-	dest := rp.Lookup(key)
-	if dest == rp.WhoAmI() {
+	if !rp.Ready() {
+		return false, ErrNotBootstrapped
+	}
+
+	dest, err := rp.Lookup(key)
+	if err != nil {
+		return false, err
+	}
+
+	identity, err := rp.WhoAmI()
+	if err != nil {
+		return false, err
+	}
+
+	if dest == identity {
 		return true, nil
 	}
 
@@ -431,12 +710,12 @@ func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, 
 // of that struct using the thrift binary protocol. This is a temporary
 // measure before frames can forwarded directly past the endpoint to the proper
 // destinaiton.
-func SerializeThrift(s thrift.TStruct) ([]byte, error) {
+func SerializeThrift(s athrift.TStruct) ([]byte, error) {
 	var b []byte
 	var buffer = bytes.NewBuffer(b)
 
-	transport := thrift.NewStreamTransportW(buffer)
-	if err := s.Write(thrift.NewTBinaryProtocolTransport(transport)); err != nil {
+	transport := athrift.NewStreamTransportW(buffer)
+	if err := s.Write(athrift.NewTBinaryProtocolTransport(transport)); err != nil {
 		return nil, err
 	}
 
@@ -450,8 +729,8 @@ func SerializeThrift(s thrift.TStruct) ([]byte, error) {
 // given thrift struct using the thrift binary protocol. This is a temporary
 // measure before frames can forwarded directly past the endpoint to the proper
 // destinaiton.
-func DeserializeThrift(b []byte, s thrift.TStruct) error {
+func DeserializeThrift(b []byte, s athrift.TStruct) error {
 	reader := bytes.NewReader(b)
-	transport := thrift.NewStreamTransportR(reader)
-	return s.Read(thrift.NewTBinaryProtocolTransport(transport))
+	transport := athrift.NewStreamTransportR(reader)
+	return s.Read(athrift.NewTBinaryProtocolTransport(transport))
 }

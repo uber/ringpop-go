@@ -24,7 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events/test/mocks"
+	"github.com/uber/tchannel-go"
 )
 
 type PingTestSuite struct {
@@ -34,9 +37,9 @@ type PingTestSuite struct {
 }
 
 func (s *PingTestSuite) SetupSuite() {
-	s.tnode = newChannelNode(s.T(), "127.0.0.1:3001")
+	s.tnode = newChannelNode(s.T())
 	s.node = s.tnode.node
-	s.tpeer = newChannelNode(s.T(), "127.0.0.1:3002")
+	s.tpeer = newChannelNode(s.T())
 	s.peer = s.tpeer.node
 
 	bootstrapNodes(s.T(), s.tnode, s.tpeer)
@@ -53,15 +56,45 @@ func (s *PingTestSuite) TestPing() {
 }
 
 func (s *PingTestSuite) TestPingFails() {
-	res, err := sendPing(s.node, "127.0.0.1:3003", time.Second)
-	s.Error(err, "expected ping to pail")
+	// Create a channel with no handlers registered. Any requests to this
+	// channel should result in an error being returned immediately.
+	ch, err := tchannel.NewChannel("test", nil)
+	ch.ListenAndServe("127.0.0.1:0")
+	s.Require().NoError(err, "channel must create successfully")
+
+	res, err := sendPing(s.node, ch.PeerInfo().HostPort, time.Second)
+	s.Error(err, "expected ping to fail")
 	s.Nil(res, "expected response to be nil")
 }
 
 func (s *PingTestSuite) TestPingTimesOut() {
-	res, err := sendPing(s.node, "127.0.0.2:3001", time.Millisecond)
-	s.Error(err, "expected ping to pail")
+	// Set the timeout so low that a ping response could never come back before
+	// the timeout is reached.
+	res, err := sendPing(s.node, s.peer.Address(), time.Nanosecond)
+	s.Error(err, "expected ping to fail")
 	s.Nil(res, "expected response to be nil")
+}
+
+func (s *PingTestSuite) TestPingBeforeReady() {
+	testNode1 := newChannelNode(s.T())
+	defer testNode1.Destroy()
+
+	testNode2 := newChannelNode(s.T())
+	defer testNode2.Destroy()
+
+	// Register listener that should be fired with the correct event type
+	listener := &mocks.EventListener{}
+	listener.On("HandleEvent", mock.AnythingOfType("RequestBeforeReadyEvent"))
+	testNode2.node.RegisterListener(listener)
+
+	res, err := sendPing(testNode1.node, testNode2.node.Address(), 500*time.Millisecond)
+	s.Error(err)
+	s.Nil(res)
+
+	// Assert the event was fired, but after a brief sleep, because the events
+	// are fired in goroutines
+	time.Sleep(10 * time.Millisecond)
+	listener.AssertExpectations(s.T())
 }
 
 func TestPingTestSuite(t *testing.T) {
