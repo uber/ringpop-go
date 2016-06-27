@@ -1,18 +1,16 @@
 ringpop-go changes
 ==================
 
-Next Release
-------------
-
 v0.6.0
 ------------
 
 * Fix: add 1-buffer for error channels, prevents leaking goroutines. #140
-* Feature: support headers forwarding. #141
-* Feature: testpop takes an additional -stats-udp or -stats-file flag that can be used to emit
-  statsd messages to a file or over the network. #144
+* Feature: support forwarding headers. #141
+* Feature: testpop takes an additional -stats-udp or -stats-file flag that can
+  be used to emit statsd messages to a file or over the network. #144
 * Fix: race condition when loading hostlist in discover provider. #145
-* Testing: add suspect, faulty and tombstope period command-line flags. #148
+* Testing: add suspect, faulty and tombstope period command-line flags to
+  testpop. #148
 * Fix: use oneself as a source when creating a change for reincarnation. #150
 * Maintainability: move from godep to Glide. #151
 * Maintainability: emit lookup and lookupn stats and add a lookupn-event. #152.
