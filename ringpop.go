@@ -186,7 +186,7 @@ func (rp *Ringpop) init() error {
 }
 
 // Starts periodic timers in a single goroutine. Can be turned back off via
-// stopTimers. At present, only 1 timer exists, to emit ring.checksum-periodic.
+// stopTimers.
 func (rp *Ringpop) startTimers() {
 	if rp.tickers != nil {
 		return
