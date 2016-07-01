@@ -6,6 +6,7 @@ declare ringpop_common_branch="master"
 
 #
 # Clones or updates the ringpop-common repository.
+# Runs `npm install` in ringpop-common/$1.
 #
 fetch-ringpop-common() {
     if [ ! -e "$ringpop_common_dir" ]; then
