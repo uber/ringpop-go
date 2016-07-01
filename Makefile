@@ -66,9 +66,15 @@ test-unit:
 	go generate $(NOVENDOR)
 	test/go-test-prettify $(NOVENDOR)
 
+test-examples: _venv/bin/cram vendor
+	. _venv/bin/activate && ./test/run-example-tests
+
 test-race:
 	go generate $(NOVENDOR)
 	test/go-test-prettify -race $(NOVENDOR)
+
+_venv/bin/cram:
+	./scripts/travis/get-cram.sh
 
 testpop:	clean
 	go build ./scripts/testpop/

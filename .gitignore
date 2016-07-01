@@ -4,3 +4,6 @@ hosts.json
 coverage.out
 lint.log
 /vendor/
+/_venv/
+README.md.err
+tick-cluster.log
