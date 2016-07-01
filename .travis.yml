@@ -33,3 +33,6 @@ after_success:
 cache:
   directories:
     - $HOME/.glide/cache
+
+before_cache:
+  - find $HOME/.glide/cache -name ORIG_HEAD -exec rm {} \;
