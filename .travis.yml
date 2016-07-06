@@ -3,6 +3,11 @@ go:
   - 1.6
   - 1.5
 
+addons:
+  apt:
+    packages:
+    - python-virtualenv
+
 install:
   - go get -u github.com/Masterminds/glide
   - go get github.com/axw/gocov/gocov
@@ -11,6 +16,8 @@ install:
   - go get github.com/golang/lint/golint
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
+  - ./scripts/travis/get-cram.sh
+  - npm install -g tcurl
   - make setup
 
 env:
@@ -18,10 +25,13 @@ env:
   - RUN="make test-unit"
   - RUN="make test-integration"
   - RUN="make test-race"
+  - RUN="make test-examples"
 
 matrix:
   allow_failures:
     - env: RUN="make test-race"
+    - env: RUN="make test-examples"
+
   fast_finish: true
 
 script:
@@ -33,6 +43,7 @@ after_success:
 cache:
   directories:
     - $HOME/.glide/cache
+    - _venv
 
 before_cache:  # glide touches ORIG_HEAD on `glide install`
   - find $HOME/.glide/cache -name ORIG_HEAD -exec rm {} \;
