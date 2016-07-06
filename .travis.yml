@@ -33,3 +33,6 @@ after_success:
 cache:
   directories:
     - $HOME/.glide/cache
+
+before_cache:  # glide touches ORIG_HEAD on `glide install`
+  - find $HOME/.glide/cache -name ORIG_HEAD -exec rm {} \;
