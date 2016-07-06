@@ -1,5 +1,7 @@
 A simple ping-pong service implementation that that integrates ringpop to forward requests between nodes.
 
+Note: this file can be [cram][3]-executed using `make test-examples`. That's why some of the example outputs below are a bit unusual.
+
 # Running the example
 
 All commands are relative to this directory:
@@ -39,3 +41,4 @@ Optionally, set the `p` header. This value will be forwarded together with the r
 
 [1]:https://github.com/uber/ringpop-common/
 [2]:https://github.com/uber/tcurl
+[3]:https://pypi.python.org/pypi/cram
