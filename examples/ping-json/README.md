@@ -4,30 +4,30 @@ A simple ping-pong service implementation that that integrates ringpop to forwar
 
 All commands are relative to this directory:
 
-  $ cd ${TESTDIR}  # examples/ping-json
-  $ go build
+    $ cd ${TESTDIR}  # examples/ping-json
+    $ go build
 
 Start a custer of 5 nodes using [tick-cluster][1]:
 
-  $ tick-cluster.js --interface=127.0.0.1 -n 5 ping-json &> tick-cluster.log &
-  $ sleep 5
+    $ tick-cluster.js --interface=127.0.0.1 -n 5 ping-json &> tick-cluster.log &
+    $ sleep 5
 
 Lookup the node `my_key` key belongs to using [tcurl][2]:
 
-  $ tcurl ringpop -P hosts.json /admin/lookup '{"key": "my_key"}'
-  {"ok":true,"head":null,"body":{"dest":"127.0.0.1:300?"},"headers":{"as":"json"},"trace":"*"} (glob)
+    $ tcurl ringpop -P hosts.json /admin/lookup '{"key": "my_key"}'
+    {"ok":true,"head":null,"body":{"dest":"127.0.0.1:300?"},"headers":{"as":"json"},"trace":"*"} (glob)
 
 Call the `/ping` endpoint (multiple times) and see the request being forwarded. Each request is sent to a random node in the cluster because of the `-P hosts.json` argument--but is always handled by the node owning the key. This can be seen in the `from` field of the response:
 
-  $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}'
-  {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","p":""},"headers":{"as":"json"},"trace":"*"} (glob)
+    $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}'
+    {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","p":""},"headers":{"as":"json"},"trace":"*"} (glob)
 
 Optionally, set the `p` header. This value will be forwarded together with the request body to the node owning the key. Its value is returned in the response body in the `pheader` field:
 
-  $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}' --headers '{"p": "my_header"}'
-  {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","pheader":"my_header"},"headers":{"as":"json"},"trace":"*"} (glob)
+    $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}' --headers '{"p": "my_header"}'
+    {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","pheader":"my_header"},"headers":{"as":"json"},"trace":"*"} (glob)
 
-  $ kill %1
+    $ kill %1
 
 [1]:https://github.com/uber/ringpop-common/
 [2]:https://github.com/uber/tcurl

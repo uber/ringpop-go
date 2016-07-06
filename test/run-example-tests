@@ -8,7 +8,7 @@
 set -euo pipefail
 
 
-declare cram_opts="-v --shell=/bin/bash"
+declare cram_opts="-v --shell=/bin/bash --indent=4"
 declare prog_cram="cram"
 declare test_files="${0%/*}/../examples/*/README.md"
 
