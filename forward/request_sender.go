@@ -119,12 +119,12 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 		identity, _ := s.sender.WhoAmI()
 
-		s.logger.WithFields(log.Fields{
-			"local":       identity,
-			"destination": s.destination,
-			"service":     s.service,
-			"endpoint":    s.endpoint,
-		}).Warn("max retries exceeded for request")
+		// s.logger.WithFields(log.Fields{
+		// 	"local":       identity,
+		// 	"destination": s.destination,
+		// 	"service":     s.service,
+		// 	"endpoint":    s.endpoint,
+		// }).Warn("max retries exceeded for request")
 
 		s.emitter.emit(MaxRetriesEvent{s.maxRetries})
 
@@ -133,12 +133,12 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 		identity, _ := s.sender.WhoAmI()
 
-		s.logger.WithFields(log.Fields{
-			"local":       identity,
-			"destination": s.destination,
-			"service":     s.service,
-			"endpoint":    s.endpoint,
-		}).Warn("request timed out")
+		// s.logger.WithFields(log.Fields{
+		// 	"local":       identity,
+		// 	"destination": s.destination,
+		// 	"service":     s.service,
+		// 	"endpoint":    s.endpoint,
+		// }).Warn("request timed out")
 
 		return nil, errors.New("request timed out")
 	}
