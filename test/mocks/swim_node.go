@@ -1,9 +1,6 @@
 package mocks
 
-import (
-	"github.com/uber/ringpop-go/events"
-	"github.com/uber/ringpop-go/swim"
-)
+import "github.com/uber/ringpop-go/swim"
 import "github.com/stretchr/testify/mock"
 
 type SwimNode struct {
@@ -125,6 +122,11 @@ func (_m *SwimNode) Ready() bool {
 }
 
 // RegisterListener provides a mock function with given fields: l
-func (_m *SwimNode) RegisterListener(l events.EventListener) {
+func (_m *SwimNode) RegisterListener(l swim.EventListener) {
 	_m.Called(l)
+}
+
+// SetReady provides a mock function with given fields:
+func (_m *SwimNode) SetReady() {
+	_m.Called()
 }

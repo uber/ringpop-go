@@ -23,9 +23,7 @@ package main
 import (
 	"flag"
 	"regexp"
-	"time"
 
-	"github.com/cactus/go-statsd-client/statsd"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/discovery/jsonfile"
@@ -36,15 +34,8 @@ import (
 )
 
 var (
-	hostport  = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
-	hostfile  = flag.String("hosts", "./hosts.json", "path to hosts file")
-	statsFile = flag.String("stats-file", "", "enable stats emitting to a file.")
-	statsUDP  = flag.String("stats-udp", "", "enable stats emitting over udp.")
-
-	suspectPeriod   = flag.Int("suspect-period", 5000, "The lifetime of a suspect member in ms. After that the member becomes faulty.")
-	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "The lifetime of a faulty member in ms. After that the member becomes a tombstone.")
-	tombstonePeriod = flag.Int("tombstone-period", 5000, "The lifetime of a tombstone member in ms. After that the member is removed from the membership.")
-
+	hostport        = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
+	hostfile        = flag.String("hosts", "./hosts.json", "path to hosts file")
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 )
 
@@ -65,42 +56,11 @@ func main() {
 	if *verbose {
 		logger.Level = log.DebugLevel
 	}
-
-	options := []ringpop.Option{ringpop.Channel(ch),
+	rp, _ := ringpop.New("ringpop",
+		ringpop.Channel(ch),
 		ringpop.Identity(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
-
-		ringpop.SuspectPeriod(time.Duration(*suspectPeriod) * time.Millisecond),
-		ringpop.FaultyPeriod(time.Duration(*faultyPeriod) * time.Millisecond),
-		ringpop.TombstonePeriod(time.Duration(*tombstonePeriod) * time.Millisecond),
-	}
-
-	if *statsUDP != "" && *statsFile != "" {
-		log.Fatalf("-stats-udp and stats-file are mutually exclusive.")
-	}
-
-	if *statsUDP != "" || *statsFile != "" {
-		var statsdClient statsd.Statter
-		if *statsUDP != "" {
-			var err error
-			statsdClient, err = statsd.New(*statsUDP, "")
-			if err != nil {
-				log.Fatalf("colud not open stats connection: %v", err)
-			}
-		}
-
-		if *statsFile != "" {
-			statsdClient, err = NewFileStatsd(*statsFile)
-			if err != nil {
-				log.Fatalf("colud not open stats file: %v", err)
-			}
-		}
-
-		statter := bark.NewStatsReporterFromCactus(statsdClient)
-		options = append(options, ringpop.Statter(statter))
-	}
-
-	rp, _ := ringpop.New("ringpop", options...)
+	)
 
 	if err := ch.ListenAndServe(*hostport); err != nil {
 		log.Fatalf("could not listen on %s: %v", *hostport, err)

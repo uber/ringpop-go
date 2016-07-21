@@ -21,11 +21,8 @@
 package swim
 
 import (
-	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
@@ -47,7 +44,7 @@ func (s *MemberTestSuite) SetupTest() {
 	s.nonLocalAddr = "non-local address"
 
 	incNumStart := util.TimeNowMS()
-	statuses := []string{Alive, Suspect, Faulty, Leave, Tombstone}
+	statuses := []string{Alive, Suspect, Faulty, Leave}
 
 	// Add incNo, status combinations of ever increasing precedence.
 	s.states = nil
@@ -98,17 +95,16 @@ func (s *MemberTestSuite) TestNonLocalOverride() {
 }
 
 func (s *MemberTestSuite) TestLocalOverride() {
-	// LocalOverride marks updates as overrides when the change will be applied
-	// to the status of this node. It follows the rules of SWIM with regards to
-	// the incarnation number, but is hardcoded to states that the node will
-	// never declare itself to. Meaning that it will allow the node to be in any
-	// of Alive or Leave state.
-	// The Update function reincarnates the node when LocalOverride returns true.
+	// LocalOverride aggressively marks updates as overrides, even if the
+	// incarnation number of the update is lower than the incarnation
+	// number of the local member. The Update function reincarnates the node
+	// when LocalOverride returns true. This very aggressive approach is likely
+	// to change in the near future.
 	for _, s1 := range s.states {
 		for _, s2 := range s.states {
 			m := newMember(s.localAddr, s1)
 			c := newChange(s.localAddr, s2)
-			expected := (c.Status == Suspect || c.Status == Faulty || c.Status == Tombstone) && c.Incarnation >= m.Incarnation
+			expected := c.Status == Suspect || c.Status == Faulty
 			got := m.localOverride(s.localAddr, c)
 			s.Equal(expected, got, "expected override when change.Status is suspect or faulty")
 
@@ -122,20 +118,4 @@ func (s *MemberTestSuite) TestLocalOverride() {
 
 func TestMemberTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberTestSuite))
-}
-
-func TestChangeOmitTombstone(t *testing.T) {
-	change := Change{
-		Address:     "192.0.2.100:1234",
-		Incarnation: 42,
-		Status:      Alive,
-	}
-
-	data, err := json.Marshal(&change)
-	require.NoError(t, err)
-
-	parsedMap := make(map[string]interface{})
-	json.Unmarshal(data, &parsedMap)
-	_, has := parsedMap["tombstone"]
-	assert.False(t, has, "don't expect the tombstone field to be serialized when it is")
 }

@@ -31,11 +31,6 @@ type EventListener interface {
 	HandleEvent(event Event)
 }
 
-// EventRegistrar is an object that you can register EventListeners on.
-type EventRegistrar interface {
-	RegisterListener(EventListener)
-}
-
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
 type RingChangedEvent struct {
 	ServersAdded   []string
@@ -54,16 +49,3 @@ type LookupEvent struct {
 	Key      string
 	Duration time.Duration
 }
-
-// A LookupNEvent is sent when a lookupN is performed on the Ringpop's ring
-type LookupNEvent struct {
-	Key      string
-	N        int
-	Duration time.Duration
-}
-
-// Ready is fired when ringpop has successfully bootstrapped and is ready to receive requests and other method calls.
-type Ready struct{}
-
-// Destroyed is fired when ringpop has been destroyed and should not be responding to requests or lookup requests.
-type Destroyed struct{}

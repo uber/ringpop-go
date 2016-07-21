@@ -24,14 +24,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
 
 type StateTransitionsSuite struct {
 	suite.Suite
-	clock            *clock.Mock
 	node             *Node
 	stateTransitions *stateTransitions
 	m                *memberlist
@@ -42,14 +40,10 @@ type StateTransitionsSuite struct {
 
 func (s *StateTransitionsSuite) SetupTest() {
 	s.incarnation = util.TimeNowMS()
-	s.clock = clock.NewMock()
 	s.node = NewNode("test", "127.0.0.1:3001", nil, &Options{
 		StateTimeouts: StateTimeouts{
-			// if we use 24 hours the faulty to tombstone test takes 20 seconds
-			// because it executes a day worth of timers
-			Faulty: 10 * time.Second,
+			Suspect: 1000 * time.Second,
 		},
-		Clock: s.clock,
 	})
 	s.stateTransitions = s.node.stateTransitions
 	s.m = s.node.memberlist
@@ -108,42 +102,17 @@ func (s *StateTransitionsSuite) TestSuspectDisabled() {
 }
 
 func (s *StateTransitionsSuite) TestSuspectBecomesFaulty() {
-	s.m.MakeSuspect(s.suspect.Address, s.suspect.Incarnation)
+	s.stateTransitions.timeouts.Suspect = time.Millisecond
+
+	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
 	s.Require().NotNil(member, "expected cannot be nil")
 
 	s.stateTransitions.ScheduleSuspectToFaulty(*member)
-	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
+	s.NotNil(s.stateTransitions.timer(member.Address), "expected suspicion timer to be set")
 
-	s.clock.Add(5 * time.Second)
+	time.Sleep(5 * time.Millisecond)
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
-}
-
-func (s *StateTransitionsSuite) TestFaultyBecomesTombstone() {
-	s.m.MakeFaulty(s.suspect.Address, s.suspect.Incarnation)
-	member, _ := s.m.Member(s.suspect.Address)
-	s.Require().NotNil(member, "expected cannot be nil")
-
-	s.stateTransitions.ScheduleFaultyToTombstone(*member)
-	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
-
-	s.clock.Add(10 * time.Second)
-	s.Equal(Tombstone, member.Status, "expected member to be tombstone")
-}
-
-func (s *StateTransitionsSuite) TestTombstoneBecomesEvicted() {
-	// we need to first make the suspect alive, otherwise we can't make it a tombstome
-	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
-	s.m.MakeTombstone(s.suspect.Address, s.suspect.Incarnation)
-	member, _ := s.m.Member(s.suspect.Address)
-	s.Require().NotNil(member, "expected cannot be nil")
-
-	s.stateTransitions.ScheduleTombstoneToEvict(*member)
-	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
-
-	s.clock.Add(1 * time.Minute)
-	_, found := s.m.Member(s.suspect.Address)
-	s.False(found, "expected member to be removed from memberlist")
 }
 
 // TestTimerCreated tests that starting suspicion for a node creates a
@@ -161,26 +130,6 @@ func (s *StateTransitionsSuite) TestTimerCreated() {
 	s.stateTransitions.ScheduleSuspectToFaulty(*member)
 
 	s.NotEqual(old, s.stateTransitions.timer(member.Address), "expected timer to change")
-}
-
-// TestTimerCanceled makes sure that the timer is removed from the state transition
-// and has not been executed when it is canceled for a member.
-func (s *StateTransitionsSuite) TestTimerCanceled() {
-	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
-	member, _ := s.m.Member(s.suspect.Address)
-
-	old := s.stateTransitions.timer(member.Address)
-	s.Require().Nil(old, "expected timer to be nil")
-
-	// Start suspcision, which should create a timer
-	s.stateTransitions.ScheduleSuspectToFaulty(*member)
-	s.NotEqual(old, s.stateTransitions.timer(member.Address), "expected timer to change")
-
-	s.stateTransitions.Cancel(*member)
-	s.Require().Nil(s.stateTransitions.timer(member.Address), "expected timer to have been canceled")
-
-	s.clock.Add(5 * time.Second)
-	s.NotEqual(Faulty, member.Status, "didn't expect the member to be marked as faulty when the timer was canceled")
 }
 
 func (s *StateTransitionsSuite) TestSuspicionDisableStopsTimers() {

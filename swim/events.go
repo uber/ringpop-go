@@ -23,10 +23,13 @@ package swim
 import (
 	"time"
 
-	"reflect"
-
 	"github.com/uber/ringpop-go/events"
 )
+
+// An EventListener handles events given to it by the SWIM node. HandleEvent should be thread safe.
+type EventListener interface {
+	HandleEvent(events.Event)
+}
 
 // The ListenerFunc type is an adapter to allow the use of ordinary functions
 // as EventListeners.
@@ -79,11 +82,6 @@ type JoinCompleteEvent struct {
 	Duration  time.Duration `json:"duration"`
 	NumJoined int           `json:"numJoined"`
 	Joined    []string      `json:"joined"`
-}
-
-// AddJoinListEvent is sent when a join list is added to the membership
-type AddJoinListEvent struct {
-	Duration time.Duration `json:"duration"`
 }
 
 // JoinFailedReason indicates the reason a join failed
@@ -210,37 +208,3 @@ type RequestBeforeReadyEvent struct {
 
 // A RefuteUpdateEvent is sent when a node detects gossip about its own state that needs to be corrected
 type RefuteUpdateEvent struct{}
-
-// A StartReverseFullSyncEvent is sent when a node starts the reverse full sync procedure
-type StartReverseFullSyncEvent struct {
-	Target string `json:"target"`
-}
-
-// OmitReverseFullSyncEvent is sent when a node omits the reverse full sync
-// prodedure because there are already the max number of reverse full sync
-// processes running.
-type OmitReverseFullSyncEvent struct {
-	Target string `json:"target"`
-}
-
-// RedundantReverseFullSyncEvent is sent when no new changes were added due
-// to the reverse full sync.
-type RedundantReverseFullSyncEvent struct {
-	Target string `json:"target"`
-}
-
-// DiscoHealEvent is sent when the discover provider healer attempts to heal a partition
-type DiscoHealEvent struct{}
-
-// AttemptHealEvent is sent when the healer is triggered
-type AttemptHealEvent struct{}
-
-// on is returns an EventListener that executes a function f upon receiving an
-// event of type t.
-func on(t interface{}, f func(e events.Event)) ListenerFunc {
-	return ListenerFunc(func(e events.Event) {
-		if reflect.TypeOf(t) == reflect.TypeOf(e) {
-			f(e)
-		}
-	})
-}

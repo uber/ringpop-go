@@ -23,7 +23,6 @@ package swim
 import (
 	"math"
 	"sync"
-	"time"
 
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
@@ -54,19 +53,16 @@ type disseminator struct {
 	sync.RWMutex
 
 	logger log.Logger
-
-	reverseFullSyncJobs chan struct{}
 }
 
 // newDisseminator returns a new Disseminator instance.
 func newDisseminator(n *Node) *disseminator {
 	d := &disseminator{
-		node:                n,
-		changes:             make(map[string]*pChange),
-		maxP:                defaultPFactor,
-		pFactor:             defaultPFactor,
-		logger:              logging.Logger("disseminator").WithField("local", n.Address()),
-		reverseFullSyncJobs: make(chan struct{}, n.maxReverseFullSyncJobs),
+		node:    n,
+		changes: make(map[string]*pChange),
+		maxP:    defaultPFactor,
+		pFactor: defaultPFactor,
+		logger:  logging.Logger("disseminator").WithField("local", n.Address()),
 	}
 
 	return d
@@ -104,7 +100,7 @@ func (d *disseminator) HasChanges() bool {
 	return result
 }
 
-func (d *disseminator) MembershipAsChanges() (changes []Change) {
+func (d *disseminator) FullSync() (changes []Change) {
 	d.Lock()
 
 	for _, member := range d.node.memberlist.GetMembers() {
@@ -114,7 +110,7 @@ func (d *disseminator) MembershipAsChanges() (changes []Change) {
 			Source:            d.node.Address(),
 			SourceIncarnation: d.node.Incarnation(),
 			Status:            member.Status,
-		}.validateOutgoing())
+		})
 	}
 
 	d.Unlock()
@@ -177,7 +173,7 @@ func (d *disseminator) IssueAsReceiver(
 		"remoteChecksum": senderChecksum,
 	}).Info("full sync")
 
-	return d.MembershipAsChanges(), true
+	return d.FullSync(), true
 }
 
 // filterChangesFromSender returns changes that didn't originate at the sender.
@@ -204,7 +200,7 @@ func (d *disseminator) issueChanges() []Change {
 	// To make JSON output [] instead of null on empty change list
 	result := []Change{}
 	for _, change := range d.changes {
-		result = append(result, change.Change.validateOutgoing())
+		result = append(result, change.Change)
 	}
 
 	d.Unlock()
@@ -248,57 +244,4 @@ func (d *disseminator) ChangesCount() int {
 	c := len(d.changes)
 	d.RUnlock()
 	return c
-}
-
-// tryStartReverseFullSync fires a goroutine that performs a full sync. We omit
-// the reverse full sync if the maximum number of processes are already
-// running. This ensures no more than reverseFullSyncJobs processes are
-// running concurrently.
-func (d *disseminator) tryStartReverseFullSync(target string, timeout time.Duration) {
-	// occupy a job, return if none are available
-	select {
-	case d.reverseFullSyncJobs <- struct{}{}:
-		// continue if job is available
-	default:
-		d.logger.WithFields(log.Fields{
-			"remote": target,
-		}).Info("omit bidirectional full sync, too many already running")
-
-		d.node.emit(OmitReverseFullSyncEvent{Target: target})
-		return
-	}
-
-	// start reverse full sync
-	go func() {
-		d.reverseFullSync(target, timeout)
-
-		// create a new vacancy when the job is done
-		<-d.reverseFullSyncJobs
-	}()
-}
-
-// reverseFullSync is the second part of a bidirectional full sync. The first
-// part is performed by the IssueAsReceiver method. The reverse full sync
-// ensures that this node merges the membership of the target node's membership
-// with its own.
-func (d *disseminator) reverseFullSync(target string, timeout time.Duration) {
-	d.node.emit(StartReverseFullSyncEvent{Target: target})
-
-	res, err := sendJoinRequest(d.node, target, timeout)
-	if err != nil || res == nil {
-		d.logger.WithFields(log.Fields{
-			"remote": target,
-			"error":  err,
-		}).Warn("bidirectional full sync failed due to failed join request")
-		return
-	}
-
-	d.logger.WithFields(log.Fields{
-		"remote": target,
-	}).Info("bidirectional full sync")
-
-	cs := d.node.memberlist.Update(res.Membership)
-	if len(cs) == 0 {
-		d.node.emit(RedundantReverseFullSyncEvent{Target: target})
-	}
 }

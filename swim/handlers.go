@@ -48,12 +48,6 @@ type Status struct {
 	Status string `json:"status"`
 }
 
-// HealResponse contains a list of nodes where healing was attempted
-type HealResponse struct {
-	Targets []string `json:"targets"`
-	Error   string   `json:"error"`
-}
-
 // notImplementedHandler is a dummy handler that returns an error explaining
 // this method is not implemented.
 func notImplementedHandler(ctx json.Context, req *emptyArg) (*emptyArg, error) {
@@ -62,20 +56,18 @@ func notImplementedHandler(ctx json.Context, req *emptyArg) (*emptyArg, error) {
 
 func (n *Node) registerHandlers() error {
 	handlers := map[string]interface{}{
-		"/protocol/join":             n.joinHandler,
-		"/protocol/ping":             n.pingHandler,
-		"/protocol/ping-req":         n.pingRequestHandler,
-		"/admin/debugSet":            notImplementedHandler,
-		"/admin/debugClear":          notImplementedHandler,
-		"/admin/gossip":              n.gossipHandler, // Deprecated
-		"/admin/gossip/start":        n.gossipHandlerStart,
-		"/admin/gossip/stop":         n.gossipHandlerStop,
-		"/admin/healpartition/disco": n.discoverProviderHealerHandler,
-		"/admin/tick":                n.tickHandler, // Deprecated
-		"/admin/gossip/tick":         n.tickHandler,
-		"/admin/member/leave":        n.adminLeaveHandler,
-		"/admin/member/join":         n.adminJoinHandler,
-		"/admin/reap":                n.reapFaultyMembersHandler,
+		"/protocol/join":      n.joinHandler,
+		"/protocol/ping":      n.pingHandler,
+		"/protocol/ping-req":  n.pingRequestHandler,
+		"/admin/debugSet":     notImplementedHandler,
+		"/admin/debugClear":   notImplementedHandler,
+		"/admin/gossip":       n.gossipHandler, // Deprecated
+		"/admin/gossip/start": n.gossipHandlerStart,
+		"/admin/gossip/stop":  n.gossipHandlerStop,
+		"/admin/tick":         n.tickHandler, // Deprecated
+		"/admin/gossip/tick":  n.tickHandler,
+		"/admin/member/leave": n.adminLeaveHandler,
+		"/admin/member/join":  n.adminJoinHandler,
 	}
 
 	return json.Register(n.channel, handlers, n.errorHandler)
@@ -123,15 +115,6 @@ func (n *Node) gossipHandlerStop(ctx json.Context, req *emptyArg) (*emptyArg, er
 	return &emptyArg{}, nil
 }
 
-func (n *Node) discoverProviderHealerHandler(ctx json.Context, req *emptyArg) (*HealResponse, error) {
-	targets, err := n.healer.Heal()
-	msg := ""
-	if err != nil {
-		msg = err.Error()
-	}
-	return &HealResponse{Targets: targets, Error: msg}, nil
-}
-
 func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {
 	n.gossip.ProtocolPeriod()
 	return &ping{Checksum: n.memberlist.Checksum()}, nil
@@ -144,21 +127,6 @@ func (n *Node) adminJoinHandler(ctx json.Context, req *emptyArg) (*Status, error
 
 func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, error) {
 	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
-	return &Status{Status: "ok"}, nil
-}
-
-// reapFaultyMembersHandler iterates through the local members of this nodes and
-// declares all the members marked as faulty as a tombstone. This will clean all
-// these members from the membership in the complete cluster due to the gossipy
-// nature of swim
-func (n *Node) reapFaultyMembersHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	members := n.memberlist.GetMembers()
-	for _, member := range members {
-		if member.Status == Faulty {
-			// declare all faulty members as tombstone
-			n.memberlist.MakeTombstone(member.Address, member.Incarnation)
-		}
-	}
 	return &Status{Status: "ok"}, nil
 }
 

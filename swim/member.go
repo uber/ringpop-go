@@ -39,9 +39,6 @@ const (
 
 	// Leave is the member "leave" state
 	Leave = "leave"
-
-	// Tombstone is the member "tombstone" state
-	Tombstone = "tombstone"
 )
 
 // A Member is a member in the member list
@@ -92,21 +89,12 @@ func (m *Member) nonLocalOverride(change Change) bool {
 	return statePrecedence(change.Status) > statePrecedence(m.Status)
 }
 
-// localOverride returns whether the change will override the state of the local
-// member. When it will override the state the member should reincarnate itself
-// to make sure that other members see this node in a correct state.
+// localOverride returns whether a change should be applied to to the member
 func (m *Member) localOverride(local string, change Change) bool {
 	if m.Address != local {
 		return false
 	}
-
-	// if the incarnation number of the change is smaller than the current
-	// incarnation number it is not overriding the change
-	if change.Incarnation < m.Incarnation {
-		return false
-	}
-
-	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
+	return change.Status == Faulty || change.Status == Suspect
 }
 
 func statePrecedence(s string) int {
@@ -119,11 +107,8 @@ func statePrecedence(s string) int {
 		return 2
 	case Leave:
 		return 3
-	case Tombstone:
-		return 4
 	default:
-		// unknown states will never have precedence
-		return -1
+		panic("invalid state")
 	}
 }
 
@@ -138,32 +123,9 @@ type Change struct {
 	Address           string `json:"address"`
 	Incarnation       int64  `json:"incarnationNumber"`
 	Status            string `json:"status"`
-	Tombstone         bool   `json:"tombstone,omitempty"`
 	// Use util.Timestamp for bi-direction binding to time encoded as
 	// integer Unix timestamp in JSON
 	Timestamp util.Timestamp `json:"timestamp"`
-}
-
-// validateIncoming validates incoming changes before they are passed into the
-// swim state machine. This is usefull to make late adjustments to incoming
-// changes to transform some legacy wire protocol changes into new swim terminology
-func (c Change) validateIncoming() Change {
-	if c.Status == Faulty && c.Tombstone {
-		c.Status = Tombstone
-	}
-	return c
-}
-
-// validateOutgoing validates outgoing changes before they are passed to the module
-// responsible for sending the change to the other side. This can be used to make sure
-// that our changes are parsable by older version of ringpop-go to prevent unwanted
-// behavior when incompatible changes are sent to older versions.
-func (c Change) validateOutgoing() Change {
-	if c.Status == Tombstone {
-		c.Status = Faulty
-		c.Tombstone = true
-	}
-	return c
 }
 
 // suspect interface
@@ -173,19 +135,4 @@ func (c Change) address() string {
 
 func (c Change) incarnation() int64 {
 	return c.Incarnation
-}
-
-func (c Change) overrides(c2 Change) bool {
-	if c.Incarnation > c2.Incarnation {
-		return true
-	}
-	if c.Incarnation < c2.Incarnation {
-		return false
-	}
-
-	return statePrecedence(c.Status) > statePrecedence(c2.Status)
-}
-
-func (c Change) isPingable() bool {
-	return c.Status == Alive || c.Status == Suspect
 }
