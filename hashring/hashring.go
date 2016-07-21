@@ -299,3 +299,31 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 	}
 	return servers
 }
+
+// UpdateServers gets the list of servers and updates it's own state
+func (r *HashRing) UpdateServers(servers []string, checksum uint32) {
+	if checksum == r.Checksum() {
+		// nothing to do; just return
+		return
+	}
+	serversToRemove := []string{}
+
+	sToAdd := make(map[string]bool)
+	for _, server := range servers {
+		sToAdd[server] = true
+	}
+
+	// Now find all the servers which need to be removed
+	for _, sOrig := range r.Servers() {
+		if _, ok := sToAdd[sOrig]; !ok {
+			serversToRemove = append(serversToRemove, sOrig)
+		}
+	}
+
+	r.AddRemoveServers(servers, serversToRemove)
+
+	//update the checksum as well
+	r.Lock()
+	r.checksum = checksum
+	r.Unlock()
+}

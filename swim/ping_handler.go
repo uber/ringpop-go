@@ -20,8 +20,6 @@
 
 package swim
 
-import "time"
-
 func handlePing(node *Node, req *ping) (*ping, error) {
 	if !node.Ready() {
 		node.emit(RequestBeforeReadyEvent{PingEndpoint})
@@ -42,16 +40,15 @@ func handlePing(node *Node, req *ping) (*ping, error) {
 	changes, fullSync :=
 		node.disseminator.IssueAsReceiver(req.Source, req.SourceIncarnation, req.Checksum)
 
+	if fullSync {
+		// TODO: handle full sync
+	}
+
 	res := &ping{
 		Checksum:          node.memberlist.Checksum(),
 		Changes:           changes,
 		Source:            node.Address(),
 		SourceIncarnation: node.Incarnation(),
-	}
-
-	// Start bi-directional full sync.
-	if fullSync {
-		node.disseminator.tryStartReverseFullSync(req.Source, time.Second)
 	}
 
 	return res, nil

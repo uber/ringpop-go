@@ -86,7 +86,7 @@ func (p *pingRequestSender) SendPingRequest() (*pingResponse, error) {
 }
 
 func (p *pingRequestSender) MakeCall(ctx json.Context, res *pingResponse) <-chan error {
-	errC := make(chan error, 1)
+	errC := make(chan error)
 
 	go func() {
 		defer close(errC)

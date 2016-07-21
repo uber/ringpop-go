@@ -39,82 +39,102 @@ type ping struct {
 	SourceIncarnation int64    `json:"sourceIncarnationNumber"`
 }
 
-// sendPing sends a ping to target node that times out after timeout
-func sendPing(node *Node, target string, timeout time.Duration) (*ping, error) {
-	changes, bumpPiggybackCounters := node.disseminator.IssueAsSender()
-
-	res, err := sendPingWithChanges(node, target, changes, timeout)
-	if err != nil {
-		return res, err
-	}
-
-	// when ping was successful
-	bumpPiggybackCounters()
-
-	return res, err
+// A PingSender is used to send a SWIM gossip ping over TChannel to target node
+type pingSender struct {
+	node    *Node
+	target  string
+	timeout time.Duration
+	logger  log.Logger
 }
 
-// sendPingWithChanges sends a special ping to the target with the given changes.
-// In normal pings the disseminator is consulted to create issue the changes,
-// this is not the case in this function. Only the given changes are transmitted.
-func sendPingWithChanges(node *Node, target string, changes []Change, timeout time.Duration) (*ping, error) {
-	req := ping{
-		Checksum:          node.memberlist.Checksum(),
-		Changes:           changes,
-		Source:            node.Address(),
-		SourceIncarnation: node.Incarnation(),
+// NewPingSender returns a new PingSender that can be used to send a ping to target node
+func newPingSender(node *Node, target string, timeout time.Duration) *pingSender {
+	ps := &pingSender{
+		node:    node,
+		target:  target,
+		timeout: timeout,
+		logger:  logging.Logger("ping").WithField("local", node.Address()),
 	}
 
-	node.emit(PingSendEvent{
-		Local:   node.Address(),
-		Remote:  target,
-		Changes: req.Changes,
-	})
+	return ps
+}
 
-	logging.Logger("ping").WithFields(log.Fields{
-		"local":   node.Address(),
-		"remote":  target,
-		"changes": req.Changes,
-	}).Debug("ping send")
+func (p *pingSender) SendPing() (*ping, error) {
+	ctx, cancel := shared.NewTChannelContext(p.timeout)
 
-	ctx, cancel := shared.NewTChannelContext(timeout)
 	defer cancel()
 
-	peer := node.channel.Peers().GetOrAdd(target)
-	startTime := time.Now()
+	var res ping
+	select {
+	case err := <-p.MakeCall(ctx, &res):
+		if err != nil {
+			return nil, err
+		}
+		return &res, nil
 
-	// send the ping
-	errC := make(chan error, 1)
-	res := &ping{}
+	case <-ctx.Done(): // ping timed out
+		return nil, errors.New("ping timed out")
+	}
+}
+
+func (p *pingSender) MakeCall(ctx json.Context, res *ping) <-chan error {
+	errC := make(chan error)
+
 	go func() {
-		errC <- json.CallPeer(ctx, peer, node.service, "/protocol/ping", req, res)
+		defer close(errC)
+
+		peer := p.node.channel.Peers().GetOrAdd(p.target)
+
+		changes, bumpPiggybackCounters := p.node.disseminator.IssueAsSender()
+		req := ping{
+			Checksum:          p.node.memberlist.Checksum(),
+			Changes:           changes,
+			Source:            p.node.Address(),
+			SourceIncarnation: p.node.Incarnation(),
+		}
+
+		p.node.emit(PingSendEvent{
+			Local:   p.node.Address(),
+			Remote:  p.target,
+			Changes: req.Changes,
+		})
+
+		p.logger.WithFields(log.Fields{
+			"remote":  p.target,
+			"changes": req.Changes,
+		}).Debug("ping send")
+
+		var startTime = time.Now()
+
+		err := json.CallPeer(ctx, peer, p.node.service, "/protocol/ping", req, res)
+		if err != nil {
+			p.logger.WithFields(log.Fields{
+				"remote": p.target,
+				"error":  err,
+			}).Debug("ping failed")
+			errC <- err
+			return
+		}
+
+		// when ping was successful
+		bumpPiggybackCounters()
+
+		p.node.emit(PingSendCompleteEvent{
+			Local:    p.node.Address(),
+			Remote:   p.target,
+			Changes:  req.Changes,
+			Duration: time.Now().Sub(startTime),
+		})
+
+		errC <- nil
 	}()
 
-	// get result or timeout
-	var err error
-	select {
-	case err = <-errC:
-	case <-ctx.Done():
-		err = errors.New("ping timed out")
-	}
+	return errC
+}
 
-	if err != nil {
-		// ping failed
-		logging.Logger("ping").WithFields(log.Fields{
-			"local":  node.Address(),
-			"remote": target,
-			"error":  err,
-		}).Debug("ping failed")
-
-		return nil, err
-	}
-
-	node.emit(PingSendCompleteEvent{
-		Local:    node.Address(),
-		Remote:   target,
-		Changes:  req.Changes,
-		Duration: time.Now().Sub(startTime),
-	})
-
+// SendPing sends a ping to target node that times out after timeout
+func sendPing(node *Node, target string, timeout time.Duration) (*ping, error) {
+	ps := newPingSender(node, target, timeout)
+	res, err := ps.SendPing()
 	return res, err
 }

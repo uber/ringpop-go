@@ -29,26 +29,11 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/events"
-	eventsmocks "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
-
-type destroyable interface {
-	Destroy()
-}
-
-type destroyableChannel struct {
-	*tchannel.Channel
-}
-
-func (c *destroyableChannel) Destroy() {
-	if c.Channel != nil {
-		c.Channel.Close()
-	}
-}
 
 type RingpopTestSuite struct {
 	suite.Suite
@@ -57,24 +42,6 @@ type RingpopTestSuite struct {
 	channel      *tchannel.Channel
 	mockRingpop  *mocks.Ringpop
 	mockSwimNode *mocks.SwimNode
-
-	destroyables []destroyable
-}
-
-func (s *RingpopTestSuite) makeNewRingpop() (rp *Ringpop, err error) {
-	ch, err := tchannel.NewChannel("test", nil)
-	s.NoError(err, "channel must create successfully")
-
-	err = ch.ListenAndServe("127.0.0.1:0")
-	s.NoError(err, "channel must listen successfully")
-
-	rp, err = New("test", Channel(ch), Clock(s.mockClock))
-	s.NoError(err, "Ringpop must create successfully")
-
-	// collect ringpop and tchannel for destruction later
-	s.destroyables = append(s.destroyables, &destroyableChannel{ch}, rp)
-
-	return
 }
 
 // createSingleNodeCluster is a helper function to create a single-node cluster
@@ -105,18 +72,8 @@ func (s *RingpopTestSuite) SetupTest() {
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
-	// remove listeners during teardown
-	s.ringpop.listeners = nil
-
 	s.channel.Close()
 	s.ringpop.Destroy()
-
-	// clean up all the things
-	for _, d := range s.destroyables {
-		if d != nil {
-			d.Destroy()
-		}
-	}
 }
 
 func (s *RingpopTestSuite) TestCanAssignRingpopToRingpopInterface() {
@@ -204,18 +161,6 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), stats.vals["ringpop.127_0_0_1_3001.num-members"], "missing num-members stats for member being set to unknown")
 	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
-	s.ringpop.HandleEvent(swim.FullSyncEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync"], "missing stats for full sync")
-
-	s.ringpop.HandleEvent(swim.StartReverseFullSyncEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync.reverse"], "missing stats for reverse full sync")
-
-	s.ringpop.HandleEvent(swim.OmitReverseFullSyncEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync.reverse-omitted"], "missing stats for omitted reverse full sync")
-
-	s.ringpop.HandleEvent(swim.RedundantReverseFullSyncEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.full-sync.redundant-reverse"], "missing stats for redundant reverse full sync")
-
 	s.ringpop.HandleEvent(swim.MaxPAdjustedEvent{NewPCount: 100})
 	s.Equal(int64(100), stats.vals["ringpop.127_0_0_1_3001.max-piggyback"], "missing stats for piggyback adjustment")
 	// expected listener to record 1 event
@@ -267,12 +212,11 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.join.retries"], "join tries didn't update")
 	// expected listener to record 1 event
 
-	s.ringpop.HandleEvent(swim.DiscoHealEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.triggered"], "missing stats for received pings")
-
-	s.ringpop.HandleEvent(swim.AttemptHealEvent{})
-	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.heal.attempt"], "missing stats for received pings")
-
+	s.ringpop.HandleEvent(events.LookupEvent{
+		Key:      "hello",
+		Duration: time.Second,
+	})
+	s.Equal(int64(1000), stats.vals["ringpop.127_0_0_1_3001.lookup"], "missing lookup timer")
 	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Alive})
@@ -312,14 +256,14 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), stats.vals["ringpop.127_0_0_1_3001.refuted-update"], "missing refuted-update stat")
 
 	// double check the counts before the event
-	s.Equal(int64(11), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "incorrect count for ring.server-added before RingChangedEvent")
+	s.Equal(int64(10), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "incorrect count for ring.server-added before RingChangedEvent")
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.ring.server-removed"], "incorrect count for ring.server-removed before RingChangedEvent")
 	s.Equal(int64(2), stats.vals["ringpop.127_0_0_1_3001.ring.changed"], "incorrect count for ring.changed before RingChangedEvent")
 	s.ringpop.HandleEvent(events.RingChangedEvent{
 		ServersAdded:   genAddresses(1, 2, 5),
 		ServersRemoved: genAddresses(1, 6, 8),
 	})
-	s.Equal(int64(15), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "missing ring.server-added stat")
+	s.Equal(int64(14), stats.vals["ringpop.127_0_0_1_3001.ring.server-added"], "missing ring.server-added stat")
 	s.Equal(int64(5), stats.vals["ringpop.127_0_0_1_3001.ring.server-removed"], "missing ring.server-removed stat")
 	s.Equal(int64(3), stats.vals["ringpop.127_0_0_1_3001.ring.changed"], "missing ring.changed stat")
 
@@ -385,7 +329,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// expected listener to record 1 event
 
 	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(47, listener.EventCount(), "incorrect count for emitted events")
+	s.Equal(42, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
@@ -542,77 +486,11 @@ func (s *RingpopTestSuite) TestLookupNotReady() {
 	s.Empty(result)
 }
 
-func (s *RingpopTestSuite) TestLookupNoDestination() {
-	createSingleNodeCluster(s.ringpop)
-
-	address, _ := s.ringpop.identity()
-	s.ringpop.ring.RemoveServer(address)
-
-	result, err := s.ringpop.Lookup("foo")
-	s.Equal("", result)
-	s.Error(err)
-}
-
-func (s *RingpopTestSuite) TestLookupEmitStat() {
-	createSingleNodeCluster(s.ringpop)
-
-	stats := newDummyStats()
-	s.ringpop.statter = stats
-
-	_, _ = s.ringpop.Lookup("foo")
-
-	_, ok := stats.vals["ringpop.127_0_0_1_3001.lookup"]
-	s.True(ok, "missing lookup timer")
-}
-
-func (s *RingpopTestSuite) TestLookupNEmitStat() {
-	createSingleNodeCluster(s.ringpop)
-
-	stats := newDummyStats()
-	s.ringpop.statter = stats
-
-	_, _ = s.ringpop.LookupN("foo", 3)
-	_, _ = s.ringpop.LookupN("foo", 5)
-
-	_, ok := stats.vals["ringpop.127_0_0_1_3001.lookupn.3"]
-	s.True(ok, "missing lookupn.3 timer")
-
-	_, ok = stats.vals["ringpop.127_0_0_1_3001.lookupn.5"]
-	s.True(ok, "missing lookupn.5 timer")
-}
-
 // TestLookupNNotReady tests that LookupN fails when Ringpop is not ready.
 func (s *RingpopTestSuite) TestLookupNNotReady() {
 	result, err := s.ringpop.LookupN("foo", 3)
 	s.Error(err)
 	s.Nil(result)
-}
-
-func (s *RingpopTestSuite) TestLookupNNoDestinations() {
-	createSingleNodeCluster(s.ringpop)
-
-	address, _ := s.ringpop.identity()
-	s.ringpop.ring.RemoveServer(address)
-
-	result, err := s.ringpop.LookupN("foo", 5)
-	s.Nil(result)
-	s.Error(err)
-}
-
-func (s *RingpopTestSuite) TestLookupN() {
-	createSingleNodeCluster(s.ringpop)
-
-	result, err := s.ringpop.LookupN("foo", 5)
-
-	s.Nil(err)
-	s.Equal(1, len(result), "LookupN returns not more results than number of nodes")
-
-	addresses := genAddresses(1, 10, 20)
-	s.ringpop.ring.AddRemoveServers(addresses, nil)
-
-	result, err = s.ringpop.LookupN("foo", 5)
-	s.Nil(err)
-	s.Equal(5, len(result), "LookupN returns N number of results")
 }
 
 // TestGetReachableMembersNotReady tests that GetReachableMembers fails when
@@ -662,6 +540,38 @@ func (s *RingpopTestSuite) TestErrorOnChannelNotListening() {
 	s.Nil(nodesJoined)
 }
 
+/*
+// XXX: test disabled since this is just temp
+func (s *RingpopTestSuite) TestTapRing() {
+	// create a brand new ring
+	listenCh, err := tchannel.NewChannel("test-1", nil)
+	s.Require().NoError(err, "channel must create successfully")
+
+	listenRing, err := New("test-1", Channel(listenCh))
+	s.Require().NoError(err)
+
+	stats := newDummyStats()
+	listenStats := newDummyStats()
+	s.ringpop.statter = stats
+	listenRing.statter = listenStats
+
+	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
+		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
+	})
+
+	s.Len(s.ringpop.ring.Servers(), 10)
+
+	// Now handle update on the new ring
+	res := handleTapRing(s.ringpop, &tapRequest{
+		Checksum: listenRing.ring.Checksum(),
+	})
+
+	listenRing.ring.UpdateServers(res.Servers, res.Checksum)
+	// Now check for the new ring and it must be updated as well
+	s.Len(listenRing.ring.Servers(), 10)
+}
+*/
+
 func TestRingpopTestSuite(t *testing.T) {
 	suite.Run(t, new(RingpopTestSuite))
 }
@@ -686,97 +596,6 @@ func (s *RingpopTestSuite) TestStartTimersIdempotance() {
 
 	// idempotent stop
 	s.ringpop.stopTimers()
-}
-
-func (s *RingpopTestSuite) TestReadyEvent() {
-	called := make(chan bool, 1)
-
-	l := &eventsmocks.EventListener{}
-	l.On("HandleEvent", events.Ready{}).Return().Once().Run(func(args mock.Arguments) {
-		called <- true
-	})
-	s.ringpop.RegisterListener(l)
-
-	s.ringpop.setState(ready)
-
-	// block with timeout for event to be emitted
-	select {
-	case <-called:
-	case <-time.After(100 * time.Millisecond):
-	}
-
-	l.AssertCalled(s.T(), "HandleEvent", events.Ready{})
-
-	s.ringpop.setState(ready)
-	l.AssertNumberOfCalls(s.T(), "HandleEvent", 1)
-}
-
-func (s *RingpopTestSuite) TestDestroyedEvent() {
-	called := make(chan bool, 1)
-
-	l := &eventsmocks.EventListener{}
-	l.On("HandleEvent", events.Destroyed{}).Return().Once().Run(func(args mock.Arguments) {
-		called <- true
-	})
-	s.ringpop.RegisterListener(l)
-
-	s.ringpop.setState(destroyed)
-
-	// block with timeout for event to be emitted
-	select {
-	case <-called:
-	case <-time.After(100 * time.Millisecond):
-	}
-
-	l.AssertCalled(s.T(), "HandleEvent", events.Destroyed{})
-
-	s.ringpop.setState(destroyed)
-	l.AssertNumberOfCalls(s.T(), "HandleEvent", 1)
-}
-
-func (s *RingpopTestSuite) TestRingIsConstructedWhenStateReady() {
-	called := make(chan bool, 1)
-
-	rp1, err := s.makeNewRingpop()
-	s.Require().NoError(err)
-
-	rp2, err := s.makeNewRingpop()
-	s.Require().NoError(err)
-
-	err = createSingleNodeCluster(rp1)
-	s.Require().NoError(err)
-
-	me1, err := rp1.WhoAmI()
-	s.Require().NoError(err)
-
-	l := &eventsmocks.EventListener{}
-
-	l.On("HandleEvent", events.Ready{}).Return().Run(func(args mock.Arguments) {
-		s.True(rp2.Ready(), "expect ringpop to be ready when the ready event fires")
-
-		me2, err := rp2.WhoAmI()
-		s.Require().NoError(err)
-
-		s.True(rp2.ring.HasServer(me1), "expected ringpop1 to be in the ring when ringpop fires the ready event")
-		s.True(rp2.ring.HasServer(me2), "expected ringpop2 to be in the ring when ringpop fires the ready event")
-		s.False(rp2.ring.HasServer("127.0.0.1:3001"), "didn't expect the mocked ringpop to be in the ring")
-
-		called <- true
-	})
-	l.On("HandleEvent", mock.Anything).Return()
-
-	rp2.RegisterListener(l)
-
-	_, err = rp2.Bootstrap(&swim.BootstrapOptions{
-		DiscoverProvider: statichosts.New(me1),
-	})
-	s.Require().NoError(err)
-
-	// block with timeout for event to be emitted
-	select {
-	case <-called:
-	case <-time.After(100 * time.Millisecond):
-	}
 }
 
 func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {

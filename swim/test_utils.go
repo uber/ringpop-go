@@ -23,7 +23,6 @@ package swim
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -31,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/uber/ringpop-go/discovery/statichosts"
-	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/util"
 	"github.com/uber/tchannel-go"
@@ -137,8 +135,8 @@ func genChannelNodes(t *testing.T, n int) (nodes []*testNode) {
 func memberlistHasMembers(t *testing.T, m *memberlist, members []Member) {
 	for _, expected := range members {
 		member, ok := m.Member(expected.Address)
-		assert.True(t, ok, "expected member to be in memberlist")
 		require.NotNil(t, member, "member cannot be nil")
+		assert.True(t, ok, "expected member to be in memberlist")
 		assert.Equal(t, expected.Status, member.Status, "expected statuses to be the same")
 	}
 }
@@ -158,43 +156,37 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 	return hostports
 }
 
-// waitForConvergence lets the nodes gossip and returns when the nodes are converged.
-// After the cluster finished gossiping we double check that all nodes have the
-// same checksum for the memberlist, this means that the cluster is converged.
 func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
-	deadline := time.Now().Add(timeout)
+	timeoutCh := time.After(timeout)
 
 	nodes := testNodesToNodes(testNodes)
 
-	// 1 node is a special case because it can't drain its changes since it
-	// cannot ping or be pinged by another member
-	if len(nodes) == 1 {
-		nodes[0].disseminator.ClearChanges()
-		return
-	}
-
+	// To get the cluster to a converged state we will let the nodes gossip until
+	// there are no more changes. After the cluster finished gossipping we double
+	// check that all nodes have the same checksum for the memberlist, this means
+	// that the cluster is converged.
 Tick:
-	// return when deadline is reached
-	if time.Now().After(deadline) {
-		t.Errorf("timeout during wait for convergence")
-		return
-	}
+	for {
+		select {
+		case <-timeoutCh:
+			t.Errorf("timeout during wait for convergence")
+			return
+		default:
+			for _, node := range nodes {
+				node.gossip.ProtocolPeriod()
+			}
+			for _, node := range nodes {
+				if node.HasChanges() {
+					continue Tick
+				}
+			}
 
-	// tick all the nodes
-	for _, node := range nodes {
-		node.gossip.ProtocolPeriod()
-	}
+			if !nodesConverged(nodes) {
+				t.Errorf("nodes did not converge to 1 checksum")
+			}
 
-	// repeat if we stil have changes
-	for _, node := range nodes {
-		if node.HasChanges() {
-			goto Tick
+			return
 		}
-	}
-
-	// check for convergence if there are no changes left
-	if !nodesConverged(nodes) {
-		t.Errorf("nodes did not converge to 1 checksum")
 	}
 }
 
@@ -337,38 +329,4 @@ func (c *swimCluster) Destroy() {
 // Nodes returns a slice of all nodes in the cluster.
 func (c *swimCluster) Nodes() []*Node {
 	return c.nodes
-}
-
-// DoThenWaitFor executes a function and then waits for a specific type
-// of event to occur. This function shouldn't be used outside tests because
-// there is no way to unsubscribe the event handler.
-//
-// Often we want to execute some code and then wait for an event be emitted due
-// to the code being executed. However in order to not miss the event we must
-// first register an event handler before we can execute the code:
-// - register listener that signals we can continue on receiving the correct event;
-// - execute the code that will lead to an event being emitted;
-// - wait for the continue signal.
-//
-// This can be quite hard to follow. Ideally we want it to look like
-// - execute the code that will lead to an event being emitted;
-// - and then wait for a specific event.
-//
-// This function helps with making the code read like the latter.
-func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
-	block := make(chan struct{}, 1)
-
-	var once sync.Once
-
-	er.RegisterListener(on(t, func(e events.Event) {
-		once.Do(func() {
-			block <- struct{}{}
-		})
-	}))
-
-	f()
-
-	// wait for first occurence of the event, close thereafter
-	<-block
-	close(block)
 }

@@ -161,11 +161,9 @@ func (rp *Ringpop) init() error {
 	}
 
 	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
-	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		StateTimeouts: rp.config.StateTimeouts,
-		Clock:         rp.clock,
+		Clock: rp.clock,
 	})
 	rp.node.RegisterListener(rp)
 
@@ -183,6 +181,11 @@ func (rp *Ringpop) init() error {
 	rp.setState(initialized)
 
 	return nil
+}
+
+// initHandlers is used to initialize the handlers
+func (rp *Ringpop) initHandlers() {
+	rp.registerHandlers()
 }
 
 // Starts periodic timers in a single goroutine. Can be turned back off via
@@ -314,23 +317,11 @@ func (rp *Ringpop) getState() state {
 	return r
 }
 
-// setState sets the state of the current Ringpop instance. It will emit an appropriate
-// event when the state will actually change
+// setState sets the state of the current Ringpop instance.
 func (rp *Ringpop) setState(s state) {
 	rp.stateMutex.Lock()
-	oldState := rp.state
 	rp.state = s
 	rp.stateMutex.Unlock()
-
-	// test if the state has changed with this call to setState
-	if oldState != s {
-		switch s {
-		case ready:
-			rp.emit(events.Ready{})
-		case destroyed:
-			rp.emit(events.Destroyed{})
-		}
-	}
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -348,6 +339,7 @@ func (rp *Ringpop) setState(s state) {
 func (rp *Ringpop) Bootstrap(bootstrapOpts *swim.BootstrapOptions) ([]string, error) {
 	if rp.getState() < initialized {
 		err := rp.init()
+		rp.initHandlers()
 		if err != nil {
 			return nil, err
 		}
@@ -373,6 +365,39 @@ func (rp *Ringpop) Ready() bool {
 		return false
 	}
 	return rp.node.Ready()
+}
+
+// TapRingInit is the routine which is used to initialize a tap ring instance
+func (rp *Ringpop) TapRingInit() error {
+	if rp.getState() < initialized {
+		err := rp.init()
+		if err != nil {
+			rp.logger.Errorf("error initing ring: %v", err)
+			return err
+		}
+	}
+
+	// set the state of ringpop instance and the SWIM instance as ready
+	rp.node.SetReady()
+	rp.setState(ready)
+
+	return nil
+}
+
+// TapRing attaches pulls the ring state from the given
+// host and updates its own ring accordingly
+// TODO: we should probably tap for a specific app on the host:port?
+func (rp *Ringpop) TapRing(host string, remoteApp string) error {
+	servers, checksum, err := tapRemoteRing(host, remoteApp, rp)
+	if err != nil {
+		rp.logger.WithFields(log.Fields{
+			"err":  err.Error(),
+			"host": host,
+		}).Info("tapring failed")
+		return err
+	}
+	rp.ring.UpdateServers(servers, checksum)
+	return nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -416,15 +441,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.FullSyncEvent:
 		rp.statter.IncCounter(rp.getStatKey("full-sync"), nil, 1)
 
-	case swim.StartReverseFullSyncEvent:
-		rp.statter.IncCounter(rp.getStatKey("full-sync.reverse"), nil, 1)
-
-	case swim.OmitReverseFullSyncEvent:
-		rp.statter.IncCounter(rp.getStatKey("full-sync.reverse-omitted"), nil, 1)
-
-	case swim.RedundantReverseFullSyncEvent:
-		rp.statter.IncCounter(rp.getStatKey("full-sync.redundant-reverse"), nil, 1)
-
 	case swim.MaxPAdjustedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("max-piggyback"), nil, int64(event.NewPCount))
 
@@ -435,9 +451,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 		rp.statter.IncCounter(rp.getStatKey("join.complete"), nil, 1)
 		rp.statter.IncCounter(rp.getStatKey("join.succeeded"), nil, 1)
 		rp.statter.RecordTimer(rp.getStatKey("join"), nil, event.Duration)
-
-	case swim.AddJoinListEvent:
-		rp.statter.RecordTimer(rp.getStatKey("join.add-join-list"), nil, event.Duration)
 
 	case swim.PingSendEvent:
 		rp.statter.IncCounter(rp.getStatKey("ping.send"), nil, 1)
@@ -484,17 +497,14 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.JoinTriesUpdateEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
 
+	case events.LookupEvent:
+		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
+
 	case swim.MakeNodeStatusEvent:
 		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
 
 	case swim.RequestBeforeReadyEvent:
 		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
-
-	case swim.DiscoHealEvent:
-		rp.statter.IncCounter(rp.getStatKey("heal.triggered"), nil, 1)
-
-	case swim.AttemptHealEvent:
-		rp.statter.IncCounter(rp.getStatKey("heal.attempt"), nil, 1)
 
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
@@ -552,9 +562,9 @@ func (rp *Ringpop) handleChanges(changes []swim.Change) {
 
 	for _, change := range changes {
 		switch change.Status {
-		case swim.Alive, swim.Suspect:
+		case swim.Alive:
 			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave, swim.Tombstone:
+		case swim.Faulty, swim.Leave:
 			serversToRemove = append(serversToRemove, change.Address)
 		}
 	}
@@ -588,12 +598,9 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	dest, success := rp.ring.Lookup(key)
 
-	duration := time.Now().Sub(startTime)
-	rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, duration)
-
 	rp.emit(events.LookupEvent{
 		Key:      key,
-		Duration: duration,
+		Duration: time.Now().Sub(startTime),
 	})
 
 	if !success {
@@ -612,26 +619,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
-	startTime := time.Now()
-
-	destinations := rp.ring.LookupN(key, n)
-
-	duration := time.Now().Sub(startTime)
-	rp.statter.RecordTimer(rp.getStatKey(fmt.Sprintf("lookupn.%d", n)), nil, duration)
-
-	rp.emit(events.LookupNEvent{
-		Key:      key,
-		N:        n,
-		Duration: duration,
-	})
-
-	if len(destinations) == 0 {
-		err := errors.New("could not find destinations for key")
-		rp.logger.WithField("key", key).Warn(err)
-		return destinations, err
-	}
-
-	return destinations, nil
+	return rp.ring.LookupN(key, n), nil
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {

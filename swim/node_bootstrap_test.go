@@ -22,14 +22,13 @@ package swim
 
 import (
 	"encoding/json"
+	"github.com/uber/ringpop-go/discovery/jsonfile"
+	"github.com/uber/ringpop-go/discovery/statichosts"
 	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/uber/ringpop-go/discovery/jsonfile"
-	"github.com/uber/ringpop-go/discovery/statichosts"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -47,8 +46,7 @@ func (s *BootstrapTestSuite) SetupTest() {
 }
 
 func (s *BootstrapTestSuite) TearDownTest() {
-	destroyNodes(s.peers...)
-	destroyNodes(s.tnode)
+	destroyNodes(append(s.peers, s.tnode)...)
 }
 
 func (s *BootstrapTestSuite) TestBootstrapOk() {
@@ -70,13 +68,24 @@ func (s *BootstrapTestSuite) TestBootstrapJoinsTimeOut() {
 }
 
 func (s *BootstrapTestSuite) TestBootstrapDestroy() {
-	s.tnode.Destroy()
+	// Destroy node first to ensure there are no races
+	// in how the goroutine below is scheduled.
+	s.node.Destroy()
 
-	_, err := s.node.Bootstrap(&BootstrapOptions{
-		DiscoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 10)...),
-	})
+	errChan := make(chan error)
 
-	s.EqualError(err, "node destroyed while attempting to join cluster")
+	go func() {
+		_, err := s.node.Bootstrap(&BootstrapOptions{
+			DiscoverProvider: statichosts.New(fakeHostPorts(1, 1, 1, 10)...),
+			JoinTimeout:      time.Millisecond,
+		})
+		errChan <- err
+	}()
+
+	// Block until the error is received from the bootstrap
+	// goroutine above.
+	chanErr := <-errChan
+	s.EqualError(chanErr, "node destroyed while attempting to join cluster")
 }
 
 func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {

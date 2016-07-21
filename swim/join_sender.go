@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/discovery"
+
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
@@ -52,8 +54,6 @@ const (
 	defaultParallelismFactor = 2
 )
 
-var errJoinTimeout = errors.New("join timed out")
-
 // A joinRequest is used to request a join to a remote node
 type joinRequest struct {
 	App         string        `json:"app"`
@@ -68,6 +68,10 @@ type joinOpts struct {
 	size              int
 	maxJoinDuration   time.Duration
 	parallelismFactor int
+
+	// discoverProvider is the DiscoverProvider that this joinSender will use to
+	// enumerate bootstrap hosts.
+	discoverProvider discovery.DiscoverProvider
 
 	// delayer delays repeated join attempts.
 	delayer joinDelayer
@@ -119,13 +123,13 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 		opts = &joinOpts{}
 	}
 
-	if node.discoverProvider == nil {
+	if opts.discoverProvider == nil {
 		return nil, errors.New("no discover provider")
 	}
 
 	// Resolve/retrieve bootstrap hosts from the provider specified in the
 	// join options.
-	bootstrapHosts, err := node.discoverProvider.Hosts()
+	bootstrapHosts, err := opts.discoverProvider.Hosts()
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +146,14 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 		logger: logging.Logger("join").WithField("local", node.Address()),
 	}
 
+	js.logger.Errorf("boothosts: %v", bootstrapHosts)
 	// Parse bootstrap hosts into a map
 	js.parseHosts(bootstrapHosts)
 
+	js.logger.Errorf("boothostsmap: %v", js.bootstrapHostsMap)
 	js.potentialNodes = js.CollectPotentialNodes(nil)
 
+	js.logger.Errorf("potential hosts: %v", js.potentialNodes)
 	js.timeout = util.SelectDuration(opts.timeout, defaultJoinTimeout)
 	js.maxJoinDuration = util.SelectDuration(opts.maxJoinDuration, defaultMaxJoinDuration)
 	js.parallelismFactor = util.SelectInt(opts.parallelismFactor, defaultParallelismFactor)
@@ -358,9 +365,6 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 	return nodesJoined, nil
 }
 
-// JoinGroup collects a number of nodes to join and sends join requests to them.
-// nodesJoined contains the nodes that are already joined. The method returns
-// the nodes that are succesfully joined, and the nodes that failed respond.
 func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	group := j.SelectGroup(nodesJoined)
 
@@ -378,44 +382,49 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	j.numTries++
 	j.node.emit(JoinTriesUpdateEvent{j.numTries})
 
-	for _, target := range group {
+	for _, node := range group {
 		wg.Add(1)
+		go func(n string) {
+			ctx, cancel := shared.NewTChannelContext(j.timeout)
+			defer cancel()
 
-		go func(target string) {
-			defer wg.Done()
+			var res joinResponse
+			var failed bool
 
-			res, err := sendJoinRequest(j.node, target, j.timeout)
-
-			if err != nil {
-				msg := "attempt to join node failed"
-				if err == errJoinTimeout {
-					msg = "attempt to join node timed out"
+			select {
+			case err := <-j.MakeCall(ctx, n, &res):
+				if err != nil {
+					j.logger.WithFields(log.Fields{
+						"remote":  n,
+						"timeout": j.timeout,
+					}).Debug("attempt to join node failed")
+					failed = true
+					break
 				}
 
-				j.logger.WithFields(log.Fields{
-					"remote":  target,
-					"timeout": j.timeout,
-				}).Debug(msg)
+				j.node.memberlist.AddJoinList(res.Membership)
 
-				responses.Lock()
-				responses.failures = append(responses.failures, target)
-				responses.Unlock()
-				return
+			case <-ctx.Done():
+				j.logger.WithFields(log.Fields{
+					"remote":  n,
+					"timeout": j.timeout,
+				}).Debug("attempt to join node timed out")
+				failed = true
 			}
 
-			responses.Lock()
-			responses.successes = append(responses.successes, target)
-			responses.Unlock()
+			if !failed {
+				responses.Lock()
+				responses.successes = append(responses.successes, n)
+				responses.Unlock()
+			} else {
+				responses.Lock()
+				responses.failures = append(responses.failures, n)
+				responses.Unlock()
+			}
 
-			start := time.Now()
-			j.node.memberlist.AddJoinList(res.Membership)
-
-			j.node.emit(AddJoinListEvent{
-				Duration: time.Now().Sub(start),
-			})
-		}(target)
+			wg.Done()
+		}(node)
 	}
-
 	// wait for joins to complete
 	wg.Wait()
 
@@ -434,45 +443,34 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	return responses.successes, responses.failures
 }
 
-// sendJoinRequest sends a join request to the specified target.
-func sendJoinRequest(node *Node, target string, timeout time.Duration) (*joinResponse, error) {
-	ctx, cancel := shared.NewTChannelContext(timeout)
-	defer cancel()
+func (j *joinSender) MakeCall(ctx json.Context, node string, res *joinResponse) <-chan error {
+	errC := make(chan error)
 
-	peer := node.channel.Peers().GetOrAdd(target)
-
-	req := joinRequest{
-		App:         node.app,
-		Source:      node.address,
-		Incarnation: node.Incarnation(),
-		Timeout:     timeout,
-	}
-	res := &joinResponse{}
-
-	// make request
-	errC := make(chan error, 1)
 	go func() {
-		errC <- json.CallPeer(ctx, peer, node.service, "/protocol/join", req, res)
+		defer close(errC)
+
+		peer := j.node.channel.Peers().GetOrAdd(node)
+
+		req := joinRequest{
+			App:         j.node.app,
+			Source:      j.node.address,
+			Incarnation: j.node.Incarnation(),
+			Timeout:     j.timeout,
+		}
+
+		err := json.CallPeer(ctx, peer, j.node.service, "/protocol/join", req, res)
+		if err != nil {
+			j.logger.WithFields(log.Fields{
+				"error": err,
+			}).Debug("could not complete join")
+			errC <- err
+			return
+		}
+
+		errC <- nil
 	}()
 
-	// wait for result or timeout
-	var err error
-	select {
-	case err = <-errC:
-	case <-ctx.Done():
-		err = errJoinTimeout
-	}
-
-	if err != nil {
-		logging.Logger("join").WithFields(log.Fields{
-			"local": node.Address(),
-			"error": err,
-		}).Debug("could not complete join")
-
-		return nil, err
-	}
-
-	return res, err
+	return errC
 }
 
 // SendJoin creates a new JoinSender and attempts to join the cluster defined by

@@ -72,7 +72,7 @@ func (s *MemberlistTestSuite) TestAddJoinList() {
 
 	// We add all the members of this node to the joinList because we want
 	// the joinList to contain the change for the local member.
-	mems := s.node.disseminator.MembershipAsChanges()
+	mems := s.node.disseminator.FullSync()
 	for _, mem := range mems {
 		joinList = append(joinList, mem)
 	}
@@ -200,31 +200,6 @@ func (s *MemberlistTestSuite) TestMultipleUpdates() {
 	s.Equal(Leave, member.Status, "expected member to be leave")
 }
 
-func (s *MemberlistTestSuite) TestUpdateTriggersReincarnation() {
-	source := "192.0.2.1:1234"
-	s.NotEqual(source, s.m.local.Address, "this test relies on the source and the target of the change to be different")
-
-	applied := s.m.Update([]Change{
-		Change{
-			Source:            source,
-			SourceIncarnation: 1337,
-
-			Address:     s.m.local.Address,
-			Incarnation: s.m.local.Incarnation,
-			Status:      Suspect,
-		},
-	})
-
-	s.Len(applied, 1, "expected change to be applied")
-
-	change := applied[0]
-	s.NotNil(change, "expected change not to be nil")
-	s.Equal(Alive, change.Status, "expected change to be overwritten to alive")
-	s.Equal(s.m.local.Address, change.Source, "expected source to be the node that reincarnated its self")
-	s.Equal(s.m.local.Incarnation, change.Incarnation, "expected the new incarnation number to be the same as the one that is stored on the local node")
-	s.Equal(s.m.local.Incarnation, change.SourceIncarnation, "expected the source incarnation number to be the same as the one that is stored on the local node")
-}
-
 func (s *MemberlistTestSuite) TestAliveToFaulty() {
 	s.m.MakeAlive("127.0.0.1:3002", s.incarnation)
 
@@ -252,41 +227,6 @@ func (s *MemberlistTestSuite) TestString() {
 func (s *MemberlistTestSuite) TestUpdateEmpty() {
 	applied := s.m.Update([]Change{})
 	s.Empty(applied, "expected no updates to be applied")
-}
-
-func (s *MemberlistTestSuite) TestUpdateWithTombstoneState() {
-	target := "127.0.0.1:3002"
-	s.m.MakeAlive(target, s.incarnation)
-
-	s.m.Update([]Change{
-		Change{
-			Address:     target,
-			Incarnation: s.incarnation,
-			Status:      Tombstone,
-		},
-	})
-
-	member := s.m.members.byAddress[target]
-
-	s.Assert().Equal(Tombstone, member.Status, "expected the member with tombstone state")
-}
-
-func (s *MemberlistTestSuite) TestUpdateWithTombstoneFlag() {
-	target := "127.0.0.1:3002"
-	s.m.MakeAlive(target, s.incarnation)
-
-	s.m.Update([]Change{
-		Change{
-			Address:     target,
-			Incarnation: s.incarnation,
-			Status:      Faulty,
-			Tombstone:   true,
-		},
-	})
-
-	member := s.m.members.byAddress[target]
-
-	s.Assert().Equal(Tombstone, member.Status, "expected the member with tombstone state")
 }
 
 func (s *MemberlistTestSuite) TestRandomPingable() {
@@ -336,30 +276,6 @@ func (s *MemberlistTestSuite) TestCountReachableMembers() {
 	reachableMemberCount := nodeA.CountReachableMembers()
 
 	s.Equal(3, reachableMemberCount, "expected 3 reachable members")
-}
-
-func (s *MemberlistTestSuite) TestRemoveMember() {
-	// seed the membership with more members
-	s.m.Update(s.changes)
-
-	var removed bool
-	var count int
-
-	count = s.m.NumMembers()
-	// remove an unknown member
-	removed = s.m.RemoveMember("192.0.2.123:1234")
-	s.Assert().False(removed, "expect to not remove an unknown member")
-	s.Assert().Equal(count, s.m.NumMembers(), "expected an unchanged count")
-
-	// remove a known member
-	removed = s.m.RemoveMember(s.changes[0].Address)
-	s.Assert().True(removed, "expect to remove a member that was added before")
-	s.Assert().Equal(count-1, s.m.NumMembers(), "expected that there is exactly one member less")
-}
-
-func (s *MemberlistTestSuite) TestApplyUnknownTombstone() {
-	applied := s.m.MakeTombstone("192.0.2.123:1234", 42)
-	s.Assert().Len(applied, 0, "expected that the declaration of a tombstone for an unknown member is not applied")
 }
 
 func TestMemberlistTestSuite(t *testing.T) {
