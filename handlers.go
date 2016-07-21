@@ -33,7 +33,11 @@ import (
 type Arg struct{}
 
 func (rp *Ringpop) registerHandlers() error {
+<<<<<<< HEAD
 	tapring := fmt.Sprintf("/%s/tapring", rp.app)
+=======
+	tapring := fmt.Sprintf("/%s/tapring", rp.App())
+>>>>>>> origin/ring_tapping
 	handlers := map[string]interface{}{
 		"/health":       rp.health,
 		"/admin/stats":  rp.adminStatsHandler,
@@ -42,7 +46,11 @@ func (rp *Ringpop) registerHandlers() error {
 	}
 
 	return json.Register(rp.subChannel, handlers, func(ctx context.Context, err error) {
+<<<<<<< HEAD
 		rp.logger.WithField("error", err).Info("error occured")
+=======
+		rp.logger.WithField("error", err).Info("register error occured")
+>>>>>>> origin/ring_tapping
 	})
 }
 

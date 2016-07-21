@@ -60,6 +60,30 @@ type Interface interface {
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
+<<<<<<< HEAD
+}
+
+// Ringpop is a consistent hashring that uses a gossip protocol to disseminate
+// changes around the ring.
+type Ringpop struct {
+	config         *configuration
+	configHashRing *hashring.Configuration
+
+	identityResolver IdentityResolver
+
+	state      state
+	stateMutex sync.RWMutex
+
+	clock clock.Clock
+
+	channel    shared.TChannel
+	subChannel shared.SubChannel
+	node       swim.NodeInterface
+	ring       *hashring.HashRing
+	forwarder  *forward.Forwarder
+
+	listeners []events.EventListener
+=======
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -92,6 +116,86 @@ type Ringpop struct {
 		sync.RWMutex
 	}
 
+	logger log.Logger
+
+	tickers   chan *clock.Ticker
+	startTime time.Time
+}
+
+// state represents the internal state of a Ringpop instance.
+type state uint
+
+const (
+	// created means the Ringpop instance has been created but the swim node,
+	// stats and hasring haven't been set up. The listen address has not been
+	// resolved yet either.
+	created state = iota
+	// initialized means the listen address has been resolved and the swim
+	// node, stats and hashring have been instantiated onto the Ringpop
+	// instance.
+	initialized
+	// ready means Bootstrap has been called, the ring has successfully
+	// bootstrapped and is now ready to receive requests.
+	ready
+	// destroyed means the Ringpop instance has been shut down, is no longer
+	// ready for requests and cannot be revived.
+	destroyed
+)
+
+// New returns a new Ringpop instance.
+func New(app string, opts ...Option) (*Ringpop, error) {
+	var err error
+
+	ringpop := &Ringpop{
+		config: &configuration{
+			App: app,
+		},
+		logger: logging.Logger("ringpop"),
+	}
+
+	err = applyOptions(ringpop, defaultOptions)
+	if err != nil {
+		panic(fmt.Errorf("Error applying default Ringpop options: %v", err))
+	}
+
+	err = applyOptions(ringpop, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	errs := checkOptions(ringpop)
+	if len(errs) != 0 {
+		return nil, fmt.Errorf("%v", errs)
+	}
+
+	ringpop.setState(created)
+
+	return ringpop, nil
+}
+
+// init configures a Ringpop instance and makes it ready to do comms.
+func (rp *Ringpop) init() error {
+	if rp.channel == nil {
+		return errors.New("Missing channel")
+	}
+
+	address, err := rp.identity()
+	if err != nil {
+		return err
+	}
+
+	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
+
+	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
+		Clock: rp.clock,
+	})
+	rp.node.RegisterListener(rp)
+>>>>>>> origin/ring_tapping
+
+	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
+	rp.ring.RegisterListener(rp)
+
+<<<<<<< HEAD
 	logger log.Logger
 
 	tickers   chan *clock.Ticker
@@ -261,6 +365,102 @@ func (rp *Ringpop) Destroy() {
 
 	rp.stopTimers()
 
+=======
+	rp.stats.hostport = genStatsHostport(address)
+	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
+	rp.stats.keys = make(map[string]string)
+
+	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
+	rp.forwarder.RegisterListener(rp)
+
+	rp.startTimers()
+	rp.setState(initialized)
+
+	return nil
+}
+
+// initHandlers is used to initialize the handlers
+func (rp *Ringpop) initHandlers() {
+	rp.registerHandlers()
+}
+
+// Starts periodic timers in a single goroutine. Can be turned back off via
+// stopTimers. At present, only 1 timer exists, to emit ring.checksum-periodic.
+func (rp *Ringpop) startTimers() {
+	if rp.tickers != nil {
+		return
+	}
+	rp.tickers = make(chan *clock.Ticker, 32) // 32 == max number of tickers
+
+	if rp.config.MembershipChecksumStatPeriod != StatPeriodNever {
+		ticker := rp.clock.Ticker(rp.config.MembershipChecksumStatPeriod)
+		rp.tickers <- ticker
+		go func() {
+			for _ = range ticker.C {
+				rp.statter.UpdateGauge(
+					rp.getStatKey("membership.checksum-periodic"),
+					nil,
+					int64(rp.node.GetChecksum()))
+			}
+		}()
+	}
+
+	if rp.config.RingChecksumStatPeriod != StatPeriodNever {
+		ticker := rp.clock.Ticker(rp.config.RingChecksumStatPeriod)
+		rp.tickers <- ticker
+		go func() {
+			for _ = range ticker.C {
+				rp.statter.UpdateGauge(
+					rp.getStatKey("ring.checksum-periodic"),
+					nil,
+					int64(rp.ring.Checksum()))
+			}
+		}()
+	}
+}
+
+func (rp *Ringpop) stopTimers() {
+	if rp.tickers != nil {
+		close(rp.tickers)
+		for ticker := range rp.tickers {
+			ticker.Stop()
+		}
+		rp.tickers = nil
+	}
+}
+
+// identity returns a host:port string of the address that Ringpop should
+// use as its identifier.
+func (rp *Ringpop) identity() (string, error) {
+	return rp.identityResolver()
+}
+
+// r.channelIdentityResolver resolves the hostport identity from the current
+// TChannel object on the Ringpop instance.
+func (rp *Ringpop) channelIdentityResolver() (string, error) {
+	peerInfo := rp.channel.PeerInfo()
+	// Check that TChannel is listening on a real hostport. By default,
+	// TChannel listens on an ephemeral host/port. The real port is then
+	// assigned by the OS when ListenAndServe is called. If the hostport is
+	// ephemeral, it means TChannel is not yet listening and the hostport
+	// cannot be resolved.
+	if peerInfo.IsEphemeralHostPort() {
+		return "", ErrEphemeralIdentity
+	}
+	return peerInfo.HostPort, nil
+}
+
+// Destroy stops all communication. Note that this does not close the TChannel
+// instance that was passed to Ringpop in the constructor. Once an instance is
+// destroyed, it cannot be restarted.
+func (rp *Ringpop) Destroy() {
+	if rp.node != nil {
+		rp.node.Destroy()
+	}
+
+	rp.stopTimers()
+
+>>>>>>> origin/ring_tapping
 	rp.setState(destroyed)
 }
 
@@ -314,6 +514,7 @@ func (rp *Ringpop) getState() state {
 	return r
 }
 
+<<<<<<< HEAD
 // setState sets the state of the current Ringpop instance. It will emit an appropriate
 // event when the state will actually change
 func (rp *Ringpop) setState(s state) {
@@ -331,6 +532,13 @@ func (rp *Ringpop) setState(s state) {
 			rp.emit(events.Destroyed{})
 		}
 	}
+=======
+// setState sets the state of the current Ringpop instance.
+func (rp *Ringpop) setState(s state) {
+	rp.stateMutex.Lock()
+	rp.state = s
+	rp.stateMutex.Unlock()
+>>>>>>> origin/ring_tapping
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -348,6 +556,10 @@ func (rp *Ringpop) setState(s state) {
 func (rp *Ringpop) Bootstrap(bootstrapOpts *swim.BootstrapOptions) ([]string, error) {
 	if rp.getState() < initialized {
 		err := rp.init()
+<<<<<<< HEAD
+=======
+		rp.initHandlers()
+>>>>>>> origin/ring_tapping
 		if err != nil {
 			return nil, err
 		}
@@ -375,19 +587,47 @@ func (rp *Ringpop) Ready() bool {
 	return rp.node.Ready()
 }
 
+<<<<<<< HEAD
+=======
+// TapRingInit is the routine which is used to initialize a tap ring instance
+func (rp *Ringpop) TapRingInit() error {
+	if rp.getState() < initialized {
+		err := rp.init()
+		if err != nil {
+			rp.logger.Errorf("error initing ring: %v", err)
+			return err
+		}
+	}
+
+	// set the state of ringpop instance and the SWIM instance as ready
+	rp.node.SetReady()
+	rp.setState(ready)
+
+	return nil
+}
+
+>>>>>>> origin/ring_tapping
 // TapRing attaches pulls the ring state from the given
 // host and updates its own ring accordingly
 // TODO: we should probably tap for a specific app on the host:port?
 func (rp *Ringpop) TapRing(host string, remoteApp string) error {
 	servers, checksum, err := tapRemoteRing(host, remoteApp, rp)
 	if err != nil {
+<<<<<<< HEAD
 		rp.log.WithFields(log.Fields{
+=======
+		rp.logger.WithFields(log.Fields{
+>>>>>>> origin/ring_tapping
 			"err":  err.Error(),
 			"host": host,
 		}).Info("tapring failed")
 		return err
 	}
+<<<<<<< HEAD
 	rp.ring.updateServers(servers, checksum)
+=======
+	rp.ring.UpdateServers(servers, checksum)
+>>>>>>> origin/ring_tapping
 	return nil
 }
 
@@ -500,18 +740,27 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.JoinTriesUpdateEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("join.retries"), nil, int64(event.Retries))
 
+<<<<<<< HEAD
+=======
+	case events.LookupEvent:
+		rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, event.Duration)
+
+>>>>>>> origin/ring_tapping
 	case swim.MakeNodeStatusEvent:
 		rp.statter.IncCounter(rp.getStatKey("make-"+event.Status), nil, 1)
 
 	case swim.RequestBeforeReadyEvent:
 		rp.statter.IncCounter(rp.getStatKey("not-ready."+string(event.Endpoint)), nil, 1)
 
+<<<<<<< HEAD
 	case swim.DiscoHealEvent:
 		rp.statter.IncCounter(rp.getStatKey("heal.triggered"), nil, 1)
 
 	case swim.AttemptHealEvent:
 		rp.statter.IncCounter(rp.getStatKey("heal.attempt"), nil, 1)
 
+=======
+>>>>>>> origin/ring_tapping
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
 
@@ -604,6 +853,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 
 	dest, success := rp.ring.Lookup(key)
 
+<<<<<<< HEAD
 	duration := time.Now().Sub(startTime)
 	rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, duration)
 
@@ -612,6 +862,13 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 		Duration: duration,
 	})
 
+=======
+	rp.emit(events.LookupEvent{
+		Key:      key,
+		Duration: time.Now().Sub(startTime),
+	})
+
+>>>>>>> origin/ring_tapping
 	if !success {
 		err := errors.New("could not find destination for key")
 		rp.logger.WithField("key", key).Warn(err)
@@ -628,6 +885,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
+<<<<<<< HEAD
 	startTime := time.Now()
 
 	destinations := rp.ring.LookupN(key, n)
@@ -648,6 +906,9 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	}
 
 	return destinations, nil
+=======
+	return rp.ring.LookupN(key, n), nil
+>>>>>>> origin/ring_tapping
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {
