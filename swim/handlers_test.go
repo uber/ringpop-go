@@ -128,7 +128,7 @@ func (s *HandlerTestSuite) TestToggleGossipHandler() {
 func (s *HandlerTestSuite) TestAdminLeaveJoinHandlers() {
 	// Join test node to cluster
 	s.cluster.Add(s.testNode.node)
-	s.Require().Equal(5, s.testNode.node.CountReachableMembers(), "expect a cluster of 5")
+	s.Require().Equal(5, s.testNode.node.CountMembers(ReachableMember), "expect a cluster of 5")
 
 	var err error
 	var status *Status
@@ -137,7 +137,7 @@ func (s *HandlerTestSuite) TestAdminLeaveJoinHandlers() {
 	status, err = s.testNode.node.adminLeaveHandler(s.ctx, &emptyArg{})
 	s.NoError(err, "calling handler should not result in error")
 	s.Equal(&Status{Status: "ok"}, status)
-	s.Equal(4, s.testNode.node.CountReachableMembers())
+	s.Equal(4, s.testNode.node.CountMembers(ReachableMember))
 
 	// Test join handler brings it back to 5
 	s.NotNil(s.mockClock)
@@ -145,7 +145,7 @@ func (s *HandlerTestSuite) TestAdminLeaveJoinHandlers() {
 	status, err = s.testNode.node.adminJoinHandler(s.ctx, &emptyArg{})
 	s.NoError(err, "calling handler should not result in error")
 	s.Equal(&Status{Status: "rejoined"}, status)
-	s.Equal(5, s.testNode.node.CountReachableMembers())
+	s.Equal(5, s.testNode.node.CountMembers(ReachableMember))
 }
 
 // TestRegisterHandlers tests that registerHandler always succeeds.

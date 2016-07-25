@@ -103,8 +103,8 @@ func (h *discoverProviderHealer) Stop() {
 // discover provider.
 func (h *discoverProviderHealer) Probability() float64 {
 	// avoid division by zero.
-	if h.previousHostListSize < h.node.CountReachableMembers() {
-		h.previousHostListSize = h.node.CountReachableMembers()
+	if h.previousHostListSize < h.node.CountMembers(ReachableMember) {
+		h.previousHostListSize = h.node.CountMembers(ReachableMember)
 	}
 	if h.previousHostListSize < 1 {
 		h.previousHostListSize = 1

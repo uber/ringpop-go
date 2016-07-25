@@ -8,7 +8,6 @@ import "github.com/uber/ringpop-go/events"
 import "github.com/uber/ringpop-go/forward"
 
 import "github.com/uber/ringpop-go/swim"
-
 import "github.com/uber/tchannel-go"
 
 type Ringpop struct {
@@ -169,13 +168,13 @@ func (_m *Ringpop) LookupN(key string, n int) ([]string, error) {
 	return r0, r1
 }
 
-// GetReachableMembers provides a mock function with given fields:
-func (_m *Ringpop) GetReachableMembers() ([]string, error) {
-	ret := _m.Called()
+// GetReachableMembers provides a mock function with given fields: predicates
+func (_m *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error) {
+	ret := _m.Called(predicates)
 
 	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) []string); ok {
+		r0 = rf(predicates...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
@@ -183,8 +182,8 @@ func (_m *Ringpop) GetReachableMembers() ([]string, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(...swim.MemberPredicate) error); ok {
+		r1 = rf(predicates...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -192,20 +191,20 @@ func (_m *Ringpop) GetReachableMembers() ([]string, error) {
 	return r0, r1
 }
 
-// CountReachableMembers provides a mock function with given fields:
-func (_m *Ringpop) CountReachableMembers() (int, error) {
-	ret := _m.Called()
+// CountReachableMembers provides a mock function with given fields: predicates
+func (_m *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (int, error) {
+	ret := _m.Called(predicates)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) int); ok {
+		r0 = rf(predicates...)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(...swim.MemberPredicate) error); ok {
+		r1 = rf(predicates...)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -1,10 +1,9 @@
 package mocks
 
-import (
-	"github.com/uber/ringpop-go/events"
-	"github.com/uber/ringpop-go/swim"
-)
+import "github.com/uber/ringpop-go/swim"
 import "github.com/stretchr/testify/mock"
+
+import "github.com/uber/ringpop-go/events"
 
 type SwimNode struct {
 	mock.Mock
@@ -33,13 +32,13 @@ func (_m *SwimNode) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	return r0, r1
 }
 
-// CountReachableMembers provides a mock function with given fields:
-func (_m *SwimNode) CountReachableMembers() int {
-	ret := _m.Called()
+// CountMembers provides a mock function with given fields: predicates
+func (_m *SwimNode) CountMembers(predicates ...swim.MemberPredicate) int {
+	ret := _m.Called(predicates)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) int); ok {
+		r0 = rf(predicates...)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
@@ -66,16 +65,16 @@ func (_m *SwimNode) GetChecksum() uint32 {
 	return r0
 }
 
-// GetReachableMembers provides a mock function with given fields:
-func (_m *SwimNode) GetReachableMembers() []string {
-	ret := _m.Called()
+// GetMembers provides a mock function with given fields: predicates
+func (_m *SwimNode) GetMembers(predicates ...swim.MemberPredicate) []swim.Member {
+	ret := _m.Called(predicates)
 
-	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
-		r0 = rf()
+	var r0 []swim.Member
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) []swim.Member); ok {
+		r0 = rf(predicates...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).([]swim.Member)
 		}
 	}
 

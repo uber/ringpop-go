@@ -55,8 +55,8 @@ type Interface interface {
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
-	GetReachableMembers() ([]string, error)
-	CountReachableMembers() (int, error)
+	GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error)
+	CountReachableMembers(predicates ...swim.MemberPredicate) (int, error)
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
@@ -179,8 +179,8 @@ func (rp *Ringpop) init() error {
 	rp.ring.RegisterListener(rp)
 
 	// add all members present in the membership of the node on startup.
-	for _, address := range rp.node.GetReachableMembers() {
-		rp.ring.AddServer(address)
+	for _, member := range rp.node.GetMembers(swim.ReachableMember) {
+		rp.ring.AddServer(member.Address)
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
@@ -647,20 +647,30 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 
 // GetReachableMembers returns a slice of members currently in this instance's
 // membership list that aren't faulty.
-func (rp *Ringpop) GetReachableMembers() ([]string, error) {
+func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
-	return rp.node.GetReachableMembers(), nil
+
+	predicates = append(predicates, swim.ReachableMember)
+	members := rp.node.GetMembers(predicates...)
+
+	addresses := make([]string, 0, len(members))
+	for _, member := range members {
+		addresses = append(addresses, member.Address)
+	}
+	return addresses, nil
 }
 
 // CountReachableMembers returns the number of members currently in this
 // instance's membership list that aren't faulty.
-func (rp *Ringpop) CountReachableMembers() (int, error) {
+func (rp *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (int, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
 	}
-	return rp.node.CountReachableMembers(), nil
+
+	predicates = append(predicates, swim.ReachableMember)
+	return rp.node.CountMembers(predicates...), nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
