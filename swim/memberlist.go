@@ -23,7 +23,6 @@ package swim
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"sort"
 	"sync"
@@ -56,7 +55,7 @@ type memberlist struct {
 	// could use members lock for that, but that introduces more deadlocks, so
 	// making a short-term fix instead by adding another lock. Like said, this
 	// is short-term, see github#113.
-	sync.Mutex
+	sync.RWMutex
 }
 
 // newMemberlist returns a new member list
@@ -64,9 +63,18 @@ func newMemberlist(n *Node) *memberlist {
 	m := &memberlist{
 		node:   n,
 		logger: logging.Logger("membership").WithField("local", n.address),
+
+		// prepopulate the local member with its state
+		local: &Member{
+			Address:     n.Address(),
+			Incarnation: nowInMillis(n.clock),
+			Status:      Alive,
+		},
 	}
 
 	m.members.byAddress = make(map[string]*Member)
+	m.members.byAddress[m.local.Address] = m.local
+	m.members.list = append(m.members.list, m.local)
 
 	return m
 }
@@ -105,6 +113,7 @@ func (m *memberlist) ComputeChecksum() {
 // generates string to use when computing checksum
 func (m *memberlist) GenChecksumString() string {
 	var strings sort.StringSlice
+	var buffer bytes.Buffer
 
 	for _, member := range m.members.list {
 		// Don't include Tombstone nodes in the checksum to avoid
@@ -112,13 +121,16 @@ func (m *memberlist) GenChecksumString() string {
 		if member.Status == Tombstone {
 			continue
 		}
-		s := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
-		strings = append(strings, s)
+
+		// collect the string from the member and add it to the list of strings
+		member.checksumString(&buffer)
+		strings = append(strings, buffer.String())
+		// the buffer is reused for the next member and collection below
+		buffer.Reset()
 	}
 
 	strings.Sort()
 
-	buffer := bytes.NewBuffer([]byte{})
 	for _, str := range strings {
 		buffer.WriteString(str)
 		buffer.WriteString(";")
@@ -232,7 +244,22 @@ func (m *memberlist) GetMembers() (members []Member) {
 // Reincarnate sets the status of the node to Alive and updates the incarnation
 // number. It adds the change to the disseminator as well.
 func (m *memberlist) Reincarnate() []Change {
-	return m.MakeAlive(m.node.address, nowInMillis(m.node.clock))
+	return m.MakeAlive(m.local.Address, nowInMillis(m.node.clock))
+}
+
+// creates a change that reincarnates the local node. It does not change the
+// state of the node but rather reasserts its state by bumping its incarnation
+// number.
+func (m *memberlist) reincarnationChange() Change {
+	// reincarnate the local copy of the state of the node
+	m.local.Incarnation = nowInMillis(m.node.clock)
+
+	// create a change to disseminate around
+	change := Change{}
+	change.populateSource(m.local)
+	change.populateSubject(m.local)
+
+	return change
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
@@ -250,9 +277,45 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
+// TODO: MakeLeave is only during testing. Need to figure out if we want to keep
+// it around or rewrite the tests.
 func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
+	// for backwards compatibility in tests we allow to update the local member
+	// in place when the gossip is about the local node and an incarnation number
+	// that is expected to have accept the update.
+	if address == m.local.Address && m.local.Incarnation <= incarnation {
+		m.local.Status = Leave
+	}
+
 	m.node.emit(MakeNodeStatusEvent{Leave})
 	return m.MakeChange(address, incarnation, Leave)
+}
+
+func (m *memberlist) SetLocalStatus(status string) {
+	m.local.Status = status
+	m.postLocalUpdate()
+}
+
+// postLocalUpdate should be called after the local Member has been updated to
+// make sure that its new state has a higher incarnation number and the change
+// will be recorded as a change to gossip around.
+func (m *memberlist) postLocalUpdate() {
+	// bump our incarnation for this change to be accepted by all peers
+	m.local.Incarnation = nowInMillis(m.node.clock)
+
+	// since we changed our local state we need to update our checksum
+	m.ComputeChecksum()
+
+	// prepare the gossip
+	change := Change{}
+	change.populateSubject(m.local)
+	change.populateSource(m.local)
+
+	changes := []Change{change}
+
+	// kick in our updating mechanism
+	m.node.handleChanges(changes)
+	m.node.rollup.TrackUpdates(changes)
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -280,30 +343,34 @@ func (m *memberlist) Evict(address string) {
 
 // makes a change to the member list
 func (m *memberlist) MakeChange(address string, incarnation int64, status string) []Change {
-	if m.local == nil {
-		m.local = &Member{
-			Address:     m.node.Address(),
-			Incarnation: util.TimeNowMS(),
-			Status:      Alive,
-		}
-	}
 
-	changes := m.Update([]Change{Change{
-		Source:            m.local.Address,
-		SourceIncarnation: m.local.Incarnation,
-		Address:           address,
-		Incarnation:       incarnation,
-		Status:            status,
-		Timestamp:         util.Timestamp(time.Now()),
-	}})
+	member, _ := m.Member(address)
 
-	if len(changes) > 0 {
+	// create the new change based on information know to the memberlist
+	var change Change
+	change.populateSubject(member)
+	change.populateSource(m.local)
+
+	// Override values that are specific to the change we are making
+	change.Address = address
+	change.Incarnation = incarnation
+	change.Status = status
+	// Keep track of when the change was made
+	change.Timestamp = util.Timestamp(time.Now())
+
+	return m.ApplyChange(change)
+}
+
+func (m *memberlist) ApplyChange(c Change) []Change {
+	applied := m.Update([]Change{c})
+
+	if len(applied) > 0 {
 		m.logger.WithFields(bark.Fields{
-			"update": changes[0],
-		}).Debugf("ringpop member declares other member %s", changes[0].Status)
+			"update": applied[0],
+		}).Debugf("ringpop member declares other member %s", applied[0].Status)
 	}
 
-	return changes
+	return applied
 }
 
 // updates the member list with the slice of changes, applying selectively
@@ -320,50 +387,52 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
 	m.Lock()
+
+	// run through all changes received and figure out if they need to be accepted
 	m.members.Lock()
-
 	for _, change := range changes {
-		member, ok := m.members.byAddress[change.Address]
+		member, has := m.members.byAddress[change.Address]
 
-		// first time member has been seen, take change wholesale
-		if !ok {
-			if m.Apply(change) {
-				applied = append(applied, change)
+		// transform the change into a member that we can test against existing
+		// members
+		gossip := Member{}
+		gossip.populateFromChange(&change)
+
+		// test to see if we accpet the gossip
+		if acceptGossip(member, &gossip) {
+			// the gossip is accepted
+
+			if gossip.Address == m.local.Address {
+				// if the gossip is about the local member it needs to be
+				// countered with a reincarnation gossip
+				change = m.reincarnationChange()
+				m.node.emit(RefuteUpdateEvent{})
+			} else {
+				// otherwise it can be applied to the memberlist
+
+				// if the member was not already present in the list we will it
+				// needs to be added and randomly inserted in the list to ensure
+				// guarantees for pinging
+				if !has {
+					m.members.byAddress[gossip.Address] = &gossip
+					i := m.getJoinPosition()
+					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
+				} else {
+					// copy the state of the gossip to the member
+					*member = gossip
+				}
+
 			}
-			continue
-		}
 
-		// if change is local override, reassert member is alive
-		if member.localOverride(m.node.Address(), change) {
-			m.node.emit(RefuteUpdateEvent{})
-			newIncNo := nowInMillis(m.node.clock)
-			overrideChange := Change{
-				Source:            m.node.Address(),
-				SourceIncarnation: newIncNo,
-				Address:           change.Address,
-				Incarnation:       newIncNo,
-				Status:            Alive,
-				Timestamp:         util.Timestamp(time.Now()),
-			}
+			// keep track of the change that it has been applied
+			applied = append(applied, change)
 
-			if m.Apply(overrideChange) {
-				applied = append(applied, overrideChange)
-			}
-
-			continue
-		}
-
-		// if non-local override, apply change wholesale
-		if member.nonLocalOverride(change) {
-			if m.Apply(change) {
-				applied = append(applied, change)
-			}
 		}
 	}
-
 	m.members.Unlock()
 
 	if len(applied) > 0 {
+		// when there are changes applied we need to recalculate our checksum
 		oldChecksum := m.Checksum()
 		m.ComputeChecksum()
 
@@ -412,40 +481,6 @@ func (m *memberlist) getJoinPosition() int {
 		return l
 	}
 	return rand.Intn(l)
-}
-
-// Apply tries to apply the change to the memberlsist. Returns true when the change was applied
-func (m *memberlist) Apply(change Change) bool {
-	member, ok := m.members.byAddress[change.Address]
-
-	if !ok {
-		// avoid indefinite tombstones by not creating new nodes
-		// directly in this state
-		if change.Status == Tombstone {
-			return false
-		}
-
-		member = &Member{
-			Address:     change.Address,
-			Status:      change.Status,
-			Incarnation: change.Incarnation,
-		}
-
-		if member.Address == m.node.Address() {
-			m.local = member
-		}
-
-		m.members.byAddress[change.Address] = member
-		i := m.getJoinPosition()
-		m.members.list = append(m.members.list[:i], append([]*Member{member}, m.members.list[i:]...)...)
-	}
-
-	member.Lock()
-	member.Status = change.Status
-	member.Incarnation = change.Incarnation
-	member.Unlock()
-
-	return true
 }
 
 // shuffles the member list

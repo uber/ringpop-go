@@ -160,6 +160,12 @@ func (rp *Ringpop) init() error {
 		return err
 	}
 
+	// early initialization of statter before registering listeners that might
+	// fire and try to stat
+	rp.stats.hostport = genStatsHostport(address)
+	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
+	rp.stats.keys = make(map[string]string)
+
 	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
 	rp.registerHandlers()
 
@@ -172,9 +178,10 @@ func (rp *Ringpop) init() error {
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
 	rp.ring.RegisterListener(rp)
 
-	rp.stats.hostport = genStatsHostport(address)
-	rp.stats.prefix = fmt.Sprintf("ringpop.%s", rp.stats.hostport)
-	rp.stats.keys = make(map[string]string)
+	// add all members present in the membership of the node on startup.
+	for _, address := range rp.node.GetReachableMembers() {
+		rp.ring.AddServer(address)
+	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
 	rp.forwarder.RegisterListener(rp)

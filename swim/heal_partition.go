@@ -72,19 +72,35 @@ func nodesThatNeedToReincarnate(MA, MB []Change) (changesForA, changesForB []Cha
 		// If a node would be overwritten and would stop being pingable, it is
 		// not suited for merging.
 		if b.isPingable() && a.overrides(b) && !a.isPingable() {
-			changesForB = append(changesForB, Change{
-				Address:     a.Address,
-				Incarnation: a.Incarnation,
-				Status:      Suspect,
-			})
+			// take a look at the state of the member
+			member := Member{}
+			member.populateFromChange(&a)
+
+			// create the member into a change
+			change := Change{}
+			change.populateSubject(&member)
+
+			// gossip the suspect status
+			change.Status = Suspect
+
+			// record the change to be sent to B
+			changesForB = append(changesForB, change)
 		}
 
 		if a.isPingable() && b.overrides(a) && !b.isPingable() {
-			changesForA = append(changesForA, Change{
-				Address:     b.Address,
-				Incarnation: b.Incarnation,
-				Status:      Suspect,
-			})
+			// take a look at the state of the member
+			member := Member{}
+			member.populateFromChange(&b)
+
+			// create the member into a change
+			change := Change{}
+			change.populateSubject(&member)
+
+			// gossip the suspect status
+			change.Status = Suspect
+
+			// record the change to be sent to A
+			changesForA = append(changesForA, change)
 		}
 	}
 
