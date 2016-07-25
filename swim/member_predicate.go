@@ -26,3 +26,18 @@ func TestMember(member Member, predicates ...MemberPredicate) bool {
 func ReachableMember(member Member) bool {
 	return member.Status == Alive || member.Status == Suspect
 }
+
+// LabeledMember returns a predicate able to test if the value of a label on a
+// member is equal to the provided value.
+func LabeledMember(key, value string) MemberPredicate {
+	return func(member Member) bool {
+		v, ok := member.Labels[key]
+
+		if !ok {
+			return false
+		}
+
+		// test if the values match
+		return v == value
+	}
+}

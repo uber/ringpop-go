@@ -11,4 +11,8 @@ var (
 	// using port 0 and is not listening (and thus has not been assigned a port by
 	// the OS).
 	ErrEphemeralIdentity = errors.New("unable to resolve this node's identity from channel that is not yet listening")
+
+	// ErrLabelsNotSupported is returned when the backing membership has no
+	// support for synchronizing labels.
+	ErrLabelsNotSupported = errors.New("labels are not supported on the current membership")
 )

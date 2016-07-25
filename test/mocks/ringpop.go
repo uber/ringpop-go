@@ -255,3 +255,26 @@ func (_m *Ringpop) Forward(dest string, keys []string, request []byte, service s
 
 	return r0, r1
 }
+
+// Labels provides a mock function with given fields:
+func (_m *Ringpop) Labels() (*swim.NodeLabels, error) {
+	ret := _m.Called()
+
+	var r0 *swim.NodeLabels
+	if rf, ok := ret.Get(0).(func() *swim.NodeLabels); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*swim.NodeLabels)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}

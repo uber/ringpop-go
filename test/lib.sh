@@ -2,7 +2,7 @@
 
 declare project_root="${0%/*}/.."
 declare ringpop_common_dir="${0%/*}/ringpop-common"
-declare ringpop_common_branch="master"
+declare ringpop_common_branch="feature/labels"
 
 #
 # Clones or updates the ringpop-common repository.

@@ -162,3 +162,38 @@ func TestAcceptGossip(t *testing.T) {
 		assert.Equal(t, test.process, shouldProcessGossip(test.member, test.gossip), "expected to "+test.name)
 	}
 }
+
+func TestMemberChecksumStringLabels(t *testing.T) {
+	member := Member{
+		Address:     "192.168.2.1:1234",
+		Status:      Alive,
+		Incarnation: 42,
+		Labels: LabelMap{
+			"hello": "world",
+		},
+	}
+
+	var b bytes.Buffer
+	member.checksumString(&b)
+
+	// the number 1613250528 is the farmhash fingerprint of /hello/world
+	assert.Equal(t, "192.168.2.1:1234alive42#labels1613250528", b.String(), "member checksum serialization failed")
+}
+
+func TestMemberChecksumStringMultiLabels(t *testing.T) {
+	member := Member{
+		Address:     "192.168.2.1:1234",
+		Status:      Alive,
+		Incarnation: 42,
+		Labels: LabelMap{
+			"hello": "world",
+			"foo":   "bar",
+		},
+	}
+
+	var b bytes.Buffer
+	member.checksumString(&b)
+
+	// the number -1494888142 is the farmhash fingerprint of /hello/world xorred with the fingerprint of /foo/bar
+	assert.Equal(t, "192.168.2.1:1234alive42#labels-1494888142", b.String(), "member checksum serialization failed")
+}

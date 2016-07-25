@@ -144,6 +144,8 @@ type NodeInterface interface {
 	ProtocolStats() ProtocolStats
 	Ready() bool
 	RegisterListener(l events.EventListener)
+
+	Labels() *NodeLabels
 }
 
 // A Node is a SWIM member
@@ -529,4 +531,11 @@ func (n *Node) GetMembers(predicates ...MemberPredicate) []Member {
 // is to count all reachable members by passing the ReachableMember predicate.
 func (n *Node) CountMembers(predicates ...MemberPredicate) int {
 	return n.memberlist.CountMembers(predicates...)
+}
+
+// Labels returns a mutator for the labels kept on this local node. This mutator
+// interacts with the local node and memberlist to change labels on this node
+// and gossip those changes around.
+func (n *Node) Labels() *NodeLabels {
+	return &NodeLabels{n}
 }

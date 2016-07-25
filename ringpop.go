@@ -60,6 +60,8 @@ type Interface interface {
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
+
+	Labels() (*swim.NodeLabels, error)
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -733,6 +735,17 @@ func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, 
 	format tchannel.Format, opts *forward.Options) ([]byte, error) {
 
 	return rp.forwarder.ForwardRequest(request, dest, service, endpoint, keys, format, opts)
+}
+
+// Labels provides access to a mutator of ringpop Labels that will be shared on
+// the membership. Changes made on the mutator are synchronized accross the
+// cluster for other members to make local decisions on.
+func (rp *Ringpop) Labels() (*swim.NodeLabels, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
+	}
+
+	return rp.node.Labels(), nil
 }
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes
