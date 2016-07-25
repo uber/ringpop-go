@@ -231,11 +231,13 @@ func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*
 }
 
 // returns an immutable slice of members representing the current state of the membership
-func (m *memberlist) GetMembers() (members []Member) {
+func (m *memberlist) GetMembers(predicates ...MemberPredicate) (members []Member) {
 	m.members.RLock()
 	members = make([]Member, 0, len(m.members.list))
 	for _, member := range m.members.list {
-		members = append(members, *member)
+		if TestMember(*member, predicates...) {
+			members = append(members, *member)
+		}
 	}
 	m.members.RUnlock()
 
@@ -487,25 +489,12 @@ func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
 }
 
-func (m *memberlist) GetReachableMembers() []string {
-	m.members.RLock()
-	active := make([]string, 0, len(m.members.list))
-	for _, member := range m.members.list {
-		if member.isReachable() {
-			active = append(active, member.Address)
-		}
-	}
-	m.members.RUnlock()
-
-	return active
-}
-
-func (m *memberlist) CountReachableMembers() int {
+func (m *memberlist) CountMembers(predicates ...MemberPredicate) int {
 	count := 0
 
 	m.members.RLock()
 	for _, member := range m.members.list {
-		if member.isReachable() {
+		if TestMember(*member, predicates...) {
 			count++
 		}
 	}
