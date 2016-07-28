@@ -22,8 +22,8 @@ package swim
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
+	"strconv"
 
 	"github.com/uber/ringpop-go/util"
 )
@@ -70,7 +70,9 @@ func (m *Member) populateFromChange(c *Change) {
 // checksumString fills a buffer that is passed with the contents that this node
 // needs to add to the checksum string.
 func (m Member) checksumString(b *bytes.Buffer) {
-	fmt.Fprintf(b, "%s%s%v", m.Address, m.Status, m.Incarnation)
+	b.WriteString(m.Address)
+	b.WriteString(m.Status)
+	b.WriteString(strconv.FormatInt(m.Incarnation, 10))
 }
 
 // shuffles slice of members pseudo-randomly, returns new slice
