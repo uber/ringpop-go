@@ -206,6 +206,11 @@ func (c *Change) populateSource(m *Member) {
 	c.SourceIncarnation = m.Incarnation
 }
 
+func (c *Change) scrubSource() {
+	c.Source = ""
+	c.SourceIncarnation = 0
+}
+
 // suspect interface
 func (c Change) address() string {
 	return c.Address

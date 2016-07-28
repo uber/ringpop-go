@@ -69,16 +69,21 @@ func nodesThatNeedToReincarnate(MA, MB []Change) (changesForA, changesForB []Cha
 			continue
 		}
 
+		// TODO: DRY
+
 		// If a node would be overwritten and would stop being pingable, it is
 		// not suited for merging.
 		if b.isPingable() && a.overrides(b) && !a.isPingable() {
-			// take a look at the state of the member
-			member := Member{}
-			member.populateFromChange(&a)
+			// take the change in a local variable, this protects to inadvertly
+			// changing the type of `a` from a value type to a pointer type.
+			var change Change
+			change = a
 
-			// create the member into a change
-			change := Change{}
-			change.populateSubject(&member)
+			// Remove the source information from the change. If the source
+			// information is present and it is gossiped to the other partition
+			// it might cause the partitions to heal before they are in a safe
+			// state.
+			change.scrubSource()
 
 			// gossip the suspect status
 			change.Status = Suspect
@@ -88,13 +93,16 @@ func nodesThatNeedToReincarnate(MA, MB []Change) (changesForA, changesForB []Cha
 		}
 
 		if a.isPingable() && b.overrides(a) && !b.isPingable() {
-			// take a look at the state of the member
-			member := Member{}
-			member.populateFromChange(&b)
+			// take the change in a local variable, this protects to inadvertly
+			// changing the type of `a` from a value type to a pointer type.
+			var change Change
+			change = b
 
-			// create the member into a change
-			change := Change{}
-			change.populateSubject(&member)
+			// Remove the source information from the change. If the source
+			// information is present and it is gossiped to the other partition
+			// it might cause the partitions to heal before they are in a safe
+			// state.
+			change.scrubSource()
 
 			// gossip the suspect status
 			change.Status = Suspect
