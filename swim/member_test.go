@@ -21,7 +21,6 @@
 package swim
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -93,17 +92,4 @@ func TestChangeOmitTombstone(t *testing.T) {
 	json.Unmarshal(data, &parsedMap)
 	_, has := parsedMap["tombstone"]
 	assert.False(t, has, "don't expect the tombstone field to be serialized when it is")
-}
-
-func TestMemberChecksumString(t *testing.T) {
-	member := Member{
-		Address:     "192.168.2.1:1234",
-		Status:      Alive,
-		Incarnation: 42,
-	}
-
-	var b bytes.Buffer
-	member.checksumString(&b)
-
-	assert.Equal(t, "192.168.2.1:1234alive42", b.String(), "member checksum serialization failed")
 }
