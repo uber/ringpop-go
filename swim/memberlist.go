@@ -418,7 +418,10 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 					i := m.getJoinPosition()
 					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
 				} else {
-					// copy the state of the gossip to the member
+					// copy the value of the gossip into the already existing
+					// struct. This operation is by value, not by reference.
+					// this is to keep both the list and byAddress map in sync
+					// without tedious lookup operations.
 					*member = gossip
 				}
 
