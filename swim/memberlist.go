@@ -198,13 +198,13 @@ func (m *memberlist) Pingable(member Member) bool {
 
 // returns the number of pingable members in the memberlist
 func (m *memberlist) NumPingableMembers() (n int) {
-	m.members.Lock()
+	m.members.RLock()
 	for _, member := range m.members.list {
 		if m.Pingable(*member) {
 			n++
 		}
 	}
-	m.members.Unlock()
+	m.members.RUnlock()
 
 	return n
 }
@@ -233,6 +233,7 @@ func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*
 // returns an immutable slice of members representing the current state of the membership
 func (m *memberlist) GetMembers() (members []Member) {
 	m.members.RLock()
+	members = make([]Member, 0, len(m.members.list))
 	for _, member := range m.members.list {
 		members = append(members, *member)
 	}
@@ -507,9 +508,8 @@ func (m *memberlist) Iter() *memberlistIter {
 }
 
 func (m *memberlist) GetReachableMembers() []string {
-	var active []string
-
 	m.members.RLock()
+	active := make([]string, 0, len(m.members.list))
 	for _, member := range m.members.list {
 		if member.isReachable() {
 			active = append(active, member.Address)
