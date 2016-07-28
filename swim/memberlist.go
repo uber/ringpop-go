@@ -91,7 +91,7 @@ func (m *memberlist) Checksum() uint32 {
 func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
-	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
+	checksum := farm.Fingerprint32([]byte(m.genChecksumString()))
 	oldChecksum := m.members.checksum
 	m.members.checksum = checksum
 	m.members.Unlock()
@@ -111,7 +111,7 @@ func (m *memberlist) ComputeChecksum() {
 }
 
 // generates string to use when computing checksum
-func (m *memberlist) GenChecksumString() string {
+func (m *memberlist) genChecksumString() string {
 	var strings sort.StringSlice
 	var buffer bytes.Buffer
 
