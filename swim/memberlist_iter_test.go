@@ -49,8 +49,19 @@ func (s *MemberlistIterTestSuite) TearDownTest() {
 }
 
 func (s *MemberlistIterTestSuite) TestNoneUseable() {
-	s.m.MakeFaulty("127.0.0.1:3002", s.incarnation)
-	s.m.MakeLeave("127.0.0.1:3003", s.incarnation)
+	// populate the membership with two unusable nodes.
+	s.m.Update([]Change{
+		Change{
+			Address:     "127.0.0.1:3002",
+			Incarnation: s.incarnation,
+			Status:      Faulty,
+		},
+		Change{
+			Address:     "127.0.0.1:3003",
+			Incarnation: s.incarnation,
+			Status:      Leave,
+		},
+	})
 
 	member, ok := s.i.Next()
 	s.Nil(member, "expected member to be nil")
@@ -81,10 +92,12 @@ func (s *MemberlistIterTestSuite) TestIterOverFive() {
 }
 
 func (s *MemberlistIterTestSuite) TestIterSkips() {
-	s.m.MakeAlive("127.0.0.1:3002", s.incarnation)
-	s.m.MakeFaulty("127.0.0.1:3003", s.incarnation)
-	s.m.MakeAlive("127.0.0.1:3004", s.incarnation)
-	s.m.MakeLeave("127.0.0.1:3005", s.incarnation)
+	s.m.Update([]Change{
+		Change{Address: "127.0.0.1:3002", Incarnation: s.incarnation, Status: Alive},
+		Change{Address: "127.0.0.1:3003", Incarnation: s.incarnation, Status: Faulty},
+		Change{Address: "127.0.0.1:3004", Incarnation: s.incarnation, Status: Alive},
+		Change{Address: "127.0.0.1:3005", Incarnation: s.incarnation, Status: Leave},
+	})
 
 	iterated := make(map[string]int)
 
