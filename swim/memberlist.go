@@ -242,12 +242,6 @@ func (m *memberlist) GetMembers() (members []Member) {
 	return
 }
 
-// Reincarnate sets the status of the node to Alive and updates the incarnation
-// number. It adds the change to the disseminator as well.
-func (m *memberlist) Reincarnate() []Change {
-	return m.MakeAlive(m.local.Address, nowInMillis(m.node.clock))
-}
-
 // bumpIncarnation will increase the incarnation number of the local member. It
 // will also prepare the change needed to gossip the change to the rest of the
 // network. This function does not update the checksum stored on the membership,
