@@ -248,10 +248,12 @@ func (m *memberlist) Reincarnate() []Change {
 	return m.MakeAlive(m.local.Address, nowInMillis(m.node.clock))
 }
 
-// creates a change that reincarnates the local node. It does not change the
-// state of the node but rather reasserts its state by bumping its incarnation
-// number.
-func (m *memberlist) reincarnationChange() Change {
+// bumpIncarnation will increase the incarnation number of the local member. It
+// will also prepare the change needed to gossip the change to the rest of the
+// network. This function does not update the checksum stored on the membership,
+// this is the responsibility of the caller since more changes might be made at
+// the same time.
+func (m *memberlist) bumpIncarnation() Change {
 	// reincarnate the local copy of the state of the node
 	m.local.Incarnation = nowInMillis(m.node.clock)
 
@@ -302,15 +304,10 @@ func (m *memberlist) SetLocalStatus(status string) {
 // will be recorded as a change to gossip around.
 func (m *memberlist) postLocalUpdate() {
 	// bump our incarnation for this change to be accepted by all peers
-	m.local.Incarnation = nowInMillis(m.node.clock)
+	change := m.bumpIncarnation()
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
-
-	// prepare the gossip
-	change := Change{}
-	change.populateSubject(m.local)
-	change.populateSource(m.local)
 
 	changes := []Change{change}
 
@@ -405,8 +402,9 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 			if gossip.Address == m.local.Address {
 				// if the gossip is about the local member it needs to be
-				// countered with a reincarnation gossip
-				change = m.reincarnationChange()
+				// countered by increasing the incarnation number and gossip the
+				// new change to the network.
+				change = m.bumpIncarnation()
 				m.node.emit(RefuteUpdateEvent{})
 			} else {
 				// otherwise it can be applied to the memberlist
