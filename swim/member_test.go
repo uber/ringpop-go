@@ -94,11 +94,11 @@ func TestChangeOmitTombstone(t *testing.T) {
 	assert.False(t, has, "don't expect the tombstone field to be serialized when it is")
 }
 
-var acceptGossipTests = []struct {
-	member *Member
-	gossip *Member
-	accept bool
-	name   string
+var shouldProcessGossipTests = []struct {
+	member  *Member
+	gossip  *Member
+	process bool
+	name    string
 }{
 	// test against unknown members
 	{nil, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, true, "accept Alive gossip for an unknown member"},
@@ -158,7 +158,7 @@ var acceptGossipTests = []struct {
 }
 
 func TestAcceptGossip(t *testing.T) {
-	for _, test := range acceptGossipTests {
-		assert.Equal(t, test.accept, acceptGossip(test.member, test.gossip), "expected to "+test.name)
+	for _, test := range shouldProcessGossipTests {
+		assert.Equal(t, test.process, shouldProcessGossip(test.member, test.gossip), "expected to "+test.name)
 	}
 }

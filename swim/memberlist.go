@@ -390,23 +390,23 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		gossip := Member{}
 		gossip.populateFromChange(&change)
 
-		// test to see if we accpet the gossip
-		if acceptGossip(member, &gossip) {
-			// the gossip is accepted
+		// test to see if we need to process the gossip
+		if shouldProcessGossip(member, &gossip) {
+			// the gossip overwrites the know state about the member
 
 			if gossip.Address == m.local.Address {
 				// if the gossip is about the local member it needs to be
 				// countered by increasing the incarnation number and gossip the
-				// new change to the network.
+				// new state to the network.
 				change = m.bumpIncarnation()
 				m.node.emit(RefuteUpdateEvent{})
 			} else {
 				// otherwise it can be applied to the memberlist
 
-				// if the member was not already present in the list we will it
-				// needs to be added and randomly inserted in the list to ensure
-				// guarantees for pinging
 				if !has {
+					// if the member was not already present in the list we will
+					// add it and assign it a random position in the list to ensure
+					// guarantees for pinging
 					m.members.byAddress[gossip.Address] = &gossip
 					i := m.getJoinPosition()
 					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
