@@ -470,7 +470,9 @@ func (m *memberlist) AddJoinList(list []Change) {
 	}
 }
 
-// gets a random position in [0, length of member list)
+// getJoinPosition picks a random position in [0, length of member list), this
+// assumes the caller already has a read lock on the member struct to prevent
+// concurrent access.
 func (m *memberlist) getJoinPosition() int {
 	l := len(m.members.list)
 	if l == 0 {
