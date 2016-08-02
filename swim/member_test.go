@@ -93,3 +93,72 @@ func TestChangeOmitTombstone(t *testing.T) {
 	_, has := parsedMap["tombstone"]
 	assert.False(t, has, "don't expect the tombstone field to be serialized when it is")
 }
+
+var acceptGossipTests = []struct {
+	member *Member
+	gossip *Member
+	accept bool
+	name   string
+}{
+	// test against unknown members
+	{nil, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, true, "accept Alive gossip for an unknown member"},
+	{nil, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, true, "accept Suspect gossip for an unknown member"},
+	{nil, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, true, "accept Faulty gossip for an unknown member"},
+	{nil, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, true, "accept Leave gossip for an unknown member"},
+	{nil, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, false, "not accept Tombstone gossip for an unknown member"},
+
+	// test against existing members with newer incarnation numbers
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 1337, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "not accept an Alive gossip with an older incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 1337, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, false, "not accept a Suspect gossip with an older incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 1337, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, false, "not accept a Faulty gossip with an older incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 1337, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, false, "not accept a Leave gossip with an older incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 1337, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, false, "not accept a Tombstone gossip with an older incarnation number"},
+
+	// test against existing members with an older incarnation number
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 41, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, true, "accept an Alive gossip with an newer incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 41, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, true, "accept a Suspect gossip with an newer incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 41, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, true, "accept a Faulty gossip with an newer incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 41, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, true, "accept a Leave gossip with an newer incarnation number"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 41, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, true, "accept a Tombstone gossip with an newer incarnation number"},
+
+	// test against existing members with the same incarnation number starting on Alive
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "not accept an Alive gossip with the same incarnation number when Alive"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, true, "accept a Suspect gossip with the same incarnation number when Alive"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, true, "accept a Faulty gossip with the same incarnation number when Alive"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, true, "accept a Leave gossip with the same incarnation number when Alive"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, true, "accept a Tombstone gossip with the same incarnation number when Alive"},
+
+	// test against existing members with the same incarnation number starting on Suspect
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "not accept an Alive gossip with the same incarnation number when Suspect"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, false, "not accept a Suspect gossip with the same incarnation number when Suspect"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, true, "accept a Faulty gossip with the same incarnation number when Suspect"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, true, "accept a Leave gossip with the same incarnation number when Suspect"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, true, "accept a Tombstone gossip with the same incarnation number when Suspect"},
+
+	// test against existing members with the same incarnation number starting on Faulty
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "not accept an Alive gossip with the same incarnation number when Faulty"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, false, "not accept a Suspect gossip with the same incarnation number when Faulty"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, false, "not accept a Faulty gossip with the same incarnation number when Faulty"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, true, "accept a Leave gossip with the same incarnation number when Faulty"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, true, "accept a Tombstone gossip with the same incarnation number when Faulty"},
+
+	// test against existing members with the same incarnation number starting on Leave
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "not accept an Alive gossip with the same incarnation number when Leave"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, false, "not accept a Suspect gossip with the same incarnation number when Leave"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, false, "not accept a Faulty gossip with the same incarnation number when Leave"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, false, "not accept a Leave gossip with the same incarnation number when Leave"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, true, "accept a Tombstone gossip with the same incarnation number when Leave"},
+
+	// test against existing members with the same incarnation number starting on Tombstone
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "not accept an Alive gossip with the same incarnation number when Tombstone"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Suspect}, false, "not accept a Suspect gossip with the same incarnation number when Tombstone"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, false, "not accept a Faulty gossip with the same incarnation number when Tombstone"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, false, "not accept a Leave gossip with the same incarnation number when Tombstone"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, false, "not accept a Tombstone gossip with the same incarnation number when Tombstone"},
+}
+
+func TestAcceptGossip(t *testing.T) {
+	for _, test := range acceptGossipTests {
+		assert.Equal(t, test.accept, acceptGossip(test.member, test.gossip), "expected to "+test.name)
+	}
+}
