@@ -28,7 +28,7 @@ func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
-			Key: func(ctx thrift.Context, name shared.UUID) (string, error) {
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
 		},
@@ -62,22 +62,22 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
-	serviceImpl.On("RemoteCall", mock.Anything, shared.UUID("hello")).Return(nil)
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
-			Key: func(ctx thrift.Context, name shared.UUID) (string, error) {
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
 		},
 	})
 	assert.Equal(t, err, nil, "creation of adator gave an error")
 
-	err = adapter.RemoteCall(ctx, shared.UUID("hello"))
+	err = adapter.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling RemoteCall gave an error")
 
-	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.UUID("hello"))
+	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
 }
 
 func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
@@ -87,7 +87,7 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
-	serviceImpl.On("RemoteCall", mock.Anything, shared.UUID("hello")).Return(nil)
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
 	ch, err := tchannel.NewChannel("remote", nil)
@@ -95,7 +95,7 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
-			Key: func(ctx thrift.Context, name shared.UUID) (string, error) {
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
 		},
@@ -116,7 +116,7 @@ func TestGetLocalClient(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000")
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
-	serviceImpl.On("RemoteCall", mock.Anything, shared.UUID("hello")).Return(nil)
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
 	ch, err := tchannel.NewChannel("remote", nil)
@@ -124,7 +124,7 @@ func TestGetLocalClient(t *testing.T) {
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
-			Key: func(ctx thrift.Context, name shared.UUID) (string, error) {
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
 		},
@@ -132,9 +132,9 @@ func TestGetLocalClient(t *testing.T) {
 
 	cf := adapter.(router.ClientFactory)
 	localClient := cf.GetLocalClient().(TChanRemoteService)
-	err = localClient.RemoteCall(ctx, shared.UUID("hello"))
+	err = localClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the local client gave an error")
-	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.UUID("hello"))
+	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
 
 }
 
@@ -145,7 +145,7 @@ func TestMakeRemoteClient(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000")
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
-	serviceImpl.On("RemoteCall", mock.Anything, shared.UUID("hello")).Return(nil)
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
 	ch, err := tchannel.NewChannel("remote", nil)
@@ -153,19 +153,19 @@ func TestMakeRemoteClient(t *testing.T) {
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
-			Key: func(ctx thrift.Context, name shared.UUID) (string, error) {
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
 		},
 	})
 
 	tchanClient := &mocks.TChanClient{}
-	tchanClient.On("Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{ID: shared.UUID("hello")}, mock.Anything).Return(true, nil)
+	tchanClient.On("Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything).Return(true, nil)
 
 	cf := adapter.(router.ClientFactory)
 	remoteClient := cf.MakeRemoteClient(tchanClient).(TChanRemoteService)
-	err = remoteClient.RemoteCall(ctx, shared.UUID("hello"))
+	err = remoteClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the remote client gave an error")
 
-	tchanClient.AssertCalled(t, "Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{ID: shared.UUID("hello")}, mock.Anything)
+	tchanClient.AssertCalled(t, "Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything)
 }

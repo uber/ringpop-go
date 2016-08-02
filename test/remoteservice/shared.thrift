@@ -1,1 +1,1 @@
-typedef string UUID
+typedef string Name
