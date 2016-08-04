@@ -68,7 +68,7 @@ func (s *StatsTestSuite) TestProtocolStats() {
 
 	// We need to sleep for at least 5 seconds, as this is the tick period for
 	// the metrics.Meter and it cannot be easily changed.
-	time.Sleep(5 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	stats := s.testNode.node.ProtocolStats()
 
