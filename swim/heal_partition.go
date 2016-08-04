@@ -69,8 +69,6 @@ func nodesThatNeedToReincarnate(MA, MB []Change) (changesForA, changesForB []Cha
 			continue
 		}
 
-		// TODO: DRY
-
 		// If a node would be overwritten and would stop being pingable, it is
 		// not suited for merging.
 		if b.isPingable() && a.overrides(b) && !a.isPingable() {
