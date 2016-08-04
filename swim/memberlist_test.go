@@ -124,30 +124,6 @@ func (s *MemberlistTestSuite) TestChecksumsEqual() {
 		"expected checksums to be equal")
 }
 
-func (s *MemberlistTestSuite) TestLocalLeaveOverrideHigher() {
-	s.Require().NotNil(s.m.local, "local member cannot be nil")
-
-	s.m.MakeLeave(s.m.local.Address, s.incarnation+1)
-
-	s.Equal(Leave, s.m.local.Status, "expected local member status to be leave")
-}
-
-func (s *MemberlistTestSuite) TestLocalLeaveOverrideEqual() {
-	s.Require().NotNil(s.m.local, "local member cannot be nil")
-
-	s.m.MakeLeave(s.m.local.Address, s.incarnation)
-
-	s.Equal(Leave, s.m.local.Status, "expected local member status to be leave")
-}
-
-func (s *MemberlistTestSuite) TestLocalLeaveOverrideLower() {
-	s.Require().NotNil(s.m.local, "local member cannot be nil")
-
-	s.m.MakeLeave(s.m.local.Address, s.incarnation-1)
-
-	s.Equal(Alive, s.m.local.Status, "expected local member status to be alive")
-}
-
 func (s *MemberlistTestSuite) TestLocalFaultyOverride() {
 	s.Require().NotNil(s.m.local, "local member cannot be nil")
 

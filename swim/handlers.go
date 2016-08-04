@@ -138,12 +138,12 @@ func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {
 }
 
 func (n *Node) adminJoinHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	n.memberlist.Reincarnate()
+	n.memberlist.SetLocalStatus(Alive)
 	return &Status{Status: "rejoined"}, nil
 }
 
 func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
+	n.memberlist.SetLocalStatus(Leave)
 	return &Status{Status: "ok"}, nil
 }
 

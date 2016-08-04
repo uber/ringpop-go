@@ -226,6 +226,13 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
+
+	for _, member := range node.memberlist.GetMembers() {
+		change := Change{}
+		change.populateSubject(&member)
+		node.disseminator.RecordChange(change)
+	}
+
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
 		opts.RollupMaxUpdates)
 
@@ -255,9 +262,9 @@ func (n *Node) HasChanges() bool {
 // Incarnation returns the incarnation number of the Node.
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
-		n.memberlist.local.RLock()
+		n.memberlist.RLock()
 		incarnation := n.memberlist.local.Incarnation
-		n.memberlist.local.RUnlock()
+		n.memberlist.RUnlock()
 		return incarnation
 	}
 	return -1
@@ -382,8 +389,6 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	if opts == nil {
 		opts = &BootstrapOptions{}
 	}
-
-	n.memberlist.Reincarnate()
 
 	n.discoverProvider = opts.DiscoverProvider
 	joinOpts := &joinOpts{

@@ -108,13 +108,10 @@ func (d *disseminator) MembershipAsChanges() (changes []Change) {
 	d.Lock()
 
 	for _, member := range d.node.memberlist.GetMembers() {
-		changes = append(changes, Change{
-			Address:           member.Address,
-			Incarnation:       member.Incarnation,
-			Source:            d.node.Address(),
-			SourceIncarnation: d.node.Incarnation(),
-			Status:            member.Status,
-		}.validateOutgoing())
+		change := Change{}
+		change.populateSubject(&member)
+		change.populateSource(d.node.memberlist.local)
+		changes = append(changes, change.validateOutgoing())
 	}
 
 	d.Unlock()

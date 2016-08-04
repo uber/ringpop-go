@@ -21,8 +21,9 @@
 package swim
 
 import (
+	"bytes"
 	"math/rand"
-	"sync"
+	"strconv"
 
 	"github.com/uber/ringpop-go/util"
 )
@@ -46,7 +47,6 @@ const (
 
 // A Member is a member in the member list
 type Member struct {
-	sync.RWMutex
 	Address     string `json:"address"`
 	Status      string `json:"status"`
 	Incarnation int64  `json:"incarnationNumber"`
@@ -61,6 +61,20 @@ func (m Member) incarnation() int64 {
 	return m.Incarnation
 }
 
+func (m *Member) populateFromChange(c *Change) {
+	m.Address = c.Address
+	m.Incarnation = c.Incarnation
+	m.Status = c.Status
+}
+
+// checksumString fills a buffer that is passed with the contents that this node
+// needs to add to the checksum string.
+func (m Member) checksumString(b *bytes.Buffer) {
+	b.WriteString(m.Address)
+	b.WriteString(m.Status)
+	b.WriteString(strconv.FormatInt(m.Incarnation, 10))
+}
+
 // shuffles slice of members pseudo-randomly, returns new slice
 func shuffle(members []*Member) []*Member {
 	newMembers := make([]*Member, len(members), cap(members))
@@ -73,40 +87,51 @@ func shuffle(members []*Member) []*Member {
 	return newMembers
 }
 
-// nonLocalOverride returns wether a change should be applied to the member.
-// This function assumes that the address of the member and the change are
-// equal.
-func (m *Member) nonLocalOverride(change Change) bool {
-	// change is younger than current member
-	if change.Incarnation > m.Incarnation {
+// shouldProcessGossip evaluates the rules of swim and returns whether the
+// gossip should be processed. eg. Copy the memberstate of the gossip to the
+// known memberstate in the memberlist (creating the member when is does not
+// exist).
+func shouldProcessGossip(old *Member, gossip *Member) bool {
+	// tombstones will not be accepted if we have no knowledge about the member
+	if gossip.Status == Tombstone && old == nil {
+		return false
+	}
+
+	// accept the gossip if we learn about the member through a gossip
+	if old == nil {
 		return true
 	}
 
-	// change is older than current member
-	if change.Incarnation < m.Incarnation {
+	// gossips with a higher incarnation number will always be accepted since
+	// it is a newer version of the member than we know
+	if gossip.Incarnation > old.Incarnation {
+		return true
+	}
+
+	// gossips with a lower incarnation number will never be accepted as we
+	// have a newer version of the member already
+	if gossip.Incarnation < old.Incarnation {
 		return false
 	}
 
-	// If the incarnation numbers are equal, we look at the state to
-	// determine wether the change overrides this member.
-	return statePrecedence(change.Status) > statePrecedence(m.Status)
-}
+	// now we know that the incarnation number of the gossip and the current
+	// view of the member are the same 'age'. Lets evaluate member state to see
+	// which version to pick
 
-// localOverride returns whether the change will override the state of the local
-// member. When it will override the state the member should reincarnate itself
-// to make sure that other members see this node in a correct state.
-func (m *Member) localOverride(local string, change Change) bool {
-	if m.Address != local {
+	// if the status of the gossip takes precedence over the status of our
+	// current member we will accept the gossip.
+	if statePrecedence(gossip.Status) > statePrecedence(old.Status) {
+		return true
+	}
+
+	if statePrecedence(gossip.Status) < statePrecedence(old.Status) {
 		return false
 	}
 
-	// if the incarnation number of the change is smaller than the current
-	// incarnation number it is not overriding the change
-	if change.Incarnation < m.Incarnation {
-		return false
-	}
-
-	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
+	// we prefer the old member over the gossiped member if they have the same
+	// internal state. This prevents the gossip to be continuously be gossiped
+	// around in the network
+	return false
 }
 
 func statePrecedence(s string) int {
@@ -164,6 +189,28 @@ func (c Change) validateOutgoing() Change {
 		c.Tombstone = true
 	}
 	return c
+}
+
+func (c *Change) populateSubject(m *Member) {
+	if m == nil {
+		return
+	}
+	c.Address = m.Address
+	c.Incarnation = m.Incarnation
+	c.Status = m.Status
+}
+
+func (c *Change) populateSource(m *Member) {
+	if m == nil {
+		return
+	}
+	c.Source = m.Address
+	c.SourceIncarnation = m.Incarnation
+}
+
+func (c *Change) scrubSource() {
+	c.Source = ""
+	c.SourceIncarnation = 0
 }
 
 // suspect interface
