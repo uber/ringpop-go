@@ -87,9 +87,10 @@ func shuffle(members []*Member) []*Member {
 	return newMembers
 }
 
-// shouldProcessGossip evaluates the rules of swim and returns wether the gossip
-// should be processed. eg. Copy the memberstate of the gossip to the known
-// memberstate in the memberlist (creating the member when is does not exist).
+// shouldProcessGossip evaluates the rules of swim and returns whether the
+// gossip should be processed. eg. Copy the memberstate of the gossip to the
+// known memberstate in the memberlist (creating the member when is does not
+// exist).
 func shouldProcessGossip(old *Member, gossip *Member) bool {
 	// tombstones will not be accepted if we have no knowledge about the member
 	if gossip.Status == Tombstone && old == nil {
