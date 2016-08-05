@@ -14,7 +14,15 @@ import (
     "github.com/uber/ringpop-go/router"
     "github.com/uber/tchannel-go"
     "github.com/uber/tchannel-go/thrift"
+
+{{ range .Includes }}
+    "{{ .Import }}"
+{{ end }}
 )
+
+{{ range .Includes }}
+    var _ = {{ .Package }}.GoUnusedProtection__
+{{ end }}
 
 {{ range .AST.Services }}
 {{ $Service := . }}
