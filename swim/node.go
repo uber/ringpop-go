@@ -136,10 +136,10 @@ func mergeDefaultOptions(opts *Options) *Options {
 // implements.
 type NodeInterface interface {
 	Bootstrap(opts *BootstrapOptions) ([]string, error)
-	CountMembers(predicates ...MemberPredicate) int
+	CountReachableMembers(predicates ...MemberPredicate) int
 	Destroy()
 	GetChecksum() uint32
-	GetMembers(predicates ...MemberPredicate) []Member
+	GetReachableMembers(predicates ...MemberPredicate) []Member
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
@@ -519,18 +519,18 @@ func (n *Node) pingNextMember() {
 	n.logger.WithField("target", target).Info("ping request target reachable")
 }
 
-// GetMembers returns a slice of members containing only members that satisfies
-// all predicates passed in. An example usecase is to use the ReachableMember
-// predicate only get members that are deemed reachable by the rules of SWIM.
-func (n *Node) GetMembers(predicates ...MemberPredicate) []Member {
-	return n.memberlist.GetMembers(predicates...)
+// GetReachableMembers returns a slice of members containing only the reachable
+// members that satisfies the predicates passed in.
+func (n *Node) GetReachableMembers(predicates ...MemberPredicate) []Member {
+	predicates = append(predicates, ReachableMember)
+	return n.memberlist.GetReachableMembers(predicates...)
 }
 
-// CountMembers returns the number of members currently in this node's
-// membership list that satisfies all predicates passed in. And example usecase
-// is to count all reachable members by passing the ReachableMember predicate.
-func (n *Node) CountMembers(predicates ...MemberPredicate) int {
-	return n.memberlist.CountMembers(predicates...)
+// CountReachableMembers returns the number of reachable members currently in
+// this node's membership list that satisfies all predicates passed in.
+func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
+	predicates = append(predicates, ReachableMember)
+	return n.memberlist.CountReachableMembers(predicates...)
 }
 
 // Labels returns a mutator for the labels kept on this local node. This mutator

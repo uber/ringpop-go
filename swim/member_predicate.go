@@ -24,7 +24,7 @@ func TestMember(member Member, predicates ...MemberPredicate) bool {
 // member is considered reachable when it is either in Alive status or in
 // Suspect status. All other Members are considered to not be reachable.
 func ReachableMember(member Member) bool {
-	return member.Status == Alive || member.Status == Suspect
+	return member.isReachable()
 }
 
 // LabeledMember returns a predicate able to test if the value of a label on a

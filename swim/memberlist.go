@@ -566,6 +566,8 @@ func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
 }
 
+// CountMembers returns the number of members maintained by the swim membership
+// protocol
 func (m *memberlist) CountMembers(predicates ...MemberPredicate) int {
 	count := 0
 

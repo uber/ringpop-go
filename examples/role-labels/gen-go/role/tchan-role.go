@@ -85,25 +85,49 @@ func (s *tchanRoleServiceServer) Methods() []string {
 }
 
 func (s *tchanRoleServiceServer) Handle(ctx thrift.Context, methodName string, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
+	args, err := s.GetArgs(methodName, protocol)
+	if err != nil {
+		return false, nil, err
+	}
+	return s.HandleArgs(ctx, methodName, args)
+}
+
+func (s *tchanRoleServiceServer) GetArgs(methodName string, protocol athrift.TProtocol) (args interface{}, err error) {
 	switch methodName {
 	case "GetMembers":
-		return s.handleGetMembers(ctx, protocol)
+		args, err = s.readGetMembers(protocol)
 	case "SetRole":
-		return s.handleSetRole(ctx, protocol)
+		args, err = s.readSetRole(protocol)
+
+	default:
+		err = fmt.Errorf("method %v not found in service %v", methodName, s.Service())
+	}
+	return
+}
+
+func (s *tchanRoleServiceServer) HandleArgs(ctx thrift.Context, methodName string, args interface{}) (bool, athrift.TStruct, error) {
+	switch methodName {
+	case "GetMembers":
+		return s.handleGetMembers(ctx, args.(RoleServiceGetMembersArgs))
+	case "SetRole":
+		return s.handleSetRole(ctx, args.(RoleServiceSetRoleArgs))
 
 	default:
 		return false, nil, fmt.Errorf("method %v not found in service %v", methodName, s.Service())
 	}
 }
 
-func (s *tchanRoleServiceServer) handleGetMembers(ctx thrift.Context, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
+func (s *tchanRoleServiceServer) readGetMembers(protocol athrift.TProtocol) (interface{}, error) {
 	var req RoleServiceGetMembersArgs
-	var res RoleServiceGetMembersResult
 
 	if err := req.Read(protocol); err != nil {
-		return false, nil, err
+		return nil, err
 	}
+	return req, nil
+}
 
+func (s *tchanRoleServiceServer) handleGetMembers(ctx thrift.Context, req RoleServiceGetMembersArgs) (bool, athrift.TStruct, error) {
+	var res RoleServiceGetMembersResult
 	r, err :=
 		s.handler.GetMembers(ctx, req.Role)
 
@@ -116,14 +140,17 @@ func (s *tchanRoleServiceServer) handleGetMembers(ctx thrift.Context, protocol a
 	return err == nil, &res, nil
 }
 
-func (s *tchanRoleServiceServer) handleSetRole(ctx thrift.Context, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
+func (s *tchanRoleServiceServer) readSetRole(protocol athrift.TProtocol) (interface{}, error) {
 	var req RoleServiceSetRoleArgs
-	var res RoleServiceSetRoleResult
 
 	if err := req.Read(protocol); err != nil {
-		return false, nil, err
+		return nil, err
 	}
+	return req, nil
+}
 
+func (s *tchanRoleServiceServer) handleSetRole(ctx thrift.Context, req RoleServiceSetRoleArgs) (bool, athrift.TStruct, error) {
+	var res RoleServiceSetRoleResult
 	err :=
 		s.handler.SetRole(ctx, req.Role)
 
