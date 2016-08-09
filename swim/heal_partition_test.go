@@ -522,7 +522,7 @@ Tick:
 
 		// continue until all members are reachable
 		for _, node := range nodes {
-			if node.memberlist.CountMembers(ReachableMember) != len(nodes) {
+			if node.memberlist.CountMembers(reachableMember) != len(nodes) {
 				continue Tick
 			}
 		}

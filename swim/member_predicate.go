@@ -23,7 +23,7 @@ func TestMember(member Member, predicates ...MemberPredicate) bool {
 // be concerned with Members that are in a Reachable state. In SWIM terms a
 // member is considered reachable when it is either in Alive status or in
 // Suspect status. All other Members are considered to not be reachable.
-func ReachableMember(member Member) bool {
+func reachableMember(member Member) bool {
 	return member.isReachable()
 }
 
