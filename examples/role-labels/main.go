@@ -52,7 +52,6 @@ type worker struct {
 }
 
 func (w *worker) GetMembers(ctx thrift.Context, role string) ([]string, error) {
-	// return empty list
 	return w.ringpop.GetReachableMembers(swim.LabeledMember(roleKey, role))
 }
 
