@@ -32,8 +32,8 @@ func (_m *SwimNode) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	return r0, r1
 }
 
-// CountMembers provides a mock function with given fields: predicates
-func (_m *SwimNode) CountMembers(predicates ...swim.MemberPredicate) int {
+// CountReachableMembers provides a mock function with given fields: predicates
+func (_m *SwimNode) CountReachableMembers(predicates ...swim.MemberPredicate) int {
 	ret := _m.Called(predicates)
 
 	var r0 int
@@ -65,8 +65,8 @@ func (_m *SwimNode) GetChecksum() uint32 {
 	return r0
 }
 
-// GetMembers provides a mock function with given fields: predicates
-func (_m *SwimNode) GetMembers(predicates ...swim.MemberPredicate) []swim.Member {
+// GetReachableMembers provides a mock function with given fields: predicates
+func (_m *SwimNode) GetReachableMembers(predicates ...swim.MemberPredicate) []swim.Member {
 	ret := _m.Called(predicates)
 
 	var r0 []swim.Member
