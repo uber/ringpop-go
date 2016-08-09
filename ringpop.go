@@ -648,13 +648,12 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 }
 
 // GetReachableMembers returns a slice of members currently in this instance's
-// membership list that aren't faulty.
+// active membership list.
 func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
 
-	predicates = append(predicates, swim.ReachableMember)
 	members := rp.node.GetMembers(predicates...)
 
 	addresses := make([]string, 0, len(members))
@@ -665,13 +664,11 @@ func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]st
 }
 
 // CountReachableMembers returns the number of members currently in this
-// instance's membership list that aren't faulty.
+// instance's active membership list.
 func (rp *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (int, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
 	}
-
-	predicates = append(predicates, swim.ReachableMember)
 	return rp.node.CountMembers(predicates...), nil
 }
 
