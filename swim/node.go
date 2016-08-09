@@ -523,14 +523,14 @@ func (n *Node) pingNextMember() {
 // members that satisfies the predicates passed in.
 func (n *Node) GetReachableMembers(predicates ...MemberPredicate) []Member {
 	predicates = append(predicates, ReachableMember)
-	return n.memberlist.GetReachableMembers(predicates...)
+	return n.memberlist.GetMembers(predicates...)
 }
 
 // CountReachableMembers returns the number of reachable members currently in
 // this node's membership list that satisfies all predicates passed in.
 func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
 	predicates = append(predicates, ReachableMember)
-	return n.memberlist.CountReachableMembers(predicates...)
+	return n.memberlist.CountMembers(predicates...)
 }
 
 // Labels returns a mutator for the labels kept on this local node. This mutator

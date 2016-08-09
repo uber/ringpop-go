@@ -181,7 +181,7 @@ func (rp *Ringpop) init() error {
 	rp.ring.RegisterListener(rp)
 
 	// add all members present in the membership of the node on startup.
-	for _, member := range rp.node.GetMembers(swim.ReachableMember) {
+	for _, member := range rp.node.GetReachableMembers() {
 		rp.ring.AddServer(member.Address)
 	}
 
@@ -654,7 +654,7 @@ func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]st
 		return nil, ErrNotBootstrapped
 	}
 
-	members := rp.node.GetMembers(predicates...)
+	members := rp.node.GetReachableMembers(predicates...)
 
 	addresses := make([]string, 0, len(members))
 	for _, member := range members {
@@ -669,7 +669,7 @@ func (rp *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (in
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
 	}
-	return rp.node.CountMembers(predicates...), nil
+	return rp.node.CountReachableMembers(predicates...), nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
