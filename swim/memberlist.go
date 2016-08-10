@@ -367,13 +367,18 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 		return false
 	}
 
-	removed := true
+	any := false    // keep track if we at least removed one label
+	removed := true // keep track if all labels are removed
 	for _, key := range keys {
 		_, has := m.local.Labels[key]
 		delete(m.local.Labels, key)
 		removed = removed && has
+		any = any || has
 	}
-	m.postLocalUpdate()
+	if any {
+		// only reincarnate if there is a label removed
+		m.postLocalUpdate()
+	}
 	return removed
 }
 
