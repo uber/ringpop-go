@@ -521,14 +521,14 @@ func (n *Node) pingNextMember() {
 // GetReachableMembers returns a slice of members containing only the reachable
 // members that satisfies the predicates passed in.
 func (n *Node) GetReachableMembers(predicates ...MemberPredicate) []Member {
-	predicates = append(predicates, reachableMember)
+	predicates = append(predicates, memberIsReachable)
 	return n.memberlist.GetMembers(predicates...)
 }
 
 // CountReachableMembers returns the number of reachable members currently in
 // this node's membership list that satisfies all predicates passed in.
 func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
-	predicates = append(predicates, reachableMember)
+	predicates = append(predicates, memberIsReachable)
 	return n.memberlist.CountMembers(predicates...)
 }
 

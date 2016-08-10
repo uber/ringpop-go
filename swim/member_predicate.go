@@ -18,12 +18,12 @@ func MemberMatchesPredicates(member Member, predicates ...MemberPredicate) bool 
 	return true
 }
 
-// ReachableMember tests if a member is deemed to be reachable. This filters out
-// all members that are known to be unresponsive. Most operations will only ever
-// be concerned with Members that are in a Reachable state. In SWIM terms a
+// memberIsReachable tests if a member is deemed to be reachable. This filters
+// out all members that are known to be unresponsive. Most operations will only
+// ever be concerned with Members that are in a Reachable state. In SWIM terms a
 // member is considered reachable when it is either in Alive status or in
 // Suspect status. All other Members are considered to not be reachable.
-func reachableMember(member Member) bool {
+func memberIsReachable(member Member) bool {
 	return member.isReachable()
 }
 
