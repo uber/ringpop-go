@@ -230,7 +230,8 @@ func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*
 	return members[:n]
 }
 
-// returns an immutable slice of members representing the current state of the membership
+// returns an slice of (copied) members representing the current state of the
+// membership. The membership will be filtered by the predicates provided.
 func (m *memberlist) GetMembers(predicates ...MemberPredicate) (members []Member) {
 	m.members.RLock()
 	members = make([]Member, 0, len(m.members.list))
