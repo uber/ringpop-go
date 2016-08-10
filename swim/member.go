@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"math/rand"
 	"strconv"
+	"sync"
 
 	"github.com/dgryski/go-farm"
 	"github.com/uber/ringpop-go/util"
@@ -44,6 +45,14 @@ const (
 
 	// Tombstone is the member "tombstone" state
 	Tombstone = "tombstone"
+)
+
+var (
+	byteBufferPool = sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
 )
 
 // A Member is a member in the member list
@@ -108,8 +117,10 @@ func (l LabelMap) checksumString(b *bytes.Buffer) {
 // labels are set, but 0 does not indicate that no labels are set. It could be
 // possible that 0 is computed as the checksum.
 func (l LabelMap) checksum() int32 {
-	var lb bytes.Buffer
 	var checksum uint32
+	lb := byteBufferPool.Get().(*bytes.Buffer)
+	// make sure the buffer is empty after getting a buffer from our pool
+	lb.Reset()
 	for key, value := range l {
 		// decide if we want to escape both fields to enforce uniqueness of the
 		// key-value checksum.
@@ -122,6 +133,8 @@ func (l LabelMap) checksum() int32 {
 
 		lb.Reset()
 	}
+	// give the buffer back to the pool
+	byteBufferPool.Put(lb)
 
 	var signedChecksum int32
 	// This line converts an unsigned integer to a signed integer (32 bits).
