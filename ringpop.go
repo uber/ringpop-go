@@ -648,7 +648,7 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 }
 
 // GetReachableMembers returns a slice of members currently in this instance's
-// active membership list.
+// active membership list that match all provided predicates.
 func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
@@ -664,7 +664,7 @@ func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]st
 }
 
 // CountReachableMembers returns the number of members currently in this
-// instance's active membership list.
+// instance's active membership list that match all provided predicates.
 func (rp *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (int, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
