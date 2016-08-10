@@ -197,12 +197,22 @@ func shouldProcessGossip(old *Member, gossip *Member) bool {
 		return false
 	}
 
-	// Only pick the gossip if the labels have a lower checksum then the checksum
-	// of the currently known labels
+	// keep the checksum values in local variables. The checksums are not cached
+	// and require some compute to get them, better to do once than twice.
 	gossipLabelsChecksum := gossip.Labels.checksum()
 	oldLabelsChecksum := old.Labels.checksum()
-	if gossipLabelsChecksum < oldLabelsChecksum {
+
+	// Gossips with a higher checksum should be processed to let the cluster
+	// converge to the labels that cause the highest checksum.
+	if gossipLabelsChecksum > oldLabelsChecksum {
 		return true
+	}
+
+	// If the gossipped labels have a lower checksum we do want to keep the
+	// current memberstate in our memberlist, therefore the gossip should not be
+	// processed.
+	if gossipLabelsChecksum < oldLabelsChecksum {
+		return false
 	}
 
 	// we prefer the old member over the gossiped member if they have the same
