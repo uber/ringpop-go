@@ -27,9 +27,9 @@ func memberIsReachable(member Member) bool {
 	return member.isReachable()
 }
 
-// LabeledMember returns a predicate able to test if the value of a label on a
-// member is equal to the provided value.
-func LabeledMember(key, value string) MemberPredicate {
+// MemberWithLabelAndValue returns a predicate able to test if the value of a
+// label on a member is equal to the provided value.
+func MemberWithLabelAndValue(key, value string) MemberPredicate {
 	return func(member Member) bool {
 		v, ok := member.Labels[key]
 

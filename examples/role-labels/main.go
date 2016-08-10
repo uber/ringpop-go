@@ -52,7 +52,7 @@ type worker struct {
 }
 
 func (w *worker) GetMembers(ctx thrift.Context, role string) ([]string, error) {
-	return w.ringpop.GetReachableMembers(swim.LabeledMember(roleKey, role))
+	return w.ringpop.GetReachableMembers(swim.MemberWithLabelAndValue(roleKey, role))
 }
 
 func (w *worker) SetRole(ctx thrift.Context, role string) error {
