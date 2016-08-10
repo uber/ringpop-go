@@ -236,7 +236,7 @@ func (m *memberlist) GetMembers(predicates ...MemberPredicate) (members []Member
 	m.members.RLock()
 	members = make([]Member, 0, len(m.members.list))
 	for _, member := range m.members.list {
-		if TestMember(*member, predicates...) {
+		if MemberMatchesPredicates(*member, predicates...) {
 			members = append(members, *member)
 		}
 	}
@@ -597,7 +597,7 @@ func (m *memberlist) CountMembers(predicates ...MemberPredicate) int {
 
 	m.members.RLock()
 	for _, member := range m.members.list {
-		if TestMember(*member, predicates...) {
+		if MemberMatchesPredicates(*member, predicates...) {
 			count++
 		}
 	}

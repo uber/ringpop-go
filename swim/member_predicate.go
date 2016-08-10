@@ -6,10 +6,10 @@ package swim
 // in the future. This is likely to happen if we pursue plugable membership.
 type MemberPredicate func(member Member) bool
 
-// TestMember can take multiple predicates and test them against a member
-// returning if the member satisfies all the predicates. This means that if one
-// test fails it will stop executing and return with false.
-func TestMember(member Member, predicates ...MemberPredicate) bool {
+// MemberMatchesPredicates can take multiple predicates and test them against a
+// member returning if the member satisfies all the predicates. This means that
+// if one test fails it will stop executing and return with false.
+func MemberMatchesPredicates(member Member, predicates ...MemberPredicate) bool {
 	for _, p := range predicates {
 		if !p(member) {
 			return false
