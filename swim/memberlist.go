@@ -321,7 +321,7 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 		return nil
 	}
 
-	cpy := make(map[string]string)
+	cpy := make(map[string]string, len(m.local.Labels))
 	for k, v := range m.local.Labels {
 		cpy[k] = v
 	}
@@ -335,7 +335,7 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 func (m *memberlist) SetLocalLabels(labels map[string]string) {
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
-		m.local.Labels = make(map[string]string)
+		m.local.Labels = make(map[string]string, len(labels))
 	}
 
 	// keep track if we made changes to the labels
