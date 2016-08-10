@@ -22,7 +22,7 @@ Lookup the node `my_key` key belongs to using [tcurl][2]:
 Call the `/ping` endpoint (multiple times) and see the request being forwarded. Each request is sent to a random node in the cluster because of the `-P hosts.json` argument--but is always handled by the node owning the key. This can be seen in the `from` field of the response:
 
     $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}'
-    {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","p":""},"headers":{"as":"json"},"trace":"*"} (glob)
+    {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","pheader":""},"headers":{"as":"json"},"trace":"*"} (glob)
 
 Optionally, set the `p` header. This value will be forwarded together with the request body to the node owning the key. Its value is returned in the response body in the `pheader` field:
 

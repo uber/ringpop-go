@@ -63,7 +63,9 @@ func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) 
 		return nil, err
 	}
 
-	pingArgs := &gen.PingPongServicePingArgs{request}
+	pingArgs := &gen.PingPongServicePingArgs{
+		Request: request,
+	}
 	req, err := ringpop.SerializeThrift(pingArgs)
 	if err != nil {
 		return nil, err
@@ -77,7 +79,11 @@ func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) 
 			return nil, err
 		}
 		pHeader := headers["p"]
-		return &gen.Pong{"Hello, world!", identity, &pHeader}, nil
+		return &gen.Pong{
+			Message: "Hello, world!",
+			From_:   identity,
+			Pheader: &pHeader,
+		}, nil
 	}
 
 	if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
