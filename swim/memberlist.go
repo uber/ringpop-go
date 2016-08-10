@@ -291,9 +291,16 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 		m.local.Labels = make(map[string]string)
 	}
 
+	old, had := m.local.Labels[key]
+
 	// set the label
 	m.local.Labels[key] = value
-	m.postLocalUpdate()
+
+	if !had || old != value {
+		// postLocalUpdate reincarnates and starts gossipping the new state
+		// which is only desired when a change to the local labels has been made
+		m.postLocalUpdate()
+	}
 
 	// there was no error during the manipulation of labels
 	return nil
@@ -331,13 +338,24 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) {
 		m.local.Labels = make(map[string]string)
 	}
 
+	// keep track if we made changes to the labels
+	changes := false
+
 	// copy the key-value pairs to our internal labels. By not setting the map
 	// of labels to the Labels value of the local member we prevent removing labels
 	// that the user did not specify in the new map.
 	for key, value := range labels {
+		old, had := m.local.Labels[key]
 		m.local.Labels[key] = value
+
+		if !had || old != value {
+			changes = true
+		}
 	}
-	m.postLocalUpdate()
+
+	if changes {
+		m.postLocalUpdate()
+	}
 }
 
 // Remove a label from the local map of labels. This will trigger a reincarnation
