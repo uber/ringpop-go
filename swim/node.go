@@ -140,12 +140,11 @@ type NodeInterface interface {
 	Destroy()
 	GetChecksum() uint32
 	GetReachableMembers(predicates ...MemberPredicate) []Member
+	Labels() *NodeLabels
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
 	RegisterListener(l events.EventListener)
-
-	Labels() *NodeLabels
 }
 
 // A Node is a SWIM member

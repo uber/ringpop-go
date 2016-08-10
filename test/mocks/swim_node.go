@@ -81,6 +81,22 @@ func (_m *SwimNode) GetReachableMembers(predicates ...swim.MemberPredicate) []sw
 	return r0
 }
 
+// Labels provides a mock function with given fields:
+func (_m *SwimNode) Labels() *swim.NodeLabels {
+	ret := _m.Called()
+
+	var r0 *swim.NodeLabels
+	if rf, ok := ret.Get(0).(func() *swim.NodeLabels); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*swim.NodeLabels)
+		}
+	}
+
+	return r0
+}
+
 // MemberStats provides a mock function with given fields:
 func (_m *SwimNode) MemberStats() swim.MemberStats {
 	ret := _m.Called()
@@ -126,20 +142,4 @@ func (_m *SwimNode) Ready() bool {
 // RegisterListener provides a mock function with given fields: l
 func (_m *SwimNode) RegisterListener(l events.EventListener) {
 	_m.Called(l)
-}
-
-// Labels provides a mock function with given fields:
-func (_m *SwimNode) Labels() *swim.NodeLabels {
-	ret := _m.Called()
-
-	var r0 *swim.NodeLabels
-	if rf, ok := ret.Get(0).(func() *swim.NodeLabels); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*swim.NodeLabels)
-		}
-	}
-
-	return r0
 }
