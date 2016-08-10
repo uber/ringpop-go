@@ -30,7 +30,6 @@ env:
 matrix:
   allow_failures:
     - env: RUN="make test-race"
-    - env: RUN="make test-examples"
 
   fast_finish: true
 
