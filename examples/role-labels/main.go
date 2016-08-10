@@ -42,7 +42,7 @@ const (
 var (
 	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start service on")
 	hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
-	rolename = flag.String("role", "master", "name of the role this node takes in the cluster")
+	rolename = flag.String("role", "roleA", "name of the role this node takes in the cluster")
 )
 
 type worker struct {
