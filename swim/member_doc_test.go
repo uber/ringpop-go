@@ -29,7 +29,7 @@ func ExampleMember_checksumString_labels() {
 	}
 	m.checksumString(&b)
 	fmt.Println(b.String())
-	// Output: 192.0.2.1:1234alive42#labels1613250528
+	// Output: 192.0.2.1:1234alive42#labels2109386529
 }
 
 func ExampleMember_checksumString_multilabels() {
@@ -40,10 +40,10 @@ func ExampleMember_checksumString_multilabels() {
 		Incarnation: 42,
 		Labels: LabelMap{
 			"hello": "world",
-			"foo":   "bar",
+			"foo":   "baz",
 		},
 	}
 	m.checksumString(&b)
 	fmt.Println(b.String())
-	// Output: 192.0.2.1:1234alive42#labels-1494888142
+	// Output: 192.0.2.1:1234alive42#labels-1017766696
 }

@@ -124,11 +124,19 @@ func (l LabelMap) checksum() int32 {
 	for key, value := range l {
 		// decide if we want to escape both fields to enforce uniqueness of the
 		// key-value checksum.
-		lb.WriteString("/")
 		lb.WriteString(key)
-		lb.WriteString("/")
+		lb.WriteString("=")
 		lb.WriteString(value)
 
+		// The checksum is calculated by xorring the checksums of all individual
+		// labels. This makes the checksum of the labels order independant. This
+		// is easier compared to sorting the labels by their key because of two
+		// reasons.
+		// 1. It saves memory allocations to have the keys in a slice.
+		// 2. This method is guaranteed to be locale independant where sorting
+		//    of strings might be different on different locale settings. This
+		//    would cause indefinite fullsync storms because two ringpops would
+		//    never agree on membership checksums.
 		checksum = checksum ^ farm.Fingerprint32(lb.Bytes())
 
 		lb.Reset()
