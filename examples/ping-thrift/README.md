@@ -34,7 +34,7 @@ Call the `PingPongService::Ping` endpoint (multiple times) and see the request b
 
 Optionally, set the `p` header. This value will be forwarded together with the request body to the node owning the key. Its value is returned in the response body in the `pheader` field:
 
-    $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}' --headers '{"p": "my_header"}'
+    $ tcurl pingchannel -P hosts.json --thrift ./ping.thrift PingPongService::Ping '{"request": {"key": "my_key"}}' --headers '{"p": "my_header"}'
     {"ok":true,"head":{},"body":{"message":"Hello, world!","from_":"127.0.0.1:300?","pheader":"my_header"},"headers":{"as":"thrift"},"trace":"*"} (glob)
 
     $ kill %1

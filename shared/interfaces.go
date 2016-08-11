@@ -4,7 +4,7 @@ import "github.com/uber/tchannel-go"
 
 // The TChannel interface defines the dependencies for TChannel in Ringpop.
 type TChannel interface {
-	tchannel.Registrar
+	Register(h tchannel.Handler, methodName string)
 	PeerInfo() tchannel.LocalPeerInfo
 	GetSubChannel(string, ...tchannel.SubChannelOption) *tchannel.SubChannel
 }
