@@ -66,6 +66,8 @@ type Options struct {
 	PartitionHealPeriod           time.Duration
 	PartitionHealBaseProbabillity float64
 
+	LabelLimits LabelOptions
+
 	Clock clock.Clock
 }
 
@@ -91,6 +93,8 @@ func defaultOptions() *Options {
 		PartitionHealPeriod:           30 * time.Second,
 		PartitionHealBaseProbabillity: 3,
 
+		LabelLimits: DefaultLabelOptions,
+
 		Clock: clock.New(),
 
 		MaxReverseFullSyncJobs: 5,
@@ -107,6 +111,7 @@ func mergeDefaultOptions(opts *Options) *Options {
 	}
 
 	opts.StateTimeouts = mergeStateTimeouts(opts.StateTimeouts, def.StateTimeouts)
+	opts.LabelLimits = mergeLabelOptions(opts.LabelLimits, def.LabelLimits)
 
 	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod, def.MinProtocolPeriod)
 
@@ -186,6 +191,8 @@ type Node struct {
 
 	logger log.Logger
 
+	labelLimits LabelOptions
+
 	// clock is used to generate incarnation numbers; it is typically the
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
@@ -215,6 +222,8 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		totalRate:  metrics.NewMeter(),
 		clock:      opts.Clock,
 	}
+
+	node.labelLimits = opts.LabelLimits
 
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)

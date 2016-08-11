@@ -282,9 +282,15 @@ func (m *memberlist) SetLocalStatus(status string) {
 	m.postLocalUpdate()
 }
 
+// SetLocalLabel sets the label identified by key to the new value. This
+// operation is validated against the configured limits for labels and will
+// return an ErrLabelSizeExceeded in the case this operation would alter the
+// labels of the node in such a way that the configured limits are exceeded.
 func (m *memberlist) SetLocalLabel(key, value string) error {
-	// TODO implement a sane limit for the size of the labels to prevent users
-	// from impacting the performance of the gossip protocol.
+	if err := m.node.labelLimits.validateLabel(m.local.Labels, key, value); err != nil {
+		// the labels operation violates the label limits that has been configured
+		return err
+	}
 
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
@@ -328,11 +334,18 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 	return cpy
 }
 
-// SetLocalLabels updates multiple labels at once. It will take all the labels
-// that are set in the map passed to this function and overwrite the value with
-// the value in the map. Keys that are not present in the provided map will
-// remain in the labels of this node.
-func (m *memberlist) SetLocalLabels(labels map[string]string) {
+// SetLocalLabels updates multiple labels at once. This operation is validated
+// against the configured limits for labels and will return an
+// ErrLabelSizeExceeded in the case this operation would alter the labels of the
+// node in such a way that the configured limits are exceeded.
+// When an error is returned non of the labels will be updated. When there is no
+// error all labels are updated with their new value.
+func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	if err := m.node.labelLimits.validateLabels(m.local.Labels, labels); err != nil {
+		// the labels operation violates the label limits that has been configured
+		return err
+	}
+
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string, len(labels))
@@ -356,6 +369,8 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) {
 	if changes {
 		m.postLocalUpdate()
 	}
+
+	return nil
 }
 
 // Remove a label from the local map of labels. This will trigger a reincarnation
