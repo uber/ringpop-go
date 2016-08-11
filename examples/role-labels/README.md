@@ -30,6 +30,7 @@ This will give you the list of all instances as they all start with their role s
 
     $ tcurl role -P hosts.json --thrift ./role.thrift RoleService::SetRole '{"role":"roleB"}'
     {"ok":true,"head":{},"headers":{"as":"thrift"},"trace":"*"} (glob)
+    $ sleep 2 # give the cluster of 5 some time to converge on the new state of the membership
 
 To validate that this worked we can now lookup both the members for `roleA` and `roleB` and see that the membership lists contain respectively 4 and 1 member:
 
