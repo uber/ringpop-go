@@ -1,8 +1,16 @@
 package swim
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 var (
+	// ErrLabelPrivateKey is an error that is returned when an application
+	// tries to set a label in the private namespace that is used by ringpop
+	// internals
+	ErrLabelPrivateKey = errors.New("label can't be altered by application because it is in the private ringpop namespace")
+
 	labelsPrivateNamespacePrefix = "__"
 )
 
@@ -25,12 +33,18 @@ func (n *NodeLabels) Get(key string) (value string, has bool) {
 // the storage capacity for labels has exceed the maximum ammount. (Currently
 // the storage limit is not implemented)
 func (n *NodeLabels) Set(key, value string) error {
+	if isPrivateLabel(key) {
+		return ErrLabelPrivateKey
+	}
 	return n.node.memberlist.SetLocalLabel(key, value)
 }
 
 // Remove a key from the labels
-func (n *NodeLabels) Remove(key string) (removed bool) {
-	return n.node.memberlist.RemoveLocalLabel(key)
+func (n *NodeLabels) Remove(key string) (removed bool, err error) {
+	if isPrivateLabel(key) {
+		return false, ErrLabelPrivateKey
+	}
+	return n.node.memberlist.RemoveLocalLabel(key), nil
 }
 
 // AsMap gets a readonly copy of all the labels assigned to Node. Changes to the
