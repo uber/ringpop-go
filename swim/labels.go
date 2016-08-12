@@ -1,5 +1,15 @@
 package swim
 
+import "strings"
+
+var (
+	labelsPrivateNamespacePrefix = "__"
+)
+
+func isPrivateLabel(key string) bool {
+	return strings.HasPrefix(key, labelsPrivateNamespacePrefix)
+}
+
 // NodeLabels implements the ringpop.Labels interface and proxies the calls to
 // the swim.Node backing the membership protocol.
 type NodeLabels struct {
