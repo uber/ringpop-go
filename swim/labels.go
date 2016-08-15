@@ -11,11 +11,11 @@ var (
 	// internals
 	ErrLabelPrivateKey = errors.New("label can't be altered by application because it is in the private ringpop namespace")
 
-	labelsPrivateNamespacePrefix = "__"
+	labelsInternalNamespacePrefix = "__"
 )
 
-func isPrivateLabel(key string) bool {
-	return strings.HasPrefix(key, labelsPrivateNamespacePrefix)
+func isInternalLabel(key string) bool {
+	return strings.HasPrefix(key, labelsInternalNamespacePrefix)
 }
 
 // NodeLabels implements the ringpop.Labels interface and proxies the calls to
@@ -33,7 +33,7 @@ func (n *NodeLabels) Get(key string) (value string, has bool) {
 // the storage capacity for labels has exceed the maximum ammount. (Currently
 // the storage limit is not implemented)
 func (n *NodeLabels) Set(key, value string) error {
-	if isPrivateLabel(key) {
+	if isInternalLabel(key) {
 		return ErrLabelPrivateKey
 	}
 	return n.node.memberlist.SetLocalLabel(key, value)
@@ -41,7 +41,7 @@ func (n *NodeLabels) Set(key, value string) error {
 
 // Remove a key from the labels
 func (n *NodeLabels) Remove(key string) (removed bool, err error) {
-	if isPrivateLabel(key) {
+	if isInternalLabel(key) {
 		return false, ErrLabelPrivateKey
 	}
 	return n.node.memberlist.RemoveLocalLabel(key), nil

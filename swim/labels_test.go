@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-var isPrivateLabelTests = []struct {
-	key     string
-	private bool
+var isInternalLabelTests = []struct {
+	key      string
+	internal bool
 }{
 	{"hello", false},
 	{"__hello", true},
 }
 
-func TestIsPrivateLabel(t *testing.T) {
-	for _, test := range isPrivateLabelTests {
-		assert.Equal(t, test.private, isPrivateLabel(test.key), test)
+func TestIsInternalLabel(t *testing.T) {
+	for _, test := range isInternalLabelTests {
+		assert.Equal(t, test.internal, isInternalLabel(test.key), test)
 	}
 }
