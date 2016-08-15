@@ -6,10 +6,9 @@ import (
 )
 
 var (
-	// ErrLabelPrivateKey is an error that is returned when an application
-	// tries to set a label in the private namespace that is used by ringpop
-	// internals
-	ErrLabelPrivateKey = errors.New("label can't be altered by application because it is in the private ringpop namespace")
+	// ErrLabelInternalKey is an error that is returned when an application
+	// tries to set a label in the internal namespace that is used by ringpop
+	ErrLabelInternalKey = errors.New("label can't be altered by application because it is in the internal ringpop namespace")
 
 	labelsInternalNamespacePrefix = "__"
 )
@@ -34,7 +33,7 @@ func (n *NodeLabels) Get(key string) (value string, has bool) {
 // the storage limit is not implemented)
 func (n *NodeLabels) Set(key, value string) error {
 	if isInternalLabel(key) {
-		return ErrLabelPrivateKey
+		return ErrLabelInternalKey
 	}
 	return n.node.memberlist.SetLocalLabel(key, value)
 }
@@ -42,7 +41,7 @@ func (n *NodeLabels) Set(key, value string) error {
 // Remove a key from the labels
 func (n *NodeLabels) Remove(key string) (removed bool, err error) {
 	if isInternalLabel(key) {
-		return false, ErrLabelPrivateKey
+		return false, ErrLabelInternalKey
 	}
 	return n.node.memberlist.RemoveLocalLabel(key), nil
 }
