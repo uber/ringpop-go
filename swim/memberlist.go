@@ -285,6 +285,12 @@ func (m *memberlist) SetLocalStatus(status string) {
 }
 
 func (m *memberlist) SetLocalLabel(key, value string) error {
+	// make sure that the contents of the key and value are allowed to be used
+	// in the gossip protocol.
+	if err := validateLabel(key, value); err != nil {
+		return err
+	}
+
 	// TODO implement a sane limit for the size of the labels to prevent users
 	// from impacting the performance of the gossip protocol.
 
@@ -336,8 +342,15 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 // SetLocalLabels updates multiple labels at once. It will take all the labels
 // that are set in the map passed to this function and overwrite the value with
 // the value in the map. Keys that are not present in the provided map will
-// remain in the labels of this node.
-func (m *memberlist) SetLocalLabels(labels map[string]string) {
+// remain in the labels of this node. The operation is guaranteed to succeed
+// completely or not at all.
+func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	// make sure that the contents of the key and value are allowed to be used
+	// in the gossip protocol.
+	if err := validateLabels(labels); err != nil {
+		return err
+	}
+
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string, len(labels))
@@ -361,6 +374,8 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) {
 	if changes {
 		m.postLocalUpdate()
 	}
+
+	return nil
 }
 
 // Remove a label from the local map of labels. This will trigger a reincarnation
