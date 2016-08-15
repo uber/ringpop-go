@@ -59,16 +59,25 @@ setup: dev_deps
 
 test:	test-unit test-integration
 
-test-integration:
+test-integration: vendor
 	test/run-integration-tests
 
 test-unit:
 	go generate $(NOVENDOR)
 	test/go-test-prettify $(NOVENDOR)
 
-test-race:
+test-examples: vendor _venv/bin/cram
+	. _venv/bin/activate && ./test/run-example-tests
+
+test-race: vendor
 	go generate $(NOVENDOR)
 	test/go-test-prettify -race $(NOVENDOR)
+
+vendor:
+	$(error run 'make setup' first)
+
+_venv/bin/cram:
+	./scripts/travis/get-cram.sh
 
 testpop:	clean
 	go build ./scripts/testpop/

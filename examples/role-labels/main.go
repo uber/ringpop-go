@@ -18,26 +18,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+//go:generate thrift-gen --generateThrift --outputDir gen-go --template github.com/uber/ringpop-go/ringpop.thrift-gen --inputFile role.thrift
+
 package main
 
 import (
-	"bytes"
 	"flag"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/discovery/jsonfile"
-	gen "github.com/uber/ringpop-go/examples/ping-thrift/gen-go/ping"
-	"github.com/uber/ringpop-go/forward"
+	gen "github.com/uber/ringpop-go/examples/role-labels/gen-go/role"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 )
 
+const (
+	roleKey = "role"
+)
+
 var (
-	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start ringpop on")
+	hostport = flag.String("listen", "127.0.0.1:3000", "hostport to start service on")
 	hostfile = flag.String("hosts", "./hosts.json", "path to hosts file")
+	rolename = flag.String("role", "roleA", "name of the role this node takes in the cluster")
 )
 
 type worker struct {
@@ -46,58 +51,29 @@ type worker struct {
 	logger  *log.Logger
 }
 
-func (w *worker) RegisterPing() error {
-	server := thrift.NewServer(w.channel)
-	server.Register(gen.NewTChanPingPongServiceServer(w))
+func (w *worker) GetMembers(ctx thrift.Context, role string) ([]string, error) {
+	return w.ringpop.GetReachableMembers(swim.MemberWithLabelAndValue(roleKey, role))
+}
+
+func (w *worker) SetRole(ctx thrift.Context, role string) error {
+	labels, err := w.ringpop.Labels()
+	if err != nil {
+		return err
+	}
+	labels.Set(roleKey, role)
 	return nil
 }
 
-func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) {
-	var pongResult gen.PingPongServicePingResult
-	var res []byte
-
-	headers := ctx.Headers()
-	var marshaledHeaders bytes.Buffer
-	err := thrift.WriteHeaders(&marshaledHeaders, headers)
-	if err != nil {
-		return nil, err
-	}
-
-	pingArgs := &gen.PingPongServicePingArgs{
-		Request: request,
-	}
-	req, err := ringpop.SerializeThrift(pingArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	forwardOptions := &forward.Options{Headers: marshaledHeaders.Bytes()}
-	handle, err := w.ringpop.HandleOrForward(request.Key, req, &res, "pingchannel", "PingPongService::Ping", tchannel.Thrift, forwardOptions)
-	if handle {
-		identity, err := w.ringpop.WhoAmI()
-		if err != nil {
-			return nil, err
-		}
-		pHeader := headers["p"]
-		return &gen.Pong{
-			Message: "Hello, world!",
-			From_:   identity,
-			Pheader: &pHeader,
-		}, nil
-	}
-
-	if err := ringpop.DeserializeThrift(res, &pongResult); err != nil {
-		return nil, err
-	}
-
-	// else request was forwarded
-	return pongResult.Success, err
+func (w *worker) RegisterRoleService() error {
+	server := thrift.NewServer(w.channel)
+	server.Register(gen.NewTChanRoleServiceServer(w))
+	return nil
 }
 
 func main() {
 	flag.Parse()
 
-	ch, err := tchannel.NewChannel("pingchannel", nil)
+	ch, err := tchannel.NewChannel("role", nil)
 	if err != nil {
 		log.Fatalf("channel did not create successfully: %v", err)
 	}
@@ -119,8 +95,8 @@ func main() {
 		logger:  logger,
 	}
 
-	if err := worker.RegisterPing(); err != nil {
-		log.Fatalf("could not register ping handler: %v", err)
+	if err := worker.RegisterRoleService(); err != nil {
+		log.Fatalf("could not register role service: %v", err)
 	}
 
 	if err := worker.channel.ListenAndServe(*hostport); err != nil {
@@ -130,9 +106,21 @@ func main() {
 	opts := new(swim.BootstrapOptions)
 	opts.DiscoverProvider = jsonfile.New(*hostfile)
 
+	log.Println("Bootstrapping")
+
 	if _, err := worker.ringpop.Bootstrap(opts); err != nil {
 		log.Fatalf("ringpop bootstrap failed: %v", err)
 	}
+
+	log.Println("Bootstrapped")
+
+	if labels, err := worker.ringpop.Labels(); err != nil {
+		log.Fatalf("unable to get access to ringpop labels: %v", err)
+	} else {
+		labels.Set(roleKey, *rolename)
+	}
+
+	log.Println("Started")
 
 	select {}
 }

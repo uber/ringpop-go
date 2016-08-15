@@ -4,9 +4,9 @@
 #
 set -eo pipefail
 
-declare project_root="${0%/*}/.."
-declare ringpop_common_dir="${0%/*}/ringpop-common"
-declare ringpop_common_branch="master"
+# Import common functions and variables
+. "${0%/*}/lib.sh"
+
 declare tap_filter="${ringpop_common_dir}/test/tap-filter"
 
 declare test_cluster_sizes="1 2 3 4 5 10"
@@ -44,46 +44,6 @@ run() {
     "$@"
 }
 
-#
-# Copy stdin to stdout but prefix each line with the specified string.
-#
-prefix() {
-    local _prefix=
-
-    [ -n "$1" ] && _prefix="[$1] "
-    while IFS= read -r -t 30 line; do
-        echo "${_prefix}${line}"
-    done
-}
-
-#
-# Clones or updates the ringpop-common repository.
-#
-fetch-ringpop-common() {
-    if [ ! -e "$ringpop_common_dir" ]; then
-        run git clone --depth=1 https://github.com/uber/ringpop-common.git "$ringpop_common_dir" --branch "$ringpop_common_branch"
-    fi
-
-    run cd "$ringpop_common_dir"
-    #run git checkout latest version of $ringpop_common_branch
-    run git fetch origin "$ringpop_common_branch"
-    run git checkout "FETCH_HEAD"
-
-    run cd - >/dev/null
-
-    run cd "${ringpop_common_dir}/test"
-    run npm install >/dev/null
-    run cd - >/dev/null
-
-    # Check tap-filter exists in ringpop-common. It is required to filter output
-    # correctly to stdout/stderr
-    if ! [ -x "$tap_filter" ]; then
-        echo "ERROR: missing '$tap_filter' in ringpop-common" >&2
-        exit 1
-    fi
-}
-
-#
 # Build the testpop binary.
 #
 build-testpop() {
@@ -109,6 +69,7 @@ run-test-for-cluster-size() {
         --enable-feature reaping-faulty-nodes \
         --enable-feature bidirectional-full-syncs \
         --enable-feature partition-healing \
+        --enable-feature labels \
         "${project_root}/testpop" &>$output_file || err=$?
 
     if [ $PIPESTATUS -gt 0 ]; then
@@ -167,7 +128,7 @@ run-tests-serial() {
 }
 
 # Fetch and build in parallel
-{ fetch-ringpop-common 2>&1|prefix "fetch ringpop-common"; } &
+{ fetch-ringpop-common "test" 2>&1|prefix "fetch ringpop-common"; } &
 { build-testpop 2>&1|prefix "build testpop"; } &
 wait-all
 

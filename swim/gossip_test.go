@@ -88,10 +88,12 @@ func (s *GossipTestSuite) TestUpdatesArePropagated() {
 	s.node.disseminator.ClearChanges()
 	peer.node.disseminator.ClearChanges()
 
-	peer.node.memberlist.MakeAlive("127.0.0.1:3003", s.incarnation)
-	peer.node.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
-	peer.node.memberlist.MakeSuspect("127.0.0.1:3005", s.incarnation)
-	peer.node.memberlist.MakeLeave("127.0.0.1:3006", s.incarnation)
+	peer.node.memberlist.Update([]Change{
+		Change{Address: "127.0.0.1:3003", Incarnation: s.incarnation, Status: Alive},
+		Change{Address: "127.0.0.1:3004", Incarnation: s.incarnation, Status: Faulty},
+		Change{Address: "127.0.0.1:3005", Incarnation: s.incarnation, Status: Suspect},
+		Change{Address: "127.0.0.1:3006", Incarnation: s.incarnation, Status: Leave},
+	})
 
 	s.Len(peer.node.disseminator.changes, 4)
 

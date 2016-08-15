@@ -72,19 +72,41 @@ func nodesThatNeedToReincarnate(MA, MB []Change) (changesForA, changesForB []Cha
 		// If a node would be overwritten and would stop being pingable, it is
 		// not suited for merging.
 		if b.isPingable() && a.overrides(b) && !a.isPingable() {
-			changesForB = append(changesForB, Change{
-				Address:     a.Address,
-				Incarnation: a.Incarnation,
-				Status:      Suspect,
-			})
+			// take the change in a local variable, this protects to inadvertly
+			// changing the type of `a` from a value type to a pointer type.
+			var change Change
+			change = a
+
+			// Remove the source information from the change. If the source
+			// information is present and it is gossiped to the other partition
+			// it might cause the partitions to heal before they are in a safe
+			// state.
+			change.scrubSource()
+
+			// gossip the suspect status
+			change.Status = Suspect
+
+			// record the change to be sent to B
+			changesForB = append(changesForB, change)
 		}
 
 		if a.isPingable() && b.overrides(a) && !b.isPingable() {
-			changesForA = append(changesForA, Change{
-				Address:     b.Address,
-				Incarnation: b.Incarnation,
-				Status:      Suspect,
-			})
+			// take the change in a local variable, this protects to inadvertly
+			// changing the type of `a` from a value type to a pointer type.
+			var change Change
+			change = b
+
+			// Remove the source information from the change. If the source
+			// information is present and it is gossiped to the other partition
+			// it might cause the partitions to heal before they are in a safe
+			// state.
+			change.scrubSource()
+
+			// gossip the suspect status
+			change.Status = Suspect
+
+			// record the change to be sent to A
+			changesForA = append(changesForA, change)
 		}
 	}
 

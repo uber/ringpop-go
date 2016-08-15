@@ -124,30 +124,6 @@ func (s *MemberlistTestSuite) TestChecksumsEqual() {
 		"expected checksums to be equal")
 }
 
-func (s *MemberlistTestSuite) TestLocalLeaveOverrideHigher() {
-	s.Require().NotNil(s.m.local, "local member cannot be nil")
-
-	s.m.MakeLeave(s.m.local.Address, s.incarnation+1)
-
-	s.Equal(Leave, s.m.local.Status, "expected local member status to be leave")
-}
-
-func (s *MemberlistTestSuite) TestLocalLeaveOverrideEqual() {
-	s.Require().NotNil(s.m.local, "local member cannot be nil")
-
-	s.m.MakeLeave(s.m.local.Address, s.incarnation)
-
-	s.Equal(Leave, s.m.local.Status, "expected local member status to be leave")
-}
-
-func (s *MemberlistTestSuite) TestLocalLeaveOverrideLower() {
-	s.Require().NotNil(s.m.local, "local member cannot be nil")
-
-	s.m.MakeLeave(s.m.local.Address, s.incarnation-1)
-
-	s.Equal(Alive, s.m.local.Status, "expected local member status to be alive")
-}
-
 func (s *MemberlistTestSuite) TestLocalFaultyOverride() {
 	s.Require().NotNil(s.m.local, "local member cannot be nil")
 
@@ -315,13 +291,17 @@ func (s *MemberlistTestSuite) TestGetReachableMembers() {
 	nodeA.memberlist.MakeFaulty("127.0.0.1:3004", s.incarnation)
 
 	activeMembers := nodeA.GetReachableMembers()
-	sort.Strings(activeMembers)
+	activeAddresses := make([]string, 0, len(activeMembers))
+	for _, member := range activeMembers {
+		activeAddresses = append(activeAddresses, member.Address)
+	}
+	sort.Strings(activeAddresses)
 
 	s.Equal([]string{
 		"127.0.0.1:3001",
 		"127.0.0.1:3002",
 		"127.0.0.1:3003",
-	}, activeMembers, "expected a list of 3 specific nodes")
+	}, activeAddresses, "expected a list of 3 specific nodes")
 }
 
 func (s *MemberlistTestSuite) TestCountReachableMembers() {

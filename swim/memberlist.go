@@ -23,7 +23,6 @@ package swim
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"sort"
 	"sync"
@@ -56,7 +55,7 @@ type memberlist struct {
 	// could use members lock for that, but that introduces more deadlocks, so
 	// making a short-term fix instead by adding another lock. Like said, this
 	// is short-term, see github#113.
-	sync.Mutex
+	sync.RWMutex
 }
 
 // newMemberlist returns a new member list
@@ -64,9 +63,18 @@ func newMemberlist(n *Node) *memberlist {
 	m := &memberlist{
 		node:   n,
 		logger: logging.Logger("membership").WithField("local", n.address),
+
+		// prepopulate the local member with its state
+		local: &Member{
+			Address:     n.Address(),
+			Incarnation: nowInMillis(n.clock),
+			Status:      Alive,
+		},
 	}
 
 	m.members.byAddress = make(map[string]*Member)
+	m.members.byAddress[m.local.Address] = m.local
+	m.members.list = append(m.members.list, m.local)
 
 	return m
 }
@@ -83,7 +91,7 @@ func (m *memberlist) Checksum() uint32 {
 func (m *memberlist) ComputeChecksum() {
 	startTime := time.Now()
 	m.members.Lock()
-	checksum := farm.Fingerprint32([]byte(m.GenChecksumString()))
+	checksum := farm.Fingerprint32([]byte(m.genChecksumString()))
 	oldChecksum := m.members.checksum
 	m.members.checksum = checksum
 	m.members.Unlock()
@@ -103,8 +111,9 @@ func (m *memberlist) ComputeChecksum() {
 }
 
 // generates string to use when computing checksum
-func (m *memberlist) GenChecksumString() string {
+func (m *memberlist) genChecksumString() string {
 	var strings sort.StringSlice
+	var buffer bytes.Buffer
 
 	for _, member := range m.members.list {
 		// Don't include Tombstone nodes in the checksum to avoid
@@ -112,13 +121,16 @@ func (m *memberlist) GenChecksumString() string {
 		if member.Status == Tombstone {
 			continue
 		}
-		s := fmt.Sprintf("%s%s%v", member.Address, member.Status, member.Incarnation)
-		strings = append(strings, s)
+
+		// collect the string from the member and add it to the list of strings
+		member.checksumString(&buffer)
+		strings = append(strings, buffer.String())
+		// the buffer is reused for the next member and collection below
+		buffer.Reset()
 	}
 
 	strings.Sort()
 
-	buffer := bytes.NewBuffer([]byte{})
 	for _, str := range strings {
 		buffer.WriteString(str)
 		buffer.WriteString(";")
@@ -186,13 +198,13 @@ func (m *memberlist) Pingable(member Member) bool {
 
 // returns the number of pingable members in the memberlist
 func (m *memberlist) NumPingableMembers() (n int) {
-	m.members.Lock()
+	m.members.RLock()
 	for _, member := range m.members.list {
 		if m.Pingable(*member) {
 			n++
 		}
 	}
-	m.members.Unlock()
+	m.members.RUnlock()
 
 	return n
 }
@@ -218,21 +230,36 @@ func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*
 	return members[:n]
 }
 
-// returns an immutable slice of members representing the current state of the membership
-func (m *memberlist) GetMembers() (members []Member) {
+// returns an slice of (copied) members representing the current state of the
+// membership. The membership will be filtered by the predicates provided.
+func (m *memberlist) GetMembers(predicates ...MemberPredicate) (members []Member) {
 	m.members.RLock()
+	members = make([]Member, 0, len(m.members.list))
 	for _, member := range m.members.list {
-		members = append(members, *member)
+		if MemberMatchesPredicates(*member, predicates...) {
+			members = append(members, *member)
+		}
 	}
 	m.members.RUnlock()
 
 	return
 }
 
-// Reincarnate sets the status of the node to Alive and updates the incarnation
-// number. It adds the change to the disseminator as well.
-func (m *memberlist) Reincarnate() []Change {
-	return m.MakeAlive(m.node.address, nowInMillis(m.node.clock))
+// bumpIncarnation will increase the incarnation number of the local member. It
+// will also prepare the change needed to gossip the change to the rest of the
+// network. This function does not update the checksum stored on the membership,
+// this is the responsibility of the caller since more changes might be made at
+// the same time.
+func (m *memberlist) bumpIncarnation() Change {
+	// reincarnate the local copy of the state of the node
+	m.local.Incarnation = nowInMillis(m.node.clock)
+
+	// create a change to disseminate around
+	change := Change{}
+	change.populateSource(m.local)
+	change.populateSubject(m.local)
+
+	return change
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
@@ -250,9 +277,148 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
-func (m *memberlist) MakeLeave(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Leave})
-	return m.MakeChange(address, incarnation, Leave)
+func (m *memberlist) SetLocalStatus(status string) {
+	m.members.Lock()
+	m.local.Status = status
+	m.members.Unlock()
+	m.postLocalUpdate()
+}
+
+func (m *memberlist) SetLocalLabel(key, value string) error {
+	// make sure that the contents of the key and value are allowed to be used
+	// in the gossip protocol.
+	if err := validateLabel(key, value); err != nil {
+		return err
+	}
+
+	// TODO implement a sane limit for the size of the labels to prevent users
+	// from impacting the performance of the gossip protocol.
+
+	m.members.Lock()
+
+	// ensure that there is a labels map
+	if m.local.Labels == nil {
+		m.local.Labels = make(map[string]string)
+	}
+
+	old, had := m.local.Labels[key]
+
+	// set the label
+	m.local.Labels[key] = value
+	m.members.Unlock()
+
+	if !had || old != value {
+		// postLocalUpdate reincarnates and starts gossipping the new state
+		// which is only desired when a change to the local labels has been made
+		m.postLocalUpdate()
+	}
+
+	// there was no error during the manipulation of labels
+	return nil
+}
+
+// GetLocalLabel returns the value of a label set on the local node. Its second
+// argument indicates if the key was present on the node or not
+func (m *memberlist) GetLocalLabel(key string) (string, bool) {
+	value, has := m.local.Labels[key]
+	return value, has
+}
+
+// LocalLabelsAsMap copies the labels set on the local node into a map for the
+// callee to use. Changes to this map will not be reflected in the labels kept
+// by this node.
+func (m *memberlist) LocalLabelsAsMap() map[string]string {
+	if len(m.local.Labels) == 0 {
+		return nil
+	}
+
+	cpy := make(map[string]string, len(m.local.Labels))
+	for k, v := range m.local.Labels {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+// SetLocalLabels updates multiple labels at once. It will take all the labels
+// that are set in the map passed to this function and overwrite the value with
+// the value in the map. Keys that are not present in the provided map will
+// remain in the labels of this node. The operation is guaranteed to succeed
+// completely or not at all.
+func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	// make sure that the contents of the key and value are allowed to be used
+	// in the gossip protocol.
+	if err := validateLabels(labels); err != nil {
+		return err
+	}
+
+	// ensure that there is a labels map
+	if m.local.Labels == nil {
+		m.local.Labels = make(map[string]string, len(labels))
+	}
+
+	// keep track if we made changes to the labels
+	changes := false
+
+	// copy the key-value pairs to our internal labels. By not setting the map
+	// of labels to the Labels value of the local member we prevent removing labels
+	// that the user did not specify in the new map.
+	for key, value := range labels {
+		old, had := m.local.Labels[key]
+		m.local.Labels[key] = value
+
+		if !had || old != value {
+			changes = true
+		}
+	}
+
+	if changes {
+		m.postLocalUpdate()
+	}
+
+	return nil
+}
+
+// Remove a label from the local map of labels. This will trigger a reincarnation
+// of the member to gossip its labels around. It returns true if all labels have
+// been removed.
+func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+	if len(m.local.Labels) == 0 || len(keys) == 0 {
+		// nothing to delete
+		return false
+	}
+
+	any := false    // keep track if we at least removed one label
+	removed := true // keep track if all labels are removed
+	for _, key := range keys {
+		_, has := m.local.Labels[key]
+		delete(m.local.Labels, key)
+		removed = removed && has
+		any = any || has
+	}
+	if any {
+		// only reincarnate if there is a label removed
+		m.postLocalUpdate()
+	}
+	return removed
+}
+
+// postLocalUpdate should be called after the local Member has been updated to
+// make sure that its new state has a higher incarnation number and the change
+// will be recorded as a change to gossip around.
+func (m *memberlist) postLocalUpdate() {
+	// bump our incarnation for this change to be accepted by all peers
+	m.members.Lock()
+	change := m.bumpIncarnation()
+	m.members.Unlock()
+
+	// since we changed our local state we need to update our checksum
+	m.ComputeChecksum()
+
+	changes := []Change{change}
+
+	// kick in our updating mechanism
+	m.node.handleChanges(changes)
+	m.node.rollup.TrackUpdates(changes)
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -280,30 +446,34 @@ func (m *memberlist) Evict(address string) {
 
 // makes a change to the member list
 func (m *memberlist) MakeChange(address string, incarnation int64, status string) []Change {
-	if m.local == nil {
-		m.local = &Member{
-			Address:     m.node.Address(),
-			Incarnation: util.TimeNowMS(),
-			Status:      Alive,
-		}
-	}
 
-	changes := m.Update([]Change{Change{
-		Source:            m.local.Address,
-		SourceIncarnation: m.local.Incarnation,
-		Address:           address,
-		Incarnation:       incarnation,
-		Status:            status,
-		Timestamp:         util.Timestamp(time.Now()),
-	}})
+	member, _ := m.Member(address)
 
-	if len(changes) > 0 {
+	// create the new change based on information know to the memberlist
+	var change Change
+	change.populateSubject(member)
+	change.populateSource(m.local)
+
+	// Override values that are specific to the change we are making
+	change.Address = address
+	change.Incarnation = incarnation
+	change.Status = status
+	// Keep track of when the change was made
+	change.Timestamp = util.Timestamp(time.Now())
+
+	return m.ApplyChange(change)
+}
+
+func (m *memberlist) ApplyChange(c Change) []Change {
+	applied := m.Update([]Change{c})
+
+	if len(applied) > 0 {
 		m.logger.WithFields(bark.Fields{
-			"update": changes[0],
-		}).Debugf("ringpop member declares other member %s", changes[0].Status)
+			"update": applied[0],
+		}).Debugf("ringpop member declares other member %s", applied[0].Status)
 	}
 
-	return changes
+	return applied
 }
 
 // updates the member list with the slice of changes, applying selectively
@@ -320,50 +490,56 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 	m.node.emit(MemberlistChangesReceivedEvent{changes})
 
 	m.Lock()
+
+	// run through all changes received and figure out if they need to be accepted
 	m.members.Lock()
-
 	for _, change := range changes {
-		member, ok := m.members.byAddress[change.Address]
+		member, has := m.members.byAddress[change.Address]
 
-		// first time member has been seen, take change wholesale
-		if !ok {
-			if m.Apply(change) {
-				applied = append(applied, change)
+		// transform the change into a member that we can test against existing
+		// members
+		gossip := Member{}
+		gossip.populateFromChange(&change)
+
+		// test to see if we need to process the gossip
+		if shouldProcessGossip(member, &gossip) {
+			// the gossip overwrites the know state about the member
+
+			if gossip.Address == m.local.Address {
+				// if the gossip is about the local member it needs to be
+				// countered by increasing the incarnation number and gossip the
+				// new state to the network.
+				change = m.bumpIncarnation()
+				m.node.emit(RefuteUpdateEvent{})
+			} else {
+				// otherwise it can be applied to the memberlist
+
+				if !has {
+					// if the member was not already present in the list we will
+					// add it and assign it a random position in the list to ensure
+					// guarantees for pinging
+					m.members.byAddress[gossip.Address] = &gossip
+					i := m.getJoinPosition()
+					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
+				} else {
+					// copy the value of the gossip into the already existing
+					// struct. This operation is by value, not by reference.
+					// this is to keep both the list and byAddress map in sync
+					// without tedious lookup operations.
+					*member = gossip
+				}
+
 			}
-			continue
-		}
 
-		// if change is local override, reassert member is alive
-		if member.localOverride(m.node.Address(), change) {
-			m.node.emit(RefuteUpdateEvent{})
-			newIncNo := nowInMillis(m.node.clock)
-			overrideChange := Change{
-				Source:            m.node.Address(),
-				SourceIncarnation: newIncNo,
-				Address:           change.Address,
-				Incarnation:       newIncNo,
-				Status:            Alive,
-				Timestamp:         util.Timestamp(time.Now()),
-			}
+			// keep track of the change that it has been applied
+			applied = append(applied, change)
 
-			if m.Apply(overrideChange) {
-				applied = append(applied, overrideChange)
-			}
-
-			continue
-		}
-
-		// if non-local override, apply change wholesale
-		if member.nonLocalOverride(change) {
-			if m.Apply(change) {
-				applied = append(applied, change)
-			}
 		}
 	}
-
 	m.members.Unlock()
 
 	if len(applied) > 0 {
+		// when there are changes applied we need to recalculate our checksum
 		oldChecksum := m.Checksum()
 		m.ComputeChecksum()
 
@@ -405,47 +581,15 @@ func (m *memberlist) AddJoinList(list []Change) {
 	}
 }
 
-// gets a random position in [0, length of member list)
+// getJoinPosition picks a random position in [0, length of member list), this
+// assumes the caller already has a read lock on the member struct to prevent
+// concurrent access.
 func (m *memberlist) getJoinPosition() int {
 	l := len(m.members.list)
 	if l == 0 {
 		return l
 	}
 	return rand.Intn(l)
-}
-
-// Apply tries to apply the change to the memberlsist. Returns true when the change was applied
-func (m *memberlist) Apply(change Change) bool {
-	member, ok := m.members.byAddress[change.Address]
-
-	if !ok {
-		// avoid indefinite tombstones by not creating new nodes
-		// directly in this state
-		if change.Status == Tombstone {
-			return false
-		}
-
-		member = &Member{
-			Address:     change.Address,
-			Status:      change.Status,
-			Incarnation: change.Incarnation,
-		}
-
-		if member.Address == m.node.Address() {
-			m.local = member
-		}
-
-		m.members.byAddress[change.Address] = member
-		i := m.getJoinPosition()
-		m.members.list = append(m.members.list[:i], append([]*Member{member}, m.members.list[i:]...)...)
-	}
-
-	member.Lock()
-	member.Status = change.Status
-	member.Incarnation = change.Incarnation
-	member.Unlock()
-
-	return true
 }
 
 // shuffles the member list
@@ -468,26 +612,14 @@ func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
 }
 
-func (m *memberlist) GetReachableMembers() []string {
-	var active []string
-
-	m.members.RLock()
-	for _, member := range m.members.list {
-		if member.isReachable() {
-			active = append(active, member.Address)
-		}
-	}
-	m.members.RUnlock()
-
-	return active
-}
-
-func (m *memberlist) CountReachableMembers() int {
+// CountMembers returns the number of members maintained by the swim membership
+// protocol for all members that match the predicates
+func (m *memberlist) CountMembers(predicates ...MemberPredicate) int {
 	count := 0
 
 	m.members.RLock()
 	for _, member := range m.members.list {
-		if member.isReachable() {
+		if MemberMatchesPredicates(*member, predicates...) {
 			count++
 		}
 	}

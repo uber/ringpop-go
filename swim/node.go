@@ -136,10 +136,11 @@ func mergeDefaultOptions(opts *Options) *Options {
 // implements.
 type NodeInterface interface {
 	Bootstrap(opts *BootstrapOptions) ([]string, error)
-	CountReachableMembers() int
+	CountReachableMembers(predicates ...MemberPredicate) int
 	Destroy()
 	GetChecksum() uint32
-	GetReachableMembers() []string
+	GetReachableMembers(predicates ...MemberPredicate) []Member
+	Labels() *NodeLabels
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
@@ -226,6 +227,13 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
+
+	for _, member := range node.memberlist.GetMembers() {
+		change := Change{}
+		change.populateSubject(&member)
+		node.disseminator.RecordChange(change)
+	}
+
 	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
 		opts.RollupMaxUpdates)
 
@@ -255,9 +263,9 @@ func (n *Node) HasChanges() bool {
 // Incarnation returns the incarnation number of the Node.
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
-		n.memberlist.local.RLock()
+		n.memberlist.members.RLock()
 		incarnation := n.memberlist.local.Incarnation
-		n.memberlist.local.RUnlock()
+		n.memberlist.members.RUnlock()
 		return incarnation
 	}
 	return -1
@@ -382,8 +390,6 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	if opts == nil {
 		opts = &BootstrapOptions{}
 	}
-
-	n.memberlist.Reincarnate()
 
 	n.discoverProvider = opts.DiscoverProvider
 	joinOpts := &joinOpts{
@@ -512,14 +518,23 @@ func (n *Node) pingNextMember() {
 	n.logger.WithField("target", target).Info("ping request target reachable")
 }
 
-// GetReachableMembers returns a slice of members currently in this node's
-// membership list that aren't faulty.
-func (n *Node) GetReachableMembers() []string {
-	return n.memberlist.GetReachableMembers()
+// GetReachableMembers returns a slice of members containing only the reachable
+// members that satisfies the predicates passed in.
+func (n *Node) GetReachableMembers(predicates ...MemberPredicate) []Member {
+	predicates = append(predicates, memberIsReachable)
+	return n.memberlist.GetMembers(predicates...)
 }
 
-// CountReachableMembers returns the number of members currently in this node's
-// membership list that aren't faulty.
-func (n *Node) CountReachableMembers() int {
-	return n.memberlist.CountReachableMembers()
+// CountReachableMembers returns the number of reachable members currently in
+// this node's membership list that satisfies all predicates passed in.
+func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
+	predicates = append(predicates, memberIsReachable)
+	return n.memberlist.CountMembers(predicates...)
+}
+
+// Labels returns a mutator for the labels kept on this local node. This mutator
+// interacts with the local node and memberlist to change labels on this node
+// and gossip those changes around.
+func (n *Node) Labels() *NodeLabels {
+	return &NodeLabels{n}
 }

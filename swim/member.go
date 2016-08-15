@@ -21,9 +21,12 @@
 package swim
 
 import (
+	"bytes"
 	"math/rand"
+	"strconv"
 	"sync"
 
+	"github.com/dgryski/go-farm"
 	"github.com/uber/ringpop-go/util"
 )
 
@@ -44,13 +47,25 @@ const (
 	Tombstone = "tombstone"
 )
 
+var (
+	byteBufferPool = sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
+)
+
 // A Member is a member in the member list
 type Member struct {
-	sync.RWMutex
-	Address     string `json:"address"`
-	Status      string `json:"status"`
-	Incarnation int64  `json:"incarnationNumber"`
+	Address     string   `json:"address"`
+	Status      string   `json:"status"`
+	Incarnation int64    `json:"incarnationNumber"`
+	Labels      LabelMap `json:"labels,omitempty"`
 }
+
+// LabelMap is a type Used by Member to store the labels of a member. It stores
+// string to string mappings containing user data that is gossiped around in SWIM.
+type LabelMap map[string]string
 
 // suspect interface
 func (m Member) address() string {
@@ -59,6 +74,82 @@ func (m Member) address() string {
 
 func (m Member) incarnation() int64 {
 	return m.Incarnation
+}
+
+func (m *Member) populateFromChange(c *Change) {
+	m.Address = c.Address
+	m.Incarnation = c.Incarnation
+	m.Status = c.Status
+	m.Labels = c.Labels
+}
+
+// checksumString fills a buffer that is passed with the contents that this node
+// needs to add to the checksum string.
+func (m Member) checksumString(b *bytes.Buffer) {
+	b.WriteString(m.Address)
+	b.WriteString(m.Status)
+	b.WriteString(strconv.FormatInt(m.Incarnation, 10))
+	m.Labels.checksumString(b)
+}
+
+// checksumString adds the label portion of the checksum to the buffer that is
+// passed in. The string will not be appended in the case where labels are not
+// set on this member. This is for backwards compatibility reasons with older
+// versions.
+func (l LabelMap) checksumString(b *bytes.Buffer) {
+	checksum := l.checksum()
+
+	if checksum == 0 {
+		// we don't write the checksum of the labels if the value of the checksum
+		// is 0 (zero) to be backwards compatible with ringpop applications on
+		// an older version. This only works if the newer version does not use
+		// labels
+		return
+	}
+
+	// write #labels<checksum> to the buffer which will be appended to the
+	// checksum string for the node.
+	b.WriteString("#labels")
+	b.WriteString(strconv.Itoa(int(checksum)))
+}
+
+// checksum computes a checksum for the labels. It will return 0 (zero) when no
+// labels are set, but 0 does not indicate that no labels are set. It could be
+// possible that 0 is computed as the checksum.
+func (l LabelMap) checksum() int32 {
+	var checksum uint32
+	lb := byteBufferPool.Get().(*bytes.Buffer)
+	// make sure the buffer is empty after getting a buffer from our pool
+	lb.Reset()
+	for key, value := range l {
+		// decide if we want to escape both fields to enforce uniqueness of the
+		// key-value checksum.
+		lb.WriteString(key)
+		lb.WriteString("=")
+		lb.WriteString(value)
+
+		// The checksum is calculated by xorring the checksums of all individual
+		// labels. This makes the checksum of the labels order independant. This
+		// is easier compared to sorting the labels by their key because of two
+		// reasons.
+		// 1. It saves memory allocations to have the keys in a slice.
+		// 2. This method is guaranteed to be locale independant where sorting
+		//    of strings might be different on different locale settings. This
+		//    would cause indefinite fullsync storms because two ringpops would
+		//    never agree on membership checksums.
+		checksum = checksum ^ farm.Fingerprint32(lb.Bytes())
+
+		lb.Reset()
+	}
+	// give the buffer back to the pool
+	byteBufferPool.Put(lb)
+
+	var signedChecksum int32
+	// This line converts an unsigned integer to a signed integer (32 bits).
+	// It is needed to be able to calculate the same value in nodejs for
+	// ringpop-node and the integration tests in ringpop-common.
+	signedChecksum = int32(checksum>>1)<<1 | int32(checksum&uint32(1))
+	return signedChecksum
 }
 
 // shuffles slice of members pseudo-randomly, returns new slice
@@ -73,40 +164,69 @@ func shuffle(members []*Member) []*Member {
 	return newMembers
 }
 
-// nonLocalOverride returns wether a change should be applied to the member.
-// This function assumes that the address of the member and the change are
-// equal.
-func (m *Member) nonLocalOverride(change Change) bool {
-	// change is younger than current member
-	if change.Incarnation > m.Incarnation {
+// shouldProcessGossip evaluates the rules of swim and returns whether the
+// gossip should be processed. eg. Copy the memberstate of the gossip to the
+// known memberstate in the memberlist (creating the member when is does not
+// exist).
+func shouldProcessGossip(old *Member, gossip *Member) bool {
+	// tombstones will not be accepted if we have no knowledge about the member
+	if gossip.Status == Tombstone && old == nil {
+		return false
+	}
+
+	// accept the gossip if we learn about the member through a gossip
+	if old == nil {
 		return true
 	}
 
-	// change is older than current member
-	if change.Incarnation < m.Incarnation {
+	// gossips with a higher incarnation number will always be accepted since
+	// it is a newer version of the member than we know
+	if gossip.Incarnation > old.Incarnation {
+		return true
+	}
+
+	// gossips with a lower incarnation number will never be accepted as we
+	// have a newer version of the member already
+	if gossip.Incarnation < old.Incarnation {
 		return false
 	}
 
-	// If the incarnation numbers are equal, we look at the state to
-	// determine wether the change overrides this member.
-	return statePrecedence(change.Status) > statePrecedence(m.Status)
-}
+	// now we know that the incarnation number of the gossip and the current
+	// view of the member are the same 'age'. Lets evaluate member state to see
+	// which version to pick
 
-// localOverride returns whether the change will override the state of the local
-// member. When it will override the state the member should reincarnate itself
-// to make sure that other members see this node in a correct state.
-func (m *Member) localOverride(local string, change Change) bool {
-	if m.Address != local {
+	// if the status of the gossip takes precedence over the status of our
+	// current member we will accept the gossip.
+	if statePrecedence(gossip.Status) > statePrecedence(old.Status) {
+		return true
+	}
+
+	if statePrecedence(gossip.Status) < statePrecedence(old.Status) {
 		return false
 	}
 
-	// if the incarnation number of the change is smaller than the current
-	// incarnation number it is not overriding the change
-	if change.Incarnation < m.Incarnation {
+	// keep the checksum values in local variables. The checksums are not cached
+	// and require some compute to get them, better to do once than twice.
+	gossipLabelsChecksum := gossip.Labels.checksum()
+	oldLabelsChecksum := old.Labels.checksum()
+
+	// Gossips with a higher checksum should be processed to let the cluster
+	// converge to the labels that cause the highest checksum.
+	if gossipLabelsChecksum > oldLabelsChecksum {
+		return true
+	}
+
+	// If the gossipped labels have a lower checksum we do want to keep the
+	// current memberstate in our memberlist, therefore the gossip should not be
+	// processed.
+	if gossipLabelsChecksum < oldLabelsChecksum {
 		return false
 	}
 
-	return change.Status == Faulty || change.Status == Suspect || change.Status == Tombstone
+	// we prefer the old member over the gossiped member if they have the same
+	// internal state. This prevents the gossip to be continuously be gossiped
+	// around in the network
+	return false
 }
 
 func statePrecedence(s string) int {
@@ -133,12 +253,13 @@ func (m *Member) isReachable() bool {
 
 // A Change is a change a member to be applied
 type Change struct {
-	Source            string `json:"source"`
-	SourceIncarnation int64  `json:"sourceIncarnationNumber"`
-	Address           string `json:"address"`
-	Incarnation       int64  `json:"incarnationNumber"`
-	Status            string `json:"status"`
-	Tombstone         bool   `json:"tombstone,omitempty"`
+	Source            string            `json:"source"`
+	SourceIncarnation int64             `json:"sourceIncarnationNumber"`
+	Address           string            `json:"address"`
+	Incarnation       int64             `json:"incarnationNumber"`
+	Status            string            `json:"status"`
+	Tombstone         bool              `json:"tombstone,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
 	// Use util.Timestamp for bi-direction binding to time encoded as
 	// integer Unix timestamp in JSON
 	Timestamp util.Timestamp `json:"timestamp"`
@@ -164,6 +285,29 @@ func (c Change) validateOutgoing() Change {
 		c.Tombstone = true
 	}
 	return c
+}
+
+func (c *Change) populateSubject(m *Member) {
+	if m == nil {
+		return
+	}
+	c.Address = m.Address
+	c.Incarnation = m.Incarnation
+	c.Status = m.Status
+	c.Labels = m.Labels
+}
+
+func (c *Change) populateSource(m *Member) {
+	if m == nil {
+		return
+	}
+	c.Source = m.Address
+	c.SourceIncarnation = m.Incarnation
+}
+
+func (c *Change) scrubSource() {
+	c.Source = ""
+	c.SourceIncarnation = 0
 }
 
 // suspect interface

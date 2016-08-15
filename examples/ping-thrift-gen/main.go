@@ -92,7 +92,11 @@ func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) 
 	}
 	headers := ctx.Headers()
 	pHeader := headers["p"]
-	return &gen.Pong{"Hello, world!", identity, &pHeader}, nil
+	return &gen.Pong{
+		Message: "Hello, world!",
+		From_:   identity,
+		Pheader: &pHeader,
+	}, nil
 }
 
 func main() {

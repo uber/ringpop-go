@@ -54,6 +54,12 @@ type HealResponse struct {
 	Error   string   `json:"error"`
 }
 
+// SetLabelRequest contains a key and a value to set in the labels
+type SetLabelRequest struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // notImplementedHandler is a dummy handler that returns an error explaining
 // this method is not implemented.
 func notImplementedHandler(ctx json.Context, req *emptyArg) (*emptyArg, error) {
@@ -75,6 +81,7 @@ func (n *Node) registerHandlers() error {
 		"/admin/gossip/tick":         n.tickHandler,
 		"/admin/member/leave":        n.adminLeaveHandler,
 		"/admin/member/join":         n.adminJoinHandler,
+		"/admin/member/setLabel":     n.adminSetLabelHandler,
 		"/admin/reap":                n.reapFaultyMembersHandler,
 	}
 
@@ -138,12 +145,20 @@ func (n *Node) tickHandler(ctx json.Context, req *emptyArg) (*ping, error) {
 }
 
 func (n *Node) adminJoinHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	n.memberlist.Reincarnate()
+	n.memberlist.SetLocalStatus(Alive)
 	return &Status{Status: "rejoined"}, nil
 }
 
 func (n *Node) adminLeaveHandler(ctx json.Context, req *emptyArg) (*Status, error) {
-	n.memberlist.MakeLeave(n.address, n.memberlist.local.incarnation())
+	n.memberlist.SetLocalStatus(Leave)
+	return &Status{Status: "ok"}, nil
+}
+
+func (n *Node) adminSetLabelHandler(ctx json.Context, req *SetLabelRequest) (*Status, error) {
+	err := n.Labels().Set(req.Key, req.Value)
+	if err != nil {
+		return nil, err
+	}
 	return &Status{Status: "ok"}, nil
 }
 
