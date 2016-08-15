@@ -17,6 +17,17 @@ func isInternalLabel(key string) bool {
 	return strings.HasPrefix(key, labelsInternalNamespacePrefix)
 }
 
+func countNonInternalLabels(labels map[string]string) int {
+	count := 0
+	for key := range labels {
+		if isInternalLabel(key) {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
 // NodeLabels implements the ringpop.Labels interface and proxies the calls to
 // the swim.Node backing the membership protocol.
 type NodeLabels struct {
