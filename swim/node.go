@@ -263,9 +263,9 @@ func (n *Node) HasChanges() bool {
 // Incarnation returns the incarnation number of the Node.
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
-		n.memberlist.RLock()
+		n.memberlist.members.RLock()
 		incarnation := n.memberlist.local.Incarnation
-		n.memberlist.RUnlock()
+		n.memberlist.members.RUnlock()
 		return incarnation
 	}
 	return -1

@@ -278,13 +278,17 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
+	m.members.Lock()
 	m.local.Status = status
+	m.members.Unlock()
 	m.postLocalUpdate()
 }
 
 func (m *memberlist) SetLocalLabel(key, value string) error {
 	// TODO implement a sane limit for the size of the labels to prevent users
 	// from impacting the performance of the gossip protocol.
+
+	m.members.Lock()
 
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
@@ -295,6 +299,7 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 
 	// set the label
 	m.local.Labels[key] = value
+	m.members.Unlock()
 
 	if !had || old != value {
 		// postLocalUpdate reincarnates and starts gossipping the new state
@@ -387,7 +392,9 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 // will be recorded as a change to gossip around.
 func (m *memberlist) postLocalUpdate() {
 	// bump our incarnation for this change to be accepted by all peers
+	m.members.Lock()
 	change := m.bumpIncarnation()
+	m.members.Unlock()
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
