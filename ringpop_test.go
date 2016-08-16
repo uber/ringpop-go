@@ -623,6 +623,60 @@ func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
 	s.Nil(result)
 }
 
+func (s *RingpopTestSuite) TestGetReachableMembers() {
+	createSingleNodeCluster(s.ringpop)
+
+	identity, err := s.ringpop.WhoAmI()
+	s.Require().NoError(err)
+
+	result, err := s.ringpop.GetReachableMembers()
+	s.NoError(err)
+	s.Equal([]string{identity}, result)
+}
+
+func (s *RingpopTestSuite) TestGetReachableMembersNotMePredicate() {
+	createSingleNodeCluster(s.ringpop)
+
+	identity, err := s.ringpop.WhoAmI()
+	s.Require().NoError(err)
+
+	// get reachable members without me (non in this test)
+	result, err := s.ringpop.GetReachableMembers(func(member swim.Member) bool {
+		return member.Address != identity
+	})
+
+	s.NoError(err)
+	s.Equal([]string{}, result)
+}
+
+func (s *RingpopTestSuite) TestCountReachableMembersNotReady() {
+	_, err := s.ringpop.CountReachableMembers()
+	s.Error(err)
+}
+
+func (s *RingpopTestSuite) TestCountReachableMembers() {
+	createSingleNodeCluster(s.ringpop)
+
+	result, err := s.ringpop.CountReachableMembers()
+	s.NoError(err)
+	s.Equal(1, result)
+}
+
+func (s *RingpopTestSuite) TestCountReachableMembersNotMePredicate() {
+	createSingleNodeCluster(s.ringpop)
+
+	identity, err := s.ringpop.WhoAmI()
+	s.Require().NoError(err)
+
+	// get reachable members without me (non in this test)
+	result, err := s.ringpop.CountReachableMembers(func(member swim.Member) bool {
+		return member.Address != identity
+	})
+
+	s.NoError(err)
+	s.Equal(0, result)
+}
+
 // TestAddSelfToBootstrapList tests that Ringpop automatically adds its own
 // identity to the bootstrap host list.
 func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
