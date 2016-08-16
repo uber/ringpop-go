@@ -314,7 +314,9 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 // GetLocalLabel returns the value of a label set on the local node. Its second
 // argument indicates if the key was present on the node or not
 func (m *memberlist) GetLocalLabel(key string) (string, bool) {
+	m.members.RLock()
 	value, has := m.local.Labels[key]
+	m.members.RUnlock()
 	return value, has
 }
 
@@ -322,6 +324,8 @@ func (m *memberlist) GetLocalLabel(key string) (string, bool) {
 // callee to use. Changes to this map will not be reflected in the labels kept
 // by this node.
 func (m *memberlist) LocalLabelsAsMap() map[string]string {
+	m.members.RLock()
+	defer m.members.RUnlock()
 	if len(m.local.Labels) == 0 {
 		return nil
 	}
@@ -339,6 +343,7 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 // remain in the labels of this node. The operation is guaranteed to succeed
 // completely or not at all.
 func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	m.members.Lock()
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string, len(labels))
@@ -359,6 +364,8 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 		}
 	}
 
+	m.members.Unlock()
+
 	if changes {
 		m.postLocalUpdate()
 	}
@@ -370,7 +377,9 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 // of the member to gossip its labels around. It returns true if all labels have
 // been removed.
 func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+	m.members.Lock()
 	if len(m.local.Labels) == 0 || len(keys) == 0 {
+		m.members.Unlock()
 		// nothing to delete
 		return false
 	}
@@ -383,6 +392,9 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 		removed = removed && has
 		any = any || has
 	}
+
+	m.members.Unlock()
+
 	if any {
 		// only reincarnate if there is a label removed
 		m.postLocalUpdate()
