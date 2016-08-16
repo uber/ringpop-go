@@ -364,6 +364,42 @@ func (s *MemberlistTestSuite) TestSetLocalLabel() {
 	s.Assert().Equal(s.node.disseminator.ChangesCount(), 0, "expected to not have changes in the disseminator when overwriting a label with the same value")
 }
 
+func (s *MemberlistTestSuite) TestSetLocalLabels() {
+	s.m.SetLocalLabels(map[string]string{"hello": "world"})
+	value, has := s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set via bulk operation")
+	s.Assert().Equal(value, "world", "expected a value of world for the local label")
+	s.Assert().Equal(s.node.disseminator.ChangesCount(), 1, "expected to have 1 change recorded in the disseminator")
+
+	// test that the change will not be recorded if a single label does not change the value
+	s.node.disseminator.ClearChanges()
+
+	s.m.SetLocalLabels(map[string]string{"hello": "world"})
+	value, has = s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set via bulk operation")
+	s.Assert().Equal(value, "world", "expected a value of world for the local label")
+	s.Assert().Equal(s.node.disseminator.ChangesCount(), 0, "expected to have 1 change recorded in the disseminator")
+
+	// test an operation for two keys
+	s.node.disseminator.ClearChanges()
+
+	s.m.SetLocalLabels(map[string]string{
+		"hello": "world",
+		"foo":   "bar",
+	})
+	value, has = s.m.GetLocalLabel("hello")
+	s.Assert().True(has, "expected to have the local label hello after is has been set via bulk operation")
+	s.Assert().Equal(value, "world", "expected a value of world for the local label")
+
+	value, has = s.m.GetLocalLabel("foo")
+	s.Assert().True(has, "expected to have the local label foo after is has been set via bulk operation")
+	s.Assert().Equal(value, "bar", "expected a value of bar for the local label")
+
+	s.Assert().Equal(s.node.disseminator.ChangesCount(), 1, "expected to have 1 change recorded in the disseminator")
+}
+
 func (s *MemberlistTestSuite) TestGetLocalLabel() {
 	s.m.SetLocalLabel("hello", "world")
 	value, has := s.m.GetLocalLabel("hello")
