@@ -342,6 +342,28 @@ func (s *MemberlistTestSuite) TestApplyUnknownTombstone() {
 	s.Assert().Len(applied, 0, "expected that the declaration of a tombstone for an unknown member is not applied")
 }
 
+func (s *MemberlistTestSuite) TestSetLocalLabel() {
+	s.m.SetLocalLabel("hello", "world")
+	value, has := s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set")
+	s.Assert().Equal(value, "world", "expected a value of world for the local label")
+	s.Assert().Equal(s.node.disseminator.ChangesCount(), 1, "expected to have 1 change recorded in the disseminator")
+
+	// testing to overwrite the value
+	s.m.SetLocalLabel("hello", "baz")
+	value, has = s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been overwritten")
+	s.Assert().Equal(value, "baz", "expected a value of baz for the local label")
+	s.Assert().Equal(s.node.disseminator.ChangesCount(), 1, "expected to have 1 change recorded in the disseminator after the labels are overwritten")
+
+	// testing to overwrite with the same value, should not result in dissemination.
+	s.node.disseminator.ClearChanges()
+	s.m.SetLocalLabel("hello", "baz")
+	s.Assert().Equal(s.node.disseminator.ChangesCount(), 0, "expected to not have changes in the disseminator when overwriting a label with the same value")
+}
+
 func TestMemberlistTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberlistTestSuite))
 }
