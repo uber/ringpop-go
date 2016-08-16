@@ -364,6 +364,32 @@ func (s *MemberlistTestSuite) TestSetLocalLabel() {
 	s.Assert().Equal(s.node.disseminator.ChangesCount(), 0, "expected to not have changes in the disseminator when overwriting a label with the same value")
 }
 
+func (s *MemberlistTestSuite) TestGetLocalLabel() {
+	s.m.SetLocalLabel("hello", "world")
+	value, has := s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set")
+	s.Assert().Equal(value, "world", "expected a value of world for the local label")
+
+	value, has = s.m.GetLocalLabel("foo")
+	s.Assert().False(has, "expected to not have a label named foo")
+}
+
+func (s *MemberlistTestSuite) TestGetLocalLabelsAsMap() {
+	m := s.m.LocalLabelsAsMap()
+	s.Assert().Len(m, 0, "expected an empty map of labels")
+
+	s.m.SetLocalLabel("hello", "world")
+
+	m = s.m.LocalLabelsAsMap()
+	s.Assert().Equal(map[string]string{"hello": "world"}, m, "expected a map with label 'hello' set to world")
+
+	m["hack"] = "pwnd"
+	value, has := s.m.GetLocalLabel("hack")
+	s.Assert().False(has, "expected no label with key 'hack' since the label map should be a copy and not the live instance")
+	s.Assert().NotEqual("pwnd", value, "expected an empty value and not the label we wrongfully put in the map returned")
+}
+
 func TestMemberlistTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberlistTestSuite))
 }
