@@ -155,6 +155,10 @@ var shouldProcessGossipTests = []struct {
 	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Faulty}, false, "not accept a Faulty gossip with the same incarnation number when Tombstone"},
 	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Leave}, false, "not accept a Leave gossip with the same incarnation number when Tombstone"},
 	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Tombstone}, false, "not accept a Tombstone gossip with the same incarnation number when Tombstone"},
+
+	// test members where only the labels are different
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive, Labels: map[string]string{"hello": "world"}}, true, "should accept an Alive gossip with the same incarnation number when labels override exising state"},
+	{&Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive, Labels: map[string]string{"hello": "world"}}, &Member{Address: "192.0.2.1:1234", Incarnation: 42, Status: Alive}, false, "should not accept an Alive gossip with the same incarnation number when labels don't override exising state"},
 }
 
 func TestAcceptGossip(t *testing.T) {
