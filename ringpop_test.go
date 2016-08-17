@@ -845,6 +845,14 @@ func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {
 	s.ringpop.Destroy()
 }
 
+func (s *RingpopTestSuite) TestLabels() {
+	createSingleNodeCluster(s.ringpop)
+
+	labels, err := s.ringpop.Labels()
+	s.Assert().NoError(err)
+	s.Assert().NotNil(labels)
+}
+
 func (s *RingpopTestSuite) TestLabelsNotReady() {
 	// todat labels are only supported after ringpop has been bootstrapped, this
 	// test can be removed when we find an elegant way of setting labels before
@@ -852,28 +860,4 @@ func (s *RingpopTestSuite) TestLabelsNotReady() {
 	labels, err := s.ringpop.Labels()
 	s.Error(err)
 	s.Nil(labels)
-}
-
-func (s *RingpopTestSuite) TestLabels() {
-	createSingleNodeCluster(s.ringpop)
-
-	labels, err := s.ringpop.Labels()
-	s.Require().NoError(err)
-
-	err = labels.Set("hello", "world")
-	s.Assert().NoError(err, "expected no error when setting labels")
-
-	value, has := labels.Get("hello")
-	s.Assert().True(has, "expected hello label to be set")
-	s.Assert().Equal("world", value, "expected 'hello' label to be set to the value 'world'")
-
-	m := labels.AsMap()
-	s.Assert().Equal(map[string]string{"hello": "world"}, m)
-
-	removed := labels.Remove("hello")
-	s.Assert().True(removed, "expected 'hello' label to be removed")
-
-	value, has = labels.Get("hello")
-	s.Assert().False(has, "expected hello label to not be set after remove")
-	s.Assert().NotEqual("world", value, "expected 'hello' label to not be set to the value 'world' after remove")
 }
