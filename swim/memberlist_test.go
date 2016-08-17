@@ -342,6 +342,114 @@ func (s *MemberlistTestSuite) TestApplyUnknownTombstone() {
 	s.Assert().Len(applied, 0, "expected that the declaration of a tombstone for an unknown member is not applied")
 }
 
+func (s *MemberlistTestSuite) TestSetLocalLabel() {
+	// make sure there are no changes recorded before the test
+	s.node.disseminator.ClearChanges()
+
+	s.m.SetLocalLabel("hello", "world")
+	value, has := s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set")
+	s.Assert().Equal("world", value, "expected a value of world for the local label")
+	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator")
+
+	// testing to overwrite the value
+	s.m.SetLocalLabel("hello", "baz")
+	value, has = s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been overwritten")
+	s.Assert().Equal("baz", value, "expected a value of baz for the local label")
+	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the labels are overwritten")
+
+	// testing to overwrite with the same value, should not result in dissemination.
+	s.node.disseminator.ClearChanges()
+	s.m.SetLocalLabel("hello", "baz")
+	s.Assert().Equal(0, s.node.disseminator.ChangesCount(), "expected to not have changes in the disseminator when overwriting a label with the same value")
+}
+
+func (s *MemberlistTestSuite) TestSetLocalLabels() {
+	// make sure there are no changes recorded before the test
+	s.node.disseminator.ClearChanges()
+
+	s.m.SetLocalLabels(map[string]string{"hello": "world"})
+	value, has := s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set via bulk operation")
+	s.Assert().Equal("world", value, "expected a value of world for the local label")
+	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator")
+
+	// test that the change will not be recorded if a single label does not change the value
+	s.node.disseminator.ClearChanges()
+
+	s.m.SetLocalLabels(map[string]string{"hello": "world"})
+	value, has = s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set via bulk operation")
+	s.Assert().Equal("world", value, "expected a value of world for the local label")
+	s.Assert().Equal(0, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator")
+
+	// test an operation for two keys
+	s.node.disseminator.ClearChanges()
+
+	s.m.SetLocalLabels(map[string]string{
+		"hello": "world",
+		"foo":   "bar",
+	})
+	value, has = s.m.GetLocalLabel("hello")
+	s.Assert().True(has, "expected to have the local label hello after is has been set via bulk operation")
+	s.Assert().Equal("world", value, "expected a value of world for the local label")
+
+	value, has = s.m.GetLocalLabel("foo")
+	s.Assert().True(has, "expected to have the local label foo after is has been set via bulk operation")
+	s.Assert().Equal("bar", value, "expected a value of bar for the local label")
+
+	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator")
+}
+
+func (s *MemberlistTestSuite) TestGetLocalLabel() {
+	s.m.SetLocalLabel("hello", "world")
+	value, has := s.m.GetLocalLabel("hello")
+
+	s.Assert().True(has, "expected to have the local label hello after is has been set")
+	s.Assert().Equal("world", value, "expected a value of world for the local label")
+
+	value, has = s.m.GetLocalLabel("foo")
+	s.Assert().False(has, "expected to not have a label named foo")
+}
+
+func (s *MemberlistTestSuite) TestGetLocalLabelsAsMap() {
+	m := s.m.LocalLabelsAsMap()
+	s.Assert().Len(m, 0, "expected an empty map of labels")
+
+	s.m.SetLocalLabel("hello", "world")
+
+	m = s.m.LocalLabelsAsMap()
+	s.Assert().Equal(map[string]string{"hello": "world"}, m, "expected a map with label 'hello' set to world")
+
+	m["hack"] = "pwnd"
+	value, has := s.m.GetLocalLabel("hack")
+	s.Assert().False(has, "expected no label with key 'hack' since the label map should be a copy and not the live instance")
+	s.Assert().NotEqual("pwnd", value, "expected an empty value and not the label we wrongfully put in the map returned")
+}
+
+func (s *MemberlistTestSuite) TestRemoveLocalLabel() {
+	// make sure there are no changes recorded before the test
+	s.node.disseminator.ClearChanges()
+
+	removed := s.m.RemoveLocalLabel("hello")
+	s.Assert().False(removed, "expected no removed labels")
+	s.Assert().Equal(0, s.node.disseminator.ChangesCount(), "expected to have 0 change recorded in the disseminator after the removal of an unexisting label")
+
+	// prepare with a single label
+	s.m.SetLocalLabel("hello", "world")
+	s.m.node.disseminator.ClearChanges()
+
+	// test
+	removed = s.m.RemoveLocalLabel("hello")
+	s.Assert().True(removed, "expected to remove a label")
+	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the removal of an existing label")
+}
+
 func TestMemberlistTestSuite(t *testing.T) {
 	suite.Run(t, new(MemberlistTestSuite))
 }

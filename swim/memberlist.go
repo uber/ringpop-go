@@ -278,7 +278,9 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
+	m.members.Lock()
 	m.local.Status = status
+	m.members.Unlock()
 	m.postLocalUpdate()
 }
 
@@ -292,6 +294,8 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 		return err
 	}
 
+	m.members.Lock()
+
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string)
@@ -301,6 +305,7 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 
 	// set the label
 	m.local.Labels[key] = value
+	m.members.Unlock()
 
 	if !had || old != value {
 		// postLocalUpdate reincarnates and starts gossipping the new state
@@ -315,7 +320,9 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 // GetLocalLabel returns the value of a label set on the local node. Its second
 // argument indicates if the key was present on the node or not
 func (m *memberlist) GetLocalLabel(key string) (string, bool) {
+	m.members.RLock()
 	value, has := m.local.Labels[key]
+	m.members.RUnlock()
 	return value, has
 }
 
@@ -323,6 +330,8 @@ func (m *memberlist) GetLocalLabel(key string) (string, bool) {
 // callee to use. Changes to this map will not be reflected in the labels kept
 // by this node.
 func (m *memberlist) LocalLabelsAsMap() map[string]string {
+	m.members.RLock()
+	defer m.members.RUnlock()
 	if len(m.local.Labels) == 0 {
 		return nil
 	}
@@ -334,18 +343,21 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 	return cpy
 }
 
-// SetLocalLabels updates multiple labels at once. This operation is validated
-// against the configured limits for labels and will return an
-// ErrLabelSizeExceeded in the case this operation would alter the labels of the
-// node in such a way that the configured limits are exceeded.
-// When an error is returned non of the labels will be updated. When there is no
-// error all labels are updated with their new value.
+// SetLocalLabels updates multiple labels at once. It will take all the labels
+// that are set in the map passed to this function and overwrite the value with
+// the value in the map. Keys that are not present in the provided map will
+// remain in the labels of this node. The operation is guaranteed to succeed
+// completely or not at all.
+// Before any changes are made to the labels the input is validated against the
+// configured limits on labels. This function will propagate any error that is
+// returned by the validation of the label limits eg. ErrLabelSizeExceeded
 func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 	if err := m.node.labelLimits.validateLabels(m.local.Labels, labels); err != nil {
 		// the labels operation violates the label limits that has been configured
 		return err
 	}
 
+	m.members.Lock()
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string, len(labels))
@@ -366,6 +378,8 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 		}
 	}
 
+	m.members.Unlock()
+
 	if changes {
 		m.postLocalUpdate()
 	}
@@ -377,7 +391,9 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 // of the member to gossip its labels around. It returns true if all labels have
 // been removed.
 func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+	m.members.Lock()
 	if len(m.local.Labels) == 0 || len(keys) == 0 {
+		m.members.Unlock()
 		// nothing to delete
 		return false
 	}
@@ -390,6 +406,9 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 		removed = removed && has
 		any = any || has
 	}
+
+	m.members.Unlock()
+
 	if any {
 		// only reincarnate if there is a label removed
 		m.postLocalUpdate()
@@ -402,7 +421,9 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 // will be recorded as a change to gossip around.
 func (m *memberlist) postLocalUpdate() {
 	// bump our incarnation for this change to be accepted by all peers
+	m.members.Lock()
 	change := m.bumpIncarnation()
+	m.members.Unlock()
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
