@@ -29,7 +29,7 @@ func ExampleMember_checksumString_labels() {
 	}
 	m.checksumString(&b)
 	fmt.Println(b.String())
-	// Output: 192.0.2.1:1234alive42#labels2109386529
+	// Output: 192.0.2.1:1234alive42#labels975109414
 }
 
 func ExampleMember_checksumString_multilabels() {
@@ -45,5 +45,5 @@ func ExampleMember_checksumString_multilabels() {
 	}
 	m.checksumString(&b)
 	fmt.Println(b.String())
-	// Output: 192.0.2.1:1234alive42#labels-1017766696
+	// Output: 192.0.2.1:1234alive42#labels-1625122257
 }
