@@ -13,6 +13,11 @@ var isInternalLabelTests = []struct {
 }{
 	{"hello", false},
 	{"__hello", true},
+	{"__hello__", true},
+	{"_hello", false},
+	{"h__ello", false},
+	{"hello__", false},
+	{"_h_ello", false},
 }
 
 func TestIsInternalLabel(t *testing.T) {
