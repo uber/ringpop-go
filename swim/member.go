@@ -22,6 +22,7 @@ package swim
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -122,10 +123,14 @@ func (l LabelMap) checksum() int32 {
 	// make sure the buffer is empty after getting a buffer from our pool
 	lb.Reset()
 	for key, value := range l {
-		// decide if we want to escape both fields to enforce uniqueness of the
-		// key-value checksum.
+		// The bytes used for checksumming are the following:
+		// <4 bytes: length of key>
+		binary.Write(lb, binary.BigEndian, int32(len(key)))
+		// <n bytes: key>
 		lb.WriteString(key)
-		lb.WriteString("=")
+		// <4 bytes: length of value>
+		binary.Write(lb, binary.BigEndian, int32(len(value)))
+		// <n bytes: value>
 		lb.WriteString(value)
 
 		// The checksum is calculated by xorring the checksums of all individual

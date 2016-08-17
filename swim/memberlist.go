@@ -278,13 +278,17 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
+	m.members.Lock()
 	m.local.Status = status
+	m.members.Unlock()
 	m.postLocalUpdate()
 }
 
 func (m *memberlist) SetLocalLabel(key, value string) error {
 	// TODO implement a sane limit for the size of the labels to prevent users
 	// from impacting the performance of the gossip protocol.
+
+	m.members.Lock()
 
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
@@ -295,6 +299,7 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 
 	// set the label
 	m.local.Labels[key] = value
+	m.members.Unlock()
 
 	if !had || old != value {
 		// postLocalUpdate reincarnates and starts gossipping the new state
@@ -309,7 +314,9 @@ func (m *memberlist) SetLocalLabel(key, value string) error {
 // GetLocalLabel returns the value of a label set on the local node. Its second
 // argument indicates if the key was present on the node or not
 func (m *memberlist) GetLocalLabel(key string) (string, bool) {
+	m.members.RLock()
 	value, has := m.local.Labels[key]
+	m.members.RUnlock()
 	return value, has
 }
 
@@ -317,6 +324,8 @@ func (m *memberlist) GetLocalLabel(key string) (string, bool) {
 // callee to use. Changes to this map will not be reflected in the labels kept
 // by this node.
 func (m *memberlist) LocalLabelsAsMap() map[string]string {
+	m.members.RLock()
+	defer m.members.RUnlock()
 	if len(m.local.Labels) == 0 {
 		return nil
 	}
@@ -331,8 +340,10 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 // SetLocalLabels updates multiple labels at once. It will take all the labels
 // that are set in the map passed to this function and overwrite the value with
 // the value in the map. Keys that are not present in the provided map will
-// remain in the labels of this node.
-func (m *memberlist) SetLocalLabels(labels map[string]string) {
+// remain in the labels of this node. The operation is guaranteed to succeed
+// completely or not at all.
+func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	m.members.Lock()
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string, len(labels))
@@ -353,16 +364,22 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) {
 		}
 	}
 
+	m.members.Unlock()
+
 	if changes {
 		m.postLocalUpdate()
 	}
+
+	return nil
 }
 
 // Remove a label from the local map of labels. This will trigger a reincarnation
 // of the member to gossip its labels around. It returns true if all labels have
 // been removed.
 func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+	m.members.Lock()
 	if len(m.local.Labels) == 0 || len(keys) == 0 {
+		m.members.Unlock()
 		// nothing to delete
 		return false
 	}
@@ -375,6 +392,9 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 		removed = removed && has
 		any = any || has
 	}
+
+	m.members.Unlock()
+
 	if any {
 		// only reincarnate if there is a label removed
 		m.postLocalUpdate()
@@ -387,7 +407,9 @@ func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
 // will be recorded as a change to gossip around.
 func (m *memberlist) postLocalUpdate() {
 	// bump our incarnation for this change to be accepted by all peers
+	m.members.Lock()
 	change := m.bumpIncarnation()
+	m.members.Unlock()
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
