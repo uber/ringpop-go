@@ -64,3 +64,23 @@ func TestNodeLabels(t *testing.T) {
 	assert.False(t, has, "expected hello label to not be set after remove")
 	assert.NotEqual(t, "world", value, "expected 'hello' label to not be set to the value 'world' after remove")
 }
+
+func TestNodeLabelsInternal(t *testing.T) {
+	testNode := newChannelNode(t)
+	defer testNode.Destroy()
+
+	labels := testNode.node.Labels()
+	require.NotNil(t, labels)
+
+	err := labels.Set("__internal", "protected value")
+	assert.Error(t, err, "expected error while setting an internal key via the public interface")
+
+	value, has := labels.Get("__internal")
+	assert.False(t, has, "expected the internal label to not be set")
+	assert.NotEqual(t, "protected value", value, "expected the 'protected value' to not be returned after setting it gave an error")
+
+	removed, err := labels.Remove("__internal")
+	assert.Error(t, err, "expected error while removing an internal key via the public interface")
+	assert.False(t, removed, "expected that not all labels have been removed")
+
+}
