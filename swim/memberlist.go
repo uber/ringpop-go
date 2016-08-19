@@ -285,30 +285,7 @@ func (m *memberlist) SetLocalStatus(status string) {
 }
 
 func (m *memberlist) SetLocalLabel(key, value string) error {
-	// TODO implement a sane limit for the size of the labels to prevent users
-	// from impacting the performance of the gossip protocol.
-
-	m.members.Lock()
-
-	// ensure that there is a labels map
-	if m.local.Labels == nil {
-		m.local.Labels = make(map[string]string)
-	}
-
-	old, had := m.local.Labels[key]
-
-	// set the label
-	m.local.Labels[key] = value
-	m.members.Unlock()
-
-	if !had || old != value {
-		// postLocalUpdate reincarnates and starts gossipping the new state
-		// which is only desired when a change to the local labels has been made
-		m.postLocalUpdate()
-	}
-
-	// there was no error during the manipulation of labels
-	return nil
+	return m.SetLocalLabels(map[string]string{key: value})
 }
 
 // GetLocalLabel returns the value of a label set on the local node. Its second
