@@ -360,6 +360,12 @@ func (rp *Ringpop) Bootstrap(bootstrapOpts *swim.BootstrapOptions) ([]string, er
 		}
 	}
 
+	// We shouldn't try to bootstrap if the channel is not listening
+	if rp.channel.State() != tchannel.ChannelListening {
+		rp.logger.WithField("channelState", rp.channel.State()).Error(ErrChannelNotListening.Error())
+		return nil, ErrChannelNotListening
+	}
+
 	joined, err := rp.node.Bootstrap(bootstrapOpts)
 	if err != nil {
 		rp.logger.WithField("error", err).Info("bootstrap failed")
