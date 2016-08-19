@@ -373,10 +373,12 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 	return nil
 }
 
-// Remove a label from the local map of labels. This will trigger a reincarnation
-// of the member to gossip its labels around. It returns true if all labels have
-// been removed.
-func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+// RemoveLocalLabels removes the labels keyed by the keys from the local map of
+// labels. When changes are made to the member state a reincarnation will be
+// triggered and the new state of the member will be recorded in the disseminator
+// and subsequently be gossiped around. It is a valid operation to remove non-
+// existing keys. It returns true if all (and only all) labels have been removed.
+func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 	m.members.Lock()
 	if len(m.local.Labels) == 0 || len(keys) == 0 {
 		m.members.Unlock()

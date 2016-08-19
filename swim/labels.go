@@ -20,7 +20,7 @@ func (n *NodeLabels) Set(key, value string) error {
 
 // Remove a key from the labels
 func (n *NodeLabels) Remove(key string) (removed bool) {
-	return n.node.memberlist.RemoveLocalLabel(key)
+	return n.node.memberlist.RemoveLocalLabels(key)
 }
 
 // AsMap gets a readonly copy of all the labels assigned to Node. Changes to the

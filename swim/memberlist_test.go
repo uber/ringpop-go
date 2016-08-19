@@ -432,11 +432,11 @@ func (s *MemberlistTestSuite) TestGetLocalLabelsAsMap() {
 	s.Assert().NotEqual("pwnd", value, "expected an empty value and not the label we wrongfully put in the map returned")
 }
 
-func (s *MemberlistTestSuite) TestRemoveLocalLabel() {
+func (s *MemberlistTestSuite) TestRemoveLocalLabels() {
 	// make sure there are no changes recorded before the test
 	s.node.disseminator.ClearChanges()
 
-	removed := s.m.RemoveLocalLabel("hello")
+	removed := s.m.RemoveLocalLabels("hello")
 	s.Assert().False(removed, "expected no removed labels")
 	s.Assert().Equal(0, s.node.disseminator.ChangesCount(), "expected to have 0 change recorded in the disseminator after the removal of an unexisting label")
 
@@ -445,7 +445,7 @@ func (s *MemberlistTestSuite) TestRemoveLocalLabel() {
 	s.m.node.disseminator.ClearChanges()
 
 	// test
-	removed = s.m.RemoveLocalLabel("hello")
+	removed = s.m.RemoveLocalLabels("hello")
 	s.Assert().True(removed, "expected to remove a label")
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the removal of an existing label")
 }
