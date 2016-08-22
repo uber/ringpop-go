@@ -63,7 +63,7 @@ type Interface interface {
 
 	// extend the functionality of self eviction to ringpop
 	// Mockery didn't allow me to embed the interface so we make things WET here
-	RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error
+	RegisterSelfEvictHook(hooks swim.SelfEvictHook) error
 	SelfEvict() error
 }
 
@@ -345,15 +345,15 @@ func (rp *Ringpop) setState(s state) {
 	}
 }
 
-// RegisterSelfEvictHooks registers the eviction hooks that need to be executed
+// RegisterSelfEvictHook registers the eviction hooks that need to be executed
 // before and after self eviction from the membership. It will return an error
 // when ringpop has not been bootstrapped or when the hooks cannot be registered
 // with the membership protocol.
-func (rp *Ringpop) RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error {
+func (rp *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
 	if !rp.Ready() {
 		return ErrNotBootstrapped
 	}
-	return rp.node.RegisterSelfEvictHooks(hooks)
+	return rp.node.RegisterSelfEvictHook(hooks)
 }
 
 // SelfEvict can be called before shutting down the application. When calling

@@ -147,7 +147,7 @@ type NodeInterface interface {
 
 	// extend the functionality of self eviction to a node
 	// Mockery didn't allow me to embed the interface so we make things WET here
-	RegisterSelfEvictHooks(hooks SelfEvictHooks) error
+	RegisterSelfEvictHook(hooks SelfEvictHook) error
 	SelfEvict() error
 }
 
@@ -355,10 +355,10 @@ func (n *Node) Ready() bool {
 	return ready
 }
 
-// RegisterSelfEvictHooks registers systems that want to hook into the eviction
+// RegisterSelfEvictHook registers systems that want to hook into the eviction
 // sequence of the swim protocol.
-func (n *Node) RegisterSelfEvictHooks(hooks SelfEvictHooks) error {
-	return n.selfEvict.RegisterSelfEvictHooks(hooks)
+func (n *Node) RegisterSelfEvictHook(hooks SelfEvictHook) error {
+	return n.selfEvict.RegisterSelfEvictHook(hooks)
 }
 
 // SelfEvict initiates the self eviction sequence of ringpop, it will mark the

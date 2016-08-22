@@ -128,12 +128,12 @@ func (_m *SwimNode) RegisterListener(l events.EventListener) {
 	_m.Called(l)
 }
 
-// RegisterSelfEvictHooks provides a mock function with given fields: hooks
-func (_m *SwimNode) RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error {
+// RegisterSelfEvictHook provides a mock function with given fields: hooks
+func (_m *SwimNode) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
 	ret := _m.Called(hooks)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(swim.SelfEvictHooks) error); ok {
+	if rf, ok := ret.Get(0).(func(swim.SelfEvictHook) error); ok {
 		r0 = rf(hooks)
 	} else {
 		r0 = ret.Error(0)

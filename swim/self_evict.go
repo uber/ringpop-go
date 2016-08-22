@@ -13,10 +13,6 @@ var (
 	// been registered.
 	ErrDuplicateHook = errors.New("expected hook name to be unique")
 
-	// ErrMissingHook is returned when both the PreEvict and the PostEvict hooks
-	// are unset on the hooks struct.
-	ErrMissingHook = errors.New("missing both PreEvict and PostEvict on SelfEvictHooks")
-
 	// ErrEvictionInProgress is returned when ringpop is already in the process
 	// of evicting
 	ErrEvictionInProgress = errors.New("ringpop is already executing an eviction")
@@ -25,27 +21,23 @@ var (
 // SelfEvict defines the functions that interact with the self eviction of nodes
 // from the membership prior to shutting down
 type SelfEvict interface {
-	RegisterSelfEvictHooks(hooks SelfEvictHooks) error
+	RegisterSelfEvictHook(hooks SelfEvictHook) error
 	SelfEvict() error
 }
 
-// EvictionHook is a function that can be called during the eviction process of
-// ringpop.
-type EvictionHook func()
+// SelfEvictHook is an interface describing a module that can be registered to
+// the self eviction hooks
+type SelfEvictHook interface {
+	// Name returns the name under which the eviction should be regitered
+	Name() string
 
-// SelfEvictHooks is used when configuring a named eviction hook. It contains
-// the name of the hook and both the hook to be executed pre eviction and post
-// eviction.
-type SelfEvictHooks struct {
-	// Name is the name of the hook to register. Every name can only be
-	// registered once.
-	Name string
+	// PreEvict is the hook that will be called before ringpop evicts itself
+	// from the membership
+	PreEvict()
 
-	// PreEvict is the hook that is called before the node is self evicted
-	PreEvict EvictionHook
-
-	// PostEvict is the hook that is called after the node is self evicted
-	PostEvict EvictionHook
+	// PostEvict is the hook that will be called after ringpop has evicted
+	// itsels from them memership
+	PostEvict()
 }
 
 type evictionPhase int
@@ -68,8 +60,7 @@ type selfEvict struct {
 	logger bark.Logger
 	phases []*phase
 
-	preHooks  map[string]EvictionHook
-	postHooks map[string]EvictionHook
+	hooks map[string]SelfEvictHook
 }
 
 func newSelfEvict(node *Node) *selfEvict {
@@ -77,31 +68,19 @@ func newSelfEvict(node *Node) *selfEvict {
 		node:   node,
 		logger: node.logger,
 
-		preHooks:  make(map[string]EvictionHook),
-		postHooks: make(map[string]EvictionHook),
+		hooks: make(map[string]SelfEvictHook),
 	}
 }
 
-// RegisterSelfEvictHooks registers a named pre/post eviction hook pair.
-func (s *selfEvict) RegisterSelfEvictHooks(hooks SelfEvictHooks) error {
+// RegisterSelfEvictHook registers a named pre/post eviction hook pair.
+func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
 
-	_, hasPreHook := s.preHooks[hooks.Name]
-	_, hasPostHook := s.postHooks[hooks.Name]
-	if hasPreHook || hasPostHook {
+	_, hasHook := s.hooks[hook.Name()]
+	if hasHook {
 		return ErrDuplicateHook
 	}
 
-	if hooks.PreEvict == nil && hooks.PostEvict == nil {
-		return ErrMissingHook
-	}
-
-	if hooks.PreEvict != nil {
-		s.preHooks[hooks.Name] = hooks.PreEvict
-	}
-
-	if hooks.PostEvict != nil {
-		s.postHooks[hooks.Name] = hooks.PostEvict
-	}
+	s.hooks[hook.Name()] = hook
 
 	return nil
 }
@@ -122,7 +101,7 @@ func (s *selfEvict) SelfEvict() error {
 
 func (s *selfEvict) preEvict() {
 	s.transitionTo(preEvict)
-	s.runHooks(s.preHooks)
+	s.runHooks(SelfEvictHook.PreEvict)
 
 	// next phase
 	s.evict()
@@ -138,7 +117,7 @@ func (s *selfEvict) evict() {
 
 func (s *selfEvict) postEvict() {
 	s.transitionTo(postEvict)
-	s.runHooks(s.postHooks)
+	s.runHooks(SelfEvictHook.PostEvict)
 
 	// next phase
 	s.done()
@@ -177,16 +156,16 @@ func (s *selfEvict) currentPhase() *phase {
 	return nil
 }
 
-func (s *selfEvict) runHooks(hooks map[string]EvictionHook) {
+func (s *selfEvict) runHooks(dispatch func(SelfEvictHook)) {
 	var wg sync.WaitGroup
 
-	wg.Add(len(hooks))
-	for name, hook := range hooks {
-		go func(name string, hook EvictionHook) {
+	wg.Add(len(s.hooks))
+	for name, hook := range s.hooks {
+		go func(name string, hook SelfEvictHook) {
 			defer wg.Done()
 
 			s.logger.WithField("hook", name).Debug("ringpop self eviction running hook")
-			hook()
+			dispatch(hook)
 			s.logger.WithField("hook", name).Debug("ringpop self eviction hook done")
 		}(name, hook)
 	}

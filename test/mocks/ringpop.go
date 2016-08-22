@@ -256,12 +256,12 @@ func (_m *Ringpop) Forward(dest string, keys []string, request []byte, service s
 	return r0, r1
 }
 
-// RegisterSelfEvictHooks provides a mock function with given fields: hooks
-func (_m *Ringpop) RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error {
+// RegisterSelfEvictHook provides a mock function with given fields: hooks
+func (_m *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
 	ret := _m.Called(hooks)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(swim.SelfEvictHooks) error); ok {
+	if rf, ok := ret.Get(0).(func(swim.SelfEvictHook) error); ok {
 		r0 = rf(hooks)
 	} else {
 		r0 = ret.Error(0)
