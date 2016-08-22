@@ -149,7 +149,7 @@ func (s *selfEvict) done() {
 	//TODO emit total timing
 }
 
-func (s *selfEvict) transitionTo(newPhase evictionPhase) {
+func (s *selfEvict) transitionTo(newPhase evictionPhase) *phase {
 	p := &phase{
 		phase: newPhase,
 		start: s.node.clock.Now(),
@@ -166,6 +166,8 @@ func (s *selfEvict) transitionTo(newPhase evictionPhase) {
 		"newPhase": p,
 		"oldPhase": previousPhase,
 	}).Debug("ringpop self eviction phase-transitioning")
+
+	return p
 }
 
 func (s *selfEvict) currentPhase() *phase {
