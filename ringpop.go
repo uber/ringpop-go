@@ -177,6 +177,7 @@ func (rp *Ringpop) init() error {
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
+		SelfEvict:     rp.config.SelfEvict,
 	})
 	rp.node.RegisterListener(rp)
 

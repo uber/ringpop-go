@@ -151,11 +151,6 @@ func signalHandler(rp *ringpop.Ringpop, interactive bool) {
 	}
 
 	rp.SelfEvict()
-	log.Println("member got evicted")
-
-	log.Println("sleeping because of human")
-	<-time.After(time.Second * 1)
-	log.Println("finished sleeping, shutting down")
 
 	os.Exit(0)
 }

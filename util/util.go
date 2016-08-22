@@ -244,6 +244,15 @@ func SelectDuration(opt, def time.Duration) time.Duration {
 	return opt
 }
 
+// SelectBool takes an option and a default value and returns the default value if
+// the option is equal to zero, and the option otherwise.
+func SelectBool(opt, def bool) bool {
+	if opt == false {
+		return def
+	}
+	return opt
+}
+
 // Min returns min(a,b)
 func Min(a, b int) int {
 	if a < b {

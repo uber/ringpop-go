@@ -47,6 +47,9 @@ type configuration struct {
 
 	// StateTimeouts keeps the state transition timeouts for swim to use
 	StateTimeouts swim.StateTimeouts
+
+	// SelfEvict holds the settings with regards to self eviction
+	SelfEvict swim.SelfEvictOptions
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -276,6 +279,24 @@ func FaultyPeriod(period time.Duration) Option {
 func TombstonePeriod(period time.Duration) Option {
 	return func(r *Ringpop) error {
 		r.config.StateTimeouts.Tombstone = period
+		return nil
+	}
+}
+
+// SelfEvictPingDisable configures if ringpop should disable actively pinging
+// other members when it evicts itself from the network
+func SelfEvictPingDisable(disable bool) Option {
+	return func(r *Ringpop) error {
+		r.config.SelfEvict.PingDisable = disable
+		return nil
+	}
+}
+
+// SelfEvictPingRatio configures the maximum percentage/ratio of the members to
+// actively ping while self evicting.
+func SelfEvictPingRatio(ratio float64) Option {
+	return func(r *Ringpop) error {
+		r.config.SelfEvict.PingRatio = ratio
 		return nil
 	}
 }

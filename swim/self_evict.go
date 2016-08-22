@@ -2,8 +2,11 @@ package swim
 
 import (
 	"errors"
+	"math"
 	"sync"
 	"time"
+
+	"github.com/uber/ringpop-go/util"
 
 	"github.com/uber-common/bark"
 )
@@ -42,6 +45,21 @@ type SelfEvictHook interface {
 
 type hookFn func(SelfEvictHook)
 
+// SelfEvictOptions configures how self eviction should behave. Applications can
+// configure if ringpop should proactively ping members of the network on self
+// eviction and what percentage/ratio of the memberlist should be pinged at most
+type SelfEvictOptions struct {
+	PingDisable bool
+	PingRatio   float64
+}
+
+func mergeSelfEvictOptions(opt, def SelfEvictOptions) SelfEvictOptions {
+	return SelfEvictOptions{
+		PingDisable: util.SelectBool(opt.PingDisable, def.PingDisable),
+		PingRatio:   util.SelectFloat(opt.PingRatio, def.PingRatio),
+	}
+}
+
 type evictionPhase int
 
 const (
@@ -55,20 +73,27 @@ type phase struct {
 	phase evictionPhase
 	start time.Time
 	end   time.Time
+
+	// phase specific information
+	// phase: evicting
+	numberOfPings           int
+	numberOfSuccessfulPings int
 }
 
 type selfEvict struct {
-	node   *Node
-	logger bark.Logger
-	phases []*phase
+	node    *Node
+	options SelfEvictOptions
+	logger  bark.Logger
+	phases  []*phase
 
 	hooks map[string]SelfEvictHook
 }
 
-func newSelfEvict(node *Node) *selfEvict {
+func newSelfEvict(node *Node, options SelfEvictOptions) *selfEvict {
 	return &selfEvict{
-		node:   node,
-		logger: node.logger,
+		node:    node,
+		options: options,
+		logger:  node.logger,
 
 		hooks: make(map[string]SelfEvictHook),
 	}
@@ -111,8 +136,44 @@ func (s *selfEvict) preEvict() {
 }
 
 func (s *selfEvict) evict() {
-	s.transitionTo(evicting)
+	phase := s.transitionTo(evicting)
 	s.node.memberlist.SetLocalStatus(Faulty)
+
+	if s.options.PingDisable == false {
+		numberOfPingableMembers := s.node.memberlist.NumPingableMembers()
+		maxNumberOfPings := int(math.Ceil(float64(numberOfPingableMembers) * s.options.PingRatio))
+
+		// final number of members to ping should not exceed any of:
+		numberOfPings := min(
+			s.node.disseminator.maxP, // the piggyback counter
+			numberOfPingableMembers,  // the number of members we can ping
+			maxNumberOfPings,         // a configured percentage of members
+		)
+
+		phase.numberOfPings = numberOfPings
+		phase.numberOfSuccessfulPings = 0
+
+		// select the members we are going to ping
+		targets := s.node.memberlist.RandomPingableMembers(numberOfPings, nil)
+
+		s.logger.WithFields(bark.Fields{
+			"numberOfPings": phase.numberOfPings,
+			"targets":       targets,
+		}).Debug("starting proactive gossip on self evict")
+
+		for _, target := range targets {
+			// TODO: test parallel pinging
+			_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
+			if err != nil {
+				phase.numberOfSuccessfulPings++
+			}
+		}
+
+		s.logger.WithFields(bark.Fields{
+			"numberOfPings":           phase.numberOfPings,
+			"numberOfSuccessfulPings": phase.numberOfSuccessfulPings,
+		}).Debug("finished proactive gossip on self evict")
+	}
 
 	// next phase
 	s.postEvict()
@@ -175,4 +236,16 @@ func (s *selfEvict) runHooks(dispatch hookFn) {
 	}
 	wg.Wait()
 	s.logger.Debug("ringpop self eviction done running hooks")
+}
+
+// min returns the lowest integer and is defined because golang only has a min
+// function for floats and not for ints.
+func min(first int, rest ...int) int {
+	m := first
+	for _, value := range rest {
+		if value < m {
+			m = value
+		}
+	}
+	return m
 }

@@ -67,6 +67,8 @@ type Options struct {
 	PartitionHealBaseProbabillity float64
 
 	Clock clock.Clock
+
+	SelfEvict SelfEvictOptions
 }
 
 func defaultOptions() *Options {
@@ -94,6 +96,11 @@ func defaultOptions() *Options {
 		Clock: clock.New(),
 
 		MaxReverseFullSyncJobs: 5,
+
+		SelfEvict: SelfEvictOptions{
+			PingDisable: false,
+			PingRatio:   .4,
+		},
 	}
 
 	return opts
@@ -124,6 +131,8 @@ func mergeDefaultOptions(opts *Options) *Options {
 	opts.PingRequestSize = util.SelectInt(opts.PingRequestSize, def.PingRequestSize)
 
 	opts.MaxReverseFullSyncJobs = util.SelectInt(opts.MaxReverseFullSyncJobs, def.MaxReverseFullSyncJobs)
+
+	opts.SelfEvict = mergeSelfEvictOptions(opts.SelfEvict, def.SelfEvict)
 
 	if opts.Clock == nil {
 		opts.Clock = def.Clock
@@ -194,7 +203,8 @@ type Node struct {
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
 
-	selfEvict *selfEvict
+	selfEvict        *selfEvict
+	selfEvictOptions SelfEvictOptions
 }
 
 // NewNode returns a new SWIM Node.
@@ -221,7 +231,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		totalRate:  metrics.NewMeter(),
 		clock:      opts.Clock,
 	}
-	node.selfEvict = newSelfEvict(node)
+	node.selfEvict = newSelfEvict(node, opts.SelfEvict)
 
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
