@@ -406,6 +406,29 @@ func (s *MemberlistTestSuite) TestSetLocalLabels() {
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator")
 }
 
+func (s *MemberlistTestSuite) TestSetLocalLabel_empty() {
+	// test an empty value
+	s.m.SetLocalLabel("empty", "")
+	value, has := s.m.GetLocalLabel("empty")
+
+	s.Assert().True(has, "expected to have a local label with an empty value")
+	s.Assert().Equal("", value, "expected an empty value")
+
+	// test an empty key
+	s.m.SetLocalLabel("", "empty")
+	value, has = s.m.GetLocalLabel("")
+
+	s.Assert().True(has, "expected to have a local label with an empty key")
+	s.Assert().Equal("empty", value, "expected the value to be the string 'empty'")
+
+	// empty key and label
+	s.m.SetLocalLabel("", "")
+	value, has = s.m.GetLocalLabel("")
+
+	s.Assert().True(has, "expected to have a local label with an empty key")
+	s.Assert().Equal("", value, "expected an empty value")
+}
+
 func (s *MemberlistTestSuite) TestGetLocalLabel() {
 	s.m.SetLocalLabel("hello", "world")
 	value, has := s.m.GetLocalLabel("hello")
