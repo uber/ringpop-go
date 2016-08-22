@@ -144,6 +144,9 @@ type NodeInterface interface {
 	ProtocolStats() ProtocolStats
 	Ready() bool
 	RegisterListener(l events.EventListener)
+
+	// extend the functionality of self eviction to a node
+	SelfEvict
 }
 
 // A Node is a SWIM member
@@ -188,6 +191,8 @@ type Node struct {
 	// clock is used to generate incarnation numbers; it is typically the
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
+
+	selfEvict SelfEvict
 }
 
 // NewNode returns a new SWIM Node.
@@ -214,6 +219,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		totalRate:  metrics.NewMeter(),
 		clock:      opts.Clock,
 	}
+	node.selfEvict = newSelfEvict(node)
 
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
@@ -345,6 +351,19 @@ func (n *Node) Ready() bool {
 	n.state.RUnlock()
 
 	return ready
+}
+
+// RegisterSelfEvictHooks registers systems that want to hook into the eviction
+// sequence of the swim protocol.
+func (n *Node) RegisterSelfEvictHooks(hooks SelfEvictHooks) error {
+	return n.selfEvict.RegisterSelfEvictHooks(hooks)
+}
+
+// SelfEvict initiates the self eviction sequence of ringpop, it will mark the
+// node as faulty and calls systems that want to hook in to the sequence at the
+// corresponding times.
+func (n *Node) SelfEvict() error {
+	return n.selfEvict.SelfEvict()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

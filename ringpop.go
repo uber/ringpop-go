@@ -60,6 +60,9 @@ type Interface interface {
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
+
+	// extend the functionality of self eviction to ringpop
+	swim.SelfEvict
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -338,6 +341,28 @@ func (rp *Ringpop) setState(s state) {
 			rp.emit(events.Destroyed{})
 		}
 	}
+}
+
+// RegisterSelfEvictHooks registers the eviction hooks that need to be executed
+// before and after self eviction from the membership. It will return an error
+// when ringpop has not been bootstrapped or when the hooks cannot be registered
+// with the membership protocol.
+func (rp *Ringpop) RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+	return rp.node.RegisterSelfEvictHooks(hooks)
+}
+
+// SelfEvict can be called before shutting down the application. When calling
+// this function ringpop will gracefully evict itself from the network. Utilities
+// that hook into ringpop will have the opportunity to hook into this system to
+// gracefully handle the shutdown of ringpop.
+func (rp *Ringpop) SelfEvict() error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+	return rp.node.SelfEvict()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
