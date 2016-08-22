@@ -18,7 +18,7 @@ var (
 	//    memberlist being sent over the wire 5 times a second.
 	// When all contiditions are met the Labels would add the following load
 	// (non-compressed) to the network:
-	//    (32+128)*5*1000*5*8 = ~32mbit
+	//    (32+128)*5*1000*5*8 = ~32mbit/s
 	DefaultLabelOptions = LabelOptions{
 		KeySize:   32,
 		ValueSize: 128,
