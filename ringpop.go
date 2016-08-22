@@ -62,7 +62,9 @@ type Interface interface {
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
 
 	// extend the functionality of self eviction to ringpop
-	swim.SelfEvict
+	// Mockery didn't allow me to embed the interface so we make things WET here
+	RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error
+	SelfEvict() error
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate

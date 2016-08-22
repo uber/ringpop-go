@@ -8,7 +8,6 @@ import "github.com/uber/ringpop-go/events"
 import "github.com/uber/ringpop-go/forward"
 
 import "github.com/uber/ringpop-go/swim"
-
 import "github.com/uber/tchannel-go"
 
 type Ringpop struct {
@@ -255,4 +254,32 @@ func (_m *Ringpop) Forward(dest string, keys []string, request []byte, service s
 	}
 
 	return r0, r1
+}
+
+// RegisterSelfEvictHooks provides a mock function with given fields: hooks
+func (_m *Ringpop) RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error {
+	ret := _m.Called(hooks)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(swim.SelfEvictHooks) error); ok {
+		r0 = rf(hooks)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SelfEvict provides a mock function with given fields:
+func (_m *Ringpop) SelfEvict() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }

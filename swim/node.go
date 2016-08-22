@@ -146,7 +146,9 @@ type NodeInterface interface {
 	RegisterListener(l events.EventListener)
 
 	// extend the functionality of self eviction to a node
-	SelfEvict
+	// Mockery didn't allow me to embed the interface so we make things WET here
+	RegisterSelfEvictHooks(hooks SelfEvictHooks) error
+	SelfEvict() error
 }
 
 // A Node is a SWIM member

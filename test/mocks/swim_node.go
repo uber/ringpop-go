@@ -1,10 +1,9 @@
 package mocks
 
-import (
-	"github.com/uber/ringpop-go/events"
-	"github.com/uber/ringpop-go/swim"
-)
+import "github.com/uber/ringpop-go/swim"
 import "github.com/stretchr/testify/mock"
+
+import "github.com/uber/ringpop-go/events"
 
 type SwimNode struct {
 	mock.Mock
@@ -127,4 +126,32 @@ func (_m *SwimNode) Ready() bool {
 // RegisterListener provides a mock function with given fields: l
 func (_m *SwimNode) RegisterListener(l events.EventListener) {
 	_m.Called(l)
+}
+
+// RegisterSelfEvictHooks provides a mock function with given fields: hooks
+func (_m *SwimNode) RegisterSelfEvictHooks(hooks swim.SelfEvictHooks) error {
+	ret := _m.Called(hooks)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(swim.SelfEvictHooks) error); ok {
+		r0 = rf(hooks)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SelfEvict provides a mock function with given fields:
+func (_m *SwimNode) SelfEvict() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
