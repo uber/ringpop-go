@@ -119,7 +119,13 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
 
 	peerView, _ = s.peer.memberlist.Member(address)
 	s.Assert().Equal(Faulty, peerView.Status, "expected to be seen as faulty by a peer after self eviction")
+}
 
+func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_AlreadyRunning() {
+	err := s.node.SelfEvict()
+	s.Assert().NoError(err, "expected no error during self eviction")
+	err = s.node.SelfEvict()
+	s.Assert().Error(err, "expected an error when self evict is called for the second time.")
 }
 
 func TestSelfEvictTestSuite(t *testing.T) {
