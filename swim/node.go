@@ -194,7 +194,7 @@ type Node struct {
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
 
-	selfEvict SelfEvict
+	selfEvict *selfEvict
 }
 
 // NewNode returns a new SWIM Node.
