@@ -22,6 +22,7 @@ package swim
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -41,6 +42,7 @@ func (s *SelfEvictTestSuite) SetupTest() {
 	s.peer = s.tpeer.node
 
 	bootstrapNodes(s.T(), s.tnode, s.tpeer)
+	waitForConvergence(s.T(), 5*time.Second, s.tnode, s.tpeer)
 }
 
 func (s *SelfEvictTestSuite) TearDownTest() {
@@ -104,6 +106,20 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict() {
 
 	hooks.AssertNumberOfCalls(s.T(), "PreEvict", 1)
 	hooks.AssertNumberOfCalls(s.T(), "PostEvict", 1)
+}
+
+func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
+	address := s.node.Address()
+
+	peerView, _ := s.peer.memberlist.Member(address)
+	s.Assert().Equal(Alive, peerView.Status, "expected to be seen as alive by a peer before self eviction")
+
+	err := s.node.SelfEvict()
+	s.Assert().NoError(err, "expected no error during self eviction")
+
+	peerView, _ = s.peer.memberlist.Member(address)
+	s.Assert().Equal(Faulty, peerView.Status, "expected to be seen as faulty by a peer after self eviction")
+
 }
 
 func TestSelfEvictTestSuite(t *testing.T) {
