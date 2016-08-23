@@ -119,6 +119,12 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
 
 	peerView, _ = s.peer.memberlist.Member(address)
 	s.Assert().Equal(Faulty, peerView.Status, "expected to be seen as faulty by a peer after self eviction")
+
+	phase := s.node.selfEvict.phases[evicting]
+	s.Require().Equal(evicting, phase.phase, "expected the evicting phase at this position in the phases phases")
+
+	s.Assert().Equal(1, phase.numberOfPings, "expected 1 ping")
+	s.Assert().Equal(1, phase.numberOfSuccessfulPings, "expected 1 successful ping")
 }
 
 func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_AlreadyRunning() {

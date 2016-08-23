@@ -164,7 +164,7 @@ func (s *selfEvict) evict() {
 		for _, target := range targets {
 			// TODO: test parallel pinging
 			_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
-			if err != nil {
+			if err == nil {
 				phase.numberOfSuccessfulPings++
 			}
 		}
