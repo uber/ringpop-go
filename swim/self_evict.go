@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/uber/ringpop-go/util"
@@ -77,7 +78,7 @@ type phase struct {
 	// phase specific information
 	// phase: evicting
 	numberOfPings           int
-	numberOfSuccessfulPings int
+	numberOfSuccessfulPings int32
 }
 
 type selfEvict struct {
@@ -151,7 +152,6 @@ func (s *selfEvict) evict() {
 		)
 
 		phase.numberOfPings = numberOfPings
-		phase.numberOfSuccessfulPings = 0
 
 		// select the members we are going to ping
 		targets := s.node.memberlist.RandomPingableMembers(numberOfPings, nil)
@@ -161,13 +161,18 @@ func (s *selfEvict) evict() {
 			"targets":       targets,
 		}).Debug("starting proactive gossip on self evict")
 
+		var wg sync.WaitGroup
+		wg.Add(len(targets))
 		for _, target := range targets {
-			// TODO: test parallel pinging
-			_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
-			if err == nil {
-				phase.numberOfSuccessfulPings++
-			}
+			go func(target *Member) {
+				defer wg.Done()
+				_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
+				if err == nil {
+					atomic.AddInt32(&phase.numberOfSuccessfulPings, 1)
+				}
+			}(target)
 		}
+		wg.Wait()
 
 		s.logger.WithFields(bark.Fields{
 			"numberOfPings":           phase.numberOfPings,

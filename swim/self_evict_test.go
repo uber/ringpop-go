@@ -124,7 +124,7 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
 	s.Require().Equal(evicting, phase.phase, "expected the evicting phase at this position in the phases phases")
 
 	s.Assert().Equal(1, phase.numberOfPings, "expected 1 ping")
-	s.Assert().Equal(1, phase.numberOfSuccessfulPings, "expected 1 successful ping")
+	s.Assert().Equal(int32(1), phase.numberOfSuccessfulPings, "expected 1 successful ping")
 }
 
 func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_AlreadyRunning() {
