@@ -40,6 +40,8 @@ type SelfEvictHook interface {
 	PostEvict()
 }
 
+type hookFn func(SelfEvictHook)
+
 type evictionPhase int
 
 const (
@@ -74,13 +76,14 @@ func newSelfEvict(node *Node) *selfEvict {
 
 // RegisterSelfEvictHook registers a named pre/post eviction hook pair.
 func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
+	name := hook.Name()
 
-	_, hasHook := s.hooks[hook.Name()]
+	_, hasHook := s.hooks[name]
 	if hasHook {
 		return ErrDuplicateHook
 	}
 
-	s.hooks[hook.Name()] = hook
+	s.hooks[name] = hook
 
 	return nil
 }
@@ -125,6 +128,7 @@ func (s *selfEvict) postEvict() {
 
 func (s *selfEvict) done() {
 	s.transitionTo(done)
+	s.logger.Info("ringpop self eviction done")
 	//TODO emit total timing
 }
 
@@ -156,7 +160,7 @@ func (s *selfEvict) currentPhase() *phase {
 	return nil
 }
 
-func (s *selfEvict) runHooks(dispatch func(SelfEvictHook)) {
+func (s *selfEvict) runHooks(dispatch hookFn) {
 	var wg sync.WaitGroup
 
 	wg.Add(len(s.hooks))

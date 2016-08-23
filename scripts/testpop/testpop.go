@@ -117,26 +117,45 @@ func main() {
 		log.Fatalf("bootstrap failed: %v", err)
 	}
 
-	go func() {
-		sigchan := make(chan os.Signal, 1)
-		signal.Notify(sigchan, syscall.SIGTERM, syscall.SIGINT)
-
-		// wait on a signal
-		<-sigchan
-		log.Println("received signal, initiating self eviction")
-
-		// shut down
-		rp.SelfEvict()
-		log.Println("member got evicted")
-
-		// sleep (TODO: remove)
-		log.Println("sleeping because of human")
-		<-time.After(time.Second * 1)
-		log.Println("finished sleeping, shutting down")
-
-		os.Exit(0)
-	}()
+	go signalHandler(rp, true)  // handle SIGINT
+	go signalHandler(rp, false) // handle SIGTERM
 
 	// block
 	select {}
+}
+
+func signalHandler(rp *ringpop.Ringpop, interactive bool) {
+	sigchan := make(chan os.Signal, 1)
+
+	var s os.Signal
+	if interactive {
+		s = syscall.SIGINT
+	} else {
+		s = syscall.SIGTERM
+	}
+
+	signal.Notify(sigchan, s)
+
+	// wait on a signal
+	<-sigchan
+	log.Println("received signal, initiating self eviction")
+
+	if interactive {
+		log.Error("triggered graceful shutdown. Press Ctrl+C again to force exit.")
+		go func() {
+			// exit on second signal
+			<-sigchan
+			log.Error("Force exiting...")
+			os.Exit(1)
+		}()
+	}
+
+	rp.SelfEvict()
+	log.Println("member got evicted")
+
+	log.Println("sleeping because of human")
+	<-time.After(time.Second * 1)
+	log.Println("finished sleeping, shutting down")
+
+	os.Exit(0)
 }
