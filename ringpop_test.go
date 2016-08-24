@@ -116,9 +116,6 @@ func (s *RingpopTestSuite) SetupTest() {
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
-	// remove listeners during teardown
-	s.ringpop.listeners = nil
-
 	s.channel.Close()
 	s.ringpop.Destroy()
 
@@ -181,6 +178,7 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 
 	listener := &dummyListener{}
 	s.ringpop.RegisterListener(listener)
+	defer s.ringpop.DeregisterListener(listener)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
@@ -776,6 +774,7 @@ func (s *RingpopTestSuite) TestReadyEvent() {
 		called <- true
 	})
 	s.ringpop.RegisterListener(l)
+	defer s.ringpop.DeregisterListener(l)
 
 	s.ringpop.setState(ready)
 
@@ -799,6 +798,7 @@ func (s *RingpopTestSuite) TestDestroyedEvent() {
 		called <- true
 	})
 	s.ringpop.RegisterListener(l)
+	defer s.ringpop.DeregisterListener(l)
 
 	s.ringpop.setState(destroyed)
 
@@ -846,6 +846,7 @@ func (s *RingpopTestSuite) TestRingIsConstructedWhenStateReady() {
 	l.On("HandleEvent", mock.Anything).Return()
 
 	rp2.RegisterListener(l)
+	defer rp2.DeregisterListener(l)
 
 	_, err = rp2.Bootstrap(&swim.BootstrapOptions{
 		DiscoverProvider: statichosts.New(me1),

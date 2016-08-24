@@ -80,6 +80,11 @@ func (_m *Ringpop) RegisterListener(l events.EventListener) {
 	_m.Called(l)
 }
 
+// DeregisterListener provides a mock function with given fields: l
+func (_m *Ringpop) DeregisterListener(l events.EventListener) {
+	_m.Called(l)
+}
+
 // Bootstrap provides a mock function with given fields: opts
 func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	ret := _m.Called(opts)

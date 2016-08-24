@@ -118,7 +118,7 @@ func (h *discoverProviderHealer) Probability() float64 {
 //
 // If heal was attempted, returns identities of the target nodes.
 func (h *discoverProviderHealer) Heal() ([]string, error) {
-	h.node.emit(DiscoHealEvent{})
+	h.node.EmitEvent(DiscoHealEvent{})
 	// get list from discovery provider
 	if h.node.discoverProvider == nil {
 		return []string{}, errors.New("discoverProvider not available to healer")
