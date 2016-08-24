@@ -355,9 +355,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	}, a.node, JoinCompleteEvent{})
 
 	// progress timers so that incarnation numbers can bump
-	c := clock.NewMock()
-	c.Add(time.Millisecond)
-	a.node.clock = c
+	a.clock.Add(time.Millisecond)
 
 	waitForConvergence(t, time.Second, a, b)
 }

@@ -62,6 +62,7 @@ func (dummyIter) Next() (*Member, bool) {
 type testNode struct {
 	node    *Node
 	channel *tchannel.Channel
+	clock   *clock.Mock
 }
 
 func (n *testNode) Destroy() {
@@ -105,11 +106,12 @@ func newChannelNode(t *testing.T) *testNode {
 	require.NoError(t, err, "channel must listen")
 
 	hostport := ch.PeerInfo().HostPort
+	c := clock.NewMock()
 	node := NewNode("test", hostport, ch.GetSubChannel("test"), &Options{
-		Clock: clock.NewMock(),
+		Clock: c,
 	})
 
-	return &testNode{node, ch}
+	return &testNode{node, ch, c}
 }
 
 // newChannelNodeWithHostPort creates a testNode with the address specified by
@@ -118,11 +120,12 @@ func newChannelNodeWithHostPort(t *testing.T, hostport string) *testNode {
 	ch, err := tchannel.NewChannel("test", nil)
 	require.NoError(t, err, "channel must create successfully")
 
+	c := clock.NewMock()
 	node := NewNode("test", hostport, ch.GetSubChannel("test"), &Options{
-		Clock: clock.NewMock(),
+		Clock: c,
 	})
 
-	return &testNode{node, ch}
+	return &testNode{node, ch, c}
 }
 
 func genChannelNodes(t *testing.T, n int) (nodes []*testNode) {

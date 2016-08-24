@@ -228,7 +228,7 @@ func TestIndirectPing3(t *testing.T) {
 	sender.node.RegisterListener(onPingRequestComplete(func() {
 		// create and add target to cluster
 		targetNode := NewNode("test", targetHostPort, ch.GetSubChannel("test"), nil)
-		target := &testNode{targetNode, ch}
+		target := &testNode{targetNode, ch, nil}
 		tnodes = append(tnodes, target)
 		bootstrapNodes(t, sender, helper1, helper2, target)
 		cont <- true
