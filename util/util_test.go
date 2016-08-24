@@ -111,6 +111,23 @@ func TestUtilsSelectOptDuration(t *testing.T) {
 	assert.Equal(t, def, SelectDuration(zopt, def), "expected to get default")
 }
 
+func TestUtilsSelectBool(t *testing.T) {
+	var tableTests = []struct {
+		opt    bool
+		def    bool
+		result bool
+	}{
+		{false, false, false},
+		{false, true, true},
+		{true, false, true},
+		{true, true, true},
+	}
+
+	for _, test := range tableTests {
+		assert.Equal(t, test.result, SelectBool(test.opt, test.def), "inputs opt: %t def: %t", test.opt, test.def)
+	}
+}
+
 func TestNoHostnameMismatch(t *testing.T) {
 	mismatches, err := CheckHostnameIPMismatch("192.0.2.1:1", map[string][]string{
 		"192.0.2.1": []string{
