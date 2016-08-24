@@ -180,7 +180,7 @@ func (n *NodeLabels) Remove(key string) (removed bool, err error) {
 	if isInternalLabel(key) {
 		return false, ErrLabelInternalKey
 	}
-	return n.node.memberlist.RemoveLocalLabel(key), nil
+	return n.node.memberlist.RemoveLocalLabels(key), nil
 }
 
 // AsMap gets a readonly copy of all the labels assigned to Node. Changes to the

@@ -406,6 +406,29 @@ func (s *MemberlistTestSuite) TestSetLocalLabels() {
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator")
 }
 
+func (s *MemberlistTestSuite) TestSetLocalLabel_empty() {
+	// test an empty value
+	s.m.SetLocalLabel("empty", "")
+	value, has := s.m.GetLocalLabel("empty")
+
+	s.Assert().True(has, "expected to have a local label with an empty value")
+	s.Assert().Equal("", value, "expected an empty value")
+
+	// test an empty key
+	s.m.SetLocalLabel("", "empty")
+	value, has = s.m.GetLocalLabel("")
+
+	s.Assert().True(has, "expected to have a local label with an empty key")
+	s.Assert().Equal("empty", value, "expected the value to be the string 'empty'")
+
+	// empty key and label
+	s.m.SetLocalLabel("", "")
+	value, has = s.m.GetLocalLabel("")
+
+	s.Assert().True(has, "expected to have a local label with an empty key")
+	s.Assert().Equal("", value, "expected an empty value")
+}
+
 func (s *MemberlistTestSuite) TestGetLocalLabel() {
 	s.m.SetLocalLabel("hello", "world")
 	value, has := s.m.GetLocalLabel("hello")
@@ -432,11 +455,11 @@ func (s *MemberlistTestSuite) TestGetLocalLabelsAsMap() {
 	s.Assert().NotEqual("pwnd", value, "expected an empty value and not the label we wrongfully put in the map returned")
 }
 
-func (s *MemberlistTestSuite) TestRemoveLocalLabel() {
+func (s *MemberlistTestSuite) TestRemoveLocalLabels() {
 	// make sure there are no changes recorded before the test
 	s.node.disseminator.ClearChanges()
 
-	removed := s.m.RemoveLocalLabel("hello")
+	removed := s.m.RemoveLocalLabels("hello")
 	s.Assert().False(removed, "expected no removed labels")
 	s.Assert().Equal(0, s.node.disseminator.ChangesCount(), "expected to have 0 change recorded in the disseminator after the removal of an unexisting label")
 
@@ -445,7 +468,7 @@ func (s *MemberlistTestSuite) TestRemoveLocalLabel() {
 	s.m.node.disseminator.ClearChanges()
 
 	// test
-	removed = s.m.RemoveLocalLabel("hello")
+	removed = s.m.RemoveLocalLabels("hello")
 	s.Assert().True(removed, "expected to remove a label")
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the removal of an existing label")
 }

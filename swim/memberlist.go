@@ -289,32 +289,7 @@ func (m *memberlist) SetLocalStatus(status string) {
 // return an ErrLabelSizeExceeded in the case this operation would alter the
 // labels of the node in such a way that the configured limits are exceeded.
 func (m *memberlist) SetLocalLabel(key, value string) error {
-	if err := m.node.labelLimits.validateLabel(m.local.Labels, key, value); err != nil {
-		// the labels operation violates the label limits that has been configured
-		return err
-	}
-
-	m.members.Lock()
-
-	// ensure that there is a labels map
-	if m.local.Labels == nil {
-		m.local.Labels = make(map[string]string)
-	}
-
-	old, had := m.local.Labels[key]
-
-	// set the label
-	m.local.Labels[key] = value
-	m.members.Unlock()
-
-	if !had || old != value {
-		// postLocalUpdate reincarnates and starts gossipping the new state
-		// which is only desired when a change to the local labels has been made
-		m.postLocalUpdate()
-	}
-
-	// there was no error during the manipulation of labels
-	return nil
+	return m.SetLocalLabels(map[string]string{key: value})
 }
 
 // GetLocalLabel returns the value of a label set on the local node. Its second
@@ -387,10 +362,12 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 	return nil
 }
 
-// Remove a label from the local map of labels. This will trigger a reincarnation
-// of the member to gossip its labels around. It returns true if all labels have
-// been removed.
-func (m *memberlist) RemoveLocalLabel(keys ...string) bool {
+// RemoveLocalLabels removes the labels keyed by the keys from the local map of
+// labels. When changes are made to the member state a reincarnation will be
+// triggered and the new state of the member will be recorded in the disseminator
+// and subsequently be gossiped around. It is a valid operation to remove non-
+// existing keys. It returns true if all (and only all) labels have been removed.
+func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 	m.members.Lock()
 	if len(m.local.Labels) == 0 || len(keys) == 0 {
 		m.members.Unlock()
