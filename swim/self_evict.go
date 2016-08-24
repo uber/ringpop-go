@@ -145,7 +145,7 @@ func (s *selfEvict) evict() {
 		maxNumberOfPings := int(math.Ceil(float64(numberOfPingableMembers) * s.options.PingRatio))
 
 		// final number of members to ping should not exceed any of:
-		numberOfPings := min(
+		numberOfPings := util.Min(
 			s.node.disseminator.maxP, // the piggyback counter
 			numberOfPingableMembers,  // the number of members we can ping
 			maxNumberOfPings,         // a configured percentage of members
@@ -241,16 +241,4 @@ func (s *selfEvict) runHooks(dispatch hookFn) {
 	}
 	wg.Wait()
 	s.logger.Debug("ringpop self eviction done running hooks")
-}
-
-// min returns the lowest integer and is defined because golang only has a min
-// function for floats and not for ints.
-func min(first int, rest ...int) int {
-	m := first
-	for _, value := range rest {
-		if value < m {
-			m = value
-		}
-	}
-	return m
 }

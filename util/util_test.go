@@ -233,9 +233,27 @@ func TestSingleNodeCluster(t *testing.T) {
 }
 
 func TestMin(t *testing.T) {
-	assert.Equal(t, 1, Min(1, 2))
-	assert.Equal(t, 2, Min(10, 2))
-	assert.Equal(t, 3, Min(3, 3))
+	var minTableTest = []struct {
+		numbers []int
+		min     int
+	}{
+		// tests for two numbers
+		{[]int{1, 2}, 1},
+		{[]int{10, 2}, 2},
+		{[]int{3, 3}, 3},
+
+		// tests for multiple numbers
+		{[]int{1, 2, 3}, 1},
+		{[]int{1, 3, 2}, 1},
+		{[]int{2, 1, 3}, 1},
+		{[]int{2, 3, 1}, 1},
+		{[]int{3, 1, 2}, 1},
+		{[]int{3, 2, 1}, 1},
+	}
+
+	for _, test := range minTableTest {
+		assert.Equal(t, test.min, Min(test.numbers[0], test.numbers[1:]...), "expected %d to be the min of %v", test.min, test.numbers)
+	}
 }
 
 func TestTimeZero(t *testing.T) {
