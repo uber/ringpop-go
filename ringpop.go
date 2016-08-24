@@ -55,11 +55,13 @@ type Interface interface {
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
-	GetReachableMembers() ([]string, error)
-	CountReachableMembers() (int, error)
+	GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error)
+	CountReachableMembers(predicates ...swim.MemberPredicate) (int, error)
 
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
+
+	Labels() (*swim.NodeLabels, error)
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -172,6 +174,7 @@ func (rp *Ringpop) init() error {
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
+		LabelLimits:   rp.config.LabelLimits,
 	})
 	rp.node.RegisterListener(rp)
 
@@ -179,8 +182,8 @@ func (rp *Ringpop) init() error {
 	rp.ring.RegisterListener(rp)
 
 	// add all members present in the membership of the node on startup.
-	for _, address := range rp.node.GetReachableMembers() {
-		rp.ring.AddServer(address)
+	for _, member := range rp.node.GetReachableMembers() {
+		rp.ring.AddServer(member.Address)
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
@@ -652,21 +655,28 @@ func (rp *Ringpop) ringEvent(e interface{}) {
 }
 
 // GetReachableMembers returns a slice of members currently in this instance's
-// membership list that aren't faulty.
-func (rp *Ringpop) GetReachableMembers() ([]string, error) {
+// active membership list that match all provided predicates.
+func (rp *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error) {
 	if !rp.Ready() {
 		return nil, ErrNotBootstrapped
 	}
-	return rp.node.GetReachableMembers(), nil
+
+	members := rp.node.GetReachableMembers(predicates...)
+
+	addresses := make([]string, 0, len(members))
+	for _, member := range members {
+		addresses = append(addresses, member.Address)
+	}
+	return addresses, nil
 }
 
 // CountReachableMembers returns the number of members currently in this
-// instance's membership list that aren't faulty.
-func (rp *Ringpop) CountReachableMembers() (int, error) {
+// instance's active membership list that match all provided predicates.
+func (rp *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (int, error) {
 	if !rp.Ready() {
 		return 0, ErrNotBootstrapped
 	}
-	return rp.node.CountReachableMembers(), nil
+	return rp.node.CountReachableMembers(predicates...), nil
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -729,6 +739,17 @@ func (rp *Ringpop) Forward(dest string, keys []string, request []byte, service, 
 	format tchannel.Format, opts *forward.Options) ([]byte, error) {
 
 	return rp.forwarder.ForwardRequest(request, dest, service, endpoint, keys, format, opts)
+}
+
+// Labels provides access to a mutator of ringpop Labels that will be shared on
+// the membership. Changes made on the mutator are synchronized accross the
+// cluster for other members to make local decisions on.
+func (rp *Ringpop) Labels() (*swim.NodeLabels, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
+	}
+
+	return rp.node.Labels(), nil
 }
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes

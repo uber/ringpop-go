@@ -95,7 +95,16 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.NoError(err, "channel must create successfully")
 	s.channel = ch
 
-	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch), Clock(s.mockClock))
+	s.ringpop, err = New("test",
+		Identity("127.0.0.1:3001"),
+		Channel(ch),
+		Clock(s.mockClock),
+
+		// configure low limits for testing of enforcement and error propagation
+		LabelLimitCount(1),
+		LabelLimitKeySize(5),
+		LabelLimitValueSize(5),
+	)
 	s.NoError(err, "Ringpop must create successfully")
 
 	ch.ListenAndServe(":0")
@@ -639,6 +648,60 @@ func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
 	s.Nil(result)
 }
 
+func (s *RingpopTestSuite) TestGetReachableMembers() {
+	createSingleNodeCluster(s.ringpop)
+
+	identity, err := s.ringpop.WhoAmI()
+	s.Require().NoError(err)
+
+	result, err := s.ringpop.GetReachableMembers()
+	s.NoError(err)
+	s.Equal([]string{identity}, result)
+}
+
+func (s *RingpopTestSuite) TestGetReachableMembersNotMePredicate() {
+	createSingleNodeCluster(s.ringpop)
+
+	identity, err := s.ringpop.WhoAmI()
+	s.Require().NoError(err)
+
+	// get reachable members without me (non in this test)
+	result, err := s.ringpop.GetReachableMembers(func(member swim.Member) bool {
+		return member.Address != identity
+	})
+
+	s.NoError(err)
+	s.Equal([]string{}, result)
+}
+
+func (s *RingpopTestSuite) TestCountReachableMembersNotReady() {
+	_, err := s.ringpop.CountReachableMembers()
+	s.Error(err)
+}
+
+func (s *RingpopTestSuite) TestCountReachableMembers() {
+	createSingleNodeCluster(s.ringpop)
+
+	result, err := s.ringpop.CountReachableMembers()
+	s.NoError(err)
+	s.Equal(1, result)
+}
+
+func (s *RingpopTestSuite) TestCountReachableMembersNotMePredicate() {
+	createSingleNodeCluster(s.ringpop)
+
+	identity, err := s.ringpop.WhoAmI()
+	s.Require().NoError(err)
+
+	// get reachable members without me (non in this test)
+	result, err := s.ringpop.CountReachableMembers(func(member swim.Member) bool {
+		return member.Address != identity
+	})
+
+	s.NoError(err)
+	s.Equal(0, result)
+}
+
 // TestAddSelfToBootstrapList tests that Ringpop automatically adds its own
 // identity to the bootstrap host list.
 func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
@@ -806,6 +869,42 @@ func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {
 	_, ok = stats.vals["ringpop.127_0_0_1_3001.ring.checksum-periodic"]
 	s.True(ok, "ring checksum stat")
 	s.ringpop.Destroy()
+}
+
+func (s *RingpopTestSuite) TestLabels() {
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "expected no error in setting up cluster")
+
+	labels, err := s.ringpop.Labels()
+	s.Assert().NoError(err)
+	s.Require().NotNil(labels)
+
+	// label count: 0
+	err = labels.Set("hellos", "world")
+	s.Assert().Error(err, "expected an error when the key size is exceeded")
+
+	// // label count: 0
+	err = labels.Set("hello", "worlds")
+	s.Assert().Error(err, "expected an error when the value size is exceeded")
+
+	// label count: 0
+	err = labels.Set("hello", "world")
+	s.Assert().NoError(err, "doesnt expect an error when setting a label that is exactly the limit")
+
+	// label count: 1
+	err = labels.Set("foo", "bar")
+	s.Assert().Error(err, "expected an error when you set more labels then allowed")
+
+	// label count: 1
+}
+
+func (s *RingpopTestSuite) TestLabelsNotReady() {
+	// todat labels are only supported after ringpop has been bootstrapped, this
+	// test can be removed when we find an elegant way of setting labels before
+	// bootstrapping
+	labels, err := s.ringpop.Labels()
+	s.Error(err)
+	s.Nil(labels)
 }
 
 func (s *RingpopTestSuite) TestDontAllowBootstrapWithoutChannelListening() {
