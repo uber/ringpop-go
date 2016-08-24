@@ -210,9 +210,17 @@ func (s *MemberlistTestSuite) TestAliveToFaulty() {
 	s.Equal(Alive, member.Status, "expected member to be alive")
 
 	s.m.MakeFaulty("127.0.0.1:3002", s.incarnation-1)
+
+	member, ok = s.m.Member("127.0.0.1:3002")
+	s.NotNil(member, "expected member not to be nil")
+	s.True(ok, "expected member to be found")
 	s.Equal(Alive, member.Status, "expected member to be alive")
 
 	s.m.MakeFaulty("127.0.0.1:3002", s.incarnation)
+
+	member, ok = s.m.Member("127.0.0.1:3002")
+	s.NotNil(member, "expected member not to be nil")
+	s.True(ok, "expected member to be found")
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 
 }

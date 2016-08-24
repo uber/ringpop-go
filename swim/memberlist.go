@@ -141,11 +141,16 @@ func (m *memberlist) genChecksumString() string {
 
 // returns the member at a specific address
 func (m *memberlist) Member(address string) (*Member, bool) {
+	var memberCopy *Member
 	m.members.RLock()
 	member, ok := m.members.byAddress[address]
+	if member != nil {
+		memberCopy = new(Member)
+		*memberCopy = *member
+	}
 	m.members.RUnlock()
 
-	return member, ok
+	return memberCopy, ok
 }
 
 // RemoveMember removes the member from the membership list. If the membership has

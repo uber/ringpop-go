@@ -116,6 +116,8 @@ func (s *StateTransitionsSuite) TestSuspectBecomesFaulty() {
 	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
 
 	s.clock.Add(5 * time.Second)
+	member, _ = s.m.Member(s.suspect.Address)
+	s.Require().NotNil(member, "expected cannot be nil")
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 }
 
@@ -128,6 +130,8 @@ func (s *StateTransitionsSuite) TestFaultyBecomesTombstone() {
 	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
 
 	s.clock.Add(10 * time.Second)
+	member, _ = s.m.Member(s.suspect.Address)
+	s.Require().NotNil(member, "expected cannot be nil")
 	s.Equal(Tombstone, member.Status, "expected member to be tombstone")
 }
 
