@@ -28,9 +28,6 @@ env:
   - RUN="make test-examples"
 
 matrix:
-  allow_failures:
-    - env: RUN="make test-race"
-
   fast_finish: true
 
 script:
