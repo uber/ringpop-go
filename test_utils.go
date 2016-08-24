@@ -32,24 +32,59 @@ import (
 )
 
 // fake stats
-type dummmyStats struct {
-	vals map[string]int64
+type dummyStats struct {
+	sync.RWMutex
+	_vals map[string]int64
 }
 
-func newDummyStats() *dummmyStats {
-	return &dummmyStats{make(map[string]int64)}
+func newDummyStats() *dummyStats {
+	return &dummyStats{
+		_vals: make(map[string]int64),
+	}
 }
 
-func (s *dummmyStats) IncCounter(key string, tags bark.Tags, val int64) {
-	s.vals[key] += val
+func (s *dummyStats) IncCounter(key string, tags bark.Tags, val int64) {
+	s.Lock()
+	defer s.Unlock()
+
+	s._vals[key] += val
 }
 
-func (s *dummmyStats) UpdateGauge(key string, tags bark.Tags, val int64) {
-	s.vals[key] = val
+func (s *dummyStats) read(key string) int64 {
+	s.Lock()
+	defer s.Unlock()
+
+	return s._vals[key]
 }
 
-func (s *dummmyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
-	s.vals[key] += util.MS(d)
+func (s *dummyStats) has(key string) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	_, has := s._vals[key]
+
+	return has
+}
+
+func (s *dummyStats) clear() {
+	s.Lock()
+	defer s.Unlock()
+
+	s._vals = make(map[string]int64)
+}
+
+func (s *dummyStats) UpdateGauge(key string, tags bark.Tags, val int64) {
+	s.Lock()
+	defer s.Unlock()
+
+	s._vals[key] = val
+}
+
+func (s *dummyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+
+	s._vals[key] += util.MS(d)
 }
 
 // fake event listener
