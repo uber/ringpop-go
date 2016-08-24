@@ -11,4 +11,8 @@ var (
 	// using port 0 and is not listening (and thus has not been assigned a port by
 	// the OS).
 	ErrEphemeralIdentity = errors.New("unable to resolve this node's identity from channel that is not yet listening")
+
+	// ErrChannelNotListening is returned on bootstrap if TChannel is not
+	// listening.
+	ErrChannelNotListening = errors.New("tchannel is not listening")
 )

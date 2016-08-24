@@ -98,6 +98,8 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch), Clock(s.mockClock))
 	s.NoError(err, "Ringpop must create successfully")
 
+	ch.ListenAndServe(":0")
+
 	s.mockRingpop = &mocks.Ringpop{}
 	s.mockSwimNode = &mocks.SwimNode{}
 
@@ -436,7 +438,8 @@ func (s *RingpopTestSuite) TestStateInitialized() {
 // TestStateReady tests that Ringpop is ready after successful bootstrapping.
 func (s *RingpopTestSuite) TestStateReady() {
 	// Bootstrap
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	s.Equal(ready, s.ringpop.state)
 }
@@ -445,7 +448,8 @@ func (s *RingpopTestSuite) TestStateReady() {
 // Destroy().
 func (s *RingpopTestSuite) TestStateDestroyed() {
 	// Bootstrap
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	// Destroy
 	s.ringpop.Destroy()
@@ -475,7 +479,8 @@ func (s *RingpopTestSuite) TestDestroyFromInitialized() {
 
 // TestDestroyIsIdempotent tests that Destroy() can be called multiple times.
 func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	s.ringpop.Destroy()
 	s.Equal(destroyed, s.ringpop.state)
@@ -493,7 +498,9 @@ func (s *RingpopTestSuite) TestWhoAmI() {
 	s.Equal("", identity)
 	s.Error(err)
 
-	createSingleNodeCluster(s.ringpop)
+	err = createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
+
 	s.Equal(ready, s.ringpop.state)
 	identity, err = s.ringpop.WhoAmI()
 	s.NoError(err)
@@ -508,7 +515,9 @@ func (s *RingpopTestSuite) TestUptime() {
 	s.Zero(uptime)
 	s.Error(err)
 
-	createSingleNodeCluster(s.ringpop)
+	err = createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
+
 	s.Equal(ready, s.ringpop.state)
 	uptime, err = s.ringpop.Uptime()
 	s.NoError(err)
@@ -523,7 +532,9 @@ func (s *RingpopTestSuite) TestChecksum() {
 	s.Zero(checksum)
 	s.Error(err)
 
-	createSingleNodeCluster(s.ringpop)
+	err = createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
+
 	s.Equal(ready, s.ringpop.state)
 	checksum, err = s.ringpop.Checksum()
 	s.NoError(err)
@@ -543,7 +554,8 @@ func (s *RingpopTestSuite) TestLookupNotReady() {
 }
 
 func (s *RingpopTestSuite) TestLookupNoDestination() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	address, _ := s.ringpop.identity()
 	s.ringpop.ring.RemoveServer(address)
@@ -554,7 +566,8 @@ func (s *RingpopTestSuite) TestLookupNoDestination() {
 }
 
 func (s *RingpopTestSuite) TestLookupEmitStat() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	stats := newDummyStats()
 	s.ringpop.statter = stats
@@ -566,7 +579,8 @@ func (s *RingpopTestSuite) TestLookupEmitStat() {
 }
 
 func (s *RingpopTestSuite) TestLookupNEmitStat() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	stats := newDummyStats()
 	s.ringpop.statter = stats
@@ -589,7 +603,8 @@ func (s *RingpopTestSuite) TestLookupNNotReady() {
 }
 
 func (s *RingpopTestSuite) TestLookupNNoDestinations() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	address, _ := s.ringpop.identity()
 	s.ringpop.ring.RemoveServer(address)
@@ -600,7 +615,8 @@ func (s *RingpopTestSuite) TestLookupNNoDestinations() {
 }
 
 func (s *RingpopTestSuite) TestLookupN() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	result, err := s.ringpop.LookupN("foo", 5)
 
@@ -646,7 +662,8 @@ func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
 // TestEmptyJoinListCreatesSingleNodeCluster tests that when you call Bootstrap
 // with no hosts or bootstrap file, a single-node cluster is created.
 func (s *RingpopTestSuite) TestEmptyJoinListCreatesSingleNodeCluster() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "unable to bootstrap single node cluster")
 	s.Equal(ready, s.ringpop.state)
 }
 
@@ -789,4 +806,21 @@ func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {
 	_, ok = stats.vals["ringpop.127_0_0_1_3001.ring.checksum-periodic"]
 	s.True(ok, "ring checksum stat")
 	s.ringpop.Destroy()
+}
+
+func (s *RingpopTestSuite) TestDontAllowBootstrapWithoutChannelListening() {
+	ch, err := tchannel.NewChannel("test", nil)
+	s.NoError(err, "channel must create successfully")
+	s.channel = ch
+
+	// Bug #146 meant that you could bootstrap ringpop without a listening
+	// channel IF you provided the Identity argument (or a custom Identity)
+	// provider.
+	s.ringpop, err = New("test", Channel(ch), Identity("127.0.0.1:3001"))
+	s.NoError(err, "Ringpop must create successfully")
+
+	// Calls bootstrap
+	err = createSingleNodeCluster(s.ringpop)
+
+	s.Error(err, "expect error when tchannel is not listening")
 }
