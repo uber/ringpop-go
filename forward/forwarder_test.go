@@ -266,7 +266,7 @@ func (s *ForwarderTestSuite) TestRequestTimesOut() {
 	dest, err := s.sender.Lookup("unreachable")
 	s.NoError(err)
 
-	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"unreachable"}, tchannel.JSON,
 		&Options{Timeout: time.Millisecond})
 
 	s.EqualError(err, "request timed out")
