@@ -95,7 +95,16 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.NoError(err, "channel must create successfully")
 	s.channel = ch
 
-	s.ringpop, err = New("test", Identity("127.0.0.1:3001"), Channel(ch), Clock(s.mockClock))
+	s.ringpop, err = New("test",
+		Identity("127.0.0.1:3001"),
+		Channel(ch),
+		Clock(s.mockClock),
+
+		// configure low limits for testing of enforcement and error propagation
+		LabelLimitCount(1),
+		LabelLimitKeySize(5),
+		LabelLimitValueSize(5),
+	)
 	s.NoError(err, "Ringpop must create successfully")
 
 	s.mockRingpop = &mocks.Ringpop{}
@@ -846,11 +855,30 @@ func (s *RingpopTestSuite) TestRingChecksumEmitTimer() {
 }
 
 func (s *RingpopTestSuite) TestLabels() {
-	createSingleNodeCluster(s.ringpop)
+	err := createSingleNodeCluster(s.ringpop)
+	s.Require().NoError(err, "expected no error in setting up cluster")
 
 	labels, err := s.ringpop.Labels()
 	s.Assert().NoError(err)
-	s.Assert().NotNil(labels)
+	s.Require().NotNil(labels)
+
+	// label count: 0
+	err = labels.Set("hellos", "world")
+	s.Assert().Error(err, "expected an error when the key size is exceeded")
+
+	// // label count: 0
+	err = labels.Set("hello", "worlds")
+	s.Assert().Error(err, "expected an error when the value size is exceeded")
+
+	// label count: 0
+	err = labels.Set("hello", "world")
+	s.Assert().NoError(err, "doesnt expect an error when setting a label that is exactly the limit")
+
+	// label count: 1
+	err = labels.Set("foo", "bar")
+	s.Assert().Error(err, "expected an error when you set more labels then allowed")
+
+	// label count: 1
 }
 
 func (s *RingpopTestSuite) TestLabelsNotReady() {
