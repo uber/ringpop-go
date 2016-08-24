@@ -284,6 +284,10 @@ func (m *memberlist) SetLocalStatus(status string) {
 	m.postLocalUpdate()
 }
 
+// SetLocalLabel sets the label identified by key to the new value. This
+// operation is validated against the configured limits for labels and will
+// return an ErrLabelSizeExceeded in the case this operation would alter the
+// labels of the node in such a way that the configured limits are exceeded.
 func (m *memberlist) SetLocalLabel(key, value string) error {
 	return m.SetLocalLabels(map[string]string{key: value})
 }
@@ -319,7 +323,15 @@ func (m *memberlist) LocalLabelsAsMap() map[string]string {
 // the value in the map. Keys that are not present in the provided map will
 // remain in the labels of this node. The operation is guaranteed to succeed
 // completely or not at all.
+// Before any changes are made to the labels the input is validated against the
+// configured limits on labels. This function will propagate any error that is
+// returned by the validation of the label limits eg. ErrLabelSizeExceeded
 func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	if err := m.node.labelLimits.validateLabels(m.local.Labels, labels); err != nil {
+		// the labels operation violates the label limits that has been configured
+		return err
+	}
+
 	m.members.Lock()
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
