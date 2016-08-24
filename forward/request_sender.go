@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/context"
 
 	log "github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
@@ -42,7 +43,7 @@ var errDestinationsDiverged = errors.New("key destinations have diverged")
 // lookup method
 type requestSender struct {
 	sender  Sender
-	emitter eventEmitter
+	emitter events.EventEmitter
 	channel shared.SubChannel
 
 	request           []byte
@@ -66,7 +67,7 @@ type requestSender struct {
 }
 
 // NewRequestSender returns a new request sender that can be used to forward a request to its destination
-func newRequestSender(sender Sender, emitter eventEmitter, channel shared.SubChannel, request []byte, keys []string,
+func newRequestSender(sender Sender, emitter events.EventEmitter, channel shared.SubChannel, request []byte, keys []string,
 	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
 	logger := logging.Logger("sender")
@@ -108,7 +109,7 @@ func (s *requestSender) Send() (res []byte, err error) {
 		if forwardError == nil {
 			if s.retries > 0 {
 				// forwarding succeeded after retries
-				s.emitter.emit(RetrySuccessEvent{s.retries})
+				s.emitter.EmitEvent(RetrySuccessEvent{s.retries})
 			}
 			return res, nil
 		}
@@ -126,7 +127,7 @@ func (s *requestSender) Send() (res []byte, err error) {
 			"endpoint":    s.endpoint,
 		}).Warn("max retries exceeded for request")
 
-		s.emitter.emit(MaxRetriesEvent{s.maxRetries})
+		s.emitter.EmitEvent(MaxRetriesEvent{s.maxRetries})
 
 		return nil, errors.New("max retries exceeded")
 	case <-ctx.Done(): // request timed out
@@ -222,11 +223,11 @@ func (s *requestSender) ScheduleRetry() ([]byte, error) {
 func (s *requestSender) AttemptRetry() ([]byte, error) {
 	s.retries++
 
-	s.emitter.emit(RetryAttemptEvent{})
+	s.emitter.EmitEvent(RetryAttemptEvent{})
 
 	dests := s.LookupKeys(s.keys)
 	if len(dests) != 1 {
-		s.emitter.emit(RetryAbortEvent{errDestinationsDiverged.Error()})
+		s.emitter.EmitEvent(RetryAbortEvent{errDestinationsDiverged.Error()})
 		return nil, errDestinationsDiverged
 	}
 
@@ -243,7 +244,7 @@ func (s *requestSender) AttemptRetry() ([]byte, error) {
 }
 
 func (s *requestSender) RerouteRetry(destination string) ([]byte, error) {
-	s.emitter.emit(RerouteEvent{
+	s.emitter.EmitEvent(RerouteEvent{
 		s.destination,
 		destination,
 	})

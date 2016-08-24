@@ -50,7 +50,6 @@ type Interface interface {
 	App() string
 	WhoAmI() (string, error)
 	Uptime() (time.Duration, error)
-	RegisterListener(l events.EventListener)
 	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
@@ -62,11 +61,18 @@ type Interface interface {
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
 
 	Labels() (*swim.NodeLabels, error)
+
+	// events.EventRegistar
+	RegisterListener(l events.EventListener)
+	DeregisterListener(l events.EventListener)
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
 // changes around the ring.
 type Ringpop struct {
+	// make ringpop an event Registar
+	events.AsyncEventEmitter
+
 	config         *configuration
 	configHashRing *hashring.Configuration
 
@@ -82,8 +88,6 @@ type Ringpop struct {
 	node       swim.NodeInterface
 	ring       *hashring.HashRing
 	forwarder  *forward.Forwarder
-
-	listeners []events.EventListener
 
 	statter log.StatsReporter
 	stats   struct {
@@ -304,18 +308,6 @@ func (rp *Ringpop) Uptime() (time.Duration, error) {
 	return time.Now().Sub(rp.startTime), nil
 }
 
-func (rp *Ringpop) emit(event interface{}) {
-	for _, listener := range rp.listeners {
-		go listener.HandleEvent(event)
-	}
-}
-
-// RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
-// should be thread safe.
-func (rp *Ringpop) RegisterListener(l events.EventListener) {
-	rp.listeners = append(rp.listeners, l)
-}
-
 // getState gets the state of the current Ringpop instance.
 func (rp *Ringpop) getState() state {
 	rp.stateMutex.RLock()
@@ -336,9 +328,9 @@ func (rp *Ringpop) setState(s state) {
 	if oldState != s {
 		switch s {
 		case ready:
-			rp.emit(events.Ready{})
+			rp.EmitEvent(events.Ready{})
 		case destroyed:
-			rp.emit(events.Destroyed{})
+			rp.EmitEvent(events.Destroyed{})
 		}
 	}
 }
@@ -399,7 +391,7 @@ func (rp *Ringpop) Ready() bool {
 
 // HandleEvent is used to satisfy the swim.EventListener interface. No touchy.
 func (rp *Ringpop) HandleEvent(event events.Event) {
-	rp.emit(event)
+	rp.EmitEvent(event)
 
 	switch event := event.(type) {
 	case swim.MemberlistChangesReceivedEvent:
@@ -607,7 +599,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 	duration := time.Now().Sub(startTime)
 	rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, duration)
 
-	rp.emit(events.LookupEvent{
+	rp.EmitEvent(events.LookupEvent{
 		Key:      key,
 		Duration: duration,
 	})
@@ -635,7 +627,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	duration := time.Now().Sub(startTime)
 	rp.statter.RecordTimer(rp.getStatKey(fmt.Sprintf("lookupn.%d", n)), nil, duration)
 
-	rp.emit(events.LookupNEvent{
+	rp.EmitEvent(events.LookupNEvent{
 		Key:      key,
 		N:        n,
 		Duration: duration,

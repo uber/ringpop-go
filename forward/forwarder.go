@@ -85,14 +85,14 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 
 // A Forwarder is used to forward requests to their destinations
 type Forwarder struct {
+	events.AsyncEventEmitter
+
 	sender  Sender
 	channel shared.SubChannel
 	logger  log.Logger
 
 	inflightLock sync.Mutex
 	inflight     int64
-
-	listeners []events.EventListener
 }
 
 // NewForwarder returns a new forwarder
@@ -110,25 +110,13 @@ func NewForwarder(s Sender, ch shared.SubChannel) *Forwarder {
 	}
 }
 
-func (f *Forwarder) emit(event events.Event) {
-	for _, listener := range f.listeners {
-		go listener.HandleEvent(event)
-	}
-}
-
-// RegisterListener adds a listener to the forwarder. The listener's HandleEvent
-// will be called for every emit on Forwarder. The HandleEvent method must be thread safe
-func (f *Forwarder) RegisterListener(l events.EventListener) {
-	f.listeners = append(f.listeners, l)
-}
-
 func (f *Forwarder) incrementInflight() {
 	f.inflightLock.Lock()
 	f.inflight++
 	inflight := f.inflight
 	f.inflightLock.Unlock()
 
-	f.emit(InflightRequestsChangedEvent{inflight})
+	f.EmitEvent(InflightRequestsChangedEvent{inflight})
 }
 
 func (f *Forwarder) decrementInflight() {
@@ -139,14 +127,14 @@ func (f *Forwarder) decrementInflight() {
 	// make sure that we do not decrement below 0
 	if f.inflight < 0 {
 		f.inflight = 0
-		f.emit(InflightRequestsMiscountEvent{InflightDecrement})
+		f.EmitEvent(InflightRequestsMiscountEvent{InflightDecrement})
 	}
 
 	inflight := f.inflight
 	f.inflightLock.Unlock()
 
 	if pre != inflight {
-		f.emit(InflightRequestsChangedEvent{inflight})
+		f.EmitEvent(InflightRequestsChangedEvent{inflight})
 	}
 }
 
@@ -156,7 +144,7 @@ func (f *Forwarder) decrementInflight() {
 func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoint string,
 	keys []string, format tchannel.Format, opts *Options) ([]byte, error) {
 
-	f.emit(RequestForwardedEvent{})
+	f.EmitEvent(RequestForwardedEvent{})
 
 	f.incrementInflight()
 	opts = f.mergeDefaultOptions(opts)
@@ -165,9 +153,9 @@ func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoin
 	f.decrementInflight()
 
 	if err != nil {
-		f.emit(FailedEvent{})
+		f.EmitEvent(FailedEvent{})
 	} else {
-		f.emit(SuccessEvent{})
+		f.EmitEvent(SuccessEvent{})
 	}
 
 	return b, err

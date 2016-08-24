@@ -20,7 +20,11 @@
 
 package events
 
-import "time"
+import (
+	"sync"
+
+	"time"
+)
 
 // Event is an empty interface that is type switched when handeled.
 type Event interface{}
@@ -31,9 +35,83 @@ type EventListener interface {
 	HandleEvent(event Event)
 }
 
+// EventEmitter describes an interface that can be used to emit events
+type EventEmitter interface {
+	EmitEvent(Event)
+}
+
 // EventRegistrar is an object that you can register EventListeners on.
 type EventRegistrar interface {
 	RegisterListener(EventListener)
+	DeregisterListener(EventListener)
+}
+
+type baseEventRegistrar struct {
+	lock      sync.RWMutex
+	listeners []EventListener
+}
+
+// RegisterListener adds a listener to the Event Registar. Events emitted on this
+// registar will be invoked on the listener
+func (a *baseEventRegistrar) RegisterListener(l EventListener) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	// by making a copy the backing array will never be changed after its creation.
+	// this allowes to copy the slice while locked but iterate while not locked
+	// preventing deadlocks when listeners are added/removed in the handler of a
+	// listener
+	cpy := append([]EventListener(nil), a.listeners...)
+	cpy = append(cpy, l)
+	a.listeners = cpy
+}
+
+// DeregisterListener removes a listener from the Event Registar. New events
+// emitted to this registar will not be invoked on the listener.
+func (a *baseEventRegistrar) DeregisterListener(l EventListener) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	for i := range a.listeners {
+		if a.listeners[i] == l {
+			// copy the list and remove the listener form the copy
+			cpy := append([]EventListener(nil), a.listeners...)
+			a.listeners = append(cpy[:i], cpy[i+1:]...)
+			break
+		}
+	}
+}
+
+// AsyncEventEmitter is an implementation of both an EventRegistar and EventEmitter
+// that emits events in their own go routine.
+type AsyncEventEmitter struct {
+	baseEventRegistrar
+}
+
+// EmitEvent will send the event to all registered listeners
+func (a *AsyncEventEmitter) EmitEvent(event Event) {
+	a.lock.RLock()
+	for _, listener := range a.listeners {
+		go listener.HandleEvent(event)
+	}
+	a.lock.RUnlock()
+}
+
+// SyncEventEmitter is an implementation of both an EventRegistar and EventEmitter
+// that emits events in the calling go routine.
+type SyncEventEmitter struct {
+	baseEventRegistrar
+}
+
+// EmitEvent will send the event to all registered listeners
+func (a *SyncEventEmitter) EmitEvent(event Event) {
+	a.lock.RLock()
+	listeners := a.listeners
+	a.lock.RUnlock()
+
+	for _, listener := range listeners {
+		listener.HandleEvent(event)
+	}
 }
 
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
