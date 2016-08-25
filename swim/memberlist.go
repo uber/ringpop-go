@@ -153,6 +153,15 @@ func (m *memberlist) Member(address string) (*Member, bool) {
 	return memberCopy, ok
 }
 
+// LocalMember returns a copy of the local Member in a thread safe way.
+func (m *memberlist) LocalMember() (member Member) {
+	m.members.Lock()
+	// copy local member state
+	member = *m.local
+	m.members.Unlock()
+	return
+}
+
 // RemoveMember removes the member from the membership list. If the membership has
 // changed during this operation a new checksum will be computed.
 func (m *memberlist) RemoveMember(address string) bool {

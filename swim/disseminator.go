@@ -107,10 +107,12 @@ func (d *disseminator) HasChanges() bool {
 func (d *disseminator) MembershipAsChanges() (changes []Change) {
 	d.Lock()
 
+	localMember := d.node.memberlist.LocalMember()
+
 	for _, member := range d.node.memberlist.GetMembers() {
 		change := Change{}
 		change.populateSubject(&member)
-		change.populateSource(d.node.memberlist.local)
+		change.populateSource(&localMember)
 		changes = append(changes, change.validateOutgoing())
 	}
 
