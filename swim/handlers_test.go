@@ -176,6 +176,7 @@ func (s *HandlerTestSuite) TestErrorHandler() {
 
 	errTest := errors.New("test error")
 	logging.SetLogger(logger)
+	defer logging.SetLogger(nil)
 
 	s.testNode.node.errorHandler(s.ctx, errTest)
 	logger.AssertCalled(s.T(), "WithFields", bark.Fields{
