@@ -325,7 +325,7 @@ func (s *DisseminatorTestSuite) TestFilterChangesFromSender() {
 
 	// make aliveAddr the source of suspect change
 	s.d.changes[suspectAddr].Source = aliveAddr
-	s.d.changes[suspectAddr].Incarnation = s.incarnation
+	s.d.changes[suspectAddr].SourceIncarnation = s.incarnation
 
 	changes := s.d.issueChanges()
 	s.Len(changes, 3, "expected three changes")

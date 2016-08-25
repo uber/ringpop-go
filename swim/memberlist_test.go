@@ -24,6 +24,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/benbjohnson/clock"
+
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
@@ -105,9 +107,15 @@ func (s *MemberlistTestSuite) TestChecksumChanges() {
 }
 
 func (s *MemberlistTestSuite) TestChecksumsEqual() {
-	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
+	c := clock.NewMock()
+
+	nodeA := NewNode("test", "127.0.0.1:3001", nil, &Options{
+		Clock: c,
+	})
 	defer nodeA.Destroy()
-	nodeB := NewNode("test", "127.0.0.1:3001", nil, nil)
+	nodeB := NewNode("test", "127.0.0.1:3001", nil, &Options{
+		Clock: c,
+	})
 	defer nodeB.Destroy()
 
 	nodeA.memberlist.MakeAlive("127.0.0.1:3001", s.incarnation)
