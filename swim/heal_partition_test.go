@@ -68,7 +68,7 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 
 	A.HasPartitionAs(t, A, 3, "alive")
 	A.HasPartitionAs(t, B, 5, "alive")
@@ -92,7 +92,7 @@ func TestPartitionHealWithMissing(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 
 	A.HasPartitionAs(t, A, 0, "alive")
 	A.HasPartitionAs(t, B, 0, "alive")
@@ -130,7 +130,7 @@ func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealWithFaultyAndMissing2 creates two partitions A and B where
@@ -163,7 +163,7 @@ func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealWithFaultyAndMissing2 creates two partitions A and B where
@@ -195,7 +195,7 @@ func TestPartitionHealWithFaultyAndMissing3(t *testing.T) {
 	waitForConvergence(t, time.Second, B...)
 
 	A[0].node.healer.Heal()
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealSemiPartition checks if the ring cluster automatically
@@ -211,7 +211,7 @@ func TestPartitionHealSemiParition(t *testing.T) {
 
 	A.AddPartitionWithStatus(B, Alive)
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealWithMultiplePartitions checks if the heal mechanism heals
@@ -263,7 +263,7 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 4, "expected correct amount of targets")
 
-	waitForPartitionHeal(t, time.Second, append(Bs, A)...)
+	waitForPartitionHeal(t, 100, append(Bs, A)...)
 }
 
 // Very flappy test on race detector
@@ -490,20 +490,19 @@ func (p partition) Contains(address string) bool {
 // when the nodes are converged. After the cluster finished gossiping we
 // double check that all nodes have the same checksum for the memberlist,
 // this means that the cluster is converged and healed.
-func waitForPartitionHeal(t *testing.T, timeout time.Duration, ps ...partition) {
+func waitForPartitionHeal(t *testing.T, maxIterations int, ps ...partition) {
 	var nodes []*Node
 	for _, p := range ps {
 		nodes = append(nodes, testNodesToNodes(p)...)
 	}
 
-	deadline := time.Now().Add(timeout)
-
 Tick:
 	for {
+		maxIterations--
 
 		// check deadline
-		if time.Now().After(deadline) {
-			t.Errorf("timeout during wait for convergence")
+		if maxIterations <= 0 {
+			t.Errorf("exhausted the maximum number of iterations while waiting for partition to heal")
 			return
 		}
 
