@@ -180,7 +180,8 @@ func (m *memberlist) RemoveMember(address string) bool {
 
 func (m *memberlist) MemberAt(i int) *Member {
 	m.members.RLock()
-	member := m.members.list[i]
+	member := new(Member)
+	*member = *m.members.list[i]
 	m.members.RUnlock()
 
 	return member
