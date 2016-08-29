@@ -54,8 +54,21 @@ type baseEventRegistrar struct {
 // RegisterListener adds a listener to the Event Registar. Events emitted on this
 // registar will be invoked on the listener
 func (a *baseEventRegistrar) RegisterListener(l EventListener) {
+	if l == nil {
+		// do not register nil listener, will cause nil pointer dereference during
+		// event emitting
+		return
+	}
+
 	a.lock.Lock()
 	defer a.lock.Unlock()
+
+	// Check if listener is already registered
+	for _, listener := range a.listeners {
+		if listener == l {
+			return
+		}
+	}
 
 	// by making a copy the backing array will never be changed after its creation.
 	// this allowes to copy the slice while locked but iterate while not locked
