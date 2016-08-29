@@ -330,22 +330,26 @@ func TestIndirectPing7(t *testing.T) {
 // onPingRequestComplete can be registered on an EventListener and fires the
 // specified function only when the PingRequestSender receives a response or
 // error.
-func onPingRequestComplete(f func()) ListenerFunc {
-	return ListenerFunc(func(e events.Event) {
-		switch e.(type) {
-		case PingRequestsSendCompleteEvent, PingRequestSendErrorEvent:
-			f()
-		}
-	})
+func onPingRequestComplete(f func()) *ListenerFunc {
+	return &ListenerFunc{
+		fn: func(e events.Event) {
+			switch e.(type) {
+			case PingRequestsSendCompleteEvent, PingRequestSendErrorEvent:
+				f()
+			}
+		},
+	}
 }
 
 // onPingRequestReceive can be registered on an EventListener and fires f only
 // when the PingRequest handler receives a request.
-func onPingRequestReceive(f func()) ListenerFunc {
-	return ListenerFunc(func(e events.Event) {
-		switch e.(type) {
-		case PingRequestReceiveEvent:
-			f()
-		}
-	})
+func onPingRequestReceive(f func()) *ListenerFunc {
+	return &ListenerFunc{
+		fn: func(e events.Event) {
+			switch e.(type) {
+			case PingRequestReceiveEvent:
+				f()
+			}
+		},
+	}
 }
