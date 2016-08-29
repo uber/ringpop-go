@@ -374,7 +374,7 @@ func (s *DisseminatorTestSuite) TestFilterChangesFromSender() {
 
 	// make change the source of suspect change back to local address
 	s.d.changes[suspectAddr].Source = s.d.node.Address()
-	s.d.changes[suspectAddr].Incarnation = s.d.node.Incarnation()
+	s.d.changes[suspectAddr].SourceIncarnation = s.d.node.Incarnation()
 
 	// test all changes are filtered
 	changes = s.d.issueChanges()
