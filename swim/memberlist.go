@@ -225,24 +225,22 @@ func (m *memberlist) NumPingableMembers() (n int) {
 }
 
 // returns n pingable members in the member list
-func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*Member {
-	var members []*Member
+func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []Member {
+	members := make([]Member, 0, n)
 
 	m.members.RLock()
-	for _, member := range m.members.list {
+	indices := rand.Perm(len(m.members.list))
+	for _, index := range indices {
+		member := m.members.list[index]
 		if m.Pingable(*member) && !excluding[member.Address] {
-			members = append(members, member)
+			members = append(members, *member)
+			if len(members) >= n {
+				break
+			}
 		}
 	}
 	m.members.RUnlock()
-
-	// shuffle members and take first n
-	members = shuffle(members)
-
-	if n > len(members) {
-		return members
-	}
-	return members[:n]
+	return members
 }
 
 // returns an slice of (copied) members representing the current state of the
