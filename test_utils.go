@@ -51,8 +51,8 @@ func (s *dummyStats) IncCounter(key string, tags bark.Tags, val int64) {
 }
 
 func (s *dummyStats) read(key string) int64 {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 
 	return s._vals[key]
 }
