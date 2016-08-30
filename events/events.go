@@ -79,8 +79,8 @@ func (a *baseEventRegistrar) RegisterListener(l EventListener) {
 	a.listeners = cpy
 }
 
-// DeregisterListener removes a listener from the Event Registar. New events
-// emitted to this registar will not be invoked on the listener.
+// DeregisterListener removes a listener from the Event Registar. Subsequent calls
+// to EmitEvent will not cause HandleEvent to be called on this listener.
 func (a *baseEventRegistrar) DeregisterListener(l EventListener) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
