@@ -72,7 +72,7 @@ type Interface interface {
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
 // changes around the ring.
 type Ringpop struct {
-	// make ringpop an event Registar
+	// make ringpop an event Emitter
 	events.AsyncEventEmitter
 
 	config         *configuration
