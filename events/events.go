@@ -89,9 +89,11 @@ func (a *baseEventRegistrar) DeregisterListener(l EventListener) {
 
 	for i := range a.listeners {
 		if a.listeners[i] == l {
-			// copy the list and remove the listener form the copy
-			cpy := append([]EventListener(nil), a.listeners...)
-			a.listeners = append(cpy[:i], cpy[i+1:]...)
+			// create a new list excluding the listener that needs removal
+			listenersCopy := make([]EventListener, 0, len(a.listeners)-1)
+			listenersCopy = append(listenersCopy, a.listeners[:i]...)
+			listenersCopy = append(listenersCopy, a.listeners[i+1:]...)
+			a.listeners = listenersCopy
 			break
 		}
 	}
