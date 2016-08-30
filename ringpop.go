@@ -63,6 +63,8 @@ type Interface interface {
 	Labels() (*swim.NodeLabels, error)
 
 	// events.EventRegistar
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
 	RegisterListener(l events.EventListener)
 	DeregisterListener(l events.EventListener)
 }
