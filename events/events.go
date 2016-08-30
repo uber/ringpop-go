@@ -74,9 +74,11 @@ func (a *baseEventRegistrar) RegisterListener(l EventListener) {
 	// this allowes to copy the slice while locked but iterate while not locked
 	// preventing deadlocks when listeners are added/removed in the handler of a
 	// listener
-	cpy := append([]EventListener(nil), a.listeners...)
-	cpy = append(cpy, l)
-	a.listeners = cpy
+	listenersCopy := make([]EventListener, 0, len(a.listeners)+1)
+	listenersCopy = append(listenersCopy, a.listeners...)
+	listenersCopy = append(listenersCopy, l)
+
+	a.listeners = listenersCopy
 }
 
 // DeregisterListener removes a listener from the Event Registar. Subsequent calls
