@@ -164,9 +164,7 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 // waitForConvergence lets the nodes gossip and returns when the nodes are converged.
 // After the cluster finished gossiping we double check that all nodes have the
 // same checksum for the memberlist, this means that the cluster is converged.
-func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
-	deadline := time.Now().Add(timeout)
-
+func waitForConvergence(t *testing.T, maxIterations int, testNodes ...*testNode) {
 	nodes := testNodesToNodes(testNodes)
 
 	// 1 node is a special case because it can't drain its changes since it
@@ -177,9 +175,10 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 	}
 
 Tick:
+	maxIterations--
 	// return when deadline is reached
-	if time.Now().After(deadline) {
-		t.Errorf("timeout during wait for convergence")
+	if maxIterations < 0 {
+		t.Errorf("exhausted the maximum number of iterations while waiting for convergence")
 		return
 	}
 

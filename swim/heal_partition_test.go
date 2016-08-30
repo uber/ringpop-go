@@ -55,8 +55,8 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	A.HasPartitionAs(t, A, 3, "alive")
 	A.HasPartitionAs(t, B, 0, "faulty")
@@ -122,8 +122,8 @@ func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	targets, err = A[0].node.healer.Heal()
 	assert.NoError(t, err, "expected no error")
@@ -155,8 +155,8 @@ func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	targets, err = A[0].node.healer.Heal()
 	assert.NoError(t, err, "expected no error")
@@ -186,13 +186,13 @@ func TestPartitionHealWithFaultyAndMissing3(t *testing.T) {
 	A.AddPartitionWithStatus(B1, Faulty)
 	B.AddPartitionWithStatus(A1, Faulty)
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 	A[0].node.healer.Heal()
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	A[0].node.healer.Heal()
 	waitForPartitionHeal(t, 100, A, B)
@@ -250,13 +250,13 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 5, "expected correct amount of targets")
 
-	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, 100, A...)
 	for _, B := range Bs {
-		waitForConvergence(t, time.Second, B...)
+		waitForConvergence(t, 100, B...)
 	}
-	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, 100, A...)
 	for _, B := range Bs {
-		waitForConvergence(t, time.Second, B...)
+		waitForConvergence(t, 100, B...)
 	}
 
 	targets, err = A[0].node.healer.Heal()
@@ -358,7 +358,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	// progress timers so that incarnation numbers can bump
 	a.clock.Add(time.Millisecond)
 
-	waitForConvergence(t, time.Second, a, b)
+	waitForConvergence(t, 100, a, b)
 }
 
 func TestPartitionHealFail(t *testing.T) {
@@ -415,7 +415,7 @@ type partition []*testNode
 func newPartition(t *testing.T, n int) partition {
 	p := partition(genChannelNodes(t, n))
 	bootstrapNodes(t, p...)
-	waitForConvergence(t, 500*time.Millisecond, p...)
+	waitForConvergence(t, 100, p...)
 	p.ClearChanges()
 	return p
 }
@@ -501,7 +501,7 @@ Tick:
 		maxIterations--
 
 		// check deadline
-		if maxIterations <= 0 {
+		if maxIterations < 0 {
 			t.Errorf("exhausted the maximum number of iterations while waiting for partition to heal")
 			return
 		}

@@ -83,7 +83,7 @@ func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {
 	// get a bootstrapped cluster
 	s.peers = genChannelNodes(s.T(), 3)
 	bootstrapList := bootstrapNodes(s.T(), s.peers...)
-	waitForConvergence(s.T(), 500*time.Millisecond, s.peers...)
+	waitForConvergence(s.T(), 100, s.peers...)
 
 	s.tnode.node.Bootstrap(&BootstrapOptions{
 		DiscoverProvider: statichosts.New(bootstrapList...),
@@ -186,14 +186,14 @@ func (s *BootstrapTestSuite) TestFailingDiscoverProvider() {
 func (s *BootstrapTestSuite) TestDisseminationCounterAfterBootstrap() {
 	s.peers = genChannelNodes(s.T(), 10)
 	bootstrapList := bootstrapNodes(s.T(), s.peers...)
-	waitForConvergence(s.T(), 5*time.Second, s.peers...)
+	waitForConvergence(s.T(), 100, s.peers...)
 
 	s.Equal(s.node.disseminator.pFactor, s.node.disseminator.maxP, "Initial maxP value should equal pFactor")
 	s.node.Bootstrap(&BootstrapOptions{
 		DiscoverProvider: statichosts.New(bootstrapList...),
 		Stopped:          true,
 	})
-	waitForConvergence(s.T(), 5*time.Second, append(s.peers, s.tnode)...)
+	waitForConvergence(s.T(), 100, append(s.peers, s.tnode)...)
 
 	// there are 11 nodes in total, log10(11) rounded up is 2
 	expected := 2 * s.node.disseminator.pFactor
