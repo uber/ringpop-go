@@ -23,6 +23,7 @@ package swim
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -373,4 +374,27 @@ func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
 	// wait for first occurence of the event, close thereafter
 	<-block
 	close(block)
+}
+
+// The ListenerFunc type is an adapter to allow the use of ordinary functions
+// as EventListeners.
+type ListenerFunc struct {
+	fn func(events.Event)
+}
+
+// HandleEvent calls f(e).
+func (f *ListenerFunc) HandleEvent(e events.Event) {
+	f.fn(e)
+}
+
+// on is returns an EventListener that executes a function f upon receiving an
+// event of type t.
+func on(t interface{}, f func(e events.Event)) *ListenerFunc {
+	return &ListenerFunc{
+		fn: func(e events.Event) {
+			if reflect.TypeOf(t) == reflect.TypeOf(e) {
+				f(e)
+			}
+		},
+	}
 }
