@@ -23,10 +23,12 @@ package swim
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/events"
@@ -266,39 +268,41 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	waitForPartitionHeal(t, 100, append(Bs, A)...)
 }
 
-// Very flappy test on race detector
-// TestPartitionHealWithTime tests whether partitions are healed over time
-// automatically.
-// func TestPartitionHealWithTime(t *testing.T) {
-// 	A := newPartition(t, 5)
-// 	B := newPartition(t, 5)
-// 	defer destroyNodes(A...)
-// 	defer destroyNodes(B...)
+// TestPartitionHealGetsTriggeredWhenTimePasses tests whether partition healing
+// is triggered over time automatically.
+func TestPartitionHealGetsTriggeredWhenTimePasses(t *testing.T) {
+	A := newPartition(t, 5)
+	B := newPartition(t, 5)
+	defer destroyNodes(A...)
+	defer destroyNodes(B...)
 
-// 	A.AddPartitionWithStatus(B, Faulty)
-// 	B.AddPartitionWithStatus(A, Faulty)
+	A.AddPartitionWithStatus(B, Faulty)
+	B.AddPartitionWithStatus(A, Faulty)
 
-// 	A.ProgressTime(time.Millisecond)
-// 	B.ProgressTime(time.Millisecond)
+	A.ProgressTime(time.Millisecond)
+	B.ProgressTime(time.Millisecond)
 
-// 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
+	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 
-// 	A[0].node.healer.Start()
+	A[0].node.healer.Start()
 
-// 	// Progress time in a background thread. This will cause the node to
-// 	// attempt a heal periodically.
+	// Progress time in a background thread. This will cause the node to
+	// attempt a heal periodically.
 
-// 	c := clock.NewMock()
-// 	A[0].node.clock = c
-// 	go func() {
-// 		for {
-// 			c.Add(A[0].node.healer.period)
-// 			time.Sleep(time.Millisecond)
-// 		}
-// 	}()
+	c := A[0].clock
 
-// 	waitForPartitionHeal(t, 3000*time.Millisecond, A, B)
-// }
+	// event emitter fires synchronous so no lock is needed
+	healTriggered := int32(0)
+	A[0].node.RegisterListener(on(DiscoHealEvent{}, func(e events.Event) {
+		atomic.AddInt32(&healTriggered, 1)
+	}))
+
+	// with the seed of the random number generator set to 0 the heal should
+	// trigger after the healing period kicks in twice
+	c.Add(2 * A[0].node.healer.period)
+
+	require.Equal(t, int32(1), atomic.LoadInt32(&healTriggered), "expected 1 heal to trigger when forwarding time")
+}
 
 // TestHealBeforeBootstrap tests that we can heal with a node that is still
 // bootstrapping. We put a node in the bootstrapping phase by giving it a
@@ -445,10 +449,7 @@ func (p partition) ClearChanges() {
 // Progresses the clock of all the nodes of the partition by T.
 func (p partition) ProgressTime(T time.Duration) {
 	for _, n := range p {
-		now := n.node.clock.Now()
-		c := clock.NewMock()
-		c.Add(now.Add(T).Sub(clock.NewMock().Now()))
-		n.node.clock = c
+		n.clock.Add(T)
 	}
 }
 
