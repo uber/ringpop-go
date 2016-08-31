@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/util"
 )
@@ -85,25 +84,6 @@ func (s *dummyStats) RecordTimer(key string, tags bark.Tags, d time.Duration) {
 	defer s.Unlock()
 
 	s._vals[key] += util.MS(d)
-}
-
-// fake event listener
-type dummyListener struct {
-	l      sync.Mutex
-	events int
-}
-
-func (d *dummyListener) EventCount() int {
-	d.l.Lock()
-	defer d.l.Unlock()
-
-	return d.events
-}
-
-func (d *dummyListener) HandleEvent(event events.Event) {
-	d.l.Lock()
-	d.events++
-	d.l.Unlock()
 }
 
 func genAddresses(host, fromPort, toPort int) []string {
