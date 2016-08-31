@@ -21,6 +21,7 @@
 package ringpop
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -173,16 +174,31 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 	}
 }
 
+func (s *RingpopTestSuite) TestEventPropagation() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	l := &eventsmocks.EventListener{}
+	l.On("HandleEvent", struct{}{}).Run(func(args mock.Arguments) {
+		wg.Done()
+	})
+
+	s.ringpop.RegisterListener(l)
+	defer s.ringpop.DeregisterListener(l)
+
+	s.ringpop.HandleEvent(struct{}{})
+
+	// wait for the event being fired asynchronous
+	wg.Wait()
+
+	l.AssertCalled(s.T(), "HandleEvent", struct{}{})
+}
+
 func (s *RingpopTestSuite) TestHandleEvents() {
 	// Fake bootstrap
 	s.ringpop.init()
 
 	// remove stats from init phase
 	s.stats.clear()
-
-	listener := &dummyListener{}
-	s.ringpop.RegisterListener(listener)
-	defer s.ringpop.DeregisterListener(listener)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
@@ -193,7 +209,6 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.membership-set.alive"), "missing stats for member being set to alive")
 	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), s.stats.read("ringpop.127_0_0_1_3001.num-members"), "missing num-members stats for member being set to alive")
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.membership-set.alive"), "missing stats for member being set to alive")
-	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 1), swim.Faulty, swim.Leave, swim.Suspect),
@@ -205,7 +220,6 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.membership-set.leave"), "missing stats for member being set to leave")
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.membership-set.suspect"), "missing stats for member being set to suspect")
 	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), s.stats.read("ringpop.127_0_0_1_3001.num-members"), "missing num-members stats for three status changes")
-	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 1), ""),
@@ -215,7 +229,6 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(2 /* 2 from before, no changes */), s.stats.read("ringpop.127_0_0_1_3001.ring.checksum-computed"), "unexpected stats for checksums being computed for unknown status change")
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.membership-set.unknown"), "missing stats for member being set to unknown")
 	s.Equal(int64(0 /* events are faked, ringpop still has 0 members */), s.stats.read("ringpop.127_0_0_1_3001.num-members"), "missing num-members stats for member being set to unknown")
-	// expected listener to record 3 events (forwarded swim event, checksum event, and ring changed event)
 
 	s.ringpop.HandleEvent(swim.FullSyncEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.full-sync"), "missing stats for full sync")
@@ -231,54 +244,42 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 
 	s.ringpop.HandleEvent(swim.MaxPAdjustedEvent{NewPCount: 100})
 	s.Equal(int64(100), s.stats.read("ringpop.127_0_0_1_3001.max-piggyback"), "missing stats for piggyback adjustment")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinReceiveEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.join.recv"), "missing stats for joins received")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinCompleteEvent{Duration: time.Second})
 	s.Equal(int64(1000), s.stats.read("ringpop.127_0_0_1_3001.join"), "missing stats for join initiated")
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.join.complete"), "missing stats for join completed")
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.join.succeeded"), "missing stats for join succeeded")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingSendEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ping.send"), "missing stats for sent pings")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingReceiveEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ping.recv"), "missing stats for received pings")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestsSendEvent{Peers: genAddresses(1, 2, 5)})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ping-req.send"), "missing ping-req.send stats")
 	s.Equal(int64(4), s.stats.read("ringpop.127_0_0_1_3001.ping-req.other-members"), "missing ping-req.other-members stats")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestReceiveEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ping-req.recv"), "missing stats for received ping-reqs")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.PingRequestPingEvent{Duration: time.Second})
 	s.Equal(int64(1000), s.stats.read("ringpop.127_0_0_1_3001.ping-req-ping"), "missing stats for ping-req pings executed")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinFailedEvent{Reason: swim.Error})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.join.failed.err"), "missing stats for join failed due to error")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinFailedEvent{Reason: swim.Destroyed})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.join.failed.destroyed"), "missing stats for join failed due to error")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinTriesUpdateEvent{Retries: 1})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.join.retries"), "missing stats for join retries")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.JoinTriesUpdateEvent{Retries: 2})
 	s.Equal(int64(2), s.stats.read("ringpop.127_0_0_1_3001.join.retries"), "join tries didn't update")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.DiscoHealEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.heal.triggered"), "missing stats for received pings")
@@ -286,23 +287,17 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.ringpop.HandleEvent(swim.AttemptHealEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.heal.attempt"), "missing stats for received pings")
 
-	// expected listener to record 1 event
-
 	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Alive})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.make-alive"), "missing make-alive stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Faulty})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.make-faulty"), "missing make-faulty stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Suspect})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.make-suspect"), "missing make-suspect stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.MakeNodeStatusEvent{Status: swim.Leave})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.make-leave"), "missing make-leave stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.ChecksumComputeEvent{
 		Duration: 3 * time.Second,
@@ -311,15 +306,12 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.membership.checksum-computed"), "missing membership.checksum-computed stat")
 	s.Equal(int64(42), s.stats.read("ringpop.127_0_0_1_3001.checksum"), "missing checksum stat")
 	s.Equal(int64(3000), s.stats.read("ringpop.127_0_0_1_3001.compute-checksum"), "missing compute-checksum stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.RequestBeforeReadyEvent{Endpoint: swim.PingEndpoint})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.not-ready.ping"), "missing not-ready.ping stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.RequestBeforeReadyEvent{Endpoint: swim.PingReqEndpoint})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.not-ready.ping-req"), "missing not-ready.ping-req stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(swim.RefuteUpdateEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.refuted-update"), "missing refuted-update stat")
@@ -338,45 +330,35 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 
 	s.ringpop.HandleEvent(forward.RequestForwardedEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.egress"), "missing requestProxy.egress stat")
-	// expected listener to record 1 event
 
 	// forward.InflightRequestsChangedEvent:
 	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{Inflight: 5})
 	s.Equal(int64(5), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.inflight"), "missing requestProxy.inflight stat")
-	// expected listener to record 1 event
 
 	// test an update on the Inflight requests count
 	s.ringpop.HandleEvent(forward.InflightRequestsChangedEvent{Inflight: 4})
 	s.Equal(int64(4), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.inflight"), "missing requestProxy.inflight stat (update)")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{Operation: forward.InflightIncrement})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.miscount.increment"), "missing requestProxy.miscount.increment stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.InflightRequestsMiscountEvent{Operation: forward.InflightDecrement})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.miscount.decrement"), "missing requestProxy.miscount.decrement stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.SuccessEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.send.success"), "missing requestProxy.send.success stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.FailedEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.send.error"), "missing requestProxy.send.error stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.MaxRetriesEvent{MaxRetries: 3})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.failed"), "missing requestProxy.retry.failed stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.RetryAttemptEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.attempted"), "missing requestProxy.retry.attempted stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.RetryAbortEvent{})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.aborted"), "missing requestProxy.retry.aborted stat")
-	// expected listener to record 1 event
 
 	me, _ := s.ringpop.WhoAmI()
 	s.ringpop.HandleEvent(forward.RerouteEvent{
@@ -384,21 +366,16 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 		NewDestination: me,
 	})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.reroute.local"), "missing requestProxy.retry.reroute.local stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.RerouteEvent{
 		OldDestination: genAddresses(1, 1, 1)[0],
 		NewDestination: genAddresses(1, 2, 2)[0],
 	})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.reroute.remote"), "missing requestProxy.retry.reroute.remote stat")
-	// expected listener to record 1 event
 
 	s.ringpop.HandleEvent(forward.RetrySuccessEvent{NumRetries: 1})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.succeeded"), "missing requestProxy.retry.reroute.remote stat")
-	// expected listener to record 1 event
 
-	time.Sleep(time.Millisecond) // sleep for a bit so that events can be recorded
-	s.Equal(47, listener.EventCount(), "incorrect count for emitted events")
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {
