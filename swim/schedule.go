@@ -11,9 +11,10 @@ func schedule(what func(), delayFn func() time.Duration, clock clock.Clock) chan
 
 	go func() {
 		for {
+			delay := delayFn()
 			what()
 			select {
-			case <-clock.After(delayFn()):
+			case <-clock.After(delay):
 			case <-stop:
 				return
 			}
