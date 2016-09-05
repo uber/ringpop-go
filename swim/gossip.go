@@ -36,8 +36,12 @@ type gossip struct {
 	node *Node
 
 	state struct {
-		stopped bool
 		sync.RWMutex
+		running bool
+
+		// control channels for background tasks
+		protocolPeriodChannel chan bool
+		protocolRateChannel   chan bool
 	}
 
 	minProtocolPeriod time.Duration
@@ -61,27 +65,10 @@ func newGossip(node *Node, minProtocolPeriod time.Duration) *gossip {
 		logger:            logging.Logger("gossip").WithField("local", node.Address()),
 	}
 
-	gossip.SetStopped(true)
 	gossip.protocol.timing = metrics.NewHistogram(metrics.NewUniformSample(10))
 	gossip.protocol.timing.Update(int64(gossip.minProtocolPeriod))
 
 	return gossip
-}
-
-// returns whether or not the gossip sub-protocol is stopped
-func (g *gossip) Stopped() bool {
-	g.state.RLock()
-	stopped := g.state.stopped
-	g.state.RUnlock()
-
-	return stopped
-}
-
-// sets the gossip sub-protocol to stopped or not stopped
-func (g *gossip) SetStopped(stopped bool) {
-	g.state.Lock()
-	g.state.stopped = stopped
-	g.state.Unlock()
 }
 
 // computes a delay for the gossip protocol period
@@ -89,13 +76,20 @@ func (g *gossip) ComputeProtocolDelay() time.Duration {
 	g.protocol.RLock()
 	defer g.protocol.RUnlock()
 
+	var delay time.Duration
+
 	if g.protocol.numPeriods != 0 {
 		target := g.protocol.lastPeriod.Add(g.protocol.lastRate)
-		delay := math.Max(float64(target.Sub(time.Now())), float64(g.minProtocolPeriod))
-		return time.Duration(delay)
+		delay = time.Duration(math.Max(float64(target.Sub(time.Now())), float64(g.minProtocolPeriod)))
+	} else {
+		// delay for first tick in [0, minProtocolPeriod]ms
+		delay = time.Duration(rand.Intn(int(g.minProtocolPeriod + 1)))
 	}
-	// delay for first tick in [0, minProtocolPeriod]ms
-	return time.Duration(rand.Intn(int(g.minProtocolPeriod + 1)))
+
+	g.node.EmitEvent(ProtocolDelayComputeEvent{
+		Duration: delay,
+	})
+	return delay
 }
 
 func (g *gossip) ProtocolRate() time.Duration {
@@ -124,54 +118,52 @@ func (g *gossip) ProtocolTiming() metrics.Histogram {
 
 // start the gossip protocol
 func (g *gossip) Start() {
-	if !g.Stopped() {
+	g.state.Lock()
+	defer g.state.Unlock()
+
+	if g.state.running {
 		g.logger.Warn("gossip already started")
 		return
 	}
 
-	g.SetStopped(false)
-	g.RunProtocolRateLoop()
-	g.RunProtocolPeriodLoop()
+	// mark the state to be running
+	g.state.running = true
+
+	// schedule repeat execution in the background
+	g.state.protocolPeriodChannel = schedule(g.ProtocolPeriod, g.ComputeProtocolDelay, g.node.clock)
+	g.state.protocolRateChannel = schedule(g.AdjustProtocolRate, func() time.Duration {
+		return time.Second
+	}, g.node.clock)
 
 	g.logger.Debug("started gossip protocol")
 }
 
 // stop the gossip protocol
 func (g *gossip) Stop() {
-	if g.Stopped() {
+	g.state.Lock()
+	defer g.state.Unlock()
+
+	if !g.state.running {
 		g.logger.Warn("gossip already stopped")
 		return
 	}
 
-	g.SetStopped(true)
+	g.state.running = false
+
+	// stop background execution of running tasks
+	close(g.state.protocolPeriodChannel)
+	close(g.state.protocolRateChannel)
+
 	g.logger.Debug("stopped gossip protocol")
 }
 
-// run the gossip protocol period loop
-func (g *gossip) RunProtocolPeriodLoop() {
-	go func() {
-		startTime := time.Now()
-		for !g.Stopped() {
-			delay := g.ComputeProtocolDelay()
-			g.node.EmitEvent(ProtocolDelayComputeEvent{
-				Duration: delay,
-			})
+// returns whether or not the gossip sub-protocol is stopped
+func (g *gossip) Stopped() bool {
+	g.state.RLock()
+	stopped := !g.state.running
+	g.state.RUnlock()
 
-			startTimeFreq := time.Now()
-
-			g.ProtocolPeriod()
-			time.Sleep(delay)
-
-			g.node.EmitEvent(ProtocolFrequencyEvent{
-				Duration: time.Now().Sub(startTimeFreq),
-			})
-		}
-
-		g.logger.WithFields(log.Fields{
-			"start": startTime,
-			"end":   time.Now(),
-		}).Debug("stopped protocol period loop")
-	}()
+	return stopped
 }
 
 // run a gossip protocol period
@@ -179,20 +171,21 @@ func (g *gossip) ProtocolPeriod() {
 	startTime := time.Now()
 
 	g.node.pingNextMember()
+	endTime := time.Now()
 
 	g.protocol.Lock()
-	g.protocol.lastPeriod = time.Now()
+
+	lag := endTime.Sub(g.protocol.lastPeriod)
+	wasFirst := (g.protocol.numPeriods == 0)
+
+	g.protocol.lastPeriod = endTime
 	g.protocol.numPeriods++
 	g.protocol.timing.Update(int64(time.Now().Sub(startTime)))
 	g.protocol.Unlock()
-}
 
-//
-func (g *gossip) RunProtocolRateLoop() {
-	go func() {
-		for !g.Stopped() {
-			time.Sleep(time.Second)
-			g.AdjustProtocolRate()
-		}
-	}()
+	if !wasFirst {
+		g.node.EmitEvent(ProtocolFrequencyEvent{
+			Duration: lag,
+		})
+	}
 }
