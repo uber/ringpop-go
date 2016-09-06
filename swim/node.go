@@ -172,7 +172,6 @@ type Node struct {
 	disseminator     *disseminator
 	stateTransitions *stateTransitions
 	gossip           *gossip
-	rollup           *updateRollup
 
 	// When we get more healer strategies we can abstract to a healer interface.
 	healer *discoverProviderHealer
@@ -242,9 +241,6 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		change.populateSubject(&member)
 		node.disseminator.RecordChange(change)
 	}
-
-	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
-		opts.RollupMaxUpdates)
 
 	if node.channel != nil {
 		node.registerHandlers()
@@ -322,7 +318,6 @@ func (n *Node) Destroy() {
 	n.state.Unlock()
 
 	n.Stop()
-	n.rollup.Destroy()
 }
 
 // Destroyed returns whether or not the node has been destroyed.

@@ -298,8 +298,11 @@ func TestPartitionHealGetsTriggeredWhenTimePasses(t *testing.T) {
 	}))
 
 	// with the seed of the random number generator set to 0 the heal should
-	// trigger after the healing period kicks in twice
-	c.Add(2 * A[0].node.healer.period)
+	// trigger after the healing period kicks in twice. It is importeant that
+	// Add gets invoked twice, otherwise the test will fail (clock 'ensures'
+	// goroutines kick in at the end of Add)
+	c.Add(A[0].node.healer.period)
+	c.Add(A[0].node.healer.period)
 
 	require.Equal(t, int32(1), atomic.LoadInt32(&healTriggered), "expected 1 heal to trigger when forwarding time")
 }

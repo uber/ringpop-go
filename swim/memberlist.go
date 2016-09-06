@@ -422,7 +422,6 @@ func (m *memberlist) postLocalUpdate() {
 
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
-	m.node.rollup.TrackUpdates(changes)
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -562,7 +561,6 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			NumMembers:  m.NumMembers(),
 		})
 		m.node.handleChanges(applied)
-		m.node.rollup.TrackUpdates(applied)
 	}
 
 	m.Unlock()
