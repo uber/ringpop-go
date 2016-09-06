@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks testpop lint mocks out setup test test-integration test-unit test-race
+.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
 
 SHELL = /bin/bash
 
@@ -27,6 +27,9 @@ clean:
 clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
 	rm -rf test/thrift/pingpong/
+
+coveralls:
+	test/update-coveralls
 
 lint:
 	@:>lint.log
