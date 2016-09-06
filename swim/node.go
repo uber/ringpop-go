@@ -149,7 +149,9 @@ type NodeInterface interface {
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
-	RegisterListener(l events.EventListener)
+
+	AddListener(events.EventListener)
+	RemoveListener(events.EventListener)
 }
 
 // A Node is a SWIM member

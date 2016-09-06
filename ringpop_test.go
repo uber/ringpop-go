@@ -182,8 +182,8 @@ func (s *RingpopTestSuite) TestEventPropagation() {
 		wg.Done()
 	})
 
-	s.ringpop.RegisterListener(l)
-	defer s.ringpop.DeregisterListener(l)
+	s.ringpop.AddListener(l)
+	defer s.ringpop.RemoveListener(l)
 
 	s.ringpop.HandleEvent(struct{}{})
 
@@ -748,8 +748,8 @@ func (s *RingpopTestSuite) TestReadyEvent() {
 	l.On("HandleEvent", events.Ready{}).Return().Once().Run(func(args mock.Arguments) {
 		called <- true
 	})
-	s.ringpop.RegisterListener(l)
-	defer s.ringpop.DeregisterListener(l)
+	s.ringpop.AddListener(l)
+	defer s.ringpop.RemoveListener(l)
 
 	s.ringpop.setState(ready)
 
@@ -772,8 +772,8 @@ func (s *RingpopTestSuite) TestDestroyedEvent() {
 	l.On("HandleEvent", events.Destroyed{}).Return().Once().Run(func(args mock.Arguments) {
 		called <- true
 	})
-	s.ringpop.RegisterListener(l)
-	defer s.ringpop.DeregisterListener(l)
+	s.ringpop.AddListener(l)
+	defer s.ringpop.RemoveListener(l)
 
 	s.ringpop.setState(destroyed)
 
@@ -820,8 +820,8 @@ func (s *RingpopTestSuite) TestRingIsConstructedWhenStateReady() {
 	})
 	l.On("HandleEvent", mock.Anything).Return()
 
-	rp2.RegisterListener(l)
-	defer rp2.DeregisterListener(l)
+	rp2.AddListener(l)
+	defer rp2.RemoveListener(l)
 
 	_, err = rp2.Bootstrap(&swim.BootstrapOptions{
 		DiscoverProvider: statichosts.New(me1),

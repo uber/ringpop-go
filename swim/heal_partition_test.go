@@ -293,7 +293,7 @@ func TestPartitionHealGetsTriggeredWhenTimePasses(t *testing.T) {
 
 	// event emitter fires synchronous so no lock is needed
 	healTriggered := int32(0)
-	A[0].node.RegisterListener(on(DiscoHealEvent{}, func(e events.Event) {
+	A[0].node.AddListener(on(DiscoHealEvent{}, func(e events.Event) {
 		atomic.AddInt32(&healTriggered, 1)
 	}))
 
@@ -321,7 +321,7 @@ func TestHealBeforeBootstrap(t *testing.T) {
 
 	// block a from completing bootstrap
 	block := make(chan struct{})
-	a.node.RegisterListener(on(JoinTriesUpdateEvent{}, func(e events.Event) {
+	a.node.AddListener(on(JoinTriesUpdateEvent{}, func(e events.Event) {
 		<-block
 	}))
 
@@ -403,7 +403,7 @@ func TestPartitionHealMaxFails(t *testing.T) {
 	A[0].node.discoverProvider = statichosts.New(brokenHosts...)
 
 	heals := 0
-	A[0].node.RegisterListener(on(AttemptHealEvent{}, func(e events.Event) {
+	A[0].node.AddListener(on(AttemptHealEvent{}, func(e events.Event) {
 		heals++
 	}))
 

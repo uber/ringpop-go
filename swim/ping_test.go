@@ -85,7 +85,7 @@ func (s *PingTestSuite) TestPingBeforeReady() {
 	// Register listener that should be fired with the correct event type
 	listener := &mocks.EventListener{}
 	listener.On("HandleEvent", mock.AnythingOfType("RequestBeforeReadyEvent"))
-	testNode2.node.RegisterListener(listener)
+	testNode2.node.AddListener(listener)
 
 	res, err := sendPing(testNode1.node, testNode2.node.Address(), 500*time.Millisecond)
 	s.Error(err)

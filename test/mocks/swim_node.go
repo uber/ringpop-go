@@ -139,7 +139,12 @@ func (_m *SwimNode) Ready() bool {
 	return r0
 }
 
-// RegisterListener provides a mock function with given fields: l
-func (_m *SwimNode) RegisterListener(l events.EventListener) {
-	_m.Called(l)
+// AddListener provides a mock function with given fields: _a0
+func (_m *SwimNode) AddListener(_a0 events.EventListener) {
+	_m.Called(_a0)
+}
+
+// RemoveListener provides a mock function with given fields: _a0
+func (_m *SwimNode) RemoveListener(_a0 events.EventListener) {
+	_m.Called(_a0)
 }

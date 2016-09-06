@@ -155,7 +155,7 @@ func TestIndirectPing1(t *testing.T) {
 	targetHostPort := target.node.Address()
 
 	// block one ping-req indefinitely
-	helper1.node.RegisterListener(onPingRequestReceive(func() {
+	helper1.node.AddListener(onPingRequestReceive(func() {
 		<-block
 	}))
 
@@ -183,12 +183,12 @@ func TestIndirectPing2(t *testing.T) {
 	targetHostPort := target.node.Address()
 
 	// block ping-req until first ping-req is done
-	helper1.node.RegisterListener(onPingRequestReceive(func() {
+	helper1.node.AddListener(onPingRequestReceive(func() {
 		<-cont
 	}))
 
 	// bootstrap node and then unblock second ping-req
-	sender.node.RegisterListener(onPingRequestComplete(func() {
+	sender.node.AddListener(onPingRequestComplete(func() {
 		// bootstrap target node
 		bootstrapNodes(t, sender, helper1, helper2, target)
 		cont <- true
@@ -220,12 +220,12 @@ func TestIndirectPing3(t *testing.T) {
 	targetHostPort := ch.PeerInfo().HostPort
 
 	// block ping-req until first ping-req is done
-	helper1.node.RegisterListener(onPingRequestReceive(func() {
+	helper1.node.AddListener(onPingRequestReceive(func() {
 		<-cont
 	}))
 
 	// initialize target and unblock second ping-req
-	sender.node.RegisterListener(onPingRequestComplete(func() {
+	sender.node.AddListener(onPingRequestComplete(func() {
 		// create and add target to cluster
 		targetNode := NewNode("test", targetHostPort, ch.GetSubChannel("test"), nil)
 		target := &testNode{targetNode, ch, nil}
@@ -257,12 +257,12 @@ func TestIndirectPing4(t *testing.T) {
 	helper2.closeAndWait(sender.channel)
 
 	// block ping-req of healthy node
-	helper1.node.RegisterListener(onPingRequestReceive(func() {
+	helper1.node.AddListener(onPingRequestReceive(func() {
 		<-cont
 	}))
 
 	// first ping-req has failed because helper2 is closed, unblock second ping-req
-	sender.node.RegisterListener(onPingRequestComplete(func() {
+	sender.node.AddListener(onPingRequestComplete(func() {
 		cont <- true
 	}))
 
