@@ -42,8 +42,8 @@ type EventEmitter interface {
 
 // EventRegistrar is an object that you can register EventListeners on.
 type EventRegistrar interface {
-	RegisterListener(EventListener)
-	DeregisterListener(EventListener)
+	AddListener(EventListener)
+	RemoveListener(EventListener)
 }
 
 type baseEventRegistrar struct {
@@ -51,9 +51,9 @@ type baseEventRegistrar struct {
 	listeners []EventListener
 }
 
-// RegisterListener adds a listener to the Event Registar. Events emitted on this
+// AddListener adds a listener to the Event Registar. Events emitted on this
 // registar will be invoked on the listener
-func (a *baseEventRegistrar) RegisterListener(l EventListener) {
+func (a *baseEventRegistrar) AddListener(l EventListener) {
 	if l == nil {
 		// do not register nil listener, will cause nil pointer dereference during
 		// event emitting
@@ -81,9 +81,9 @@ func (a *baseEventRegistrar) RegisterListener(l EventListener) {
 	a.listeners = listenersCopy
 }
 
-// DeregisterListener removes a listener from the Event Registar. Subsequent calls
+// RemoveListener removes a listener from the Event Registar. Subsequent calls
 // to EmitEvent will not cause HandleEvent to be called on this listener.
-func (a *baseEventRegistrar) DeregisterListener(l EventListener) {
+func (a *baseEventRegistrar) RemoveListener(l EventListener) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 

@@ -360,7 +360,7 @@ func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
 
 	var once sync.Once
 
-	er.RegisterListener(on(t, func(e events.Event) {
+	er.AddListener(on(t, func(e events.Event) {
 		once.Do(func() {
 			block <- struct{}{}
 		})

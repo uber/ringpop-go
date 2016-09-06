@@ -317,8 +317,8 @@ func (s *ForwarderTestSuite) TestInvalidInflightDecrement() {
 	}).Return()
 
 	s.forwarder.inflight = 0
-	s.forwarder.RegisterListener(listener)
-	defer s.forwarder.DeregisterListener(listener)
+	s.forwarder.AddListener(listener)
+	defer s.forwarder.RemoveListener(listener)
 	s.forwarder.decrementInflight()
 
 	s.Assertions.Equal(int64(0), s.forwarder.inflight, "Expected inflight to stay at 0 when decremented at 0")

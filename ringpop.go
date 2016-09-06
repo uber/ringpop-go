@@ -65,8 +65,12 @@ type Interface interface {
 	// events.EventRegistar
 	// mockery has troubles generating a working mock when the interface is
 	// embedded therefore the definitions are copied here.
-	RegisterListener(l events.EventListener)
-	DeregisterListener(l events.EventListener)
+	AddListener(events.EventListener)
+	RemoveListener(events.EventListener)
+
+	// DEPRECATED, use AddListener (!) kept around for backwards compatibility
+	// but will start logging warnings
+	RegisterListener(events.EventListener)
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -182,10 +186,10 @@ func (rp *Ringpop) init() error {
 		Clock:         rp.clock,
 		LabelLimits:   rp.config.LabelLimits,
 	})
-	rp.node.RegisterListener(rp)
+	rp.node.AddListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
-	rp.ring.RegisterListener(rp)
+	rp.ring.AddListener(rp)
 
 	// add all members present in the membership of the node on startup.
 	for _, member := range rp.node.GetReachableMembers() {
@@ -193,7 +197,7 @@ func (rp *Ringpop) init() error {
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
-	rp.forwarder.RegisterListener(rp)
+	rp.forwarder.AddListener(rp)
 
 	rp.startTimers()
 	rp.setState(initialized)
@@ -308,6 +312,12 @@ func (rp *Ringpop) Uptime() (time.Duration, error) {
 		return 0, ErrNotBootstrapped
 	}
 	return time.Now().Sub(rp.startTime), nil
+}
+
+// RegisterListener is DEPRECATED, use AddListener
+func (rp *Ringpop) RegisterListener(l events.EventListener) {
+	rp.logger.Warn("RegisterListener is deprecated, use AddListener")
+	rp.AddListener(l)
 }
 
 // getState gets the state of the current Ringpop instance.

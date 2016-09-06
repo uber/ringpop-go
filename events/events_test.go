@@ -57,9 +57,9 @@ func (s *EventsTestSuite) TestEventListenerRegistration() {
 	l1.On("HandleEvent", testEvent{}).Run(func(args mock.Arguments) {
 		wg1.Done()
 	}).Return()
-	s.e.RegisterListener(l1)
+	s.e.AddListener(l1)
 	// make sure listener does stick around for next tests
-	defer s.e.DeregisterListener(l1)
+	defer s.e.RemoveListener(l1)
 
 	// expect listener to be invoked twice
 	wg2.Add(2)
@@ -67,9 +67,9 @@ func (s *EventsTestSuite) TestEventListenerRegistration() {
 	l2.On("HandleEvent", testEvent{}).Run(func(args mock.Arguments) {
 		wg2.Done()
 	}).Return()
-	s.e.RegisterListener(l2)
+	s.e.AddListener(l2)
 	// make sure listener does stick around for next tests
-	defer s.e.DeregisterListener(l2)
+	defer s.e.RemoveListener(l2)
 
 	// emit event by value
 	s.e.EmitEvent(testEvent{})
@@ -80,7 +80,7 @@ func (s *EventsTestSuite) TestEventListenerRegistration() {
 	l1.AssertNumberOfCalls(s.T(), "HandleEvent", 1)
 
 	// remove listener
-	s.e.DeregisterListener(l1)
+	s.e.RemoveListener(l1)
 
 	// emit new event that should not be emitted to the listener
 	s.e.EmitEvent(testEvent{})
@@ -94,17 +94,17 @@ func (s *EventsTestSuite) TestEventListenerRegistration() {
 }
 
 func (s *EventsTestSuite) TestRegisterNilListener() {
-	s.e.RegisterListener(nil)
+	s.e.AddListener(nil)
 	s.e.EmitEvent(testEvent{})
 }
 
 func (s *EventsTestSuite) TestDeregisterUnregisteredListener() {
 	unregistered := &MockEventListener{}
-	s.e.DeregisterListener(unregistered)
+	s.e.RemoveListener(unregistered)
 }
 
 func (s *EventsTestSuite) TestDeregisterNilListener() {
-	s.e.DeregisterListener(nil)
+	s.e.RemoveListener(nil)
 }
 
 func (s *EventsTestSuite) TestDeregisterDuringHandleEvent() {
@@ -114,12 +114,12 @@ func (s *EventsTestSuite) TestDeregisterDuringHandleEvent() {
 	wg1.Add(1)
 	l1 := &MockEventListener{}
 	l1.On("HandleEvent", testEvent{}).Run(func(args mock.Arguments) {
-		s.e.DeregisterListener(l1)
+		s.e.RemoveListener(l1)
 		wg1.Done()
 	}).Return()
-	s.e.RegisterListener(l1)
+	s.e.AddListener(l1)
 	// make sure listener does stick around for next tests
-	defer s.e.DeregisterListener(l1)
+	defer s.e.RemoveListener(l1)
 
 	s.e.EmitEvent(testEvent{})
 
@@ -144,8 +144,8 @@ func (s *EventsTestSuite) TestRegisterTwice() {
 		wg1.Done()
 	}).Return()
 
-	s.e.RegisterListener(l1)
-	s.e.RegisterListener(l1)
+	s.e.AddListener(l1)
+	s.e.AddListener(l1)
 
 	s.e.EmitEvent(testEvent{})
 

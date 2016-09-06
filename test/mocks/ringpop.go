@@ -75,16 +75,6 @@ func (_m *Ringpop) Uptime() (time.Duration, error) {
 	return r0, r1
 }
 
-// RegisterListener provides a mock function with given fields: l
-func (_m *Ringpop) RegisterListener(l events.EventListener) {
-	_m.Called(l)
-}
-
-// DeregisterListener provides a mock function with given fields: l
-func (_m *Ringpop) DeregisterListener(l events.EventListener) {
-	_m.Called(l)
-}
-
 // Bootstrap provides a mock function with given fields: opts
 func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	ret := _m.Called(opts)
@@ -282,4 +272,19 @@ func (_m *Ringpop) Labels() (*swim.NodeLabels, error) {
 	}
 
 	return r0, r1
+}
+
+// AddListener provides a mock function with given fields: _a0
+func (_m *Ringpop) AddListener(_a0 events.EventListener) {
+	_m.Called(_a0)
+}
+
+// RemoveListener provides a mock function with given fields: _a0
+func (_m *Ringpop) RemoveListener(_a0 events.EventListener) {
+	_m.Called(_a0)
+}
+
+// RegisterListener provides a mock function with given fields: _a0
+func (_m *Ringpop) RegisterListener(_a0 events.EventListener) {
+	_m.Called(_a0)
 }

@@ -55,7 +55,7 @@ func (d *dummyListener) HandleEvent(event events.Event) {
 func TestAddServer(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	l := &dummyListener{}
-	ring.RegisterListener(l)
+	ring.AddListener(l)
 
 	ring.AddServer("server1")
 	ring.AddServer("server2")
@@ -72,7 +72,7 @@ func TestAddServer(t *testing.T) {
 func TestRemoveServer(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	l := &dummyListener{}
-	ring.RegisterListener(l)
+	ring.AddListener(l)
 
 	ring.AddServer("server1")
 	ring.AddServer("server2")
@@ -143,7 +143,7 @@ func TestServers(t *testing.T) {
 func TestAddRemoveServers(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	l := &dummyListener{}
-	ring.RegisterListener(l)
+	ring.AddListener(l)
 	add := []string{"server1", "server2"}
 	remove := []string{"server3", "server4"}
 
