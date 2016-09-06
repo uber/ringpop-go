@@ -23,7 +23,7 @@ install:
 
 env:
   - RUN="make lint"
-  - RUN="make test-unit"
+  - RUN="make test-unit coveralls"
   - RUN="make test-integration"
   - RUN="make test-race"
   - RUN="make test-examples"
@@ -36,9 +36,6 @@ matrix:
 
 script:
   - test/travis
-
-after_success:
-  - test/update-coveralls
 
 cache:
   directories:
