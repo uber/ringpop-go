@@ -21,7 +21,6 @@
 package swim
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -166,8 +165,10 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 // After the cluster finished gossiping we double check that all nodes have the
 // same checksum for the memberlist, this means that the cluster is converged.
 func waitForConvergence(t *testing.T, maxIterations int, testNodes ...*testNode) {
-	nodes := testNodesToNodes(testNodes)
+	waitForConvergenceNodes(t, maxIterations, testNodesToNodes(testNodes)...)
+}
 
+func waitForConvergenceNodes(t *testing.T, maxIterations int, nodes ...*Node) {
 	// 1 node is a special case because it can't drain its changes since it
 	// cannot ping or be pinged by another member
 	if len(nodes) == 1 {
@@ -288,19 +289,8 @@ func (c *swimCluster) Bootstrap() {
 }
 
 // WaitForConvergence polls the checksums of each node in the cluster and returns when they all match, or until timeout occurs.
-func (c *swimCluster) WaitForConvergence(timeout time.Duration) error {
-	timeoutCh := time.After(timeout)
-
-	for {
-		select {
-		case <-time.After(time.Millisecond):
-			if nodesConverged(c.nodes) {
-				return nil
-			}
-		case <-timeoutCh:
-			return errors.New("timeout during converging")
-		}
-	}
+func (c *swimCluster) WaitForConvergence(t *testing.T, maxIterations int) {
+	waitForConvergenceNodes(t, maxIterations, c.nodes...)
 }
 
 func testNodesToNodes(testNodes []*testNode) []*Node {
