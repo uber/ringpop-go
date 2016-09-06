@@ -40,8 +40,9 @@ type gossip struct {
 		running bool
 
 		// control channels for background tasks
-		protocolPeriodChannel chan bool
-		protocolRateChannel   chan bool
+		protocolPeriodStop  chan bool
+		protocolPeriodWait  <-chan bool
+		protocolRateChannel chan bool
 	}
 
 	minProtocolPeriod time.Duration
@@ -130,8 +131,8 @@ func (g *gossip) Start() {
 	g.state.running = true
 
 	// schedule repeat execution in the background
-	g.state.protocolPeriodChannel = schedule(g.ProtocolPeriod, g.ComputeProtocolDelay, g.node.clock)
-	g.state.protocolRateChannel = schedule(g.AdjustProtocolRate, func() time.Duration {
+	g.state.protocolPeriodStop, g.state.protocolPeriodWait = schedule(g.ProtocolPeriod, g.ComputeProtocolDelay, g.node.clock)
+	g.state.protocolRateChannel, _ = schedule(g.AdjustProtocolRate, func() time.Duration {
 		return time.Second
 	}, g.node.clock)
 
@@ -151,8 +152,11 @@ func (g *gossip) Stop() {
 	g.state.running = false
 
 	// stop background execution of running tasks
-	close(g.state.protocolPeriodChannel)
+	close(g.state.protocolPeriodStop)
 	close(g.state.protocolRateChannel)
+
+	// wait for the goroutine to be stopped
+	_ = <-g.state.protocolPeriodWait
 
 	g.logger.Debug("stopped gossip protocol")
 }
