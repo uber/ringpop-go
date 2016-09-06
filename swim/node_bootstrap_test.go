@@ -87,6 +87,9 @@ func (s *BootstrapTestSuite) TestJoinHandlerNotMakingAlive() {
 
 	s.tnode.node.Bootstrap(&BootstrapOptions{
 		DiscoverProvider: statichosts.New(bootstrapList...),
+		// prevent the gossip protocol from disseminating its own aliveness which
+		// would cause the test to be flappy
+		Stopped: true,
 	})
 
 	// test that there are no changes to disseminate after the bootstrapping of a host
