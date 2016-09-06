@@ -176,6 +176,24 @@ func waitForConvergenceNodes(t *testing.T, maxIterations int, nodes ...*Node) {
 		return
 	}
 
+	// mark which nodes were gossiping and stop them from gossiping
+	wasGossiping := make([]bool, len(nodes))
+	for i, node := range nodes {
+		wasGossiping[i] = !node.gossip.Stopped()
+		if wasGossiping[i] {
+			node.gossip.Stop()
+		}
+	}
+
+	// after the forceful convergence start all nodes that were gossiping before
+	defer func() {
+		for i, shouldStart := range wasGossiping {
+			if shouldStart {
+				nodes[i].gossip.Start()
+			}
+		}
+	}()
+
 Tick:
 	maxIterations--
 	// return when deadline is reached
