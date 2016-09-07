@@ -41,12 +41,6 @@ type EventsTestSuite struct {
 	e emittingEventRegistrar
 }
 
-func (s *EventsTestSuite) SetupTest() {
-}
-
-func (s *EventsTestSuite) TearDownTest() {
-}
-
 func (s *EventsTestSuite) TestEventListenerRegistration() {
 	var wg1 sync.WaitGroup
 	var wg2 sync.WaitGroup

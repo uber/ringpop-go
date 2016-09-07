@@ -22,7 +22,6 @@ package events
 
 import (
 	"sync"
-
 	"time"
 )
 
