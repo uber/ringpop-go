@@ -137,8 +137,8 @@ func signalHandler(rp *ringpop.Ringpop, interactive bool) {
 	signal.Notify(sigchan, s)
 
 	// wait on a signal
-	<-sigchan
-	log.Println("received signal, initiating self eviction")
+	receivedSignal := <-sigchan
+	log.Printf("received signal %q, initiating self eviction\n", receivedSignal)
 
 	if interactive {
 		log.Error("triggered graceful shutdown. Press Ctrl+C again to force exit.")
@@ -146,11 +146,15 @@ func signalHandler(rp *ringpop.Ringpop, interactive bool) {
 			// exit on second signal
 			<-sigchan
 			log.Error("Force exiting...")
-			os.Exit(1)
+			os.Exit(2)
 		}()
 	}
 
-	rp.SelfEvict()
+	err := rp.SelfEvict()
+	if err != nil {
+		log.Errorf("Error during self-eviction: %v\n", err)
+		os.Exit(1)
+	}
 
 	os.Exit(0)
 }

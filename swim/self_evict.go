@@ -44,7 +44,14 @@ var (
 // SelfEvict defines the functions that interact with the self eviction of nodes
 // from the membership prior to shutting down
 type SelfEvict interface {
+	// RegisterSelfEvictHook is used to register a SelfEvictHook interface to be
+	// called during the shutting down of ringpop. Hooks can't be registered
+	// after the self eviction has started.
 	RegisterSelfEvictHook(hooks SelfEvictHook) error
+
+	// SelfEvict should be called before shutting down the application to notify
+	// the members of the membership that this node is going down and should not
+	// receive reqeusts anymore.
 	SelfEvict() error
 }
 
@@ -121,6 +128,10 @@ func newSelfEvict(node *Node, options SelfEvictOptions) *selfEvict {
 
 // RegisterSelfEvictHook registers a named pre/post eviction hook pair.
 func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
+	if s.currentPhase() != nil {
+		return ErrSelfEvictionInProgress
+	}
+
 	name := hook.Name()
 
 	_, hasHook := s.hooks[name]

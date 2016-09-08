@@ -61,8 +61,9 @@ type Interface interface {
 	HandleOrForward(key string, request []byte, response *[]byte, service, endpoint string, format tchannel.Format, opts *forward.Options) (bool, error)
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
 
-	// extend the functionality of self eviction to ringpop
-	// Mockery didn't allow me to embed the interface so we make things WET here
+	// swim.SelfEvict
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
 	RegisterSelfEvictHook(hooks swim.SelfEvictHook) error
 	SelfEvict() error
 }
@@ -347,9 +348,12 @@ func (rp *Ringpop) setState(s state) {
 }
 
 // RegisterSelfEvictHook registers the eviction hooks that need to be executed
-// before and after self eviction from the membership. It will return an error
-// when ringpop has not been bootstrapped or when the hooks cannot be registered
-// with the membership protocol.
+// before and after self eviction from the membership. An error will be returned
+// if ringpop was unable to register the hooks. This could happen in the following
+// cases:
+// - Ringpop has not been bootstrapped yet
+// - SelfEvict has already been called
+// - The hook was already registered
 func (rp *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
 	if !rp.Ready() {
 		return ErrNotBootstrapped
