@@ -280,14 +280,14 @@ func (s *RingpopOptionsTestSuite) TestSelfEvictOptions() {
 		result  swim.SelfEvictOptions
 	}{
 		{[]Option{
-			SelfEvictPingDisable(false),
+			SelfEvictDisablePing(false),
 		}, swim.SelfEvictOptions{
-			PingDisable: false,
+			DisablePing: false,
 		}},
 		{[]Option{
-			SelfEvictPingDisable(true),
+			SelfEvictDisablePing(true),
 		}, swim.SelfEvictOptions{
-			PingDisable: true,
+			DisablePing: true,
 		}},
 
 		{[]Option{
@@ -296,17 +296,17 @@ func (s *RingpopOptionsTestSuite) TestSelfEvictOptions() {
 			PingRatio: .2,
 		}},
 		{[]Option{
-			SelfEvictPingDisable(false),
+			SelfEvictDisablePing(false),
 			SelfEvictPingRatio(.3),
 		}, swim.SelfEvictOptions{
-			PingDisable: false,
+			DisablePing: false,
 			PingRatio:   .3,
 		}},
 		{[]Option{
-			SelfEvictPingDisable(true),
+			SelfEvictDisablePing(true),
 			SelfEvictPingRatio(.4),
 		}, swim.SelfEvictOptions{
-			PingDisable: true,
+			DisablePing: true,
 			PingRatio:   .4,
 		}},
 	}

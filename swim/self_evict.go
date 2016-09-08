@@ -50,13 +50,13 @@ type hookFn func(SelfEvictHook)
 // configure if ringpop should proactively ping members of the network on self
 // eviction and what percentage/ratio of the memberlist should be pinged at most
 type SelfEvictOptions struct {
-	PingDisable bool
+	DisablePing bool
 	PingRatio   float64
 }
 
 func mergeSelfEvictOptions(opt, def SelfEvictOptions) SelfEvictOptions {
 	return SelfEvictOptions{
-		PingDisable: util.SelectBool(opt.PingDisable, def.PingDisable),
+		DisablePing: util.SelectBool(opt.DisablePing, def.DisablePing),
 		PingRatio:   util.SelectFloat(opt.PingRatio, def.PingRatio),
 	}
 }
@@ -140,7 +140,7 @@ func (s *selfEvict) evict() {
 	phase := s.transitionTo(evicting)
 	s.node.memberlist.SetLocalStatus(Faulty)
 
-	if s.options.PingDisable == false {
+	if s.options.DisablePing == false {
 		numberOfPingableMembers := s.node.memberlist.NumPingableMembers()
 		maxNumberOfPings := int(math.Ceil(float64(numberOfPingableMembers) * s.options.PingRatio))
 

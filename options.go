@@ -283,11 +283,11 @@ func TombstonePeriod(period time.Duration) Option {
 	}
 }
 
-// SelfEvictPingDisable configures if ringpop should disable actively pinging
+// SelfEvictDisablePing configures if ringpop should disable actively pinging
 // other members when it evicts itself from the network
-func SelfEvictPingDisable(disable bool) Option {
+func SelfEvictDisablePing(disabled bool) Option {
 	return func(r *Ringpop) error {
-		r.config.SelfEvict.PingDisable = disable
+		r.config.SelfEvict.DisablePing = disabled
 		return nil
 	}
 }
