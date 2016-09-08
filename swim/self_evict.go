@@ -151,9 +151,11 @@ func (s *selfEvict) SelfEvict() error {
 
 	s.logger.Info("ringpop is initiating self eviction sequence")
 
-	// this starts the shutdown sequence, when it returns the complete sequence
-	// has been executed
+	// these are the phases executed in order.
 	s.preEvict()
+	s.evict()
+	s.postEvict()
+	s.done()
 
 	return nil
 }
@@ -161,9 +163,6 @@ func (s *selfEvict) SelfEvict() error {
 func (s *selfEvict) preEvict() {
 	s.transitionTo(preEvict)
 	s.runHooks(SelfEvictHook.PreEvict)
-
-	// next phase
-	s.evict()
 }
 
 func (s *selfEvict) evict() {
@@ -209,17 +208,11 @@ func (s *selfEvict) evict() {
 			"numberOfSuccessfulPings": phase.numberOfSuccessfulPings,
 		}).Debug("finished proactive gossip on self evict")
 	}
-
-	// next phase
-	s.postEvict()
 }
 
 func (s *selfEvict) postEvict() {
 	s.transitionTo(postEvict)
 	s.runHooks(SelfEvictHook.PostEvict)
-
-	// next phase
-	s.done()
 }
 
 func (s *selfEvict) done() {
