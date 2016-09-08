@@ -1,3 +1,23 @@
+// Copyright (c) 2016 Uber Technologies, Inc.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 package swim
 
 import (
@@ -7,9 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber/ringpop-go/util"
-
 	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/util"
 )
 
 var (
@@ -17,9 +36,9 @@ var (
 	// been registered.
 	ErrDuplicateHook = errors.New("expected hook name to be unique")
 
-	// ErrEvictionInProgress is returned when ringpop is already in the process
-	// of evicting
-	ErrEvictionInProgress = errors.New("ringpop is already executing an eviction")
+	// ErrSelfEvictionInProgress is returned when ringpop is already in the process
+	// of evicting itself from the network.
+	ErrSelfEvictionInProgress = errors.New("ringpop is already executing a self-eviction")
 )
 
 // SelfEvict defines the functions that interact with the self eviction of nodes
@@ -32,7 +51,7 @@ type SelfEvict interface {
 // SelfEvictHook is an interface describing a module that can be registered to
 // the self eviction hooks
 type SelfEvictHook interface {
-	// Name returns the name under which the eviction should be regitered
+	// Name returns the name under which the eviction should be registered
 	Name() string
 
 	// PreEvict is the hook that will be called before ringpop evicts itself
@@ -40,7 +59,7 @@ type SelfEvictHook interface {
 	PreEvict()
 
 	// PostEvict is the hook that will be called after ringpop has evicted
-	// itsels from them memership
+	// itself from them memership
 	PostEvict()
 }
 
@@ -116,7 +135,7 @@ func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
 
 func (s *selfEvict) SelfEvict() error {
 	if s.currentPhase() != nil {
-		return ErrEvictionInProgress
+		return ErrSelfEvictionInProgress
 	}
 
 	s.logger.Info("ringpop is initiating self eviction sequence")

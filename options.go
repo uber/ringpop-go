@@ -284,7 +284,11 @@ func TombstonePeriod(period time.Duration) Option {
 }
 
 // SelfEvictDisablePing configures if ringpop should disable actively pinging
-// other members when it evicts itself from the network
+// other members when it evicts itself from the network. It is not advised to
+// disable the ping as it might cause the suspicion time to still kick in since
+// the chances are high that the node will be shutdown before its self eviction
+// is gossiped. Only use this setting if you explicitly require no extra network
+// traffic during shutdown.
 func SelfEvictDisablePing(disabled bool) Option {
 	return func(r *Ringpop) error {
 		r.config.SelfEvict.DisablePing = disabled
@@ -294,6 +298,14 @@ func SelfEvictDisablePing(disabled bool) Option {
 
 // SelfEvictPingRatio configures the maximum percentage/ratio of the members to
 // actively ping while self evicting.
+// A bigger ratio would allow for bigger batch sizes during restarts without the
+// self eviction being lost due to all nodes having the knowledge going down at
+// the same time.
+// A smaller ratio will cause less network traffic and therefore slightly faster
+// shutdown times.
+// A ratio that exceeds 1 will be capped to one when the self eviction is
+// executed as it does not make sense to send the gossip to the same node twice.
+// A negative value will cause no pings to be sent out during self eviction.
 func SelfEvictPingRatio(ratio float64) Option {
 	return func(r *Ringpop) error {
 		r.config.SelfEvict.PingRatio = ratio

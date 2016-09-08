@@ -357,7 +357,7 @@ func (rp *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
 	return rp.node.RegisterSelfEvictHook(hooks)
 }
 
-// SelfEvict can be called before shutting down the application. When calling
+// SelfEvict should be called before shutting down the application. When calling
 // this function ringpop will gracefully evict itself from the network. Utilities
 // that hook into ringpop will have the opportunity to hook into this system to
 // gracefully handle the shutdown of ringpop.
