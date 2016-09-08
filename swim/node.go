@@ -154,8 +154,9 @@ type NodeInterface interface {
 	Ready() bool
 	RegisterListener(l events.EventListener)
 
-	// extend the functionality of self eviction to a node
-	// Mockery didn't allow me to embed the interface so we make things WET here
+	// swim.SelfEvict
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
 	RegisterSelfEvictHook(hooks SelfEvictHook) error
 	SelfEvict() error
 }

@@ -297,15 +297,13 @@ func SelfEvictDisablePing(disabled bool) Option {
 }
 
 // SelfEvictPingRatio configures the maximum percentage/ratio of the members to
-// actively ping while self evicting.
-// A bigger ratio would allow for bigger batch sizes during restarts without the
-// self eviction being lost due to all nodes having the knowledge going down at
-// the same time.
-// A smaller ratio will cause less network traffic and therefore slightly faster
-// shutdown times.
-// A ratio that exceeds 1 will be capped to one when the self eviction is
-// executed as it does not make sense to send the gossip to the same node twice.
-// A negative value will cause no pings to be sent out during self eviction.
+// actively ping while self evicting. A bigger ratio would allow for bigger
+// batch sizes during restarts without the self eviction being lost due to all
+// nodes having the knowledge going down at the same time. A smaller ratio will
+// cause less network traffic and therefore slightly faster shutdown times. A
+// ratio that exceeds 1 will be capped to one when the self eviction is executed
+// as it does not make sense to send the gossip to the same node twice. A
+// negative value will cause no pings to be sent out during self eviction.
 func SelfEvictPingRatio(ratio float64) Option {
 	return func(r *Ringpop) error {
 		r.config.SelfEvict.PingRatio = ratio
