@@ -34,38 +34,51 @@ type EventListener interface {
 	HandleEvent(event Event)
 }
 
-// EventEmitter describes an interface that can be used to emit events
+// EventEmitter can add and remove listeners which will be invoked when an event
+// is emitted.
 type EventEmitter interface {
+	// AddListener adds a listener that will be invoked when an evemit is
+	// emitted via EmitEvent. The value returned indicates if the listener have
+	// been added or not. The operation will not fail, but a listener will only
+	// be added once.
+	AddListener(EventListener) bool
+
+	// RemoveListener removes a listener and prevents it being invoked in
+	// subsequent emitted events. The return value indicates if a value has been
+	// removed or not.
+	RemoveListener(EventListener) bool
+
+	// EmitEvent invokes all the listeners that are registered with the
+	// EventEmitter
 	EmitEvent(Event)
 }
 
-// EventRegistrar is an object that you can register EventListeners on.
-type EventRegistrar interface {
-	AddListener(EventListener)
-	RemoveListener(EventListener)
-}
-
-type baseEventRegistrar struct {
-	lock      sync.RWMutex
-	listeners []EventListener
+type sharedEventEmitter struct {
+	// listeners is a slice keeping all added EvenListener interfaces. The slice
+	// is only assinged, but never altered in place. When the slice is accessed
+	// an approriate lock needs to be aquired on listenersLock. After reading
+	// the slice it is safe to release the lock because the underlying array is
+	// never changed in place.
+	listeners     []EventListener
+	listenersLock sync.RWMutex
 }
 
 // AddListener adds a listener to the Event Registar. Events emitted on this
 // registar will be invoked on the listener
-func (a *baseEventRegistrar) AddListener(l EventListener) {
+func (a *sharedEventEmitter) AddListener(l EventListener) bool {
 	if l == nil {
 		// do not register nil listener, will cause nil pointer dereference during
 		// event emitting
-		return
+		return false
 	}
 
-	a.lock.Lock()
-	defer a.lock.Unlock()
+	a.listenersLock.Lock()
+	defer a.listenersLock.Unlock()
 
 	// Check if listener is already registered
 	for _, listener := range a.listeners {
 		if listener == l {
-			return
+			return false
 		}
 	}
 
@@ -78,13 +91,15 @@ func (a *baseEventRegistrar) AddListener(l EventListener) {
 	listenersCopy = append(listenersCopy, l)
 
 	a.listeners = listenersCopy
+
+	return true
 }
 
 // RemoveListener removes a listener from the Event Registar. Subsequent calls
 // to EmitEvent will not cause HandleEvent to be called on this listener.
-func (a *baseEventRegistrar) RemoveListener(l EventListener) {
-	a.lock.Lock()
-	defer a.lock.Unlock()
+func (a *sharedEventEmitter) RemoveListener(l EventListener) bool {
+	a.listenersLock.Lock()
+	defer a.listenersLock.Unlock()
 
 	for i := range a.listeners {
 		if a.listeners[i] == l {
@@ -93,37 +108,44 @@ func (a *baseEventRegistrar) RemoveListener(l EventListener) {
 			listenersCopy = append(listenersCopy, a.listeners[:i]...)
 			listenersCopy = append(listenersCopy, a.listeners[i+1:]...)
 			a.listeners = listenersCopy
-			break
+
+			return true
 		}
 	}
+
+	return false
 }
 
 // AsyncEventEmitter is an implementation of both an EventRegistar and EventEmitter
 // that emits events in their own go routine.
 type AsyncEventEmitter struct {
-	baseEventRegistrar
+	sharedEventEmitter
 }
 
 // EmitEvent will send the event to all registered listeners
 func (a *AsyncEventEmitter) EmitEvent(event Event) {
-	a.lock.RLock()
+	a.listenersLock.RLock()
 	for _, listener := range a.listeners {
 		go listener.HandleEvent(event)
 	}
-	a.lock.RUnlock()
+	a.listenersLock.RUnlock()
 }
 
 // SyncEventEmitter is an implementation of both an EventRegistar and EventEmitter
 // that emits events in the calling go routine.
 type SyncEventEmitter struct {
-	baseEventRegistrar
+	sharedEventEmitter
 }
 
 // EmitEvent will send the event to all registered listeners
 func (a *SyncEventEmitter) EmitEvent(event Event) {
-	a.lock.RLock()
+	// we copy the slice to a local variable before calling the listeners. This
+	// makes it possible for the listener to remove itself during its invocation
+	// without running into a deadlock. Since the underlying array is immutable
+	// (by convention) reading it without the lock is safe to do
+	a.listenersLock.RLock()
 	listeners := a.listeners
-	a.lock.RUnlock()
+	a.listenersLock.RUnlock()
 
 	for _, listener := range listeners {
 		listener.HandleEvent(event)

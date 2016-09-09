@@ -65,8 +65,8 @@ type Interface interface {
 	// events.EventRegistar
 	// mockery has troubles generating a working mock when the interface is
 	// embedded therefore the definitions are copied here.
-	AddListener(events.EventListener)
-	RemoveListener(events.EventListener)
+	AddListener(events.EventListener) bool
+	RemoveListener(events.EventListener) bool
 
 	// DEPRECATED, use AddListener (!) kept around for backwards compatibility
 	// but will start logging warnings
