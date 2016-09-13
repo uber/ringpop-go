@@ -22,11 +22,9 @@ install:
   - make setup
 
 env:
-  - RUN="make lint"
-  - RUN="make test-unit"
+  - RUN="make test-unit test-examples lint coveralls"
   - RUN="make test-integration"
   - RUN="make test-race"
-  - RUN="make test-examples"
 
 matrix:
   allow_failures:
@@ -36,9 +34,6 @@ matrix:
 
 script:
   - test/travis
-
-after_success:
-  - test/update-coveralls
 
 cache:
   directories:
