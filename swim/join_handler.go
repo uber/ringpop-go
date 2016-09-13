@@ -50,7 +50,7 @@ func validateSourceApp(node *Node, sourceApp string) error {
 }
 
 func handleJoin(node *Node, req *joinRequest) (*joinResponse, error) {
-	node.emit(JoinReceiveEvent{
+	node.EmitEvent(JoinReceiveEvent{
 		Local:  node.Address(),
 		Source: req.Source,
 	})

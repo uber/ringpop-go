@@ -355,12 +355,12 @@ func (c *swimCluster) Nodes() []*Node {
 // - and then wait for a specific event.
 //
 // This function helps with making the code read like the latter.
-func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
+func DoThenWaitFor(f func(), er events.EventEmitter, t interface{}) {
 	block := make(chan struct{}, 1)
 
 	var once sync.Once
 
-	er.RegisterListener(on(t, func(e events.Event) {
+	er.AddListener(on(t, func(e events.Event) {
 		once.Do(func() {
 			block <- struct{}{}
 		})

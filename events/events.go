@@ -20,7 +20,10 @@
 
 package events
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // Event is an empty interface that is type switched when handeled.
 type Event interface{}
@@ -31,9 +34,126 @@ type EventListener interface {
 	HandleEvent(event Event)
 }
 
-// EventRegistrar is an object that you can register EventListeners on.
-type EventRegistrar interface {
-	RegisterListener(EventListener)
+// EventEmitter can add and remove listeners which will be invoked when an event
+// is emitted.
+type EventEmitter interface {
+	// AddListener adds a listener that will be invoked when an evemit is
+	// emitted via EmitEvent. The value returned indicates if the listener have
+	// been added or not. The operation will not fail, but a listener will only
+	// be added once.
+	AddListener(EventListener) bool
+
+	// RemoveListener removes a listener and prevents it being invoked in
+	// subsequent emitted events. The return value indicates if a value has been
+	// removed or not.
+	RemoveListener(EventListener) bool
+
+	// EmitEvent invokes all the listeners that are registered with the
+	// EventEmitter
+	EmitEvent(Event)
+}
+
+type sharedEventEmitter struct {
+	// listeners is a slice keeping all added EvenListener interfaces. The slice
+	// is only assinged, but never altered in place. When the slice is accessed
+	// an approriate lock needs to be aquired on listenersLock. After reading
+	// the slice it is safe to release the lock because the underlying array is
+	// never changed in place.
+	listeners     []EventListener
+	listenersLock sync.RWMutex
+}
+
+// AddListener adds a listener to the EventEmitter. Events emitted on this
+// emitter will be invoked on the listener. The return value indicates if the
+// listener has been added or not. It can't be added if it is already added and
+// therefore registered to receive events
+func (a *sharedEventEmitter) AddListener(l EventListener) bool {
+	if l == nil {
+		// do not register nil listener, will cause nil pointer dereference during
+		// event emitting
+		return false
+	}
+
+	a.listenersLock.Lock()
+	defer a.listenersLock.Unlock()
+
+	// Check if listener is already registered
+	for _, listener := range a.listeners {
+		if listener == l {
+			return false
+		}
+	}
+
+	// by making a copy the backing array will never be changed after its creation.
+	// this allowes to copy the slice while locked but iterate while not locked
+	// preventing deadlocks when listeners are added/removed in the handler of a
+	// listener
+	listenersCopy := make([]EventListener, 0, len(a.listeners)+1)
+	listenersCopy = append(listenersCopy, a.listeners...)
+	listenersCopy = append(listenersCopy, l)
+
+	a.listeners = listenersCopy
+
+	return true
+}
+
+// RemoveListener removes a listener from the EventEmitter. Subsequent calls to
+// EmitEvent will not cause HandleEvent to be called on this listener. The
+// return value indicates if a listener has been removed or not. The listener
+// can't be removed if it was not present before.
+func (a *sharedEventEmitter) RemoveListener(l EventListener) bool {
+	a.listenersLock.Lock()
+	defer a.listenersLock.Unlock()
+
+	for i := range a.listeners {
+		if a.listeners[i] == l {
+			// create a new list excluding the listener that needs removal
+			listenersCopy := make([]EventListener, 0, len(a.listeners)-1)
+			listenersCopy = append(listenersCopy, a.listeners[:i]...)
+			listenersCopy = append(listenersCopy, a.listeners[i+1:]...)
+			a.listeners = listenersCopy
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// AsyncEventEmitter is an implementation of both an EventRegistar and EventEmitter
+// that emits events in their own go routine.
+type AsyncEventEmitter struct {
+	sharedEventEmitter
+}
+
+// EmitEvent will send the event to all registered listeners
+func (a *AsyncEventEmitter) EmitEvent(event Event) {
+	a.listenersLock.RLock()
+	for _, listener := range a.listeners {
+		go listener.HandleEvent(event)
+	}
+	a.listenersLock.RUnlock()
+}
+
+// SyncEventEmitter is an implementation of both an EventRegistar and EventEmitter
+// that emits events in the calling go routine.
+type SyncEventEmitter struct {
+	sharedEventEmitter
+}
+
+// EmitEvent will send the event to all registered listeners
+func (a *SyncEventEmitter) EmitEvent(event Event) {
+	// we copy the slice to a local variable before calling the listeners. This
+	// makes it possible for the listener to remove itself during its invocation
+	// without running into a deadlock. Since the underlying array is immutable
+	// (by convention) reading it without the lock is safe to do
+	a.listenersLock.RLock()
+	listeners := a.listeners
+	a.listenersLock.RUnlock()
+
+	for _, listener := range listeners {
+		listener.HandleEvent(event)
+	}
 }
 
 // A RingChangedEvent is sent when servers are added and/or removed from the ring

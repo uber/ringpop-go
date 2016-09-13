@@ -21,6 +21,7 @@
 package ringpop
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -116,9 +117,6 @@ func (s *RingpopTestSuite) SetupTest() {
 }
 
 func (s *RingpopTestSuite) TearDownTest() {
-	// remove listeners during teardown
-	s.ringpop.listeners = nil
-
 	s.channel.Close()
 	s.ringpop.Destroy()
 
@@ -172,6 +170,25 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 	}
 }
 
+func (s *RingpopTestSuite) TestEventPropagation() {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	l := &eventsmocks.EventListener{}
+	l.On("HandleEvent", struct{}{}).Run(func(args mock.Arguments) {
+		wg.Done()
+	})
+
+	s.ringpop.AddListener(l)
+	defer s.ringpop.RemoveListener(l)
+
+	s.ringpop.HandleEvent(struct{}{})
+
+	// wait for the event being fired asynchronous
+	wg.Wait()
+
+	l.AssertCalled(s.T(), "HandleEvent", struct{}{})
+}
+
 func (s *RingpopTestSuite) TestHandleEvents() {
 	// Fake bootstrap
 	s.ringpop.init()
@@ -180,7 +197,8 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.ringpop.statter = stats
 
 	listener := &dummyListener{}
-	s.ringpop.RegisterListener(listener)
+	s.ringpop.AddListener(listener)
+	defer s.ringpop.RemoveListener(listener)
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
 		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
@@ -775,7 +793,8 @@ func (s *RingpopTestSuite) TestReadyEvent() {
 	l.On("HandleEvent", events.Ready{}).Return().Once().Run(func(args mock.Arguments) {
 		called <- true
 	})
-	s.ringpop.RegisterListener(l)
+	s.ringpop.AddListener(l)
+	defer s.ringpop.RemoveListener(l)
 
 	s.ringpop.setState(ready)
 
@@ -798,7 +817,8 @@ func (s *RingpopTestSuite) TestDestroyedEvent() {
 	l.On("HandleEvent", events.Destroyed{}).Return().Once().Run(func(args mock.Arguments) {
 		called <- true
 	})
-	s.ringpop.RegisterListener(l)
+	s.ringpop.AddListener(l)
+	defer s.ringpop.RemoveListener(l)
 
 	s.ringpop.setState(destroyed)
 
@@ -845,7 +865,8 @@ func (s *RingpopTestSuite) TestRingIsConstructedWhenStateReady() {
 	})
 	l.On("HandleEvent", mock.Anything).Return()
 
-	rp2.RegisterListener(l)
+	rp2.AddListener(l)
+	defer rp2.RemoveListener(l)
 
 	_, err = rp2.Bootstrap(&swim.BootstrapOptions{
 		DiscoverProvider: statichosts.New(me1),

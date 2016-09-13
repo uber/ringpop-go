@@ -31,7 +31,7 @@ import "time"
 //
 // Check out ringpop-common/docs for a full description of the algorithm.
 func AttemptHeal(node *Node, target string) ([]string, error) {
-	node.emit(AttemptHealEvent{})
+	node.EmitEvent(AttemptHealEvent{})
 	node.logger.WithField("target", target).Info("attempt heal")
 
 	// If join request succeeds a partition is detected,

@@ -149,11 +149,15 @@ type NodeInterface interface {
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
-	RegisterListener(l events.EventListener)
+
+	AddListener(events.EventListener) bool
+	RemoveListener(events.EventListener) bool
 }
 
 // A Node is a SWIM member
 type Node struct {
+	events.SyncEventEmitter
+
 	app     string
 	service string
 	address string
@@ -180,8 +184,6 @@ type Node struct {
 	pingRequestSize int
 
 	maxReverseFullSyncJobs int
-
-	listeners []events.EventListener
 
 	clientRate metrics.Meter
 	serverRate metrics.Meter
@@ -278,20 +280,6 @@ func (n *Node) Incarnation() int64 {
 		return incarnation
 	}
 	return -1
-}
-
-func (n *Node) emit(event interface{}) {
-	for _, listener := range n.listeners {
-		listener.HandleEvent(event)
-	}
-}
-
-// RegisterListener adds an EventListener to the node. When a swim event e is
-// emitted, l.HandleEvent(e) is called for every registered listener l.
-// Attention, all listeners are called synchronously. Be careful with
-// registering blocking and other slow calls.
-func (n *Node) RegisterListener(l events.EventListener) {
-	n.listeners = append(n.listeners, l)
 }
 
 // Start starts the SWIM protocol and all sub-protocols.

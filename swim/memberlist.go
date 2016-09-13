@@ -103,7 +103,7 @@ func (m *memberlist) ComputeChecksum() {
 		}).Debug("ringpop membership computed new checksum")
 	}
 
-	m.node.emit(ChecksumComputeEvent{
+	m.node.EmitEvent(ChecksumComputeEvent{
 		Duration:    time.Now().Sub(startTime),
 		Checksum:    checksum,
 		OldChecksum: oldChecksum,
@@ -263,17 +263,17 @@ func (m *memberlist) bumpIncarnation() Change {
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Alive})
+	m.node.EmitEvent(MakeNodeStatusEvent{Alive})
 	return m.MakeChange(address, incarnation, Alive)
 }
 
 func (m *memberlist) MakeSuspect(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Suspect})
+	m.node.EmitEvent(MakeNodeStatusEvent{Suspect})
 	return m.MakeChange(address, incarnation, Suspect)
 }
 
 func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Faulty})
+	m.node.EmitEvent(MakeNodeStatusEvent{Faulty})
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
@@ -419,7 +419,7 @@ func (m *memberlist) postLocalUpdate() {
 // changes that have been applied to the memberlist. It can be used to test if the
 // tombstone declaration has been executed atleast to the local memberlist.
 func (m *memberlist) MakeTombstone(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Tombstone})
+	m.node.EmitEvent(MakeNodeStatusEvent{Tombstone})
 	return m.MakeChange(address, incarnation, Tombstone)
 }
 
@@ -478,7 +478,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		changes[i] = change.validateIncoming()
 	}
 
-	m.node.emit(MemberlistChangesReceivedEvent{changes})
+	m.node.EmitEvent(MemberlistChangesReceivedEvent{changes})
 
 	m.Lock()
 
@@ -501,7 +501,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				// countered by increasing the incarnation number and gossip the
 				// new state to the network.
 				change = m.bumpIncarnation()
-				m.node.emit(RefuteUpdateEvent{})
+				m.node.EmitEvent(RefuteUpdateEvent{})
 			} else {
 				// otherwise it can be applied to the memberlist
 
@@ -542,7 +542,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			}
 		}
 
-		m.node.emit(MemberlistChangesAppliedEvent{
+		m.node.EmitEvent(MemberlistChangesAppliedEvent{
 			Changes:     applied,
 			OldChecksum: oldChecksum,
 			NewChecksum: m.Checksum(),

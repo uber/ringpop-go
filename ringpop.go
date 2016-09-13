@@ -50,7 +50,6 @@ type Interface interface {
 	App() string
 	WhoAmI() (string, error)
 	Uptime() (time.Duration, error)
-	RegisterListener(l events.EventListener)
 	Bootstrap(opts *swim.BootstrapOptions) ([]string, error)
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
@@ -62,11 +61,24 @@ type Interface interface {
 	Forward(dest string, keys []string, request []byte, service, endpoint string, format tchannel.Format, opts *forward.Options) ([]byte, error)
 
 	Labels() (*swim.NodeLabels, error)
+
+	// events.EventRegistar
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
+	AddListener(events.EventListener) bool
+	RemoveListener(events.EventListener) bool
+
+	// DEPRECATED, use AddListener (!) kept around for backwards compatibility
+	// but will start logging warnings
+	RegisterListener(events.EventListener)
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
 // changes around the ring.
 type Ringpop struct {
+	// make ringpop an event Emitter
+	events.AsyncEventEmitter
+
 	config         *configuration
 	configHashRing *hashring.Configuration
 
@@ -82,8 +94,6 @@ type Ringpop struct {
 	node       swim.NodeInterface
 	ring       *hashring.HashRing
 	forwarder  *forward.Forwarder
-
-	listeners []events.EventListener
 
 	statter log.StatsReporter
 	stats   struct {
@@ -176,10 +186,10 @@ func (rp *Ringpop) init() error {
 		Clock:         rp.clock,
 		LabelLimits:   rp.config.LabelLimits,
 	})
-	rp.node.RegisterListener(rp)
+	rp.node.AddListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
-	rp.ring.RegisterListener(rp)
+	rp.ring.AddListener(rp)
 
 	// add all members present in the membership of the node on startup.
 	for _, member := range rp.node.GetReachableMembers() {
@@ -187,7 +197,7 @@ func (rp *Ringpop) init() error {
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
-	rp.forwarder.RegisterListener(rp)
+	rp.forwarder.AddListener(rp)
 
 	rp.startTimers()
 	rp.setState(initialized)
@@ -304,16 +314,15 @@ func (rp *Ringpop) Uptime() (time.Duration, error) {
 	return time.Now().Sub(rp.startTime), nil
 }
 
-func (rp *Ringpop) emit(event interface{}) {
-	for _, listener := range rp.listeners {
-		go listener.HandleEvent(event)
-	}
-}
-
-// RegisterListener adds a listener to the ringpop. The listener's HandleEvent method
-// should be thread safe.
+// RegisterListener is DEPRECATED, use AddListener. This function is kept around
+// for the time being to make sure that ringpop is a drop in replacement for
+// now. It should not be used by new projects, to accomplish this it will log a
+// warning message that the developer can understand. A release in the future
+// will remove this function completely which will cause a breaking change to
+// the ringpop public interface.
 func (rp *Ringpop) RegisterListener(l events.EventListener) {
-	rp.listeners = append(rp.listeners, l)
+	rp.logger.Warn("RegisterListener is deprecated, use AddListener")
+	rp.AddListener(l)
 }
 
 // getState gets the state of the current Ringpop instance.
@@ -336,9 +345,9 @@ func (rp *Ringpop) setState(s state) {
 	if oldState != s {
 		switch s {
 		case ready:
-			rp.emit(events.Ready{})
+			rp.EmitEvent(events.Ready{})
 		case destroyed:
-			rp.emit(events.Destroyed{})
+			rp.EmitEvent(events.Destroyed{})
 		}
 	}
 }
@@ -399,7 +408,7 @@ func (rp *Ringpop) Ready() bool {
 
 // HandleEvent is used to satisfy the swim.EventListener interface. No touchy.
 func (rp *Ringpop) HandleEvent(event events.Event) {
-	rp.emit(event)
+	rp.EmitEvent(event)
 
 	switch event := event.(type) {
 	case swim.MemberlistChangesReceivedEvent:
@@ -607,7 +616,7 @@ func (rp *Ringpop) Lookup(key string) (string, error) {
 	duration := time.Now().Sub(startTime)
 	rp.statter.RecordTimer(rp.getStatKey("lookup"), nil, duration)
 
-	rp.emit(events.LookupEvent{
+	rp.EmitEvent(events.LookupEvent{
 		Key:      key,
 		Duration: duration,
 	})
@@ -635,7 +644,7 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	duration := time.Now().Sub(startTime)
 	rp.statter.RecordTimer(rp.getStatKey(fmt.Sprintf("lookupn.%d", n)), nil, duration)
 
-	rp.emit(events.LookupNEvent{
+	rp.EmitEvent(events.LookupNEvent{
 		Key:      key,
 		N:        n,
 		Duration: duration,
