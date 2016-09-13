@@ -30,10 +30,6 @@ mockery -name NodeInterface -recursive -print \
 
 mockery -case=underscore -dir router -recursive -output "$mock_directory" -name ClientFactory
 
-# make a EventListenerMock for forward (can't use on from $mock_directory because of circular dependency)
-mockery -name EventListener -dir events -recursive -print \
-    |sed 's/package mocks/package forward/g' \
-    > "${0%/*}/../forward/mock_event_listener_test.go"
 mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -print \
     | sed 's/package mocks/package forward/g' \
     > "${0%/*}/../forward/mock_logger_test.go"

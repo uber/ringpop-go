@@ -28,23 +28,12 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type emittingEventRegistrar interface {
-	EventEmitter
-	EventRegistrar
-}
-
 type testEvent struct{}
 
 type EventsTestSuite struct {
 	suite.Suite
 
-	e emittingEventRegistrar
-}
-
-func (s *EventsTestSuite) SetupTest() {
-}
-
-func (s *EventsTestSuite) TearDownTest() {
+	e EventEmitter
 }
 
 func (s *EventsTestSuite) TestEventListenerRegistration() {
@@ -94,20 +83,36 @@ func (s *EventsTestSuite) TestEventListenerRegistration() {
 }
 
 func (s *EventsTestSuite) TestRegisterNilListener() {
-	s.e.AddListener(nil)
+	added := s.e.AddListener(nil)
+	s.Assert().False(added, "expected a nil listener to not be added")
+
+	// this is to test that there is no nil pointer dereference when emitting a
+	// value after a nil listener has been added
+	s.e.EmitEvent(testEvent{})
+}
+
+func (s *EventsTestSuite) TestEmitEventWithNoListener() {
+	// test and make sure that emitting to an empty event listener works.
 	s.e.EmitEvent(testEvent{})
 }
 
 func (s *EventsTestSuite) TestDeregisterUnregisteredListener() {
 	unregistered := &MockEventListener{}
-	s.e.RemoveListener(unregistered)
+	removed := s.e.RemoveListener(unregistered)
+	s.Assert().False(removed, "expected to not remove a listener that never has been added")
 }
 
 func (s *EventsTestSuite) TestDeregisterNilListener() {
-	s.e.RemoveListener(nil)
+	removed := s.e.RemoveListener(nil)
+	s.Assert().False(removed, "expect a nil listener to not be removed since it has not been added")
+
+	s.e.AddListener(nil)
+
+	removed = s.e.RemoveListener(nil)
+	s.Assert().False(removed, "expect a nil listener to not be removed since it can't be added")
 }
 
-func (s *EventsTestSuite) TestDeregisterDuringHandleEvent() {
+func (s *EventsTestSuite) TestRemoveListenerDuringHandleEvent() {
 	var wg1 sync.WaitGroup
 
 	// expect listener to be invoked only once
@@ -143,9 +148,12 @@ func (s *EventsTestSuite) TestRegisterTwice() {
 	l1.On("HandleEvent", testEvent{}).Run(func(args mock.Arguments) {
 		wg1.Done()
 	}).Return()
+	defer s.e.RemoveListener(l1)
 
-	s.e.AddListener(l1)
-	s.e.AddListener(l1)
+	added := s.e.AddListener(l1)
+	s.Assert().True(added, "expected a listener to be added on the first occurance")
+	added = s.e.AddListener(l1)
+	s.Assert().False(added, "expected a listener to not be added on the second occurance")
 
 	s.e.EmitEvent(testEvent{})
 

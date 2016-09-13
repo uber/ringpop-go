@@ -275,13 +275,31 @@ func (_m *Ringpop) Labels() (*swim.NodeLabels, error) {
 }
 
 // AddListener provides a mock function with given fields: _a0
-func (_m *Ringpop) AddListener(_a0 events.EventListener) {
-	_m.Called(_a0)
+func (_m *Ringpop) AddListener(_a0 events.EventListener) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(events.EventListener) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 // RemoveListener provides a mock function with given fields: _a0
-func (_m *Ringpop) RemoveListener(_a0 events.EventListener) {
-	_m.Called(_a0)
+func (_m *Ringpop) RemoveListener(_a0 events.EventListener) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(events.EventListener) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 // RegisterListener provides a mock function with given fields: _a0

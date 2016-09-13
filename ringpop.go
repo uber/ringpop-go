@@ -65,8 +65,8 @@ type Interface interface {
 	// events.EventRegistar
 	// mockery has troubles generating a working mock when the interface is
 	// embedded therefore the definitions are copied here.
-	AddListener(events.EventListener)
-	RemoveListener(events.EventListener)
+	AddListener(events.EventListener) bool
+	RemoveListener(events.EventListener) bool
 
 	// DEPRECATED, use AddListener (!) kept around for backwards compatibility
 	// but will start logging warnings
@@ -314,7 +314,12 @@ func (rp *Ringpop) Uptime() (time.Duration, error) {
 	return time.Now().Sub(rp.startTime), nil
 }
 
-// RegisterListener is DEPRECATED, use AddListener
+// RegisterListener is DEPRECATED, use AddListener. This function is kept around
+// for the time being to make sure that ringpop is a drop in replacement for
+// now. It should not be used by new projects, to accomplish this it will log a
+// warning message that the developer can understand. A release in the future
+// will remove this function completely which will cause a breaking change to
+// the ringpop public interface.
 func (rp *Ringpop) RegisterListener(l events.EventListener) {
 	rp.logger.Warn("RegisterListener is deprecated, use AddListener")
 	rp.AddListener(l)

@@ -31,6 +31,7 @@ import (
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	events "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/test/thrift/pingpong"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
@@ -314,7 +315,7 @@ func (s *ForwarderTestSuite) TestInvalidInflightDecrement() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	listener := &EventListener{}
+	listener := &events.EventListener{}
 	listener.On("HandleEvent", mock.AnythingOfTypeArgument("forward.InflightRequestsMiscountEvent")).Run(func(args mock.Arguments) {
 		wg.Done()
 	}).Return()
