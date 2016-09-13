@@ -131,8 +131,8 @@ func (g *gossip) Start() {
 	g.state.running = true
 
 	// schedule repeat execution in the background
-	g.state.protocolPeriodStop, g.state.protocolPeriodWait = schedule(g.ProtocolPeriod, g.ComputeProtocolDelay, g.node.clock)
-	g.state.protocolRateChannel, _ = schedule(g.AdjustProtocolRate, func() time.Duration {
+	g.state.protocolPeriodStop, g.state.protocolPeriodWait = scheduleRepeaditly(g.ProtocolPeriod, g.ComputeProtocolDelay, g.node.clock)
+	g.state.protocolRateChannel, _ = scheduleRepeaditly(g.AdjustProtocolRate, func() time.Duration {
 		return time.Second
 	}, g.node.clock)
 

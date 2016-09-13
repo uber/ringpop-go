@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/benbjohnson/clock"
-
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
