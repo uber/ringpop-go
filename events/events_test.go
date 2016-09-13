@@ -91,6 +91,11 @@ func (s *EventsTestSuite) TestRegisterNilListener() {
 	s.e.EmitEvent(testEvent{})
 }
 
+func (s *EventsTestSuite) TestEmitEventWithNoListener() {
+	// test and make sure that emitting to an empty event listener works.
+	s.e.EmitEvent(testEvent{})
+}
+
 func (s *EventsTestSuite) TestDeregisterUnregisteredListener() {
 	unregistered := &MockEventListener{}
 	removed := s.e.RemoveListener(unregistered)
@@ -143,6 +148,7 @@ func (s *EventsTestSuite) TestRegisterTwice() {
 	l1.On("HandleEvent", testEvent{}).Run(func(args mock.Arguments) {
 		wg1.Done()
 	}).Return()
+	defer s.e.RemoveListener(l1)
 
 	added := s.e.AddListener(l1)
 	s.Assert().True(added, "expected a listener to be added on the first occurance")
