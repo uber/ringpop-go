@@ -74,16 +74,16 @@ func (h *discoverProviderHealer) Start() {
 
 	go func() {
 		for {
-			// attempt heal with the pro
-			if h.rand.Float64() < h.Probability() {
-				h.Heal()
-			}
-
 			// loop or quit
 			select {
 			case <-h.node.clock.After(h.period):
 			case <-h.quit:
 				return
+			}
+
+			// attempt heal with the pro
+			if h.rand.Float64() < h.Probability() {
+				h.Heal()
 			}
 		}
 	}()

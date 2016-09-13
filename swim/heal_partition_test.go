@@ -298,9 +298,10 @@ func TestPartitionHealGetsTriggeredWhenTimePasses(t *testing.T) {
 	}))
 
 	// with the seed of the random number generator set to 0 the heal should
-	// trigger after the healing period kicks in twice. It is importeant that
-	// Add gets invoked twice, otherwise the test will fail (clock 'ensures'
-	// goroutines kick in at the end of Add)
+	// trigger after the healing period kicks in three times. It is important
+	// that Add gets invoked separately, otherwise the test will fail (clock
+	// 'ensures' goroutines kick in at the end of Add)
+	c.Add(A[0].node.healer.period)
 	c.Add(A[0].node.healer.period)
 	c.Add(A[0].node.healer.period)
 
