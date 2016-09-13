@@ -63,8 +63,10 @@ type sharedEventEmitter struct {
 	listenersLock sync.RWMutex
 }
 
-// AddListener adds a listener to the Event Registar. Events emitted on this
-// registar will be invoked on the listener
+// AddListener adds a listener to the EventEmitter. Events emitted on this
+// emitter will be invoked on the listener. The return value indicates if the
+// listener has been added or not. It can't be added if it is already added and
+// therefore registered to receive events
 func (a *sharedEventEmitter) AddListener(l EventListener) bool {
 	if l == nil {
 		// do not register nil listener, will cause nil pointer dereference during
@@ -95,8 +97,10 @@ func (a *sharedEventEmitter) AddListener(l EventListener) bool {
 	return true
 }
 
-// RemoveListener removes a listener from the Event Registar. Subsequent calls
-// to EmitEvent will not cause HandleEvent to be called on this listener.
+// RemoveListener removes a listener from the EventEmitter. Subsequent calls to
+// EmitEvent will not cause HandleEvent to be called on this listener. The
+// return value indicates if a listener has been removed or not. The listener
+// can't be removed if it was not present before.
 func (a *sharedEventEmitter) RemoveListener(l EventListener) bool {
 	a.listenersLock.Lock()
 	defer a.listenersLock.Unlock()

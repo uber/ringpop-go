@@ -314,7 +314,12 @@ func (rp *Ringpop) Uptime() (time.Duration, error) {
 	return time.Now().Sub(rp.startTime), nil
 }
 
-// RegisterListener is DEPRECATED, use AddListener
+// RegisterListener is DEPRECATED, use AddListener. This function is kept around
+// for the time being to make sure that ringpop is a drop in replacement for
+// now. It should not be used by new projects, to accomplish this it will log a
+// warning message that the developer can understand. A release in the future
+// will remove this function completely which will cause a breaking change to
+// the ringpop public interface.
 func (rp *Ringpop) RegisterListener(l events.EventListener) {
 	rp.logger.Warn("RegisterListener is deprecated, use AddListener")
 	rp.AddListener(l)

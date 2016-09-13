@@ -107,7 +107,7 @@ func (s *EventsTestSuite) TestDeregisterNilListener() {
 	s.Assert().False(removed, "expect a nil listener to not be removed since it can't be added")
 }
 
-func (s *EventsTestSuite) TestDeregisterDuringHandleEvent() {
+func (s *EventsTestSuite) TestRemoveListenerDuringHandleEvent() {
 	var wg1 sync.WaitGroup
 
 	// expect listener to be invoked only once
