@@ -195,7 +195,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 			})
 
 			resC <- res
-		}(*peer)
+		}(peer)
 	}
 
 	// wait for all sends to complete before closing channel

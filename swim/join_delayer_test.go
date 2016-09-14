@@ -23,9 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/swim/test/mocks"
 )
 
 // Null randomizer and sleeper used for join delay tests.
@@ -55,11 +53,6 @@ func (s *joinDelayerTestSuite) SetupTest() {
 		opts.max, // Backoff delay is capped at this point.
 		opts.max,
 	}
-
-	var logger *mocks.Logger
-	logger = &mocks.Logger{}
-	logger.On("WithFields", mock.Anything).Return(logger)
-	logger.On("Warn", mock.Anything).Return(nil)
 
 	delayer, err := newExponentialDelayer("dummyjoiner", opts)
 	s.NoError(err, "expected valid exponential delayer")

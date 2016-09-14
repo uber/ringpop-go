@@ -46,6 +46,8 @@ type discoverProviderHealer struct {
 	started              chan struct{}
 
 	logger log.Logger
+
+	rand *rand.Rand
 }
 
 func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Duration) *discoverProviderHealer {
@@ -56,12 +58,12 @@ func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Dur
 		logger:           logging.Logger("healer").WithField("local", n.Address()),
 		started:          make(chan struct{}, 1),
 		quit:             make(chan struct{}),
+		rand:             rand.New(rand.NewSource(n.clock.Now().UnixNano())),
 	}
 }
 
 // Start the partition healing loop
 func (h *discoverProviderHealer) Start() {
-	rand.Seed(time.Now().UnixNano())
 	// check if started channel is already filled
 	// if not, we start a new loop
 	select {
@@ -72,16 +74,16 @@ func (h *discoverProviderHealer) Start() {
 
 	go func() {
 		for {
-			// attempt heal with the pro
-			if rand.Float64() < h.Probability() {
-				h.Heal()
-			}
-
 			// loop or quit
 			select {
 			case <-h.node.clock.After(h.period):
 			case <-h.quit:
 				return
+			}
+
+			// attempt heal with the pro
+			if h.rand.Float64() < h.Probability() {
+				h.Heal()
 			}
 		}
 	}()

@@ -20,24 +20,7 @@
 
 package swim
 
-import (
-	"time"
-
-	"reflect"
-
-	"github.com/uber/ringpop-go/events"
-)
-
-// The ListenerFunc type is an adapter to allow the use of ordinary functions
-// as EventListeners.
-type ListenerFunc struct {
-	fn func(events.Event)
-}
-
-// HandleEvent calls f(e).
-func (f *ListenerFunc) HandleEvent(e events.Event) {
-	f.fn(e)
-}
+import "time"
 
 // A MaxPAdjustedEvent occurs when the disseminator adjusts the max propagation
 // count for changes
@@ -236,15 +219,3 @@ type DiscoHealEvent struct{}
 
 // AttemptHealEvent is sent when the healer is triggered
 type AttemptHealEvent struct{}
-
-// on is returns an EventListener that executes a function f upon receiving an
-// event of type t.
-func on(t interface{}, f func(e events.Event)) *ListenerFunc {
-	return &ListenerFunc{
-		fn: func(e events.Event) {
-			if reflect.TypeOf(t) == reflect.TypeOf(e) {
-				f(e)
-			}
-		},
-	}
-}

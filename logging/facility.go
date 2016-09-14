@@ -88,6 +88,9 @@ func (f *Facility) SetLogger(log bark.Logger) {
 	// Prevent changing the logger while a message is logged.
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if log == nil {
+		log = NoLogger
+	}
 	f.logger = log
 }
 

@@ -23,10 +23,12 @@ package swim
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/benbjohnson/clock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/events"
@@ -55,8 +57,8 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	A.HasPartitionAs(t, A, 3, "alive")
 	A.HasPartitionAs(t, B, 0, "faulty")
@@ -68,7 +70,7 @@ func TestPartitionHealWithFaulties(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 
 	A.HasPartitionAs(t, A, 3, "alive")
 	A.HasPartitionAs(t, B, 5, "alive")
@@ -92,7 +94,7 @@ func TestPartitionHealWithMissing(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 
 	A.HasPartitionAs(t, A, 0, "alive")
 	A.HasPartitionAs(t, B, 0, "alive")
@@ -122,15 +124,15 @@ func TestPartitionHealWithFaultyAndMissing1(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	targets, err = A[0].node.healer.Heal()
 	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealWithFaultyAndMissing2 creates two partitions A and B where
@@ -155,15 +157,15 @@ func TestPartitionHealWithFaultyAndMissing2(t *testing.T) {
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	targets, err = A[0].node.healer.Heal()
 	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 1, "expected correct amount of targets")
 	assert.True(t, B.Contains(targets[0]), "expected target to be a node from the right partition")
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealWithFaultyAndMissing2 creates two partitions A and B where
@@ -186,16 +188,16 @@ func TestPartitionHealWithFaultyAndMissing3(t *testing.T) {
 	A.AddPartitionWithStatus(B1, Faulty)
 	B.AddPartitionWithStatus(A1, Faulty)
 
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	A[0].node.discoverProvider = statichosts.New(append(A.Hosts(), B.Hosts()...)...)
 	A[0].node.healer.Heal()
-	waitForConvergence(t, time.Second, A...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, A...)
+	waitForConvergence(t, 100, B...)
 
 	A[0].node.healer.Heal()
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealSemiPartition checks if the ring cluster automatically
@@ -211,7 +213,7 @@ func TestPartitionHealSemiParition(t *testing.T) {
 
 	A.AddPartitionWithStatus(B, Alive)
 
-	waitForPartitionHeal(t, time.Second, A, B)
+	waitForPartitionHeal(t, 100, A, B)
 }
 
 // TestPartitionHealWithMultiplePartitions checks if the heal mechanism heals
@@ -250,25 +252,25 @@ func TestPartitionHealWithMultiplePartitions(t *testing.T) {
 	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 5, "expected correct amount of targets")
 
-	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, 100, A...)
 	for _, B := range Bs {
-		waitForConvergence(t, time.Second, B...)
+		waitForConvergence(t, 100, B...)
 	}
-	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, 100, A...)
 	for _, B := range Bs {
-		waitForConvergence(t, time.Second, B...)
+		waitForConvergence(t, 100, B...)
 	}
 
 	targets, err = A[0].node.healer.Heal()
 	assert.NoError(t, err, "expected no error")
 	assert.Len(t, targets, 4, "expected correct amount of targets")
 
-	waitForPartitionHeal(t, time.Second, append(Bs, A)...)
+	waitForPartitionHeal(t, 100, append(Bs, A)...)
 }
 
-// TestPartitionHealWithTime tests whether partitions are healed over time
-// automatically.
-func TestPartitionHealWithTime(t *testing.T) {
+// TestPartitionHealGetsTriggeredWhenTimePasses tests whether partition healing
+// is triggered over time automatically.
+func TestPartitionHealGetsTriggeredWhenTimePasses(t *testing.T) {
 	A := newPartition(t, 5)
 	B := newPartition(t, 5)
 	defer destroyNodes(A...)
@@ -287,16 +289,23 @@ func TestPartitionHealWithTime(t *testing.T) {
 	// Progress time in a background thread. This will cause the node to
 	// attempt a heal periodically.
 
-	c := clock.NewMock()
-	A[0].node.clock = c
-	go func() {
-		for {
-			c.Add(A[0].node.healer.period)
-			time.Sleep(time.Millisecond)
-		}
-	}()
+	c := A[0].clock
 
-	waitForPartitionHeal(t, 3000*time.Millisecond, A, B)
+	// event emitter fires synchronous so no lock is needed
+	healTriggered := int32(0)
+	A[0].node.AddListener(on(DiscoHealEvent{}, func(e events.Event) {
+		atomic.AddInt32(&healTriggered, 1)
+	}))
+
+	// with the seed of the random number generator set to 0 the heal should
+	// trigger after the healing period kicks in three times. It is important
+	// that Add gets invoked separately, otherwise the test will fail (clock
+	// 'ensures' goroutines kick in at the end of Add)
+	c.Add(A[0].node.healer.period)
+	c.Add(A[0].node.healer.period)
+	c.Add(A[0].node.healer.period)
+
+	require.Equal(t, int32(1), atomic.LoadInt32(&healTriggered), "expected 1 heal to trigger when forwarding time")
 }
 
 // TestHealBeforeBootstrap tests that we can heal with a node that is still
@@ -355,11 +364,9 @@ func TestHealBeforeBootstrap(t *testing.T) {
 	}, a.node, JoinCompleteEvent{})
 
 	// progress timers so that incarnation numbers can bump
-	c := clock.NewMock()
-	c.Add(time.Millisecond)
-	a.node.clock = c
+	a.clock.Add(time.Millisecond)
 
-	waitForConvergence(t, time.Second, a, b)
+	waitForConvergence(t, 100, a, b)
 }
 
 func TestPartitionHealFail(t *testing.T) {
@@ -416,7 +423,7 @@ type partition []*testNode
 func newPartition(t *testing.T, n int) partition {
 	p := partition(genChannelNodes(t, n))
 	bootstrapNodes(t, p...)
-	waitForConvergence(t, 500*time.Millisecond, p...)
+	waitForConvergence(t, 100, p...)
 	p.ClearChanges()
 	return p
 }
@@ -446,10 +453,7 @@ func (p partition) ClearChanges() {
 // Progresses the clock of all the nodes of the partition by T.
 func (p partition) ProgressTime(T time.Duration) {
 	for _, n := range p {
-		now := n.node.clock.Now()
-		c := clock.NewMock()
-		c.Add(now.Add(T).Sub(clock.NewMock().Now()))
-		n.node.clock = c
+		n.clock.Add(T)
 	}
 }
 
@@ -491,20 +495,19 @@ func (p partition) Contains(address string) bool {
 // when the nodes are converged. After the cluster finished gossiping we
 // double check that all nodes have the same checksum for the memberlist,
 // this means that the cluster is converged and healed.
-func waitForPartitionHeal(t *testing.T, timeout time.Duration, ps ...partition) {
+func waitForPartitionHeal(t *testing.T, maxIterations int, ps ...partition) {
 	var nodes []*Node
 	for _, p := range ps {
 		nodes = append(nodes, testNodesToNodes(p)...)
 	}
 
-	deadline := time.Now().Add(timeout)
-
 Tick:
 	for {
+		maxIterations--
 
 		// check deadline
-		if time.Now().After(deadline) {
-			t.Errorf("timeout during wait for convergence")
+		if maxIterations < 0 {
+			t.Errorf("exhausted the maximum number of iterations while waiting for partition to heal")
 			return
 		}
 

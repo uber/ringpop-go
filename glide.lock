@@ -1,5 +1,5 @@
-hash: e12513affb2c18d45db0866ec31b46508afaee6157cc5aec35fad18ab3b634c2
-updated: 2016-06-06T15:26:39.744362484+02:00
+hash: 4ccda5624a1c3a632cb019d8e2e953856637534b7dba0b735a8f729f23778750
+updated: 2016-08-30T14:48:58.602347073+02:00
 imports:
 - name: github.com/apache/thrift
   version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
@@ -12,13 +12,17 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
+  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
   version: fc41e106ee0e4394f69a56046e5c5adbaf29d912
+- name: github.com/opentracing/opentracing-go
+  version: 77a31d686003349e89c89e58408aafcd20003f41
+  subpackages:
+  - ext
 - name: github.com/pmezard/go-difflib
-  version: e8554b8641db39598be7f6342874b958f12ae1d4
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
   - difflib
 - name: github.com/rcrowley/go-metrics
@@ -28,15 +32,17 @@ imports:
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: e3a8ff8ce36581f87a15341206f205b1da467059
+  version: d77da356e56a7428ad25149ca77381849a6a5232
   subpackages:
   - assert
   - mock
   - require
 - name: github.com/uber-common/bark
   version: d52ffa061726911f47fcd3d9e8b9b55f22794772
+- name: github.com/uber-go/atomic
+  version: 0c9e689d64f004564b79d9a663634756df322902
 - name: github.com/uber/tchannel-go
-  version: 6ea263463a946c89e6565a12110aa424175155c3
+  version: 1a0e35378f6f721bc07f6c4466bc9701ed70b506
   subpackages:
   - json
   - raw
@@ -48,7 +54,7 @@ imports:
   - typed
   - thrift/gen-go/meta
 - name: golang.org/x/net
-  version: 5aa7325eaa14d7ed4b520f40d58adf2834c8de01
+  version: 6250b412798208e6c90b03b7c4f226de5aa299e2
   subpackages:
   - context
 devImports: []

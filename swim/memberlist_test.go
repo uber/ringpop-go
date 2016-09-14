@@ -24,6 +24,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/util"
 )
@@ -105,9 +106,15 @@ func (s *MemberlistTestSuite) TestChecksumChanges() {
 }
 
 func (s *MemberlistTestSuite) TestChecksumsEqual() {
-	nodeA := NewNode("test", "127.0.0.1:3001", nil, nil)
+	c := clock.NewMock()
+
+	nodeA := NewNode("test", "127.0.0.1:3001", nil, &Options{
+		Clock: c,
+	})
 	defer nodeA.Destroy()
-	nodeB := NewNode("test", "127.0.0.1:3001", nil, nil)
+	nodeB := NewNode("test", "127.0.0.1:3001", nil, &Options{
+		Clock: c,
+	})
 	defer nodeB.Destroy()
 
 	nodeA.memberlist.MakeAlive("127.0.0.1:3001", s.incarnation)
@@ -210,9 +217,17 @@ func (s *MemberlistTestSuite) TestAliveToFaulty() {
 	s.Equal(Alive, member.Status, "expected member to be alive")
 
 	s.m.MakeFaulty("127.0.0.1:3002", s.incarnation-1)
+
+	member, ok = s.m.Member("127.0.0.1:3002")
+	s.NotNil(member, "expected member not to be nil")
+	s.True(ok, "expected member to be found")
 	s.Equal(Alive, member.Status, "expected member to be alive")
 
 	s.m.MakeFaulty("127.0.0.1:3002", s.incarnation)
+
+	member, ok = s.m.Member("127.0.0.1:3002")
+	s.NotNil(member, "expected member not to be nil")
+	s.True(ok, "expected member to be found")
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 
 }

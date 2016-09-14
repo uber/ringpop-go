@@ -141,11 +141,25 @@ func (m *memberlist) genChecksumString() string {
 
 // returns the member at a specific address
 func (m *memberlist) Member(address string) (*Member, bool) {
+	var memberCopy *Member
 	m.members.RLock()
 	member, ok := m.members.byAddress[address]
+	if member != nil {
+		memberCopy = new(Member)
+		*memberCopy = *member
+	}
 	m.members.RUnlock()
 
-	return member, ok
+	return memberCopy, ok
+}
+
+// LocalMember returns a copy of the local Member in a thread safe way.
+func (m *memberlist) LocalMember() (member Member) {
+	m.members.Lock()
+	// copy local member state
+	member = *m.local
+	m.members.Unlock()
+	return
 }
 
 // RemoveMember removes the member from the membership list. If the membership has
@@ -175,7 +189,8 @@ func (m *memberlist) RemoveMember(address string) bool {
 
 func (m *memberlist) MemberAt(i int) *Member {
 	m.members.RLock()
-	member := m.members.list[i]
+	member := new(Member)
+	*member = *m.members.list[i]
 	m.members.RUnlock()
 
 	return member
@@ -210,24 +225,22 @@ func (m *memberlist) NumPingableMembers() (n int) {
 }
 
 // returns n pingable members in the member list
-func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*Member {
-	var members []*Member
+func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []Member {
+	members := make([]Member, 0, n)
 
 	m.members.RLock()
-	for _, member := range m.members.list {
+	indices := rand.Perm(len(m.members.list))
+	for _, index := range indices {
+		member := m.members.list[index]
 		if m.Pingable(*member) && !excluding[member.Address] {
-			members = append(members, member)
+			members = append(members, *member)
+			if len(members) >= n {
+				break
+			}
 		}
 	}
 	m.members.RUnlock()
-
-	// shuffle members and take first n
-	members = shuffle(members)
-
-	if n > len(members) {
-		return members
-	}
-	return members[:n]
+	return members
 }
 
 // returns an slice of (copied) members representing the current state of the
@@ -409,7 +422,6 @@ func (m *memberlist) postLocalUpdate() {
 
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
-	m.node.rollup.TrackUpdates(changes)
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -549,7 +561,6 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			NumMembers:  m.NumMembers(),
 		})
 		m.node.handleChanges(applied)
-		m.node.rollup.TrackUpdates(applied)
 	}
 
 	m.Unlock()

@@ -64,7 +64,7 @@ func (s *PingRequestTestSuite) TestOk() {
 
 func (s *PingRequestTestSuite) TestRemoteFail() {
 	bootstrapNodes(s.T(), s.tnode, s.peers[0])
-	waitForConvergence(s.T(), 500*time.Millisecond, s.tnode, s.peers[0])
+	waitForConvergence(s.T(), 100, s.tnode, s.peers[0])
 
 	response := <-sendPingRequests(s.node, "127.0.0.1:3005", 1, time.Second)
 	switch res := response.(type) {
@@ -77,7 +77,7 @@ func (s *PingRequestTestSuite) TestRemoteFail() {
 
 func (s *PingRequestTestSuite) TestRemoteTimesOut() {
 	bootstrapNodes(s.T(), s.tnode, s.peers[0])
-	waitForConvergence(s.T(), 500*time.Millisecond, s.tnode, s.peers[0])
+	waitForConvergence(s.T(), 100, s.tnode, s.peers[0])
 
 	s.peers[0].node.pingTimeout = time.Millisecond
 
@@ -150,7 +150,7 @@ func TestIndirectPing1(t *testing.T) {
 
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
 	bootstrapNodes(t, sender, helper1, helper2, target)
-	waitForConvergence(t, 500*time.Millisecond, sender, helper1, helper2, target)
+	waitForConvergence(t, 100, sender, helper1, helper2, target)
 
 	targetHostPort := target.node.Address()
 
@@ -177,7 +177,7 @@ func TestIndirectPing2(t *testing.T) {
 	// don't bootstrap the target
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
 	bootstrapNodes(t, sender, helper1, helper2)
-	waitForConvergence(t, 500*time.Millisecond, sender, helper1, helper2)
+	waitForConvergence(t, 100, sender, helper1, helper2)
 
 	tnodes = append(tnodes, newChannelNode(t))
 	targetHostPort := target.node.Address()
@@ -211,7 +211,7 @@ func TestIndirectPing3(t *testing.T) {
 	// don't create target yet
 	sender, helper1, helper2 := tnodes[0], tnodes[1], tnodes[2]
 	bootstrapNodes(t, sender, helper1, helper2)
-	waitForConvergence(t, 500*time.Millisecond, sender, helper1, helper2)
+	waitForConvergence(t, 100, sender, helper1, helper2)
 
 	ch, err := tchannel.NewChannel("test", nil)
 	assert.NoError(t, err, "expected to setup tchannel")
@@ -228,7 +228,7 @@ func TestIndirectPing3(t *testing.T) {
 	sender.node.AddListener(onPingRequestComplete(func() {
 		// create and add target to cluster
 		targetNode := NewNode("test", targetHostPort, ch.GetSubChannel("test"), nil)
-		target := &testNode{targetNode, ch}
+		target := &testNode{targetNode, ch, nil}
 		tnodes = append(tnodes, target)
 		bootstrapNodes(t, sender, helper1, helper2, target)
 		cont <- true
@@ -250,7 +250,7 @@ func TestIndirectPing4(t *testing.T) {
 
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
 	bootstrapNodes(t, sender, helper1, helper2, target)
-	waitForConvergence(t, 500*time.Millisecond, sender, helper1, helper2, target)
+	waitForConvergence(t, 100, sender, helper1, helper2, target)
 
 	targetHostPort := target.node.Address()
 
@@ -280,7 +280,7 @@ func TestIndirectPing5(t *testing.T) {
 	// don't bootstrap the target
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
 	bootstrapNodes(t, sender, helper1, helper2)
-	waitForConvergence(t, 500*time.Millisecond, sender, helper1, helper2)
+	waitForConvergence(t, 100, sender, helper1, helper2)
 
 	// Add an bootstrapped node.
 	targetHostPort := target.node.Address()
@@ -298,7 +298,7 @@ func TestIndirectPing6(t *testing.T) {
 
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
 	bootstrapNodes(t, sender, helper1, helper2, target)
-	waitForConvergence(t, 500*time.Millisecond, sender, helper1, helper2, target)
+	waitForConvergence(t, 100, sender, helper1, helper2, target)
 
 	targetHostPort := target.node.Address()
 	target.closeAndWait(sender.channel)
@@ -315,7 +315,7 @@ func TestIndirectPing7(t *testing.T) {
 	defer destroyNodes(tnodes...)
 
 	bootstrapNodes(t, tnodes...)
-	waitForConvergence(t, 500*time.Millisecond, tnodes...)
+	waitForConvergence(t, 100, tnodes...)
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
 
 	targetHostPort := target.node.Address()

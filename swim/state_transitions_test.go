@@ -110,24 +110,28 @@ func (s *StateTransitionsSuite) TestSuspectDisabled() {
 func (s *StateTransitionsSuite) TestSuspectBecomesFaulty() {
 	s.m.MakeSuspect(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
-	s.Require().NotNil(member, "expected cannot be nil")
+	s.Require().NotNil(member, "expected member, cannot be nil")
 
 	s.stateTransitions.ScheduleSuspectToFaulty(*member)
 	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
 
 	s.clock.Add(5 * time.Second)
+	member, _ = s.m.Member(s.suspect.Address)
+	s.Require().NotNil(member, "expected member, cannot be nil")
 	s.Equal(Faulty, member.Status, "expected member to be faulty")
 }
 
 func (s *StateTransitionsSuite) TestFaultyBecomesTombstone() {
 	s.m.MakeFaulty(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
-	s.Require().NotNil(member, "expected cannot be nil")
+	s.Require().NotNil(member, "expected member, cannot be nil")
 
 	s.stateTransitions.ScheduleFaultyToTombstone(*member)
 	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
 
 	s.clock.Add(10 * time.Second)
+	member, _ = s.m.Member(s.suspect.Address)
+	s.Require().NotNil(member, "expected member, cannot be nil")
 	s.Equal(Tombstone, member.Status, "expected member to be tombstone")
 }
 
@@ -136,7 +140,7 @@ func (s *StateTransitionsSuite) TestTombstoneBecomesEvicted() {
 	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
 	s.m.MakeTombstone(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
-	s.Require().NotNil(member, "expected cannot be nil")
+	s.Require().NotNil(member, "expected member, cannot be nil")
 
 	s.stateTransitions.ScheduleTombstoneToEvict(*member)
 	s.NotNil(s.stateTransitions.timer(member.Address), "expected state transtition timer to be set")
@@ -152,7 +156,7 @@ func (s *StateTransitionsSuite) TestTombstoneBecomesEvicted() {
 func (s *StateTransitionsSuite) TestTimerCreated() {
 	s.m.MakeAlive(s.suspect.Address, s.suspect.Incarnation)
 	member, _ := s.m.Member(s.suspect.Address)
-	s.Require().NotNil(member, "expected cannot be nil")
+	s.Require().NotNil(member, "expected member, cannot be nil")
 
 	old := s.stateTransitions.timer(member.Address)
 	s.Require().Nil(old, "expected timer to be nil")
