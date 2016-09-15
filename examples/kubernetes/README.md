@@ -1,3 +1,6 @@
+Note: since this file will be executed with cram during the test-examples target of make we want to signal cram that these tests need to be skipped. This is done by exiting with exit code 80 like below. When this is more crystallized we might figure out how to run minikube on travis-ci.
+
+    $ exit 80
 
 ```bash
 # start minikube and get it working with docker
