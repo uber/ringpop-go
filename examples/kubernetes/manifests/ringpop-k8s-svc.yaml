@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ringpop-k8s
+  labels:
+    app: ringpop-k8s
+spec:
+  clusterIP: None
+  ports:
+    - name: ringpop
+      port: 3000
+  selector:
+    app: ringpop-k8s
