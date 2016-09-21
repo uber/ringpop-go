@@ -1,6 +1,19 @@
 ringpop-go changes
 ==================
 
+v0.7.0
+------
+
+* Feature: Added label support to ringpop for nodes to annotate them self with more information #167 #171 #172
+* Refactored internal representation of member state for more flexible reincarnation and state change of a member #159 #161
+* Make sure ringpop is listening for requests before bootstrapping #176 #146
+* Added support for imports in `.thrift` files in generated code for thrift forwarding #162
+* Mark generated code as being generated for suppression in diffs #169
+* Be more specific in the functionality required from TChannel #166
+* Tests: Run all tests on go 1.7 #179
+* Tests: More stable unit tests, integration tests and race detector tests #164 #178 #181 #182
+* Tests: All examples are tested on every pull request #157 #170
+
 v0.6.0
 ------------
 
