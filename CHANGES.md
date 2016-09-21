@@ -14,6 +14,24 @@ v0.7.0
 * Tests: More stable unit tests, integration tests and race detector tests #164 #178 #181 #182
 * Tests: All examples are tested on every pull request #157 #170
 
+### Release notes
+
+#### Change to ringpop interface
+
+The ringpop interface changed two existing functions `GetReachableMembers` and
+`CountReachableMembers` that now take a variadic argument of type
+`swim.MemberPredicate` instead of no arguments. This does not change the usage
+of these functions, but does change the type of the function. This might cause
+custom declared interfaces to not match ringpop anymore. The solution is to
+change these functions in the interface used to match the current signature.
+
+#### Deprecated RegisterListener
+
+Due to a refactor in how event emitting is done the `RegisterListener` method is
+deprecated and starts logging warnings when used, instead the use of
+`AddListener` is advised. This function also returns if the listener has been
+added or not.
+
 v0.6.0
 ------------
 
