@@ -48,7 +48,7 @@ mocks:
 
 dev_deps:
 	go get github.com/uber/tchannel-go/thrift/thrift-gen
-	go get github.com/golang/lint/golint
+	./scripts/go-get-version.sh github.com/golang/lint/golint/.../@c6242afa
 	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps
