@@ -66,6 +66,8 @@ type Options struct {
 	PartitionHealPeriod           time.Duration
 	PartitionHealBaseProbabillity float64
 
+	LabelLimits LabelOptions
+
 	Clock clock.Clock
 }
 
@@ -91,6 +93,8 @@ func defaultOptions() *Options {
 		PartitionHealPeriod:           30 * time.Second,
 		PartitionHealBaseProbabillity: 3,
 
+		LabelLimits: DefaultLabelOptions,
+
 		Clock: clock.New(),
 
 		MaxReverseFullSyncJobs: 5,
@@ -107,6 +111,7 @@ func mergeDefaultOptions(opts *Options) *Options {
 	}
 
 	opts.StateTimeouts = mergeStateTimeouts(opts.StateTimeouts, def.StateTimeouts)
+	opts.LabelLimits = mergeLabelOptions(opts.LabelLimits, def.LabelLimits)
 
 	opts.MinProtocolPeriod = util.SelectDuration(opts.MinProtocolPeriod, def.MinProtocolPeriod)
 
@@ -136,18 +141,23 @@ func mergeDefaultOptions(opts *Options) *Options {
 // implements.
 type NodeInterface interface {
 	Bootstrap(opts *BootstrapOptions) ([]string, error)
-	CountReachableMembers() int
+	CountReachableMembers(predicates ...MemberPredicate) int
 	Destroy()
 	GetChecksum() uint32
-	GetReachableMembers() []string
+	GetReachableMembers(predicates ...MemberPredicate) []Member
+	Labels() *NodeLabels
 	MemberStats() MemberStats
 	ProtocolStats() ProtocolStats
 	Ready() bool
-	RegisterListener(l events.EventListener)
+
+	AddListener(events.EventListener) bool
+	RemoveListener(events.EventListener) bool
 }
 
 // A Node is a SWIM member
 type Node struct {
+	events.SyncEventEmitter
+
 	app     string
 	service string
 	address string
@@ -164,7 +174,6 @@ type Node struct {
 	disseminator     *disseminator
 	stateTransitions *stateTransitions
 	gossip           *gossip
-	rollup           *updateRollup
 
 	// When we get more healer strategies we can abstract to a healer interface.
 	healer *discoverProviderHealer
@@ -175,8 +184,6 @@ type Node struct {
 
 	maxReverseFullSyncJobs int
 
-	listeners []events.EventListener
-
 	clientRate metrics.Meter
 	serverRate metrics.Meter
 	totalRate  metrics.Meter
@@ -184,6 +191,8 @@ type Node struct {
 	startTime time.Time
 
 	logger log.Logger
+
+	labelLimits LabelOptions
 
 	// clock is used to generate incarnation numbers; it is typically the
 	// system clock, wrapped via clock.New()
@@ -215,6 +224,8 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		clock:      opts.Clock,
 	}
 
+	node.labelLimits = opts.LabelLimits
+
 	node.memberlist = newMemberlist(node)
 	node.memberiter = newMemberlistIter(node.memberlist)
 	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
@@ -226,8 +237,12 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)
 	node.disseminator = newDisseminator(node)
-	node.rollup = newUpdateRollup(node, opts.RollupFlushInterval,
-		opts.RollupMaxUpdates)
+
+	for _, member := range node.memberlist.GetMembers() {
+		change := Change{}
+		change.populateSubject(&member)
+		node.disseminator.RecordChange(change)
+	}
 
 	if node.channel != nil {
 		node.registerHandlers()
@@ -255,26 +270,12 @@ func (n *Node) HasChanges() bool {
 // Incarnation returns the incarnation number of the Node.
 func (n *Node) Incarnation() int64 {
 	if n.memberlist != nil && n.memberlist.local != nil {
-		n.memberlist.local.RLock()
+		n.memberlist.members.RLock()
 		incarnation := n.memberlist.local.Incarnation
-		n.memberlist.local.RUnlock()
+		n.memberlist.members.RUnlock()
 		return incarnation
 	}
 	return -1
-}
-
-func (n *Node) emit(event interface{}) {
-	for _, listener := range n.listeners {
-		listener.HandleEvent(event)
-	}
-}
-
-// RegisterListener adds an EventListener to the node. When a swim event e is
-// emitted, l.HandleEvent(e) is called for every registered listener l.
-// Attention, all listeners are called synchronously. Be careful with
-// registering blocking and other slow calls.
-func (n *Node) RegisterListener(l events.EventListener) {
-	n.listeners = append(n.listeners, l)
 }
 
 // Start starts the SWIM protocol and all sub-protocols.
@@ -319,7 +320,6 @@ func (n *Node) Destroy() {
 	n.state.Unlock()
 
 	n.Stop()
-	n.rollup.Destroy()
 }
 
 // Destroyed returns whether or not the node has been destroyed.
@@ -382,8 +382,6 @@ func (n *Node) Bootstrap(opts *BootstrapOptions) ([]string, error) {
 	if opts == nil {
 		opts = &BootstrapOptions{}
 	}
-
-	n.memberlist.Reincarnate()
 
 	n.discoverProvider = opts.DiscoverProvider
 	joinOpts := &joinOpts{
@@ -512,14 +510,23 @@ func (n *Node) pingNextMember() {
 	n.logger.WithField("target", target).Info("ping request target reachable")
 }
 
-// GetReachableMembers returns a slice of members currently in this node's
-// membership list that aren't faulty.
-func (n *Node) GetReachableMembers() []string {
-	return n.memberlist.GetReachableMembers()
+// GetReachableMembers returns a slice of members containing only the reachable
+// members that satisfies the predicates passed in.
+func (n *Node) GetReachableMembers(predicates ...MemberPredicate) []Member {
+	predicates = append(predicates, memberIsReachable)
+	return n.memberlist.GetMembers(predicates...)
 }
 
-// CountReachableMembers returns the number of members currently in this node's
-// membership list that aren't faulty.
-func (n *Node) CountReachableMembers() int {
-	return n.memberlist.CountReachableMembers()
+// CountReachableMembers returns the number of reachable members currently in
+// this node's membership list that satisfies all predicates passed in.
+func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
+	predicates = append(predicates, memberIsReachable)
+	return n.memberlist.CountMembers(predicates...)
+}
+
+// Labels returns a mutator for the labels kept on this local node. This mutator
+// interacts with the local node and memberlist to change labels on this node
+// and gossip those changes around.
+func (n *Node) Labels() *NodeLabels {
+	return &NodeLabels{n}
 }

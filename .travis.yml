@@ -1,35 +1,40 @@
 language: go
 go:
+  - 1.7
   - 1.6
   - 1.5
+
+addons:
+  apt:
+    packages:
+    - python-virtualenv
 
 install:
   - go get -u github.com/Masterminds/glide
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
   - go get golang.org/x/tools/cmd/cover
-  - go get github.com/golang/lint/golint
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
+  - ./scripts/travis/get-cram.sh
+  - npm install -g tcurl
   - make setup
 
 env:
-  - RUN="make lint"
-  - RUN="make test-unit"
+  - RUN="make test-unit test-examples lint coveralls"
   - RUN="make test-integration"
   - RUN="make test-race"
 
 matrix:
-  allow_failures:
-    - env: RUN="make test-race"
   fast_finish: true
 
 script:
   - test/travis
 
-after_success:
-  - test/update-coveralls
-
 cache:
   directories:
     - $HOME/.glide/cache
+    - _venv
+
+before_cache:  # glide touches ORIG_HEAD on `glide install`
+  - find $HOME/.glide/cache -name ORIG_HEAD -exec rm {} \;

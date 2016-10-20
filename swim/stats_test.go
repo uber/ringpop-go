@@ -68,7 +68,7 @@ func (s *StatsTestSuite) TestProtocolStats() {
 
 	// We need to sleep for at least 5 seconds, as this is the tick period for
 	// the metrics.Meter and it cannot be easily changed.
-	time.Sleep(5 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	stats := s.testNode.node.ProtocolStats()
 
@@ -93,7 +93,7 @@ func (s *StatsTestSuite) TestProtocolStats() {
 }
 
 func (s *StatsTestSuite) TestMemberStats() {
-	s.NoError(s.cluster.WaitForConvergence(time.Second), "We expect the cluster to converge within a second")
+	s.cluster.WaitForConvergence(s.T(), 100)
 	stats := s.cluster.Nodes()[0].MemberStats()
 
 	// Extract addresses from the member list

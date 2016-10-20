@@ -65,7 +65,7 @@ func sendPingWithChanges(node *Node, target string, changes []Change, timeout ti
 		SourceIncarnation: node.Incarnation(),
 	}
 
-	node.emit(PingSendEvent{
+	node.EmitEvent(PingSendEvent{
 		Local:   node.Address(),
 		Remote:  target,
 		Changes: req.Changes,
@@ -109,7 +109,7 @@ func sendPingWithChanges(node *Node, target string, changes []Change, timeout ti
 		return nil, err
 	}
 
-	node.emit(PingSendCompleteEvent{
+	node.EmitEvent(PingSendCompleteEvent{
 		Local:    node.Address(),
 		Remote:   target,
 		Changes:  req.Changes,

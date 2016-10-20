@@ -1,39 +1,36 @@
 A simple ping-pong service implementation that that integrates ringpop to forward requests between nodes.
 
+Note: this file can be [cram][3]-executed using `make test-examples`. That's why some of the example outputs below are a bit unusual.
+
 # Running the example
 
 All commands are relative to this directory:
-```bash
-cd examples/ping-json
-```
 
-Build the example binary:
-```bash
-go build
-```
+    $ cd ${TESTDIR}  # examples/ping-json
+    $ go build
 
 Start a custer of 5 nodes using [tick-cluster][1]:
-```bash
-tick-cluster.js -n 5 ping-json
-```
+
+    $ tick-cluster.js --interface=127.0.0.1 -n 5 ping-json &> tick-cluster.log &
+    $ sleep 5
 
 Lookup the node `my_key` key belongs to using [tcurl][2]:
-```bash
-$ tcurl ringpop -P hosts.json /admin/lookup '{"key": "my_key"}'
-{"ok":true,"head":null,"body":{"dest":"127.0.0.1:3002"},"headers":{"as":"json"},"trace":"88c8217f8ce220fd"}
-```
+
+    $ tcurl ringpop -P hosts.json /admin/lookup '{"key": "my_key"}'
+    {"ok":true,"head":null,"body":{"dest":"127.0.0.1:300?"},"headers":{"as":"json"},"trace":"*"} (glob)
 
 Call the `/ping` endpoint (multiple times) and see the request being forwarded. Each request is sent to a random node in the cluster because of the `-P hosts.json` argument--but is always handled by the node owning the key. This can be seen in the `from` field of the response:
-```bash
-$ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}'
-{"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:3002","p":""},"headers":{"as":"json"},"trace":"825d0c582c758aa5"}
-```
+
+    $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}'
+    {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","pheader":""},"headers":{"as":"json"},"trace":"*"} (glob)
 
 Optionally, set the `p` header. This value will be forwarded together with the request body to the node owning the key. Its value is returned in the response body in the `pheader` field:
-```bash
-$ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}' --headers '{"p": "my_header"}'
-{"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:3002","pheader":"my_header"},"headers":{"as":"json"},"trace":"36b2a16b57b92945"}
-```
+
+    $ tcurl pingchannel -P hosts.json /ping '{"key": "my_key"}' --headers '{"p": "my_header"}'
+    {"ok":true,"head":null,"body":{"message":"Hello, world!","from":"127.0.0.1:300?","pheader":"my_header"},"headers":{"as":"json"},"trace":"*"} (glob)
+
+    $ kill %1
 
 [1]:https://github.com/uber/ringpop-common/
 [2]:https://github.com/uber/tcurl
+[3]:https://pypi.python.org/pypi/cram

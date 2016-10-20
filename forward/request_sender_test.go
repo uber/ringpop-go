@@ -21,11 +21,13 @@
 package forward
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
-	"testing"
 )
 
 type requestSenderTestSuite struct {
@@ -37,7 +39,7 @@ type requestSenderTestSuite struct {
 type dummies struct {
 	channel  shared.SubChannel
 	dest     string
-	emitter  eventEmitter
+	emitter  events.EventEmitter
 	endpoint string
 	format   tchannel.Format
 	keys     []string

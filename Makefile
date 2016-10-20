@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks testpop lint mocks out setup test test-integration test-unit test-race
+.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
 
 SHELL = /bin/bash
 
@@ -28,6 +28,9 @@ clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
 	rm -rf test/thrift/pingpong/
 
+coveralls:
+	test/update-coveralls
+
 lint:
 	@:>lint.log
 
@@ -45,7 +48,7 @@ mocks:
 
 dev_deps:
 	go get github.com/uber/tchannel-go/thrift/thrift-gen
-	go get github.com/golang/lint/golint
+	./scripts/go-get-version.sh github.com/golang/lint/golint/.../@c6242afa
 	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps
@@ -59,16 +62,25 @@ setup: dev_deps
 
 test:	test-unit test-integration
 
-test-integration:
+test-integration: vendor
 	test/run-integration-tests
 
 test-unit:
 	go generate $(NOVENDOR)
 	test/go-test-prettify $(NOVENDOR)
 
-test-race:
+test-examples: vendor _venv/bin/cram
+	. _venv/bin/activate && ./test/run-example-tests
+
+test-race: vendor
 	go generate $(NOVENDOR)
 	test/go-test-prettify -race $(NOVENDOR)
+
+vendor:
+	$(error run 'make setup' first)
+
+_venv/bin/cram:
+	./scripts/travis/get-cram.sh
 
 testpop:	clean
 	go build ./scripts/testpop/

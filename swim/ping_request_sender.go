@@ -149,7 +149,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 		peerAddresses = append(peerAddresses, peer.Address)
 	}
 
-	node.emit(PingRequestsSendEvent{
+	node.EmitEvent(PingRequestsSendEvent{
 		Local:  node.Address(),
 		Target: target,
 		Peers:  peerAddresses,
@@ -175,7 +175,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 			res, err := p.SendPingRequest()
 
 			if err != nil {
-				node.emit(PingRequestSendErrorEvent{
+				node.EmitEvent(PingRequestSendErrorEvent{
 					Local:  node.Address(),
 					Target: target,
 					Peers:  peerAddresses,
@@ -186,7 +186,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 				return
 			}
 
-			node.emit(PingRequestsSendCompleteEvent{
+			node.EmitEvent(PingRequestsSendCompleteEvent{
 				Local:    node.Address(),
 				Target:   target,
 				Peers:    peerAddresses,
@@ -195,7 +195,7 @@ func sendPingRequests(node *Node, target string, size int, timeout time.Duration
 			})
 
 			resC <- res
-		}(*peer)
+		}(peer)
 	}
 
 	// wait for all sends to complete before closing channel

@@ -24,11 +24,11 @@ import "time"
 
 func handlePing(node *Node, req *ping) (*ping, error) {
 	if !node.Ready() {
-		node.emit(RequestBeforeReadyEvent{PingEndpoint})
+		node.EmitEvent(RequestBeforeReadyEvent{PingEndpoint})
 		return nil, ErrNodeNotReady
 	}
 
-	node.emit(PingReceiveEvent{
+	node.EmitEvent(PingReceiveEvent{
 		Local:   node.Address(),
 		Source:  req.Source,
 		Changes: req.Changes,

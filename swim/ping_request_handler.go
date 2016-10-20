@@ -31,11 +31,11 @@ type pingResponse struct {
 
 func handlePingRequest(node *Node, req *pingRequest) (*pingResponse, error) {
 	if !node.Ready() {
-		node.emit(RequestBeforeReadyEvent{PingReqEndpoint})
+		node.EmitEvent(RequestBeforeReadyEvent{PingReqEndpoint})
 		return nil, ErrNodeNotReady
 	}
 
-	node.emit(PingRequestReceiveEvent{
+	node.EmitEvent(PingRequestReceiveEvent{
 		Local:   node.Address(),
 		Source:  req.Source,
 		Target:  req.Target,
@@ -53,7 +53,7 @@ func handlePingRequest(node *Node, req *pingRequest) (*pingResponse, error) {
 	pingOk := err == nil
 
 	if pingOk {
-		node.emit(PingRequestPingEvent{
+		node.EmitEvent(PingRequestPingEvent{
 			Local:    node.Address(),
 			Source:   req.Source,
 			Target:   req.Target,

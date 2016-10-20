@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# Runs the ringpop-admin tests.
+#
+# This script launches a ringpop cluster using tick-cluster and then runs
+# a series of tests against the ringpop-admin command output.
+#
+set -euo pipefail
+
+
+declare cram_opts="-v --shell=/bin/bash --indent=4"
+declare prog_cram="cram"
+declare test_files="${0%/*}/../examples/*/README.md"
+
+# Import common functions
+. "${0%/*}/lib.sh"
+
+#
+# Print the specified text to stdout, prefixing with a timestamp.
+#
+# $1: Text to print
+#
+_print() {
+    echo -e "[$(date)] ${0##*/}: $@"
+}
+
+#
+# Echos the full normalised path of the specified path, or nothing if the path
+# does not exist.
+#
+_normalise_path() {
+    path="$(cd "$1" && echo $PWD)"
+    if [ $? -gt 0 ]; then
+        return 1
+    else
+        echo $path
+        return 0
+    fi
+}
+
+if [ $# -gt 0 ]; then
+
+    if [ "$1" == "--help" -o "$1" == "-h" ]; then
+        {
+            echo
+            echo "Run the tests for ringpop-go/examples."
+            echo
+            echo "Usage: $0 [--update] [test_file] [...]"
+            echo
+            echo "  --update      When a test fails, prompt to update the saved test output."
+            echo
+        } >&2
+        exit 1
+    fi
+
+    if [ "$1" == "--update" ]; then
+        cram_opts="$cram_opts -i"
+        shift
+    fi
+
+fi
+
+# Check cram is installed
+if ! type cram &>/dev/null; then
+    echo "$0 requires cram to be installed (try: 'sudo pip install cram')." >&2
+    echo
+    exit 1
+fi
+
+fetch-ringpop-common "tools" 2>&1
+
+export PATH=$PATH:$(_normalise_path "${ringpop_common_dir}/tools")
+
+run_test() {
+	# Check test files exist
+	if ! ls "$@" >/dev/null; then
+		echo "ERROR: Test files missing." >&2
+		exit 1
+	fi
+
+	# Run the tests
+	_print "Running tests..."
+    exit_code=0
+	cram $cram_opts "$@" || exit_code=1
+
+	return $exit_code
+}
+
+declare test_result=0
+# Accept test files as arguments
+if [ $# -gt 0 ]; then
+    run_test "$@" || test_result=1
+else
+	_print "Testing $test_files"
+	run_test $test_files
+fi
+
+
+if [ $test_result -eq 0 ]; then
+    _print "\033[0;32mSuccess!\033[0m"
+fi
+
+_print "exiting $test_result"
+
+exit $test_result

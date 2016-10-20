@@ -31,6 +31,7 @@ import (
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	events "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/test/thrift/pingpong"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
@@ -114,11 +115,6 @@ func (s *ForwarderTestSuite) SetupSuite() {
 	s.peer = peer
 
 	s.forwarder = NewForwarder(s.sender, s.channel.GetSubChannel("forwarder"))
-}
-
-func (s *ForwarderTestSuite) SetupTest() {
-	//make sure there are no listeners
-	s.forwarder.listeners = nil
 }
 
 func (s *ForwarderTestSuite) TearDownSuite() {
@@ -271,8 +267,11 @@ func (s *ForwarderTestSuite) TestRequestTimesOut() {
 	dest, err := s.sender.Lookup("unreachable")
 	s.NoError(err)
 
-	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", nil, tchannel.JSON,
-		&Options{Timeout: time.Millisecond})
+	_, err = s.forwarder.ForwardRequest(ping.Bytes(), dest, "test", "/ping", []string{"unreachable"}, tchannel.JSON, &Options{
+		// By providing a negative timeout the context will directly return with
+		// a DeadlineExceeded error
+		Timeout: -1,
+	})
 
 	s.EqualError(err, "request timed out")
 }
@@ -312,67 +311,18 @@ func (s *ForwarderTestSuite) TestRequestNoReroutes() {
 	s.EqualError(err, "max retries exceeded")
 }
 
-func (s *ForwarderTestSuite) TestRegisterListener() {
-	listener := &EventListener{}
-	listener.On("HandleEvent").Return()
-
-	s.forwarder.RegisterListener(listener)
-	s.Assertions.Equal(1, len(s.forwarder.listeners), "Expected 1 listener to be registered")
-}
-
-func (s *ForwarderTestSuite) TestEmit() {
-	// wait for HandleEvent being called
-	var wg sync.WaitGroup
-	wg.Add(1) // expect 1 call to HandleEvent
-
-	listener := &EventListener{}
-	listener.On("HandleEvent", mock.Anything).Run(func(args mock.Arguments) {
-		wg.Done()
-	}).Return()
-
-	s.forwarder.RegisterListener(listener)
-
-	// emit an empty struct
-	s.forwarder.emit(struct{}{})
-
-	wg.Wait()
-}
-
-func (s *ForwarderTestSuite) TestEmit2() {
-	// wait for HandleEvent being called
-	var wg sync.WaitGroup
-	wg.Add(2) // expect 2 calls to HandleEvent
-
-	listener1 := &EventListener{}
-	listener1.On("HandleEvent", mock.Anything).Run(func(args mock.Arguments) {
-		wg.Done()
-	}).Return()
-
-	listener2 := &EventListener{}
-	listener2.On("HandleEvent", mock.Anything).Run(func(args mock.Arguments) {
-		wg.Done()
-	}).Return()
-
-	s.forwarder.RegisterListener(listener1)
-	s.forwarder.RegisterListener(listener2)
-
-	// emit an empty struct
-	s.forwarder.emit(struct{}{})
-
-	wg.Wait()
-}
-
 func (s *ForwarderTestSuite) TestInvalidInflightDecrement() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	listener := &EventListener{}
+	listener := &events.EventListener{}
 	listener.On("HandleEvent", mock.AnythingOfTypeArgument("forward.InflightRequestsMiscountEvent")).Run(func(args mock.Arguments) {
 		wg.Done()
 	}).Return()
 
 	s.forwarder.inflight = 0
-	s.forwarder.RegisterListener(listener)
+	s.forwarder.AddListener(listener)
+	defer s.forwarder.RemoveListener(listener)
 	s.forwarder.decrementInflight()
 
 	s.Assertions.Equal(int64(0), s.forwarder.inflight, "Expected inflight to stay at 0 when decremented at 0")
