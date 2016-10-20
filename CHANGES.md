@@ -25,12 +25,25 @@ of these functions, but does change the type of the function. This might cause
 custom declared interfaces to not match ringpop anymore. The solution is to
 change these functions in the interface used to match the current signature.
 
+Previously the signature was:
+```golang
+  GetReachableMembers() ([]string, error)
+  CountReachableMembers() (int, error)
+```
+
+The current signature is:
+```golang
+  GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error)
+  CountReachableMembers(predicates ...swim.MemberPredicate) (int, error)
+```
+
 #### Deprecated RegisterListener
 
 Due to a refactor in how event emitting is done the `RegisterListener` method is
-deprecated and starts logging warnings when used, instead the use of
-`AddListener` is advised. This function also returns if the listener has been
-added or not.
+deprecated. Even though it still works and behaves as previously it will start
+logging warnings. Since this code is not on the hot path only little log volume
+is expected. Instead of this function it is now advised to use `AddListener`.
+This function also returns if the listener has been added or not.
 
 v0.6.0
 ------------
