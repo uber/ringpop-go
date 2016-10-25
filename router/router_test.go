@@ -44,7 +44,7 @@ func (s *RouterTestSuite) SetupTest() {
 	s.clientFactory.On("MakeRemoteClient", mock.Anything).Return("remote client")
 
 	s.ringpop = &mocks.Ringpop{}
-	s.ringpop.On("RegisterListener", mock.Anything).Return()
+	s.ringpop.On("AddListener", mock.Anything).Return(false)
 	s.ringpop.On("WhoAmI").Return("127.0.0.1:3000", nil)
 	s.ringpop.On("Lookup", "local").Return("127.0.0.1:3000", nil)
 	s.ringpop.On("Lookup", "local2").Return("127.0.0.1:3000", nil)
@@ -229,7 +229,7 @@ func TestRingpopRouterGetClientForwardWhoAmIError(t *testing.T) {
 	stubError := errors.New("ringpop not ready")
 
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("", stubError)
 

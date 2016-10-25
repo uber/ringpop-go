@@ -49,6 +49,7 @@ type Configuration struct {
 // a Red-Black Tree to achieve O(log N) lookup and insertion time.
 type HashRing struct {
 	sync.RWMutex
+	events.SyncEventEmitter
 
 	hashfunc      func(string) int
 	replicaPoints int
@@ -58,19 +59,6 @@ type HashRing struct {
 	checksum  uint32
 
 	logger bark.Logger
-
-	listeners []events.EventListener
-}
-
-func (r *HashRing) emit(event interface{}) {
-	for _, listener := range r.listeners {
-		listener.HandleEvent(event)
-	}
-}
-
-// RegisterListener adds a listener that will listen for hashring events.
-func (r *HashRing) RegisterListener(l events.EventListener) {
-	r.listeners = append(r.listeners, l)
 }
 
 // New instantiates and returns a new HashRing.
@@ -113,7 +101,7 @@ func (r *HashRing) computeChecksumNoLock() {
 		}).Debug("ringpop ring computed new checksum")
 	}
 
-	r.emit(events.RingChecksumEvent{
+	r.EmitEvent(events.RingChecksumEvent{
 		OldChecksum: old,
 		NewChecksum: r.checksum,
 	})
@@ -125,7 +113,7 @@ func (r *HashRing) AddServer(address string) bool {
 	ok := r.addServerNoLock(address)
 	if ok {
 		r.computeChecksumNoLock()
-		r.emit(events.RingChangedEvent{
+		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   []string{address},
 			ServersRemoved: nil,
 		})
@@ -159,7 +147,7 @@ func (r *HashRing) RemoveServer(address string) bool {
 	ok := r.removeServerNoLock(address)
 	if ok {
 		r.computeChecksumNoLock()
-		r.emit(events.RingChangedEvent{
+		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   nil,
 			ServersRemoved: []string{address},
 		})
@@ -214,7 +202,7 @@ func (r *HashRing) addRemoveServersNoLock(add []string, remove []string) bool {
 
 	if changed {
 		r.computeChecksumNoLock()
-		r.emit(events.RingChangedEvent{
+		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   add,
 			ServersRemoved: remove,
 		})

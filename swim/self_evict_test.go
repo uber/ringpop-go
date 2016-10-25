@@ -22,7 +22,6 @@ package swim
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -41,7 +40,7 @@ func (s *SelfEvictTestSuite) SetupTest() {
 	s.peer = s.tpeer.node
 
 	bootstrapNodes(s.T(), s.tnode, s.tpeer)
-	waitForConvergence(s.T(), 5*time.Second, s.tnode, s.tpeer)
+	waitForConvergence(s.T(), 100, s.tnode, s.tpeer)
 }
 
 func (s *SelfEvictTestSuite) TearDownTest() {

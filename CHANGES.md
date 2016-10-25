@@ -1,6 +1,50 @@
 ringpop-go changes
 ==================
 
+v0.7.0
+------
+
+* Feature: Added label support to ringpop for nodes to annotate themselves with more information [#167](https://github.com/uber/ringpop-go/pull/167) [#171](https://github.com/uber/ringpop-go/pull/171) [#172](https://github.com/uber/ringpop-go/pull/172)
+* Maintainability: Refactored internal representation of member state for more flexible reincarnation and state change of a member [#159](https://github.com/uber/ringpop-go/pull/159) [#161](https://github.com/uber/ringpop-go/pull/161)
+* Fix: Make sure ringpop is listening for requests before bootstrapping [#176](https://github.com/uber/ringpop-go/pull/176) [#146](https://github.com/uber/ringpop-go/pull/146)
+* Fix: Added support for imports in `.thrift` files in generated code for thrift forwarding [#162](https://github.com/uber/ringpop-go/pull/162)
+* Fix: Mark generated code as being generated for suppression in diffs [#169](https://github.com/uber/ringpop-go/pull/169)
+* Fix: Be more specific in the functionality required from TChannel [#166](https://github.com/uber/ringpop-go/pull/166)
+* Tests: Run all tests on go 1.7 [#179](https://github.com/uber/ringpop-go/pull/179)
+* Tests: More stable unit tests, integration tests and race detector tests. Races are now mandatory tests on ci [#164](https://github.com/uber/ringpop-go/pull/164) [#178](https://github.com/uber/ringpop-go/pull/178) [#181](https://github.com/uber/ringpop-go/pull/181) [#182](https://github.com/uber/ringpop-go/pull/182)
+* Tests: All examples are tested on every pull request [#157](https://github.com/uber/ringpop-go/pull/157) [#170](https://github.com/uber/ringpop-go/pull/170)
+
+### Release notes
+
+#### Change to ringpop interface
+
+The ringpop interface changed two existing functions `GetReachableMembers` and
+`CountReachableMembers` that now take a variadic argument of type
+`swim.MemberPredicate` instead of no arguments. This does not change the usage
+of these functions, but does change the type of the function. This might cause
+custom declared interfaces to not match ringpop anymore. The solution is to
+change these functions in the interface used to match the current signature.
+
+Previously the signature was:
+```golang
+  GetReachableMembers() ([]string, error)
+  CountReachableMembers() (int, error)
+```
+
+The current signature is:
+```golang
+  GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error)
+  CountReachableMembers(predicates ...swim.MemberPredicate) (int, error)
+```
+
+#### Deprecated RegisterListener
+
+Due to a refactor in how event emitting is done the `RegisterListener` method is
+deprecated. Even though it still works and behaves as previously it will start
+logging warnings. Since this code is not on the hot path only little log volume
+is expected. Instead of this function it is now advised to use `AddListener`.
+This function also returns if the listener has been added or not.
+
 v0.6.0
 ------------
 

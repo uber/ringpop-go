@@ -23,7 +23,7 @@ var _ = shared.GoUnusedProtection__
 
 func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	serviceImpl := &servicemocks.TChanRemoteService{}
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
@@ -39,7 +39,7 @@ func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 
 func TestNewRingpopRemoteServiceAdapterInputValidation(t *testing.T) {
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	serviceImpl := &servicemocks.TChanRemoteService{}
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{})
@@ -57,7 +57,7 @@ func TestNewRingpopRemoteServiceAdapterInputValidation(t *testing.T) {
 
 func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
@@ -82,7 +82,7 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 
 func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
@@ -111,7 +111,7 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 
 func TestGetLocalClient(t *testing.T) {
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
 	rp.On("WhoAmI").Return("127.0.0.1:3000")
 
@@ -140,7 +140,7 @@ func TestGetLocalClient(t *testing.T) {
 
 func TestMakeRemoteClient(t *testing.T) {
 	rp := &mocks.Ringpop{}
-	rp.On("RegisterListener", mock.Anything).Return()
+	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
 	rp.On("WhoAmI").Return("127.0.0.1:3000")
 

@@ -1,5 +1,6 @@
 language: go
 go:
+  - 1.7
   - 1.6
   - 1.5
 
@@ -13,7 +14,6 @@ install:
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
   - go get golang.org/x/tools/cmd/cover
-  - go get github.com/golang/lint/golint
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
   - ./scripts/travis/get-cram.sh
@@ -21,23 +21,15 @@ install:
   - make setup
 
 env:
-  - RUN="make lint"
-  - RUN="make test-unit"
+  - RUN="make test-unit test-examples lint coveralls"
   - RUN="make test-integration"
   - RUN="make test-race"
-  - RUN="make test-examples"
 
 matrix:
-  allow_failures:
-    - env: RUN="make test-race"
-
   fast_finish: true
 
 script:
   - test/travis
-
-after_success:
-  - test/update-coveralls
 
 cache:
   directories:

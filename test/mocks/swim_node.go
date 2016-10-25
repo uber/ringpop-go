@@ -32,13 +32,13 @@ func (_m *SwimNode) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	return r0, r1
 }
 
-// CountReachableMembers provides a mock function with given fields:
-func (_m *SwimNode) CountReachableMembers() int {
-	ret := _m.Called()
+// CountReachableMembers provides a mock function with given fields: predicates
+func (_m *SwimNode) CountReachableMembers(predicates ...swim.MemberPredicate) int {
+	ret := _m.Called(predicates)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) int); ok {
+		r0 = rf(predicates...)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
@@ -65,16 +65,32 @@ func (_m *SwimNode) GetChecksum() uint32 {
 	return r0
 }
 
-// GetReachableMembers provides a mock function with given fields:
-func (_m *SwimNode) GetReachableMembers() []string {
+// GetReachableMembers provides a mock function with given fields: predicates
+func (_m *SwimNode) GetReachableMembers(predicates ...swim.MemberPredicate) []swim.Member {
+	ret := _m.Called(predicates)
+
+	var r0 []swim.Member
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) []swim.Member); ok {
+		r0 = rf(predicates...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]swim.Member)
+		}
+	}
+
+	return r0
+}
+
+// Labels provides a mock function with given fields:
+func (_m *SwimNode) Labels() *swim.NodeLabels {
 	ret := _m.Called()
 
-	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
+	var r0 *swim.NodeLabels
+	if rf, ok := ret.Get(0).(func() *swim.NodeLabels); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).(*swim.NodeLabels)
 		}
 	}
 
@@ -123,9 +139,32 @@ func (_m *SwimNode) Ready() bool {
 	return r0
 }
 
-// RegisterListener provides a mock function with given fields: l
-func (_m *SwimNode) RegisterListener(l events.EventListener) {
-	_m.Called(l)
+// AddListener provides a mock function with given fields: _a0
+func (_m *SwimNode) AddListener(_a0 events.EventListener) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(events.EventListener) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// RemoveListener provides a mock function with given fields: _a0
+func (_m *SwimNode) RemoveListener(_a0 events.EventListener) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(events.EventListener) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 // RegisterSelfEvictHook provides a mock function with given fields: hooks

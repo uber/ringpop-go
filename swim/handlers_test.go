@@ -176,6 +176,7 @@ func (s *HandlerTestSuite) TestErrorHandler() {
 
 	errTest := errors.New("test error")
 	logging.SetLogger(logger)
+	defer logging.SetLogger(nil)
 
 	s.testNode.node.errorHandler(s.ctx, errTest)
 	logger.AssertCalled(s.T(), "WithFields", bark.Fields{
@@ -246,16 +247,14 @@ func (s *HandlerTestSuite) TestPingRequestHandlerFail() {
 func (s *HandlerTestSuite) TestAdminReapHandler() {
 	memberAddr := "192.0.2.100:1234"
 	s.cluster.nodes[0].memberlist.MakeFaulty(memberAddr, 42)
-	err := s.cluster.WaitForConvergence(time.Second)
-	s.Require().NoError(err, "expected the cluster to converge with a faulty node")
+	s.cluster.WaitForConvergence(s.T(), 100)
 	s.Assert().Equal(len(s.cluster.nodes)+1, s.cluster.nodes[3].memberlist.NumMembers(), "expected 1 extra (faulty) member compared to the nodes in the cluster")
 
 	res, err := s.cluster.nodes[1].reapFaultyMembersHandler(s.ctx, &emptyArg{})
 	s.Assert().NoError(err, "reaping faulty members should not return an error")
 	s.Assert().Equal("ok", res.Status, "expected the reap call to return with 'ok' as its status")
 
-	err = s.cluster.WaitForConvergence(time.Second)
-	s.Require().NoError(err, "expected the cluster to converge after reaping of faulty nodes")
+	s.cluster.WaitForConvergence(s.T(), 100)
 
 	member, ok := s.cluster.nodes[2].memberlist.Member(memberAddr)
 	s.Require().True(ok, "expected the member to be reaped to be in the memberlist")

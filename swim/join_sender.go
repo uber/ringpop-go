@@ -292,7 +292,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 
 	for {
 		if j.node.Destroyed() {
-			j.node.emit(JoinFailedEvent{
+			j.node.EmitEvent(JoinFailedEvent{
 				Reason: Destroyed,
 				Error:  nil,
 			})
@@ -332,7 +332,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 			err := fmt.Errorf("join duration of %v exceeded max %v",
 				joinDuration, j.maxJoinDuration)
 
-			j.node.emit(JoinFailedEvent{
+			j.node.EmitEvent(JoinFailedEvent{
 				Reason: Error,
 				Error:  err,
 			})
@@ -349,7 +349,7 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		j.delayer.delay()
 	}
 
-	j.node.emit(JoinCompleteEvent{
+	j.node.EmitEvent(JoinCompleteEvent{
 		Duration:  time.Now().Sub(startTime),
 		NumJoined: numJoined,
 		Joined:    nodesJoined,
@@ -376,7 +376,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 	var wg sync.WaitGroup
 
 	j.numTries++
-	j.node.emit(JoinTriesUpdateEvent{j.numTries})
+	j.node.EmitEvent(JoinTriesUpdateEvent{j.numTries})
 
 	for _, target := range group {
 		wg.Add(1)
@@ -410,7 +410,7 @@ func (j *joinSender) JoinGroup(nodesJoined []string) ([]string, []string) {
 			start := time.Now()
 			j.node.memberlist.AddJoinList(res.Membership)
 
-			j.node.emit(AddJoinListEvent{
+			j.node.EmitEvent(AddJoinListEvent{
 				Duration: time.Now().Sub(start),
 			})
 		}(target)

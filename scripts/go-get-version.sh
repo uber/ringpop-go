@@ -124,6 +124,8 @@ _main() {
 		if [ ! -z "$package_version" ]; then
 			echo "# cd $PWD" >&2
 			run git checkout -q $package_version
+			# install dependencies for checked out version
+			run go get ./...
 		fi
 
 		# Generate list of sub packages

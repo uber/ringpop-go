@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks testpop lint mocks out setup test test-integration test-unit test-race
+.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
 
 SHELL = /bin/bash
 
@@ -28,6 +28,9 @@ clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
 	rm -rf test/thrift/pingpong/
 
+coveralls:
+	test/update-coveralls
+
 lint:
 	@:>lint.log
 
@@ -45,7 +48,7 @@ mocks:
 
 dev_deps:
 	go get github.com/uber/tchannel-go/thrift/thrift-gen
-	go get github.com/golang/lint/golint
+	./scripts/go-get-version.sh github.com/golang/lint/golint/.../@c6242afa
 	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps

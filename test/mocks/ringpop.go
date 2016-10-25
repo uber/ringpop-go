@@ -75,11 +75,6 @@ func (_m *Ringpop) Uptime() (time.Duration, error) {
 	return r0, r1
 }
 
-// RegisterListener provides a mock function with given fields: l
-func (_m *Ringpop) RegisterListener(l events.EventListener) {
-	_m.Called(l)
-}
-
 // Bootstrap provides a mock function with given fields: opts
 func (_m *Ringpop) Bootstrap(opts *swim.BootstrapOptions) ([]string, error) {
 	ret := _m.Called(opts)
@@ -168,13 +163,13 @@ func (_m *Ringpop) LookupN(key string, n int) ([]string, error) {
 	return r0, r1
 }
 
-// GetReachableMembers provides a mock function with given fields:
-func (_m *Ringpop) GetReachableMembers() ([]string, error) {
-	ret := _m.Called()
+// GetReachableMembers provides a mock function with given fields: predicates
+func (_m *Ringpop) GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error) {
+	ret := _m.Called(predicates)
 
 	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) []string); ok {
+		r0 = rf(predicates...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
@@ -182,8 +177,8 @@ func (_m *Ringpop) GetReachableMembers() ([]string, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(...swim.MemberPredicate) error); ok {
+		r1 = rf(predicates...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -191,20 +186,20 @@ func (_m *Ringpop) GetReachableMembers() ([]string, error) {
 	return r0, r1
 }
 
-// CountReachableMembers provides a mock function with given fields:
-func (_m *Ringpop) CountReachableMembers() (int, error) {
-	ret := _m.Called()
+// CountReachableMembers provides a mock function with given fields: predicates
+func (_m *Ringpop) CountReachableMembers(predicates ...swim.MemberPredicate) (int, error) {
+	ret := _m.Called(predicates)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(...swim.MemberPredicate) int); ok {
+		r0 = rf(predicates...)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(...swim.MemberPredicate) error); ok {
+		r1 = rf(predicates...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -254,6 +249,62 @@ func (_m *Ringpop) Forward(dest string, keys []string, request []byte, service s
 	}
 
 	return r0, r1
+}
+
+// Labels provides a mock function with given fields:
+func (_m *Ringpop) Labels() (*swim.NodeLabels, error) {
+	ret := _m.Called()
+
+	var r0 *swim.NodeLabels
+	if rf, ok := ret.Get(0).(func() *swim.NodeLabels); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*swim.NodeLabels)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AddListener provides a mock function with given fields: _a0
+func (_m *Ringpop) AddListener(_a0 events.EventListener) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(events.EventListener) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// RemoveListener provides a mock function with given fields: _a0
+func (_m *Ringpop) RemoveListener(_a0 events.EventListener) bool {
+	ret := _m.Called(_a0)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(events.EventListener) bool); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// RegisterListener provides a mock function with given fields: _a0
+func (_m *Ringpop) RegisterListener(_a0 events.EventListener) {
+	_m.Called(_a0)
 }
 
 // RegisterSelfEvictHook provides a mock function with given fields: hooks

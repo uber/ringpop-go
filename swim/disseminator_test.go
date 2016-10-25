@@ -325,7 +325,7 @@ func (s *DisseminatorTestSuite) TestFilterChangesFromSender() {
 
 	// make aliveAddr the source of suspect change
 	s.d.changes[suspectAddr].Source = aliveAddr
-	s.d.changes[suspectAddr].Incarnation = s.incarnation
+	s.d.changes[suspectAddr].SourceIncarnation = s.incarnation
 
 	changes := s.d.issueChanges()
 	s.Len(changes, 3, "expected three changes")
@@ -374,7 +374,7 @@ func (s *DisseminatorTestSuite) TestFilterChangesFromSender() {
 
 	// make change the source of suspect change back to local address
 	s.d.changes[suspectAddr].Source = s.d.node.Address()
-	s.d.changes[suspectAddr].Incarnation = s.d.node.Incarnation()
+	s.d.changes[suspectAddr].SourceIncarnation = s.d.node.Incarnation()
 
 	// test all changes are filtered
 	changes = s.d.issueChanges()
@@ -426,7 +426,7 @@ func TestBidirectionalFullSync(t *testing.T) {
 
 	// only when a reverse full sync is issued the membership of b changes
 	// we listen for a membership change and continue the main thread of the test
-	b.node.RegisterListener(on(MemberlistChangesAppliedEvent{}, func(e events.Event) {
+	b.node.AddListener(on(MemberlistChangesAppliedEvent{}, func(e events.Event) {
 		cont <- struct{}{}
 	}))
 
@@ -461,20 +461,20 @@ func TestThrottleBidirectionalFullSyncs(t *testing.T) {
 	tnodes := genChannelNodes(t, maxJobs+1)
 
 	bootstrapNodes(t, append(tnodes, tnode)...)
-	waitForConvergence(t, time.Second, append(tnodes, tnode)...)
+	waitForConvergence(t, 100, append(tnodes, tnode)...)
 	block := make(chan struct{})
 	quit := make(chan struct{})
 	total := int64(0)
 
 	// Block the reverse full sync procedure to test if we throttle correctly.
-	tnode.node.RegisterListener(on(StartReverseFullSyncEvent{}, func(e events.Event) {
+	tnode.node.AddListener(on(StartReverseFullSyncEvent{}, func(e events.Event) {
 		atomic.AddInt64(&total, 1)
 		<-block
 	}))
 
 	// Listen for a reverse full sync that is omitted because the max number of
 	// reverse full sync routines are running.
-	tnode.node.RegisterListener(on(OmitReverseFullSyncEvent{}, func(e events.Event) {
+	tnode.node.AddListener(on(OmitReverseFullSyncEvent{}, func(e events.Event) {
 		go func() {
 			for i := 0; i < maxJobs; i++ {
 				block <- struct{}{}
@@ -508,16 +508,16 @@ func TestThrottleBidirectionalFullSyncs(t *testing.T) {
 func TestReverseFullSync(t *testing.T) {
 	A := genChannelNodes(t, 5)
 	bootstrapNodes(t, A...)
-	waitForConvergence(t, time.Second, A...)
+	waitForConvergence(t, 100, A...)
 
 	B := genChannelNodes(t, 5)
 	bootstrapNodes(t, B...)
-	waitForConvergence(t, time.Second, B...)
+	waitForConvergence(t, 100, B...)
 
 	target := B[0].node.Address()
 	A[0].node.disseminator.reverseFullSync(target, time.Second)
 
-	waitForConvergence(t, time.Second, append(A, B...)...)
+	waitForConvergence(t, 100, append(A, B...)...)
 }
 
 // TestRedundantFullSync tests wether a RudundantReverseFullSyncEvent is fired
@@ -526,10 +526,10 @@ func TestReverseFullSync(t *testing.T) {
 func TestRedundantFullSync(t *testing.T) {
 	tnodes := genChannelNodes(t, 5)
 	bootstrapNodes(t, tnodes...)
-	waitForConvergence(t, time.Second, tnodes...)
+	waitForConvergence(t, 100, tnodes...)
 
 	quit := make(chan struct{})
-	tnodes[0].node.RegisterListener(on(RedundantReverseFullSyncEvent{}, func(e events.Event) {
+	tnodes[0].node.AddListener(on(RedundantReverseFullSyncEvent{}, func(e events.Event) {
 		close(quit)
 	}))
 
@@ -548,6 +548,6 @@ func TestRedundantFullSync(t *testing.T) {
 func TestReverseFullSyncJoinFailure(t *testing.T) {
 	tnodes := genChannelNodes(t, 5)
 	bootstrapNodes(t, tnodes...)
-	waitForConvergence(t, time.Second, tnodes...)
+	waitForConvergence(t, 100, tnodes...)
 	tnodes[0].node.disseminator.reverseFullSync("XXX", time.Second)
 }

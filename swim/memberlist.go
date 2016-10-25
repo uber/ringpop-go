@@ -103,7 +103,7 @@ func (m *memberlist) ComputeChecksum() {
 		}).Debug("ringpop membership computed new checksum")
 	}
 
-	m.node.emit(ChecksumComputeEvent{
+	m.node.EmitEvent(ChecksumComputeEvent{
 		Duration:    time.Now().Sub(startTime),
 		Checksum:    checksum,
 		OldChecksum: oldChecksum,
@@ -141,11 +141,25 @@ func (m *memberlist) genChecksumString() string {
 
 // returns the member at a specific address
 func (m *memberlist) Member(address string) (*Member, bool) {
+	var memberCopy *Member
 	m.members.RLock()
 	member, ok := m.members.byAddress[address]
+	if member != nil {
+		memberCopy = new(Member)
+		*memberCopy = *member
+	}
 	m.members.RUnlock()
 
-	return member, ok
+	return memberCopy, ok
+}
+
+// LocalMember returns a copy of the local Member in a thread safe way.
+func (m *memberlist) LocalMember() (member Member) {
+	m.members.Lock()
+	// copy local member state
+	member = *m.local
+	m.members.Unlock()
+	return
 }
 
 // RemoveMember removes the member from the membership list. If the membership has
@@ -175,7 +189,8 @@ func (m *memberlist) RemoveMember(address string) bool {
 
 func (m *memberlist) MemberAt(i int) *Member {
 	m.members.RLock()
-	member := m.members.list[i]
+	member := new(Member)
+	*member = *m.members.list[i]
 	m.members.RUnlock()
 
 	return member
@@ -210,32 +225,33 @@ func (m *memberlist) NumPingableMembers() (n int) {
 }
 
 // returns n pingable members in the member list
-func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []*Member {
-	var members []*Member
+func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []Member {
+	members := make([]Member, 0, n)
 
 	m.members.RLock()
-	for _, member := range m.members.list {
+	indices := rand.Perm(len(m.members.list))
+	for _, index := range indices {
+		member := m.members.list[index]
 		if m.Pingable(*member) && !excluding[member.Address] {
-			members = append(members, member)
+			members = append(members, *member)
+			if len(members) >= n {
+				break
+			}
 		}
 	}
 	m.members.RUnlock()
-
-	// shuffle members and take first n
-	members = shuffle(members)
-
-	if n > len(members) {
-		return members
-	}
-	return members[:n]
+	return members
 }
 
-// returns an immutable slice of members representing the current state of the membership
-func (m *memberlist) GetMembers() (members []Member) {
+// returns an slice of (copied) members representing the current state of the
+// membership. The membership will be filtered by the predicates provided.
+func (m *memberlist) GetMembers(predicates ...MemberPredicate) (members []Member) {
 	m.members.RLock()
 	members = make([]Member, 0, len(m.members.list))
 	for _, member := range m.members.list {
-		members = append(members, *member)
+		if MemberMatchesPredicates(*member, predicates...) {
+			members = append(members, *member)
+		}
 	}
 	m.members.RUnlock()
 
@@ -260,23 +276,134 @@ func (m *memberlist) bumpIncarnation() Change {
 }
 
 func (m *memberlist) MakeAlive(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Alive})
+	m.node.EmitEvent(MakeNodeStatusEvent{Alive})
 	return m.MakeChange(address, incarnation, Alive)
 }
 
 func (m *memberlist) MakeSuspect(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Suspect})
+	m.node.EmitEvent(MakeNodeStatusEvent{Suspect})
 	return m.MakeChange(address, incarnation, Suspect)
 }
 
 func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Faulty})
+	m.node.EmitEvent(MakeNodeStatusEvent{Faulty})
 	return m.MakeChange(address, incarnation, Faulty)
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
+	m.members.Lock()
 	m.local.Status = status
+	m.members.Unlock()
 	m.postLocalUpdate()
+}
+
+// SetLocalLabel sets the label identified by key to the new value. This
+// operation is validated against the configured limits for labels and will
+// return an ErrLabelSizeExceeded in the case this operation would alter the
+// labels of the node in such a way that the configured limits are exceeded.
+func (m *memberlist) SetLocalLabel(key, value string) error {
+	return m.SetLocalLabels(map[string]string{key: value})
+}
+
+// GetLocalLabel returns the value of a label set on the local node. Its second
+// argument indicates if the key was present on the node or not
+func (m *memberlist) GetLocalLabel(key string) (string, bool) {
+	m.members.RLock()
+	value, has := m.local.Labels[key]
+	m.members.RUnlock()
+	return value, has
+}
+
+// LocalLabelsAsMap copies the labels set on the local node into a map for the
+// callee to use. Changes to this map will not be reflected in the labels kept
+// by this node.
+func (m *memberlist) LocalLabelsAsMap() map[string]string {
+	m.members.RLock()
+	defer m.members.RUnlock()
+	if len(m.local.Labels) == 0 {
+		return nil
+	}
+
+	cpy := make(map[string]string, len(m.local.Labels))
+	for k, v := range m.local.Labels {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+// SetLocalLabels updates multiple labels at once. It will take all the labels
+// that are set in the map passed to this function and overwrite the value with
+// the value in the map. Keys that are not present in the provided map will
+// remain in the labels of this node. The operation is guaranteed to succeed
+// completely or not at all.
+// Before any changes are made to the labels the input is validated against the
+// configured limits on labels. This function will propagate any error that is
+// returned by the validation of the label limits eg. ErrLabelSizeExceeded
+func (m *memberlist) SetLocalLabels(labels map[string]string) error {
+	if err := m.node.labelLimits.validateLabels(m.local.Labels, labels); err != nil {
+		// the labels operation violates the label limits that has been configured
+		return err
+	}
+
+	m.members.Lock()
+	// ensure that there is a labels map
+	if m.local.Labels == nil {
+		m.local.Labels = make(map[string]string, len(labels))
+	}
+
+	// keep track if we made changes to the labels
+	changes := false
+
+	// copy the key-value pairs to our internal labels. By not setting the map
+	// of labels to the Labels value of the local member we prevent removing labels
+	// that the user did not specify in the new map.
+	for key, value := range labels {
+		old, had := m.local.Labels[key]
+		m.local.Labels[key] = value
+
+		if !had || old != value {
+			changes = true
+		}
+	}
+
+	m.members.Unlock()
+
+	if changes {
+		m.postLocalUpdate()
+	}
+
+	return nil
+}
+
+// RemoveLocalLabels removes the labels keyed by the keys from the local map of
+// labels. When changes are made to the member state a reincarnation will be
+// triggered and the new state of the member will be recorded in the disseminator
+// and subsequently be gossiped around. It is a valid operation to remove non-
+// existing keys. It returns true if all (and only all) labels have been removed.
+func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
+	m.members.Lock()
+	if len(m.local.Labels) == 0 || len(keys) == 0 {
+		m.members.Unlock()
+		// nothing to delete
+		return false
+	}
+
+	any := false    // keep track if we at least removed one label
+	removed := true // keep track if all labels are removed
+	for _, key := range keys {
+		_, has := m.local.Labels[key]
+		delete(m.local.Labels, key)
+		removed = removed && has
+		any = any || has
+	}
+
+	m.members.Unlock()
+
+	if any {
+		// only reincarnate if there is a label removed
+		m.postLocalUpdate()
+	}
+	return removed
 }
 
 // postLocalUpdate should be called after the local Member has been updated to
@@ -284,7 +411,9 @@ func (m *memberlist) SetLocalStatus(status string) {
 // will be recorded as a change to gossip around.
 func (m *memberlist) postLocalUpdate() {
 	// bump our incarnation for this change to be accepted by all peers
+	m.members.Lock()
 	change := m.bumpIncarnation()
+	m.members.Unlock()
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
@@ -293,7 +422,6 @@ func (m *memberlist) postLocalUpdate() {
 
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
-	m.node.rollup.TrackUpdates(changes)
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -303,7 +431,7 @@ func (m *memberlist) postLocalUpdate() {
 // changes that have been applied to the memberlist. It can be used to test if the
 // tombstone declaration has been executed atleast to the local memberlist.
 func (m *memberlist) MakeTombstone(address string, incarnation int64) []Change {
-	m.node.emit(MakeNodeStatusEvent{Tombstone})
+	m.node.EmitEvent(MakeNodeStatusEvent{Tombstone})
 	return m.MakeChange(address, incarnation, Tombstone)
 }
 
@@ -362,7 +490,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 		changes[i] = change.validateIncoming()
 	}
 
-	m.node.emit(MemberlistChangesReceivedEvent{changes})
+	m.node.EmitEvent(MemberlistChangesReceivedEvent{changes})
 
 	m.Lock()
 
@@ -385,7 +513,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				// countered by increasing the incarnation number and gossip the
 				// new state to the network.
 				change = m.bumpIncarnation()
-				m.node.emit(RefuteUpdateEvent{})
+				m.node.EmitEvent(RefuteUpdateEvent{})
 			} else {
 				// otherwise it can be applied to the memberlist
 
@@ -426,14 +554,13 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			}
 		}
 
-		m.node.emit(MemberlistChangesAppliedEvent{
+		m.node.EmitEvent(MemberlistChangesAppliedEvent{
 			Changes:     applied,
 			OldChecksum: oldChecksum,
 			NewChecksum: m.Checksum(),
 			NumMembers:  m.NumMembers(),
 		})
 		m.node.handleChanges(applied)
-		m.node.rollup.TrackUpdates(applied)
 	}
 
 	m.Unlock()
@@ -487,25 +614,14 @@ func (m *memberlist) Iter() *memberlistIter {
 	return newMemberlistIter(m)
 }
 
-func (m *memberlist) GetReachableMembers() []string {
-	m.members.RLock()
-	active := make([]string, 0, len(m.members.list))
-	for _, member := range m.members.list {
-		if member.isReachable() {
-			active = append(active, member.Address)
-		}
-	}
-	m.members.RUnlock()
-
-	return active
-}
-
-func (m *memberlist) CountReachableMembers() int {
+// CountMembers returns the number of members maintained by the swim membership
+// protocol for all members that match the predicates
+func (m *memberlist) CountMembers(predicates ...MemberPredicate) int {
 	count := 0
 
 	m.members.RLock()
 	for _, member := range m.members.list {
-		if member.isReachable() {
+		if MemberMatchesPredicates(*member, predicates...) {
 			count++
 		}
 	}

@@ -21,8 +21,8 @@
 package swim
 
 import (
-	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -62,6 +62,7 @@ func (dummyIter) Next() (*Member, bool) {
 type testNode struct {
 	node    *Node
 	channel *tchannel.Channel
+	clock   *clock.Mock
 }
 
 func (n *testNode) Destroy() {
@@ -105,11 +106,12 @@ func newChannelNode(t *testing.T) *testNode {
 	require.NoError(t, err, "channel must listen")
 
 	hostport := ch.PeerInfo().HostPort
+	c := clock.NewMock()
 	node := NewNode("test", hostport, ch.GetSubChannel("test"), &Options{
-		Clock: clock.NewMock(),
+		Clock: c,
 	})
 
-	return &testNode{node, ch}
+	return &testNode{node, ch, c}
 }
 
 // newChannelNodeWithHostPort creates a testNode with the address specified by
@@ -118,11 +120,12 @@ func newChannelNodeWithHostPort(t *testing.T, hostport string) *testNode {
 	ch, err := tchannel.NewChannel("test", nil)
 	require.NoError(t, err, "channel must create successfully")
 
+	c := clock.NewMock()
 	node := NewNode("test", hostport, ch.GetSubChannel("test"), &Options{
-		Clock: clock.NewMock(),
+		Clock: c,
 	})
 
-	return &testNode{node, ch}
+	return &testNode{node, ch, c}
 }
 
 func genChannelNodes(t *testing.T, n int) (nodes []*testNode) {
@@ -161,11 +164,11 @@ func bootstrapNodes(t *testing.T, testNodes ...*testNode) []string {
 // waitForConvergence lets the nodes gossip and returns when the nodes are converged.
 // After the cluster finished gossiping we double check that all nodes have the
 // same checksum for the memberlist, this means that the cluster is converged.
-func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testNode) {
-	deadline := time.Now().Add(timeout)
+func waitForConvergence(t *testing.T, maxIterations int, testNodes ...*testNode) {
+	waitForConvergenceNodes(t, maxIterations, testNodesToNodes(testNodes)...)
+}
 
-	nodes := testNodesToNodes(testNodes)
-
+func waitForConvergenceNodes(t *testing.T, maxIterations int, nodes ...*Node) {
 	// 1 node is a special case because it can't drain its changes since it
 	// cannot ping or be pinged by another member
 	if len(nodes) == 1 {
@@ -173,10 +176,29 @@ func waitForConvergence(t *testing.T, timeout time.Duration, testNodes ...*testN
 		return
 	}
 
+	// mark which nodes were gossiping and stop them from gossiping
+	wasGossiping := make([]bool, len(nodes))
+	for i, node := range nodes {
+		wasGossiping[i] = !node.gossip.Stopped()
+		if wasGossiping[i] {
+			node.gossip.Stop()
+		}
+	}
+
+	// after the forceful convergence start all nodes that were gossiping before
+	defer func() {
+		for i, shouldStart := range wasGossiping {
+			if shouldStart {
+				nodes[i].gossip.Start()
+			}
+		}
+	}()
+
 Tick:
+	maxIterations--
 	// return when deadline is reached
-	if time.Now().After(deadline) {
-		t.Errorf("timeout during wait for convergence")
+	if maxIterations < 0 {
+		t.Errorf("exhausted the maximum number of iterations while waiting for convergence")
 		return
 	}
 
@@ -285,19 +307,8 @@ func (c *swimCluster) Bootstrap() {
 }
 
 // WaitForConvergence polls the checksums of each node in the cluster and returns when they all match, or until timeout occurs.
-func (c *swimCluster) WaitForConvergence(timeout time.Duration) error {
-	timeoutCh := time.After(timeout)
-
-	for {
-		select {
-		case <-time.After(time.Millisecond):
-			if nodesConverged(c.nodes) {
-				return nil
-			}
-		case <-timeoutCh:
-			return errors.New("timeout during converging")
-		}
-	}
+func (c *swimCluster) WaitForConvergence(t *testing.T, maxIterations int) {
+	waitForConvergenceNodes(t, maxIterations, c.nodes...)
 }
 
 func testNodesToNodes(testNodes []*testNode) []*Node {
@@ -355,12 +366,12 @@ func (c *swimCluster) Nodes() []*Node {
 // - and then wait for a specific event.
 //
 // This function helps with making the code read like the latter.
-func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
+func DoThenWaitFor(f func(), er events.EventEmitter, t interface{}) {
 	block := make(chan struct{}, 1)
 
 	var once sync.Once
 
-	er.RegisterListener(on(t, func(e events.Event) {
+	er.AddListener(on(t, func(e events.Event) {
 		once.Do(func() {
 			block <- struct{}{}
 		})
@@ -371,4 +382,27 @@ func DoThenWaitFor(f func(), er events.EventRegistrar, t interface{}) {
 	// wait for first occurence of the event, close thereafter
 	<-block
 	close(block)
+}
+
+// The ListenerFunc type is an adapter to allow the use of ordinary functions
+// as EventListeners.
+type ListenerFunc struct {
+	fn func(events.Event)
+}
+
+// HandleEvent calls f(e).
+func (f *ListenerFunc) HandleEvent(e events.Event) {
+	f.fn(e)
+}
+
+// on is returns an EventListener that executes a function f upon receiving an
+// event of type t.
+func on(t interface{}, f func(e events.Event)) *ListenerFunc {
+	return &ListenerFunc{
+		fn: func(e events.Event) {
+			if reflect.TypeOf(t) == reflect.TypeOf(e) {
+				f(e)
+			}
+		},
+	}
 }

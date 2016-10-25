@@ -63,7 +63,7 @@ func New(rp ringpop.Interface, f ClientFactory, ch *tchannel.Channel) Router {
 		clientCache: make(map[string]interface{}),
 		channel:     ch,
 	}
-	rp.RegisterListener(r)
+	rp.AddListener(r)
 	return r
 }
 

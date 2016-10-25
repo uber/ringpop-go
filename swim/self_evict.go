@@ -193,7 +193,7 @@ func (s *selfEvict) evict() {
 		var wg sync.WaitGroup
 		wg.Add(len(targets))
 		for _, target := range targets {
-			go func(target *Member) {
+			go func(target Member) {
 				defer wg.Done()
 				_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
 				if err == nil {

@@ -48,6 +48,10 @@ type configuration struct {
 	// StateTimeouts keeps the state transition timeouts for swim to use
 	StateTimeouts swim.StateTimeouts
 
+	// LabelLimits keeps track of configured limits on labels. Among things the
+	// number of labels and the size of key and value can be configured.
+	LabelLimits swim.LabelOptions
+
 	// SelfEvict holds the settings with regards to self eviction
 	SelfEvict swim.SelfEvictOptions
 }
@@ -279,6 +283,31 @@ func FaultyPeriod(period time.Duration) Option {
 func TombstonePeriod(period time.Duration) Option {
 	return func(r *Ringpop) error {
 		r.config.StateTimeouts.Tombstone = period
+		return nil
+	}
+}
+
+// LabelLimitCount limits the number of labels an application can set on this
+// node.
+func LabelLimitCount(count int) Option {
+	return func(r *Ringpop) error {
+		r.config.LabelLimits.Count = count
+		return nil
+	}
+}
+
+// LabelLimitKeySize limits the size that a key of a label can be.
+func LabelLimitKeySize(size int) Option {
+	return func(r *Ringpop) error {
+		r.config.LabelLimits.KeySize = size
+		return nil
+	}
+}
+
+// LabelLimitValueSize limits the size that a value of a label can be.
+func LabelLimitValueSize(size int) Option {
+	return func(r *Ringpop) error {
+		r.config.LabelLimits.ValueSize = size
 		return nil
 	}
 }

@@ -114,6 +114,8 @@ func (s *RingpopOptionsTestSuite) TestLogger() {
 	mockLogger.On("WithFields", mock.Anything).Return(mockLogger)
 
 	rp, err := New("test", Channel(s.channel), Logger(mockLogger))
+	defer logging.SetLogger(nil)
+
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 

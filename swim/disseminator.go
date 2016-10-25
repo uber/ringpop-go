@@ -83,7 +83,7 @@ func (d *disseminator) AdjustMaxPropagations() {
 	if newMaxP != prevMaxP {
 		d.maxP = newMaxP
 
-		d.node.emit(MaxPAdjustedEvent{prevMaxP, newMaxP})
+		d.node.EmitEvent(MaxPAdjustedEvent{prevMaxP, newMaxP})
 
 		d.logger.WithFields(log.Fields{
 			"newMax":            newMaxP,
@@ -107,10 +107,12 @@ func (d *disseminator) HasChanges() bool {
 func (d *disseminator) MembershipAsChanges() (changes []Change) {
 	d.Lock()
 
+	localMember := d.node.memberlist.LocalMember()
+
 	for _, member := range d.node.memberlist.GetMembers() {
 		change := Change{}
 		change.populateSubject(&member)
-		change.populateSource(d.node.memberlist.local)
+		change.populateSource(&localMember)
 		changes = append(changes, change.validateOutgoing())
 	}
 
@@ -166,7 +168,7 @@ func (d *disseminator) IssueAsReceiver(
 		return changes, false
 	}
 
-	d.node.emit(FullSyncEvent{senderAddress, senderChecksum})
+	d.node.EmitEvent(FullSyncEvent{senderAddress, senderChecksum})
 
 	d.node.logger.WithFields(log.Fields{
 		"localChecksum":  d.node.memberlist.Checksum(),
@@ -182,7 +184,7 @@ func (d *disseminator) IssueAsReceiver(
 func (d *disseminator) filterChangesFromSender(cs []Change, source string, incarnation int64) []Change {
 	for i := 0; i < len(cs); i++ {
 		if incarnation == cs[i].SourceIncarnation && source == cs[i].Source {
-			d.node.emit(ChangeFilteredEvent{cs[i]})
+			d.node.EmitEvent(ChangeFilteredEvent{cs[i]})
 
 			// swap, and not just overwrite, so that in the end only the order
 			// of the underlying array has changed.
@@ -206,7 +208,7 @@ func (d *disseminator) issueChanges() []Change {
 
 	d.Unlock()
 
-	d.node.emit(ChangesCalculatedEvent{result})
+	d.node.EmitEvent(ChangesCalculatedEvent{result})
 
 	return result
 }
@@ -261,7 +263,7 @@ func (d *disseminator) tryStartReverseFullSync(target string, timeout time.Durat
 			"remote": target,
 		}).Info("omit bidirectional full sync, too many already running")
 
-		d.node.emit(OmitReverseFullSyncEvent{Target: target})
+		d.node.EmitEvent(OmitReverseFullSyncEvent{Target: target})
 		return
 	}
 
@@ -279,7 +281,7 @@ func (d *disseminator) tryStartReverseFullSync(target string, timeout time.Durat
 // ensures that this node merges the membership of the target node's membership
 // with its own.
 func (d *disseminator) reverseFullSync(target string, timeout time.Duration) {
-	d.node.emit(StartReverseFullSyncEvent{Target: target})
+	d.node.EmitEvent(StartReverseFullSyncEvent{Target: target})
 
 	res, err := sendJoinRequest(d.node, target, timeout)
 	if err != nil || res == nil {
@@ -296,6 +298,6 @@ func (d *disseminator) reverseFullSync(target string, timeout time.Duration) {
 
 	cs := d.node.memberlist.Update(res.Membership)
 	if len(cs) == 0 {
-		d.node.emit(RedundantReverseFullSyncEvent{Target: target})
+		d.node.EmitEvent(RedundantReverseFullSyncEvent{Target: target})
 	}
 }
