@@ -108,6 +108,11 @@ type phase struct {
 }
 
 type selfEvict struct {
+	// lock is used to gate access to state changing operations like registering
+	// hooks and starting self eviction. After eviction has started all state
+	// changing functions should return ErrSelfEvictionInProgress
+	lock sync.Mutex
+
 	node    *Node
 	options SelfEvictOptions
 	logger  bark.Logger
@@ -128,6 +133,12 @@ func newSelfEvict(node *Node, options SelfEvictOptions) *selfEvict {
 
 // RegisterSelfEvictHook registers a named pre/post eviction hook pair.
 func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
+	// lock the phases to prevent reading the current phase in a race. Unlocking
+	// will happen when this function terminates to prevent self-eviction to
+	// start while a hook is being added
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if s.currentPhase() != nil {
 		return ErrSelfEvictionInProgress
 	}
@@ -145,24 +156,28 @@ func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
 }
 
 func (s *selfEvict) SelfEvict() error {
+	s.lock.Lock()
 	if s.currentPhase() != nil {
+		s.lock.Unlock()
 		return ErrSelfEvictionInProgress
 	}
+	// pre-evict
+	s.transitionTo(preEvict)
+	// unlock only after transitioning the phase to make it an atomic operation.
+	s.lock.Unlock()
 
 	s.logger.Info("ringpop is initiating self eviction sequence")
+	s.runHooks(SelfEvictHook.PreEvict)
 
-	// these are the phases executed in order.
-	s.preEvict()
 	s.evict()
-	s.postEvict()
+
+	// post-evict
+	s.transitionTo(postEvict)
+	s.runHooks(SelfEvictHook.PostEvict)
+
 	s.done()
 
 	return nil
-}
-
-func (s *selfEvict) preEvict() {
-	s.transitionTo(preEvict)
-	s.runHooks(SelfEvictHook.PreEvict)
 }
 
 func (s *selfEvict) evict() {
@@ -208,11 +223,6 @@ func (s *selfEvict) evict() {
 			"numberOfSuccessfulPings": phase.numberOfSuccessfulPings,
 		}).Debug("finished proactive gossip on self evict")
 	}
-}
-
-func (s *selfEvict) postEvict() {
-	s.transitionTo(postEvict)
-	s.runHooks(SelfEvictHook.PostEvict)
 }
 
 func (s *selfEvict) done() {
