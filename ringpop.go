@@ -556,6 +556,9 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
 
+	case swim.SelfEvictedEvent:
+		rp.statter.RecordTimer(rp.getStatKey("self-eviction"), nil, event.Duration)
+
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
 		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))

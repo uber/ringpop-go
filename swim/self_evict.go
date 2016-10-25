@@ -227,8 +227,20 @@ func (s *selfEvict) evict() {
 
 func (s *selfEvict) done() {
 	s.transitionTo(done)
-	s.logger.Info("ringpop self eviction done")
-	//TODO emit total timing
+
+	firstPhase := s.phases[0].start
+	lastPhase := s.phases[len(s.phases)-1]
+	duration := lastPhase.end.Sub(firstPhase)
+
+	s.logger.WithFields(bark.Fields{
+		"phases":        s.phases,
+		"totalDuration": duration,
+	}).Info("ringpop self eviction done")
+
+	s.node.EmitEvent(SelfEvictedEvent{
+		PhasesCount: len(s.phases),
+		Duration:    duration,
+	})
 }
 
 func (s *selfEvict) transitionTo(newPhase evictionPhase) *phase {

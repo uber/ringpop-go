@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	eventsmocks "github.com/uber/ringpop-go/events/test/mocks"
 )
 
 type SelfEvictTestSuite struct {
@@ -104,6 +105,23 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict() {
 
 	hooks.AssertNumberOfCalls(s.T(), "PreEvict", 1)
 	hooks.AssertNumberOfCalls(s.T(), "PostEvict", 1)
+}
+
+func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_SelfEvictedEvent() {
+	listener := &eventsmocks.EventListener{}
+	listener.On("HandleEvent", mock.AnythingOfType("SelfEvictedEvent")).Run(func(args mock.Arguments) {
+		event := args[0].(SelfEvictedEvent)
+		s.Assert().Equal(4, event.PhasesCount, "expected phases count to contain the number of phases executed")
+	})
+
+	// catch all
+	listener.On("HandleEvent", mock.Anything).Return()
+
+	s.node.AddListener(listener)
+	err := s.node.SelfEvict()
+	s.Assert().NoError(err, "expected no error during self eviction")
+
+	listener.AssertCalled(s.T(), "HandleEvent", mock.AnythingOfType("SelfEvictedEvent"))
 }
 
 func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
