@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
+.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race test-all
 
 SHELL = /bin/bash
 
@@ -61,6 +61,10 @@ setup: dev_deps
 	ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
 
 test:	test-unit test-integration
+
+# lint should happen after test-unit and test-examples as it relies on objects
+# being created during these phases
+test-all: test-unit test-race test-examples lint test-integration
 
 test-integration: vendor
 	test/run-integration-tests
