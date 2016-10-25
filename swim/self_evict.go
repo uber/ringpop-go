@@ -32,9 +32,9 @@ import (
 )
 
 var (
-	// ErrDuplicateHook is returned when a hook with the given name has already
-	// been registered.
-	ErrDuplicateHook = errors.New("expected hook name to be unique")
+	// ErrDuplicateHook is returned when a hook that has already been registered
+	// is registered again
+	ErrDuplicateHook = errors.New("hook already registered")
 
 	// ErrSelfEvictionInProgress is returned when ringpop is already in the process
 	// of evicting itself from the network.
@@ -58,9 +58,6 @@ type SelfEvict interface {
 // SelfEvictHook is an interface describing a module that can be registered to
 // the self eviction hooks
 type SelfEvictHook interface {
-	// Name returns the name under which the eviction should be registered
-	Name() string
-
 	// PreEvict is the hook that will be called before ringpop evicts itself
 	// from the membership
 	PreEvict()
@@ -118,7 +115,7 @@ type selfEvict struct {
 	logger  bark.Logger
 	phases  []*phase
 
-	hooks map[string]SelfEvictHook
+	hooks []SelfEvictHook
 }
 
 func newSelfEvict(node *Node, options SelfEvictOptions) *selfEvict {
@@ -126,12 +123,12 @@ func newSelfEvict(node *Node, options SelfEvictOptions) *selfEvict {
 		node:    node,
 		options: options,
 		logger:  node.logger,
-
-		hooks: make(map[string]SelfEvictHook),
 	}
 }
 
-// RegisterSelfEvictHook registers a named pre/post eviction hook pair.
+// RegisterSelfEvictHook registers a pre/post eviction hook pair. If the hook
+// has already been registered before it returns the ErrDuplicateHook and does
+// not register it twice.
 func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
 	// lock the phases to prevent reading the current phase in a race. Unlocking
 	// will happen when this function terminates to prevent self-eviction to
@@ -143,14 +140,13 @@ func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
 		return ErrSelfEvictionInProgress
 	}
 
-	name := hook.Name()
-
-	_, hasHook := s.hooks[name]
-	if hasHook {
-		return ErrDuplicateHook
+	for _, h := range s.hooks {
+		if h == hook {
+			return ErrDuplicateHook
+		}
 	}
 
-	s.hooks[name] = hook
+	s.hooks = append(s.hooks, hook)
 
 	return nil
 }
@@ -275,14 +271,14 @@ func (s *selfEvict) runHooks(dispatch hookFn) {
 	var wg sync.WaitGroup
 
 	wg.Add(len(s.hooks))
-	for name, hook := range s.hooks {
-		go func(name string, hook SelfEvictHook) {
+	for _, hook := range s.hooks {
+		go func(hook SelfEvictHook) {
 			defer wg.Done()
 
-			s.logger.WithField("hook", name).Debug("ringpop self eviction running hook")
+			s.logger.Debugf("ringpop self eviction running hook: %+v", hook)
 			dispatch(hook)
-			s.logger.WithField("hook", name).Debug("ringpop self eviction hook done")
-		}(name, hook)
+			s.logger.Debugf("ringpop self eviction hook done: %+v", hook)
+		}(hook)
 	}
 	wg.Wait()
 	s.logger.Debug("ringpop self eviction done running hooks")

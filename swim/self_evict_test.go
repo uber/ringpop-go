@@ -51,13 +51,8 @@ func (s *SelfEvictTestSuite) TearDownTest() {
 func (s *SelfEvictTestSuite) TestSelfEvict_RegisterSelfEvictHook() {
 	// have some hooks
 	hook1 := new(MockSelfEvictHook)
-	hook1.On("Name").Return("hook1")
-
-	hookDuplicate := new(MockSelfEvictHook)
-	hookDuplicate.On("Name").Return("hook1")
-
+	hookDuplicate := hook1
 	hook2 := new(MockSelfEvictHook)
-	hook2.On("Name").Return("hook2")
 
 	err := s.node.RegisterSelfEvictHook(hook1)
 	s.Assert().NoError(err, "expected no error when a hook gets attached for the first time")
@@ -71,7 +66,6 @@ func (s *SelfEvictTestSuite) TestSelfEvict_RegisterSelfEvictHook() {
 
 func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict() {
 	hooks := &MockSelfEvictHook{}
-	hooks.On("Name").Return("hooks")
 
 	hooks.On("PreEvict").Run(func(args mock.Arguments) {
 		phase := s.node.selfEvict.currentPhase()
