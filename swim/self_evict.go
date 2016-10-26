@@ -152,32 +152,38 @@ func (s *selfEvict) RegisterSelfEvictHook(hook SelfEvictHook) error {
 }
 
 func (s *selfEvict) SelfEvict() error {
-	s.lock.Lock()
-	if s.currentPhase() != nil {
-		s.lock.Unlock()
-		return ErrSelfEvictionInProgress
+	// preEvict makes sure that SelfEvict will return ErrSelfEvictionInProgress
+	// when eviction is already in progress
+	err := s.preEvict()
+	if err != nil {
+		return err
 	}
-	// pre-evict
-	s.transitionTo(preEvict)
-	// unlock only after transitioning the phase to make it an atomic operation.
-	s.lock.Unlock()
-
-	s.logger.Info("ringpop is initiating self eviction sequence")
-	s.runHooks(SelfEvictHook.PreEvict)
-
 	s.evict()
-
-	// post-evict
-	s.transitionTo(postEvict)
-	s.runHooks(SelfEvictHook.PostEvict)
-
+	s.postEvict()
 	s.done()
 
 	return nil
 }
 
+func (s *selfEvict) preEvict() error {
+	s.lock.Lock()
+	if s.currentPhase() != nil {
+		s.lock.Unlock()
+		return ErrSelfEvictionInProgress
+	}
+	s.transitionTo(preEvict)
+	s.lock.Unlock()
+
+	s.logger.Info("ringpop is initiating self eviction sequence")
+	s.runHooks(SelfEvictHook.PreEvict)
+
+	return nil
+}
+
 func (s *selfEvict) evict() {
+	s.lock.Lock()
 	phase := s.transitionTo(evicting)
+	s.lock.Unlock()
 	s.node.memberlist.SetLocalStatus(Faulty)
 
 	if s.options.DisablePing == false {
@@ -221,11 +227,22 @@ func (s *selfEvict) evict() {
 	}
 }
 
-func (s *selfEvict) done() {
-	s.transitionTo(done)
+func (s *selfEvict) postEvict() {
+	s.lock.Lock()
+	s.transitionTo(postEvict)
+	s.lock.Unlock()
 
+	s.runHooks(SelfEvictHook.PostEvict)
+}
+
+func (s *selfEvict) done() {
+	s.lock.Lock()
+	s.transitionTo(done)
+	phasesCount := len(s.phases)
 	firstPhase := s.phases[0].start
-	lastPhase := s.phases[len(s.phases)-1]
+	lastPhase := s.phases[phasesCount-1]
+	s.lock.Unlock()
+
 	duration := lastPhase.end.Sub(firstPhase)
 
 	s.logger.WithFields(bark.Fields{
@@ -234,7 +251,7 @@ func (s *selfEvict) done() {
 	}).Info("ringpop self eviction done")
 
 	s.node.EmitEvent(SelfEvictedEvent{
-		PhasesCount: len(s.phases),
+		PhasesCount: phasesCount,
 		Duration:    duration,
 	})
 }

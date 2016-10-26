@@ -21,6 +21,8 @@
 package swim
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -101,6 +103,45 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict() {
 	hooks.AssertNumberOfCalls(s.T(), "PostEvict", 1)
 }
 
+func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_InvokedTwice_AfterCompleted() {
+	err := s.node.SelfEvict()
+	s.Assert().NoError(err, "expected no error during self eviction")
+	err = s.node.SelfEvict()
+	s.Assert().Error(err, "expected an error when self evict is called for the second time.")
+}
+
+func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_InvokedTwice_Concurrent() {
+	// hooks are used to validate the sequence has only be run once
+	hooks := &MockSelfEvictHook{}
+	hooks.On("PreEvict").Return()
+	hooks.On("PostEvict").Return()
+	s.node.RegisterSelfEvictHook(hooks)
+
+	var wg sync.WaitGroup
+	var errorCount int32
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			err := s.node.SelfEvict()
+			if err != nil {
+				// if there is an error it should be ErrSelfEvictionInProgress
+				s.Assert().Equal(ErrSelfEvictionInProgress, err, "expected an error that indicates self eviction is in progress")
+				// keep track of the amount of errors, we only expect 1 in the end
+				atomic.AddInt32(&errorCount, 1)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+
+	// because SelfEvict returns an error on the second invocation we expect the hooks to only be called once
+	hooks.AssertNumberOfCalls(s.T(), "PreEvict", 1)
+	hooks.AssertNumberOfCalls(s.T(), "PostEvict", 1)
+
+	s.Assert().EqualValues(1, errorCount, "expected number of errors when SelfEvict is invoked twice")
+}
+
 func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_SelfEvictedEvent() {
 	listener := &eventsmocks.EventListener{}
 	listener.On("HandleEvent", mock.AnythingOfType("SelfEvictedEvent")).Run(func(args mock.Arguments) {
@@ -135,13 +176,6 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
 
 	s.Assert().Equal(1, phase.numberOfPings, "expected 1 ping")
 	s.Assert().Equal(int32(1), phase.numberOfSuccessfulPings, "expected 1 successful ping")
-}
-
-func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_AlreadyRunning() {
-	err := s.node.SelfEvict()
-	s.Assert().NoError(err, "expected no error during self eviction")
-	err = s.node.SelfEvict()
-	s.Assert().Error(err, "expected an error when self evict is called for the second time.")
 }
 
 func TestSelfEvictTestSuite(t *testing.T) {
