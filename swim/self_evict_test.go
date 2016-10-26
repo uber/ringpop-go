@@ -66,6 +66,14 @@ func (s *SelfEvictTestSuite) TestSelfEvict_RegisterSelfEvictHook() {
 	s.Assert().Error(err, "expected an error when a duplicate hook gets attached to ringpop")
 }
 
+func (s *SelfEvictTestSuite) TestSelfEvict_RegisterSelfEvictHook_AfterEviction() {
+	s.node.SelfEvict()
+
+	hook1 := new(MockSelfEvictHook)
+	err := s.node.RegisterSelfEvictHook(hook1)
+	s.Assert().Error(err, "expected an error when adding a hook after self eviciton is called")
+}
+
 func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict() {
 	hooks := &MockSelfEvictHook{}
 
