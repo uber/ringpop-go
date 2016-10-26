@@ -197,10 +197,9 @@ func (s *selfEvict) evict() {
 			maxNumberOfPings,         // a configured percentage of members
 		)
 
-		phase.numberOfPings = numberOfPings
-
 		// select the members we are going to ping
 		targets := s.node.memberlist.RandomPingableMembers(numberOfPings, nil)
+		phase.numberOfPings = len(targets)
 
 		s.logger.WithFields(bark.Fields{
 			"numberOfPings": phase.numberOfPings,
