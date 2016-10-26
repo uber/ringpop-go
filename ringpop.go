@@ -365,7 +365,7 @@ func (rp *Ringpop) setState(s state) {
 // cases:
 // - Ringpop has not been bootstrapped yet
 // - SelfEvict has already been called
-// - The hook was already registered
+// - The hook is already registered
 func (rp *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
 	if !rp.Ready() {
 		return ErrNotBootstrapped
