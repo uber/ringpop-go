@@ -102,8 +102,7 @@ func defaultOptions() *Options {
 		MaxReverseFullSyncJobs: 5,
 
 		SelfEvict: SelfEvictOptions{
-			DisablePing: false,
-			PingRatio:   .4,
+			PingRatio: .4,
 		},
 	}
 

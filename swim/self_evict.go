@@ -73,14 +73,12 @@ type hookFn func(SelfEvictHook)
 // configure if ringpop should proactively ping members of the network on self
 // eviction and what percentage/ratio of the memberlist should be pinged at most
 type SelfEvictOptions struct {
-	DisablePing bool
-	PingRatio   float64
+	PingRatio float64
 }
 
 func mergeSelfEvictOptions(opt, def SelfEvictOptions) SelfEvictOptions {
 	return SelfEvictOptions{
-		DisablePing: util.SelectBool(opt.DisablePing, def.DisablePing),
-		PingRatio:   util.SelectFloat(opt.PingRatio, def.PingRatio),
+		PingRatio: util.SelectFloat(opt.PingRatio, def.PingRatio),
 	}
 }
 
@@ -186,44 +184,48 @@ func (s *selfEvict) evict() {
 	s.lock.Unlock()
 	s.node.memberlist.SetLocalStatus(Faulty)
 
-	if s.options.DisablePing == false {
-		numberOfPingableMembers := s.node.memberlist.NumPingableMembers()
-		maxNumberOfPings := int(math.Ceil(float64(numberOfPingableMembers) * s.options.PingRatio))
+	numberOfPingableMembers := s.node.memberlist.NumPingableMembers()
+	maxNumberOfPings := int(math.Ceil(float64(numberOfPingableMembers) * s.options.PingRatio))
 
-		// final number of members to ping should not exceed any of:
-		numberOfPings := util.Min(
-			s.node.disseminator.maxP, // the piggyback counter
-			numberOfPingableMembers,  // the number of members we can ping
-			maxNumberOfPings,         // a configured percentage of members
-		)
+	// final number of members to ping should not exceed any of:
+	numberOfPings := util.Min(
+		s.node.disseminator.maxP, // the piggyback counter
+		numberOfPingableMembers,  // the number of members we can ping
+		maxNumberOfPings,         // a configured percentage of members
+	)
 
-		// select the members we are going to ping
-		targets := s.node.memberlist.RandomPingableMembers(numberOfPings, nil)
-		phase.numberOfPings = len(targets)
-
-		s.logger.WithFields(bark.Fields{
-			"numberOfPings": phase.numberOfPings,
-			"targets":       targets,
-		}).Debug("starting proactive gossip on self evict")
-
-		var wg sync.WaitGroup
-		wg.Add(len(targets))
-		for _, target := range targets {
-			go func(target Member) {
-				defer wg.Done()
-				_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
-				if err == nil {
-					atomic.AddInt32(&phase.numberOfSuccessfulPings, 1)
-				}
-			}(target)
-		}
-		wg.Wait()
-
-		s.logger.WithFields(bark.Fields{
-			"numberOfPings":           phase.numberOfPings,
-			"numberOfSuccessfulPings": phase.numberOfSuccessfulPings,
-		}).Debug("finished proactive gossip on self evict")
+	if numberOfPings <= 0 {
+		// there are no nodes to be pinged, a value below 0 can be caused by a
+		// negative ping ratio
+		return
 	}
+
+	// select the members we are going to ping
+	targets := s.node.memberlist.RandomPingableMembers(numberOfPings, nil)
+	phase.numberOfPings = len(targets)
+
+	s.logger.WithFields(bark.Fields{
+		"numberOfPings": phase.numberOfPings,
+		"targets":       targets,
+	}).Debug("starting proactive gossip on self evict")
+
+	var wg sync.WaitGroup
+	wg.Add(len(targets))
+	for _, target := range targets {
+		go func(target Member) {
+			defer wg.Done()
+			_, err := sendPing(s.node, target.address(), s.node.pingTimeout)
+			if err == nil {
+				atomic.AddInt32(&phase.numberOfSuccessfulPings, 1)
+			}
+		}(target)
+	}
+	wg.Wait()
+
+	s.logger.WithFields(bark.Fields{
+		"numberOfPings":           phase.numberOfPings,
+		"numberOfSuccessfulPings": phase.numberOfSuccessfulPings,
+	}).Debug("finished proactive gossip on self evict")
 }
 
 func (s *selfEvict) postEvict() {

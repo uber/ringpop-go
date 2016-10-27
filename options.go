@@ -312,19 +312,6 @@ func LabelLimitValueSize(size int) Option {
 	}
 }
 
-// SelfEvictDisablePing configures if ringpop should disable actively pinging
-// other members when it evicts itself from the network. It is not advised to
-// disable the ping as it might cause the suspicion time to kick in as chances
-// are high that the node will be shutdown before its self-eviction is gossiped.
-// Only use this setting if you explicitly require no extra network traffic
-// during shutdown.
-func SelfEvictDisablePing(disabled bool) Option {
-	return func(r *Ringpop) error {
-		r.config.SelfEvict.DisablePing = disabled
-		return nil
-	}
-}
-
 // SelfEvictPingRatio configures the maximum percentage/ratio of the members to
 // actively ping while self evicting. A bigger ratio would allow for bigger
 // batch sizes during restarts without the self eviction being lost due to all

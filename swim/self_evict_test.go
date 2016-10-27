@@ -186,6 +186,27 @@ func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_GossipFaulty() {
 	s.Assert().Equal(int32(1), phase.numberOfSuccessfulPings, "expected 1 successful ping")
 }
 
+func (s *SelfEvictTestSuite) TestSelfEvict_SelfEvict_NegativeRatio() {
+	s.node.selfEvict.options.PingRatio = -1
+	address := s.node.Address()
+
+	peerView, _ := s.peer.memberlist.Member(address)
+	s.Assert().Equal(Alive, peerView.Status, "expected to be seen as alive by a peer before self eviction")
+
+	err := s.node.SelfEvict()
+	s.Assert().NoError(err, "expected no error during self eviction")
+
+	// we want to make sure the node has been marked as faulty even when we do
+	// not send pings to its peers
+	s.Assert().Equal(Faulty, s.node.memberlist.local.Status, "expected the status of the local node to be Faulty")
+
+	phase := s.node.selfEvict.phases[evicting]
+	s.Require().Equal(evicting, phase.phase, "expected the evicting phase at this position in the phases phases")
+
+	s.Assert().Equal(0, phase.numberOfPings, "expected no pings when PingRatio is a negative number")
+	s.Assert().Equal(int32(0), phase.numberOfSuccessfulPings, "expected no successful ping")
+}
+
 func TestSelfEvictTestSuite(t *testing.T) {
 	suite.Run(t, new(SelfEvictTestSuite))
 }
