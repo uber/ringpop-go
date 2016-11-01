@@ -376,6 +376,12 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.ringpop.HandleEvent(forward.RetrySuccessEvent{NumRetries: 1})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.succeeded"), "missing requestProxy.retry.reroute.remote stat")
 
+	s.ringpop.HandleEvent(swim.SelfEvictedEvent{
+		PhasesCount: 4,
+		Duration:    time.Duration(1) * time.Second,
+	})
+	s.Equal(int64(1000), s.stats.read("ringpop.127_0_0_1_3001.self-eviction"), "missing self-eviction stat")
+
 }
 
 func (s *RingpopTestSuite) TestRingpopReady() {

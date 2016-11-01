@@ -306,3 +306,31 @@ func (_m *Ringpop) RemoveListener(_a0 events.EventListener) bool {
 func (_m *Ringpop) RegisterListener(_a0 events.EventListener) {
 	_m.Called(_a0)
 }
+
+// RegisterSelfEvictHook provides a mock function with given fields: hooks
+func (_m *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
+	ret := _m.Called(hooks)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(swim.SelfEvictHook) error); ok {
+		r0 = rf(hooks)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SelfEvict provides a mock function with given fields:
+func (_m *Ringpop) SelfEvict() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

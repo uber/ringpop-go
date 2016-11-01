@@ -69,6 +69,8 @@ type Options struct {
 	LabelLimits LabelOptions
 
 	Clock clock.Clock
+
+	SelfEvict SelfEvictOptions
 }
 
 func defaultOptions() *Options {
@@ -98,6 +100,10 @@ func defaultOptions() *Options {
 		Clock: clock.New(),
 
 		MaxReverseFullSyncJobs: 5,
+
+		SelfEvict: SelfEvictOptions{
+			PingRatio: .4,
+		},
 	}
 
 	return opts
@@ -130,6 +136,8 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.MaxReverseFullSyncJobs = util.SelectInt(opts.MaxReverseFullSyncJobs, def.MaxReverseFullSyncJobs)
 
+	opts.SelfEvict = mergeSelfEvictOptions(opts.SelfEvict, def.SelfEvict)
+
 	if opts.Clock == nil {
 		opts.Clock = def.Clock
 	}
@@ -152,6 +160,12 @@ type NodeInterface interface {
 
 	AddListener(events.EventListener) bool
 	RemoveListener(events.EventListener) bool
+
+	// swim.SelfEvict
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
+	RegisterSelfEvictHook(hooks SelfEvictHook) error
+	SelfEvict() error
 }
 
 // A Node is a SWIM member
@@ -197,6 +211,9 @@ type Node struct {
 	// clock is used to generate incarnation numbers; it is typically the
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
+
+	selfEvict        *selfEvict
+	selfEvictOptions SelfEvictOptions
 }
 
 // NewNode returns a new SWIM Node.
@@ -223,6 +240,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		totalRate:  metrics.NewMeter(),
 		clock:      opts.Clock,
 	}
+	node.selfEvict = newSelfEvict(node, opts.SelfEvict)
 
 	node.labelLimits = opts.LabelLimits
 
@@ -338,6 +356,19 @@ func (n *Node) Ready() bool {
 	n.state.RUnlock()
 
 	return ready
+}
+
+// RegisterSelfEvictHook registers systems that want to hook into the eviction
+// sequence of the swim protocol.
+func (n *Node) RegisterSelfEvictHook(hooks SelfEvictHook) error {
+	return n.selfEvict.RegisterSelfEvictHook(hooks)
+}
+
+// SelfEvict initiates the self eviction sequence of ringpop, it will mark the
+// node as faulty and calls systems that want to hook in to the sequence at the
+// corresponding times.
+func (n *Node) SelfEvict() error {
+	return n.selfEvict.SelfEvict()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

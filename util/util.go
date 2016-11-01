@@ -244,12 +244,25 @@ func SelectDuration(opt, def time.Duration) time.Duration {
 	return opt
 }
 
-// Min returns min(a,b)
-func Min(a, b int) int {
-	if a < b {
-		return a
+// SelectBool takes an option and a default value and returns the default value if
+// the option is equal to the zero value, and the option otherwise.
+func SelectBool(opt, def bool) bool {
+	if opt == false {
+		return def
 	}
-	return b
+	return opt
+}
+
+// Min returns the lowest integer and is defined because golang only has a min
+// function for floats and not for ints.
+func Min(first int, rest ...int) int {
+	m := first
+	for _, value := range rest {
+		if value < m {
+			m = value
+		}
+	}
+	return m
 }
 
 // Timestamp is a bi-directional binding of Time to interger Unix timestamp in

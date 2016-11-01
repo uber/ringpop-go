@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
@@ -272,6 +273,49 @@ func (s *RingpopOptionsTestSuite) TestCombinedPeriodConfig() {
 	s.Equal(rp.config.StateTimeouts.Suspect, 1*time.Second)
 	s.Equal(rp.config.StateTimeouts.Faulty, 2*time.Second)
 	s.Equal(rp.config.StateTimeouts.Tombstone, 3*time.Second)
+}
+
+func (s *RingpopOptionsTestSuite) TestSelfEvictOptions() {
+	var tableTest = []struct {
+		options []Option
+		result  swim.SelfEvictOptions
+	}{
+		{[]Option{
+			SelfEvictPingRatio(.2),
+		}, swim.SelfEvictOptions{
+			PingRatio: .2,
+		}},
+		{[]Option{
+			SelfEvictPingRatio(.3),
+		}, swim.SelfEvictOptions{
+			PingRatio: .3,
+		}},
+		{[]Option{
+			SelfEvictPingRatio(.4),
+		}, swim.SelfEvictOptions{
+			PingRatio: .4,
+		}},
+		{[]Option{
+			SelfEvictPingRatio(-1),
+		}, swim.SelfEvictOptions{
+			PingRatio: -1,
+		}},
+	}
+
+	for _, test := range tableTest {
+		options := []Option{Channel(s.channel)}
+		options = append(options, test.options...)
+		rp, err := New(
+			"test",
+			options...,
+		)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(rp)
+
+		s.Equal(test.result, rp.config.SelfEvict)
+	}
+
 }
 
 func TestRingpopOptionsTestSuite(t *testing.T) {

@@ -51,6 +51,9 @@ type configuration struct {
 	// LabelLimits keeps track of configured limits on labels. Among things the
 	// number of labels and the size of key and value can be configured.
 	LabelLimits swim.LabelOptions
+
+	// SelfEvict holds the settings with regards to self eviction
+	SelfEvict swim.SelfEvictOptions
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -305,6 +308,26 @@ func LabelLimitKeySize(size int) Option {
 func LabelLimitValueSize(size int) Option {
 	return func(r *Ringpop) error {
 		r.config.LabelLimits.ValueSize = size
+		return nil
+	}
+}
+
+// SelfEvictPingRatio configures the maximum percentage/ratio of the members to
+// actively ping while self evicting. A bigger ratio would allow for bigger
+// batch sizes during restarts without the self eviction being lost due to all
+// nodes having the knowledge being shutdown at the same time.
+//
+// A smaller ratio will cause less network traffic and therefore slightly faster
+// shutdown times. A ratio that exceeds 1 will be capped to one when the self
+// eviction is executed as it does not make sense to send the gossip to the same
+// node twice. A negative value will cause no pings to be sent out during self
+// eviction.
+//
+// In no case will there be more pings sent then makes sense by the limit of the
+// current piggyback count
+func SelfEvictPingRatio(ratio float64) Option {
+	return func(r *Ringpop) error {
+		r.config.SelfEvict.PingRatio = ratio
 		return nil
 	}
 }

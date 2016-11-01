@@ -219,3 +219,12 @@ type DiscoHealEvent struct{}
 
 // AttemptHealEvent is sent when the healer is triggered
 type AttemptHealEvent struct{}
+
+// SelfEvictedEvent is emitted when self eviction has been completed
+type SelfEvictedEvent struct {
+	// PhasesCount the total number of phases executed
+	PhasesCount int
+
+	// Duration in milliseconds the self-eviction took
+	Duration time.Duration
+}

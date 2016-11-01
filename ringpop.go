@@ -71,6 +71,12 @@ type Interface interface {
 	// DEPRECATED, use AddListener (!) kept around for backwards compatibility
 	// but will start logging warnings
 	RegisterListener(events.EventListener)
+
+	// swim.SelfEvict
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
+	RegisterSelfEvictHook(hooks swim.SelfEvictHook) error
+	SelfEvict() error
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -185,6 +191,7 @@ func (rp *Ringpop) init() error {
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
 		LabelLimits:   rp.config.LabelLimits,
+		SelfEvict:     rp.config.SelfEvict,
 	})
 	rp.node.AddListener(rp)
 
@@ -350,6 +357,31 @@ func (rp *Ringpop) setState(s state) {
 			rp.EmitEvent(events.Destroyed{})
 		}
 	}
+}
+
+// RegisterSelfEvictHook registers the eviction hooks that need to be executed
+// before and after self eviction from the membership. An error will be returned
+// if ringpop was unable to register the hooks. This could happen in the following
+// cases:
+// - Ringpop has not been bootstrapped yet
+// - SelfEvict has already been called
+// - The hook is already registered
+func (rp *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+	return rp.node.RegisterSelfEvictHook(hooks)
+}
+
+// SelfEvict should be called before shutting down the application. When calling
+// this function ringpop will gracefully evict itself from the network. Utilities
+// that hook into ringpop will have the opportunity to hook into this system to
+// gracefully handle the shutdown of ringpop.
+func (rp *Ringpop) SelfEvict() error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+	return rp.node.SelfEvict()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -523,6 +555,9 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
+
+	case swim.SelfEvictedEvent:
+		rp.statter.RecordTimer(rp.getStatKey("self-eviction"), nil, event.Duration)
 
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)

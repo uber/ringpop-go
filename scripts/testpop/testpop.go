@@ -22,7 +22,10 @@ package main
 
 import (
 	"flag"
+	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 	"time"
 
 	"github.com/cactus/go-statsd-client/statsd"
@@ -114,6 +117,44 @@ func main() {
 		log.Fatalf("bootstrap failed: %v", err)
 	}
 
+	go signalHandler(rp, true)  // handle SIGINT
+	go signalHandler(rp, false) // handle SIGTERM
+
 	// block
 	select {}
+}
+
+func signalHandler(rp *ringpop.Ringpop, interactive bool) {
+	sigchan := make(chan os.Signal, 1)
+
+	var s os.Signal
+	if interactive {
+		s = syscall.SIGINT
+	} else {
+		s = syscall.SIGTERM
+	}
+
+	signal.Notify(sigchan, s)
+
+	// wait on a signal
+	receivedSignal := <-sigchan
+	log.Printf("received signal %q, initiating self eviction\n", receivedSignal)
+
+	if interactive {
+		log.Error("triggered graceful shutdown. Press Ctrl+C again to force exit.")
+		go func() {
+			// exit on second signal
+			<-sigchan
+			log.Error("Force exiting...")
+			os.Exit(2)
+		}()
+	}
+
+	err := rp.SelfEvict()
+	if err != nil {
+		log.Errorf("Error during self-eviction: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(0)
 }
