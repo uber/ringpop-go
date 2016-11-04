@@ -106,8 +106,9 @@ type Ringpop struct {
 
 	logger log.Logger
 
-	tickers   chan *clock.Ticker
-	startTime time.Time
+	tickers     chan *clock.Ticker
+	tickersStop chan bool
+	startTime   time.Time
 }
 
 // state represents the internal state of a Ringpop instance.
@@ -212,16 +213,22 @@ func (rp *Ringpop) startTimers() {
 		return
 	}
 	rp.tickers = make(chan *clock.Ticker, 32) // 32 == max number of tickers
+	rp.tickersStop = make(chan bool, 1)
 
 	if rp.config.MembershipChecksumStatPeriod != StatPeriodNever {
 		ticker := rp.clock.Ticker(rp.config.MembershipChecksumStatPeriod)
 		rp.tickers <- ticker
 		go func() {
-			for _ = range ticker.C {
-				rp.statter.UpdateGauge(
-					rp.getStatKey("membership.checksum-periodic"),
-					nil,
-					int64(rp.node.GetChecksum()))
+			for {
+				select {
+				case <-ticker.C:
+					rp.statter.UpdateGauge(
+						rp.getStatKey("membership.checksum-periodic"),
+						nil,
+						int64(rp.node.GetChecksum()))
+				case <-rp.tickersStop:
+					return
+				}
 			}
 		}()
 	}
@@ -230,11 +237,16 @@ func (rp *Ringpop) startTimers() {
 		ticker := rp.clock.Ticker(rp.config.RingChecksumStatPeriod)
 		rp.tickers <- ticker
 		go func() {
-			for _ = range ticker.C {
-				rp.statter.UpdateGauge(
-					rp.getStatKey("ring.checksum-periodic"),
-					nil,
-					int64(rp.ring.Checksum()))
+			for {
+				select {
+				case <-ticker.C:
+					rp.statter.UpdateGauge(
+						rp.getStatKey("ring.checksum-periodic"),
+						nil,
+						int64(rp.ring.Checksum()))
+				case <-rp.tickersStop:
+					return
+				}
 			}
 		}()
 	}
@@ -246,6 +258,8 @@ func (rp *Ringpop) stopTimers() {
 		for ticker := range rp.tickers {
 			ticker.Stop()
 		}
+		close(rp.tickersStop)
+		rp.tickersStop = nil
 		rp.tickers = nil
 	}
 }
