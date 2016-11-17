@@ -45,6 +45,13 @@ type Configuration struct {
 	ReplicaPoints int
 }
 
+// Range ...
+type Range struct {
+	Address             string
+	LowerBoundIncluding int
+	UpperBoundIncluding int
+}
+
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
 // a Red-Black Tree to achieve O(log N) lookup and insertion time.
 type HashRing struct {
@@ -286,4 +293,22 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 		servers = append(servers, server)
 	}
 	return servers
+}
+
+func (r *HashRing) GetRanges() (ranges []Range) {
+	var lastVal int
+	lastVal = 0
+
+	r.RLock()
+	r.tree.Iterate(func(val int, str string) {
+		ranges = append(ranges, Range{
+			Address:             str,
+			LowerBoundIncluding: lastVal,
+			UpperBoundIncluding: val,
+		})
+		lastVal = val + 1
+	})
+	r.RUnlock()
+
+	return
 }

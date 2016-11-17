@@ -256,6 +256,23 @@ func (t *redBlackTree) Search(val int) (string, bool) {
 	return t.root.search(val)
 }
 
+func (t *redBlackTree) Iterate(fn func(val int, str string)) {
+	if t.root == nil {
+		return
+	}
+	t.root.iterate(fn)
+}
+
+func (n *redBlackNode) iterate(fn func(val int, str string)) {
+	if n.left != nil {
+		n.left.iterate(fn)
+	}
+	fn(n.val, n.str)
+	if n.right != nil {
+		n.right.iterate(fn)
+	}
+}
+
 // LookupNAt iterates through the tree from the node with value val, and
 // returns the next n unique strings. This function is not guaranteed to
 // return n strings.

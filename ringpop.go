@@ -54,6 +54,7 @@ type Interface interface {
 	Checksum() (uint32, error)
 	Lookup(key string) (string, error)
 	LookupN(key string, n int) ([]string, error)
+	Hashring() (*hashring.HashRing, error)
 	GetReachableMembers(predicates ...swim.MemberPredicate) ([]string, error)
 	CountReachableMembers(predicates ...swim.MemberPredicate) (int, error)
 
@@ -657,6 +658,14 @@ func (rp *Ringpop) LookupN(key string, n int) ([]string, error) {
 	}
 
 	return destinations, nil
+}
+
+func (rp *Ringpop) Hashring() (*hashring.HashRing, error) {
+	if !rp.Ready() {
+		return nil, ErrNotBootstrapped
+	}
+
+	return rp.ring, nil
 }
 
 func (rp *Ringpop) ringEvent(e interface{}) {
