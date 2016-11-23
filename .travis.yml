@@ -20,9 +20,8 @@ install:
   - make setup
 
 env:
-  - RUN="make test-unit test-examples lint coveralls"
+  - RUN="make test-unit test-race test-examples lint coveralls"
   - RUN="make test-integration"
-  - RUN="make test-race"
 
 matrix:
   fast_finish: true
