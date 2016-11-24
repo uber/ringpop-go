@@ -269,7 +269,7 @@ func TestLookupNLoopAround(t *testing.T) {
 	ring.AddRemoveServers(addresses, nil)
 
 	unique := make(map[string]struct{})
-	ring.tree.LookupNUniqueAt(1, 0, unique)
+	ring.tree.LookupNUniqueAt(1, replicapoint(0), unique)
 	var firstInTree string
 	for server := range unique {
 		firstInTree = server
