@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/membership"
+
 	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
 	"github.com/uber-common/bark"
@@ -291,10 +293,12 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
+	var before Member
 	m.members.Lock()
+	before = *m.local // make a copy of the before state
 	m.local.Status = status
 	m.members.Unlock()
-	m.postLocalUpdate()
+	m.postLocalUpdate(before)
 }
 
 // SetLocalLabel sets the label identified by key to the new value. This
@@ -345,7 +349,13 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 		return err
 	}
 
+	var before Member
+
 	m.members.Lock()
+	before = *m.local
+
+	// TODO make local labels immutable so the copy above actually works
+
 	// ensure that there is a labels map
 	if m.local.Labels == nil {
 		m.local.Labels = make(map[string]string, len(labels))
@@ -369,7 +379,7 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 	m.members.Unlock()
 
 	if changes {
-		m.postLocalUpdate()
+		m.postLocalUpdate(before)
 	}
 
 	return nil
@@ -381,7 +391,10 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 // and subsequently be gossiped around. It is a valid operation to remove non-
 // existing keys. It returns true if all (and only all) labels have been removed.
 func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
+	var before Member
 	m.members.Lock()
+	before = *m.local
+
 	if len(m.local.Labels) == 0 || len(keys) == 0 {
 		m.members.Unlock()
 		// nothing to delete
@@ -401,7 +414,7 @@ func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 
 	if any {
 		// only reincarnate if there is a label removed
-		m.postLocalUpdate()
+		m.postLocalUpdate(before)
 	}
 	return removed
 }
@@ -409,7 +422,7 @@ func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 // postLocalUpdate should be called after the local Member has been updated to
 // make sure that its new state has a higher incarnation number and the change
 // will be recorded as a change to gossip around.
-func (m *memberlist) postLocalUpdate() {
+func (m *memberlist) postLocalUpdate(before Member) {
 	// bump our incarnation for this change to be accepted by all peers
 	m.members.Lock()
 	change := m.bumpIncarnation()
@@ -422,6 +435,22 @@ func (m *memberlist) postLocalUpdate() {
 
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
+
+	// prepare a membership change event for observable state changes
+	var memberChange membership.MemberChange
+	if m.Pingable(before) {
+		memberChange.Before = before
+	}
+	if m.Pingable(*m.local) {
+		memberChange.After = *m.local
+	}
+	if memberChange.Before != nil || memberChange.After != nil {
+		m.node.EmitEvent(membership.ChangeEvent{
+			Changes: []membership.MemberChange{
+				memberChange,
+			},
+		})
+	}
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -492,6 +521,8 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 	m.node.EmitEvent(MemberlistChangesReceivedEvent{changes})
 
+	var memberChanges []membership.MemberChange
+
 	m.Lock()
 
 	// run through all changes received and figure out if they need to be accepted
@@ -517,6 +548,20 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			} else {
 				// otherwise it can be applied to the memberlist
 
+				// prepare the change and collect if there is an outside
+				// observable change eg. changes that involve active
+				// participants of the membership (pingable)
+				memberChange := membership.MemberChange{}
+				if has && m.Pingable(*member) {
+					memberChange.Before = *member
+				}
+				if m.Pingable(gossip) {
+					memberChange.After = gossip
+				}
+				if memberChange.Before != nil || memberChange.After != nil {
+					memberChanges = append(memberChanges, memberChange)
+				}
+
 				if !has {
 					// if the member was not already present in the list we will
 					// add it and assign it a random position in the list to ensure
@@ -524,6 +569,7 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 					m.members.byAddress[gossip.Address] = &gossip
 					i := m.getJoinPosition()
 					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
+
 				} else {
 					// copy the value of the gossip into the already existing
 					// struct. This operation is by value, not by reference.
@@ -561,6 +607,15 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			NumMembers:  m.NumMembers(),
 		})
 		m.node.handleChanges(applied)
+
+	}
+
+	// if there are changes that are important for outside observers of the
+	// membership emit those
+	if len(memberChanges) > 0 {
+		m.node.EmitEvent(membership.ChangeEvent{
+			Changes: memberChanges,
+		})
 	}
 
 	m.Unlock()

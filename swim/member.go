@@ -68,6 +68,15 @@ type Member struct {
 // string to string mappings containing user data that is gossiped around in SWIM.
 type LabelMap map[string]string
 
+func (m Member) GetAddress() string {
+	return m.Address
+}
+
+func (m Member) Label(key string) (value string, has bool) {
+	value, has = m.Labels[key]
+	return
+}
+
 // suspect interface
 func (m Member) address() string {
 	return m.Address
