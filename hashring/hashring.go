@@ -276,7 +276,7 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 	}
 
 	hash := r.hashfunc(key)
-	unique := make(map[string]struct{})
+	unique := make(map[valuetype]struct{})
 
 	// lookup N unique servers from the red-black tree. If we have not
 	// collected all the servers we want, we have reached the
@@ -289,7 +289,7 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 
 	var servers []string
 	for server := range unique {
-		servers = append(servers, server)
+		servers = append(servers, server.(string))
 	}
 	return servers
 }

@@ -30,10 +30,12 @@ type keytype interface {
 	Compare(other interface{}) int
 }
 
+type valuetype interface{}
+
 // redBlackNode is a node of the redBlackTree
 type redBlackNode struct {
 	key   keytype
-	str   string
+	value valuetype
 	left  *redBlackNode
 	right *redBlackNode
 	red   bool
@@ -84,9 +86,12 @@ func doubleRotate(root *redBlackNode, dir bool) *redBlackNode {
 
 // Insert inserts a value and string into the tree
 // Returns true on succesful insertion, false if duplicate exists
-func (t *redBlackTree) Insert(key keytype, str string) (ret bool) {
+func (t *redBlackTree) Insert(key keytype, value valuetype) (ret bool) {
 	if t.root == nil {
-		t.root = &redBlackNode{key: key, str: str}
+		t.root = &redBlackNode{
+			key:   key,
+			value: value,
+		}
 		ret = true
 	} else {
 		var head = &redBlackNode{}
@@ -104,7 +109,11 @@ func (t *redBlackTree) Insert(key keytype, str string) (ret bool) {
 		for {
 			if node == nil {
 				// insert new node at bottom
-				node = &redBlackNode{key: key, str: str, red: true}
+				node = &redBlackNode{
+					key:   key,
+					value: value,
+					red:   true,
+				}
 				parent.setChild(dir, node)
 				ret = true
 			} else if isRed(node.left) && isRed(node.right) {
@@ -225,7 +234,7 @@ func (t *redBlackTree) Delete(key keytype) bool {
 	// get rid of node if we've found one
 	if found != nil {
 		found.key = node.key
-		found.str = node.str
+		found.value = node.value
 		parent.setChild(parent.right == node, node.Child(node.left == nil))
 		t.size--
 	}
@@ -238,10 +247,10 @@ func (t *redBlackTree) Delete(key keytype) bool {
 	return found != nil
 }
 
-func (n *redBlackNode) search(key keytype) (string, bool) {
+func (n *redBlackNode) search(key keytype) (valuetype, bool) {
 	cmp := n.key.Compare(key)
 	if cmp == 0 {
-		return n.str, true
+		return n.value, true
 	} else if 0 < cmp {
 		if n.left != nil {
 			return n.left.search(key)
@@ -254,7 +263,7 @@ func (n *redBlackNode) search(key keytype) (string, bool) {
 
 // Search searches for a value in the redBlackTree, returns the string and true
 // if found or the empty string and false if val is not in the tree.
-func (t *redBlackTree) Search(key keytype) (string, bool) {
+func (t *redBlackTree) Search(key keytype) (valuetype, bool) {
 	if t.root == nil {
 		return "", false
 	}
@@ -264,13 +273,13 @@ func (t *redBlackTree) Search(key keytype) (string, bool) {
 // LookupNAt iterates through the tree from the node with value val, and
 // returns the next n unique strings. This function is not guaranteed to
 // return n strings.
-func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[string]struct{}) {
+func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[valuetype]struct{}) {
 	findNUniqueAbove(t.root, n, key, result)
 }
 
 // findNUniqueAbove is a recursive search that finds n unique strings
 // with a value bigger or equal than val
-func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[string]struct{}) {
+func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[valuetype]struct{}) {
 	if len(result) >= n || node == nil {
 		return
 	}
@@ -287,7 +296,7 @@ func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[string]
 	}
 
 	if cmp >= 0 {
-		result[node.str] = struct{}{}
+		result[node.value] = struct{}{}
 	}
 
 	findNUniqueAbove(node.right, n, key, result)
