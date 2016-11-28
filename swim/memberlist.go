@@ -23,6 +23,7 @@ package swim
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"math/rand"
 	"sort"
 	"sync"
@@ -354,12 +355,9 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 	m.members.Lock()
 	before = *m.local
 
-	// TODO make local labels immutable so the copy above actually works
-
-	// ensure that there is a labels map
-	if m.local.Labels == nil {
-		m.local.Labels = make(map[string]string, len(labels))
-	}
+	// ensure that there is a new copy of the labels on the member to work with,
+	// CopyLabels guarantees a non-nil map so it is safe to work with
+	m.local.Labels = CopyLabels(m.local.Labels)
 
 	// keep track if we made changes to the labels
 	changes := false
@@ -401,6 +399,10 @@ func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 		return false
 	}
 
+	// ensure that there is a new copy of the labels on the member to work with,
+	// CopyLabels guarantees a non-nil map so it is safe to work with
+	m.local.Labels = CopyLabels(m.local.Labels)
+
 	any := false    // keep track if we at least removed one label
 	removed := true // keep track if all labels are removed
 	for _, key := range keys {
@@ -436,15 +438,20 @@ func (m *memberlist) postLocalUpdate(before Member) {
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
 
+	log.Println("calculating membership chage post local update")
 	// prepare a membership change event for observable state changes
 	var memberChange membership.MemberChange
-	if m.Pingable(before) {
+	if before.isReachable() {
+		log.Println("before is reachable")
 		memberChange.Before = before
 	}
-	if m.Pingable(*m.local) {
+	if m.local.isReachable() {
+		log.Println("after is reachable")
 		memberChange.After = *m.local
 	}
+
 	if memberChange.Before != nil || memberChange.After != nil {
+		log.Println("emitting change")
 		m.node.EmitEvent(membership.ChangeEvent{
 			Changes: []membership.MemberChange{
 				memberChange,
@@ -552,10 +559,10 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				// observable change eg. changes that involve active
 				// participants of the membership (pingable)
 				memberChange := membership.MemberChange{}
-				if has && m.Pingable(*member) {
+				if has && member.isReachable() {
 					memberChange.Before = *member
 				}
-				if m.Pingable(gossip) {
+				if gossip.isReachable() {
 					memberChange.After = gossip
 				}
 				if memberChange.Before != nil || memberChange.After != nil {

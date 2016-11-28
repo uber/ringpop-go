@@ -102,6 +102,14 @@ func (m Member) checksumString(b *bytes.Buffer) {
 	m.Labels.checksumString(b)
 }
 
+func CopyLabels(labels LabelMap) (result LabelMap) {
+	result = make(map[string]string, len(labels))
+	for key, value := range labels {
+		result[key] = value
+	}
+	return
+}
+
 // checksumString adds the label portion of the checksum to the buffer that is
 // passed in. The string will not be appended in the case where labels are not
 // set on this member. This is for backwards compatibility reasons with older
