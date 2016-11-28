@@ -192,7 +192,7 @@ func (r *HashRing) removeReplicasNoLock(server membership.Member) {
 
 func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberChange) {
 	r.Lock()
-	changed := true
+	changed := false
 	for _, change := range changes {
 		if change.Before == nil && change.After != nil {
 			// new member
@@ -205,9 +205,11 @@ func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberCh
 		}
 	}
 
+	// recompute checksums on changes
 	if changed {
 		r.computeChecksumNoLock()
 	}
+
 	r.Unlock()
 }
 
