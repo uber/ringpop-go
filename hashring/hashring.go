@@ -64,16 +64,16 @@ type HashRing struct {
 	serverSet map[string]struct{}
 	tree      *redBlackTree
 
+	// legacyChecksum is the old checksum that is calculated only from the
+	// identities being added.
+	legacyChecksum uint32
+
 	// checksummers is map of named Checksum calculators for the hashring
 	checksummers map[string]Checksum
 	// checksums is a map containing the checksums that are representing this
 	// hashring. The map should never be altered in place so it is safe to pass
 	// a copy to components that need the checksums
 	checksums map[string]uint32
-	// defaultChecksum is the name of the Checksum calculator that is used as
-	// the default checksum for the hashring. The default checksum is returned
-	// when asked for only 1 checksum and is present for legacy reasons
-	defaultChecksum string
 
 	logger bark.Logger
 }
@@ -87,11 +87,8 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		},
 		logger: logging.Logger("ring"),
 
-		defaultChecksum: "address",
 		checksummers: map[string]Checksum{
-			"address":  &addressChecksum{},
-			"identity": &identityChecksum{},
-			"replica":  &replicaPointChecksum{},
+			"replica": &replicaPointChecksum{},
 		},
 	}
 
@@ -102,11 +99,11 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 
 // Checksum returns the checksum of all stored servers in the HashRing
 // Use this value to find out if the HashRing is mutated.
-func (r *HashRing) Checksum() uint32 {
+func (r *HashRing) Checksum() (checksum uint32) {
 	r.RLock()
-	checksum := r.checksums[r.defaultChecksum]
+	checksum = r.legacyChecksum
 	r.RUnlock()
-	return checksum
+	return
 }
 
 func (r *HashRing) Checksums() (checksums map[string]uint32) {
@@ -121,7 +118,6 @@ func (r *HashRing) Checksums() (checksums map[string]uint32) {
 // computeChecksumsNoLock re-computes all configured checksums for this hashring
 // and updates the in memory map with a new map containing the new checksums.
 func (r *HashRing) computeChecksumsNoLock() {
-	oldChecksums := r.checksums
 	r.checksums = make(map[string]uint32)
 
 	// calculate all configured checksums
@@ -129,16 +125,21 @@ func (r *HashRing) computeChecksumsNoLock() {
 		r.checksums[name] = checksummer.Compute(r)
 	}
 
-	if r.checksums[r.defaultChecksum] != oldChecksums[r.defaultChecksum] {
+	// calculate the legacy identy only based checksum
+	legacy := identityChecksum{}
+	old := r.legacyChecksum
+	r.legacyChecksum = legacy.Compute(r)
+
+	if old != r.legacyChecksum {
 		r.logger.WithFields(bark.Fields{
-			"checksum":    r.checksums[r.defaultChecksum],
-			"oldChecksum": oldChecksums[r.defaultChecksum],
+			"checksum":    r.legacyChecksum,
+			"oldChecksum": old,
 		}).Debug("ringpop ring computed new checksum")
 	}
 
 	r.EmitEvent(events.RingChecksumEvent{
-		OldChecksum: oldChecksums[r.defaultChecksum],
-		NewChecksum: r.checksums[r.defaultChecksum],
+		OldChecksum: old,
+		NewChecksum: r.legacyChecksum,
 	})
 }
 
