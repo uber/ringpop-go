@@ -22,10 +22,6 @@ type Checksum interface {
 
 // addressChecksum calculates checksums for all addresses that are added to the
 // hashring.
-// TODO calculate the checksum on identities. This will be backwards compatible.
-// The best case would be to iterate the rbtree in order and hash its content so
-// we have more certainty that the rings are looking up the same way but that
-// will be a backwards incompatible change
 type addressChecksum struct{}
 
 func (i *addressChecksum) Compute(ring *HashRing) uint32 {
@@ -35,13 +31,31 @@ func (i *addressChecksum) Compute(ring *HashRing) uint32 {
 	return farm.Fingerprint32(bytes)
 }
 
-type replicapointChecksum struct{}
+type identityChecksum struct{}
 
-func (r *replicapointChecksum) Compute(ring *HashRing) uint32 {
+func (i *identityChecksum) Compute(ring *HashRing) uint32 {
+	identitySet := make(map[string]struct{})
+	visitNodes(ring.tree.root, func(node *redBlackNode) {
+		identitySet[node.key.(replicaPoint).identity] = struct{}{}
+	})
+
+	identities := make([]string, 0, len(identitySet))
+	for identity := range identitySet {
+		identities = append(identities, identity)
+	}
+
+	sort.Strings(identities)
+	bytes := []byte(strings.Join(identities, ";"))
+	return farm.Fingerprint32(bytes)
+}
+
+type replicaPointChecksum struct{}
+
+func (r *replicaPointChecksum) Compute(ring *HashRing) uint32 {
 	buffer := bytes.Buffer{}
 
 	visitNodes(ring.tree.root, func(node *redBlackNode) {
-		buffer.WriteString(strconv.Itoa(node.key.(replicapoint).point))
+		buffer.WriteString(strconv.Itoa(node.key.(replicaPoint).point))
 		buffer.WriteString("-")
 		buffer.WriteString(node.value.(string))
 		buffer.WriteString(";")

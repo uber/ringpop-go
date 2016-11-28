@@ -85,13 +85,15 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		hashfunc: func(str string) int {
 			return int(hashfunc([]byte(str)))
 		},
-		logger:       logging.Logger("ring"),
-		checksummers: make(map[string]Checksum),
-	}
+		logger: logging.Logger("ring"),
 
-	r.defaultChecksum = "address"
-	r.checksummers["address"] = &addressChecksum{}
-	r.checksummers["replica"] = &replicapointChecksum{}
+		defaultChecksum: "address",
+		checksummers: map[string]Checksum{
+			"address":  &addressChecksum{},
+			"identity": &identityChecksum{},
+			"replica":  &replicaPointChecksum{},
+		},
+	}
 
 	r.serverSet = make(map[string]struct{})
 	r.tree = &redBlackTree{}
