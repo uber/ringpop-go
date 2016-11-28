@@ -35,8 +35,9 @@ type identityChecksum struct{}
 
 func (i *identityChecksum) Compute(ring *HashRing) uint32 {
 	identitySet := make(map[string]struct{})
-	visitNodes(ring.tree.root, func(node *redBlackNode) {
+	ring.tree.root.walk(func(node *redBlackNode) bool {
 		identitySet[node.key.(replicaPoint).identity] = struct{}{}
+		return true
 	})
 
 	identities := make([]string, 0, len(identitySet))
@@ -54,22 +55,13 @@ type replicaPointChecksum struct{}
 func (r *replicaPointChecksum) Compute(ring *HashRing) uint32 {
 	buffer := bytes.Buffer{}
 
-	visitNodes(ring.tree.root, func(node *redBlackNode) {
+	ring.tree.root.walk(func(node *redBlackNode) bool {
 		buffer.WriteString(strconv.Itoa(node.key.(replicaPoint).point))
 		buffer.WriteString("-")
 		buffer.WriteString(node.value.(string))
 		buffer.WriteString(";")
+		return true
 	})
 
 	return farm.Fingerprint32(buffer.Bytes())
-}
-
-func visitNodes(node *redBlackNode, visitor func(node *redBlackNode)) {
-	if node == nil {
-		return
-	}
-
-	visitNodes(node.left, visitor)
-	visitor(node)
-	visitNodes(node.right, visitor)
 }
