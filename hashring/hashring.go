@@ -115,7 +115,7 @@ func (r *HashRing) computeChecksumNoLock() {
 }
 
 func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
-	identity := fmt.Sprintf("%s%v", server.GetAddress(), replica)
+	identity := fmt.Sprintf("%s%v", server.Identity(), replica)
 	return replicaPoint(r.hashfunc(identity))
 }
 
@@ -202,6 +202,13 @@ func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberCh
 			// remove member
 			r.removeServerNoLock(change.Before)
 			changed = true
+		} else {
+			if change.Before.Identity() != change.After.Identity() {
+				// identity has changed, member needs to be removed and readded
+				r.removeServerNoLock(change.Before)
+				r.addServerNoLock(change.After)
+				changed = true
+			}
 		}
 	}
 
