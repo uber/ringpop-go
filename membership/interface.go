@@ -1,5 +1,11 @@
 package membership
 
+const (
+	// IdentityLabelKey is the key used to identify the identity label of a
+	// Member
+	IdentityLabelKey = "__identity"
+)
+
 // Member defines a member of the membership that can be used by the rest of the
 // system
 type Member interface {
