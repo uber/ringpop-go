@@ -1,7 +1,9 @@
 package hashring
 
 import (
+	"bytes"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/dgryski/go-farm"
@@ -31,4 +33,29 @@ func (i *addressChecksum) Compute(ring *HashRing) uint32 {
 	sort.Strings(addresses)
 	bytes := []byte(strings.Join(addresses, ";"))
 	return farm.Fingerprint32(bytes)
+}
+
+type replicapointChecksum struct{}
+
+func (r *replicapointChecksum) Compute(ring *HashRing) uint32 {
+	buffer := bytes.Buffer{}
+
+	visitNodes(ring.tree.root, func(node *redBlackNode) {
+		buffer.WriteString(strconv.Itoa(node.key.(replicapoint).point))
+		buffer.WriteString("-")
+		buffer.WriteString(node.value.(string))
+		buffer.WriteString(";")
+	})
+
+	return farm.Fingerprint32(buffer.Bytes())
+}
+
+func visitNodes(node *redBlackNode, visitor func(node *redBlackNode)) {
+	if node == nil {
+		return
+	}
+
+	visitNodes(node.left, visitor)
+	visitor(node)
+	visitNodes(node.right, visitor)
 }

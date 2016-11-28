@@ -89,8 +89,9 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		checksummers: make(map[string]Checksum),
 	}
 
-	r.checksummers["address"] = &addressChecksum{}
 	r.defaultChecksum = "address"
+	r.checksummers["address"] = &addressChecksum{}
+	r.checksummers["replica"] = &replicapointChecksum{}
 
 	r.serverSet = make(map[string]struct{})
 	r.tree = &redBlackTree{}
