@@ -17,4 +17,9 @@ type Member interface {
 	// Label reads the label for a givin key from the member. It also returns
 	// wether or not the label was present on the member
 	Label(key string) (value string, has bool)
+
+	// Identity returns the logical identity the member takes within the
+	// hashring, this is experimental and might move away from the membership to
+	// the Hashring
+	Identity() string
 }

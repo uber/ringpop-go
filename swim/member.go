@@ -27,6 +27,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/uber/ringpop-go/membership"
+
 	"github.com/dgryski/go-farm"
 	"github.com/uber/ringpop-go/util"
 )
@@ -75,6 +77,17 @@ func (m Member) GetAddress() string {
 func (m Member) Label(key string) (value string, has bool) {
 	value, has = m.Labels[key]
 	return
+}
+
+func (m Member) Identity() string {
+	// Read the identity from the labels
+	identity, set := m.Label(membership.IdentityLabelKey)
+	if set {
+		return identity
+	}
+
+	// return the member's address if there is no identity set
+	return m.Address
 }
 
 // suspect interface
