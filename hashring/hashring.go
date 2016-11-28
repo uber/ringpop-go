@@ -24,16 +24,12 @@ package hashring
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
-
-	"github.com/dgryski/go-farm"
 )
 
 // Configuration is a configuration struct that can be passed to the
@@ -67,7 +63,17 @@ type HashRing struct {
 
 	serverSet map[string]struct{}
 	tree      *redBlackTree
-	checksum  uint32
+
+	// checksummers is map of named Checksum calculators for the hashring
+	checksummers map[string]Checksum
+	// checksums is a map containing the checksums that are representing this
+	// hashring. The map should never be altered in place so it is safe to pass
+	// a copy to components that need the checksums
+	checksums map[string]uint32
+	// defaultChecksum is the name of the Checksum calculator that is used as
+	// the default checksum for the hashring. The default checksum is returned
+	// when asked for only 1 checksum and is present for legacy reasons
+	defaultChecksum string
 
 	logger bark.Logger
 }
@@ -79,8 +85,12 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		hashfunc: func(str string) int {
 			return int(hashfunc([]byte(str)))
 		},
-		logger: logging.Logger("ring"),
+		logger:       logging.Logger("ring"),
+		checksummers: make(map[string]Checksum),
 	}
+
+	r.checksummers["address"] = &addressChecksum{}
+	r.defaultChecksum = "address"
 
 	r.serverSet = make(map[string]struct{})
 	r.tree = &redBlackTree{}
@@ -91,30 +101,41 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 // Use this value to find out if the HashRing is mutated.
 func (r *HashRing) Checksum() uint32 {
 	r.RLock()
-	checksum := r.checksum
+	checksum := r.checksums[r.defaultChecksum]
 	r.RUnlock()
 	return checksum
 }
 
-// computeChecksum computes checksum of all servers in the ring.
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) computeChecksumNoLock() {
-	addresses := r.copyServersNoLock()
-	sort.Strings(addresses)
-	bytes := []byte(strings.Join(addresses, ";"))
-	old := r.checksum
-	r.checksum = farm.Fingerprint32(bytes)
+func (r *HashRing) Checksums() (checksums map[string]uint32) {
+	r.RLock()
+	// even though the map is immutable the pointer to it is not so it requires
+	// a readlock
+	checksums = r.checksums
+	r.RUnlock()
+	return
+}
 
-	if r.checksum != old {
+// computeChecksumsNoLock re-computes all configured checksums for this hashring
+// and updates the in memory map with a new map containing the new checksums.
+func (r *HashRing) computeChecksumsNoLock() {
+	oldChecksums := r.checksums
+	r.checksums = make(map[string]uint32)
+
+	// calculate all configured checksums
+	for name, checksummer := range r.checksummers {
+		r.checksums[name] = checksummer.Compute(r)
+	}
+
+	if r.checksums[r.defaultChecksum] != oldChecksums[r.defaultChecksum] {
 		r.logger.WithFields(bark.Fields{
-			"checksum":    r.checksum,
-			"oldChecksum": old,
+			"checksum":    r.checksums[r.defaultChecksum],
+			"oldChecksum": oldChecksums[r.defaultChecksum],
 		}).Debug("ringpop ring computed new checksum")
 	}
 
 	r.EmitEvent(events.RingChecksumEvent{
-		OldChecksum: old,
-		NewChecksum: r.checksum,
+		OldChecksum: oldChecksums[r.defaultChecksum],
+		NewChecksum: r.checksums[r.defaultChecksum],
 	})
 }
 
@@ -132,7 +153,7 @@ func (r *HashRing) AddServer(server membership.Member) bool {
 	r.Lock()
 	ok := r.addServerNoLock(server)
 	if ok {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   []string{server.GetAddress()},
 			ServersRemoved: nil,
@@ -168,7 +189,7 @@ func (r *HashRing) RemoveServer(server membership.Member) bool {
 	r.Lock()
 	ok := r.removeServerNoLock(server)
 	if ok {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   nil,
 			ServersRemoved: []string{server.GetAddress()},
@@ -222,7 +243,7 @@ func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberCh
 
 	// recompute checksums on changes
 	if changed {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 	}
 
 	r.Unlock()
@@ -257,7 +278,7 @@ func (r *HashRing) addRemoveServersNoLock(add []membership.Member, remove []memb
 	}
 
 	if changed {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   added,
 			ServersRemoved: removed,
