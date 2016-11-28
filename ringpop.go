@@ -230,7 +230,8 @@ func (rp *Ringpop) startTimers() {
 				rp.statter.UpdateGauge(
 					rp.getStatKey("membership.checksum-periodic"),
 					nil,
-					int64(rp.node.GetChecksum()))
+					int64(rp.node.GetChecksum()),
+				)
 			}
 		}()
 	}
@@ -243,7 +244,17 @@ func (rp *Ringpop) startTimers() {
 				rp.statter.UpdateGauge(
 					rp.getStatKey("ring.checksum-periodic"),
 					nil,
-					int64(rp.ring.Checksum()))
+					int64(rp.ring.Checksum()),
+				)
+
+				// emit all named checksums aswell
+				for name, checksum := range rp.ring.Checksums() {
+					rp.statter.UpdateGauge(
+						rp.getStatKey("ring.checksum-periodic."+name),
+						nil,
+						int64(checksum),
+					)
+				}
 			}
 		}()
 	}
