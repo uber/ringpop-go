@@ -261,6 +261,40 @@ func (n *redBlackNode) search(key keytype) (valuetype, bool) {
 	return "", false
 }
 
+// walk walks the tree in sorted order calling the walking verion on everynode.
+// If the walker function should return wether or not the walk should continue,
+// eg. the first time walker returns false the walk function will exit and no
+// more calls to walker will be made. Since the walk is recursive the walk will
+// respond wether or not the walking has been exited prematurely, eg false is a
+// premature exit, true means natural exit
+func (n *redBlackNode) walk(walker func(*redBlackNode) bool) bool {
+	if n == nil {
+		// the end of the tree does not signal the end of walking, but we can't
+		// walk this node (nil) nor left or right anymore
+		return true
+	}
+
+	// walk left first
+	if !n.left.walk(walker) {
+		// stop if walker indicated to not continue
+		return false
+	}
+	// now visit this node
+	if !walker(n) {
+		// stop if walker indicated to not continue
+		return false
+	}
+	// lastly visit right
+	if !n.right.walk(walker) {
+		// stop if walker indicated to not continue
+		return false
+	}
+
+	// signal that we reached the end and walking should continue till we hit
+	// end of tree
+	return true
+}
+
 // Search searches for a value in the redBlackTree, returns the string and true
 // if found or the empty string and false if val is not in the tree.
 func (t *redBlackTree) Search(key keytype) (valuetype, bool) {
