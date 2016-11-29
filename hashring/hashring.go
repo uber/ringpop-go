@@ -45,10 +45,10 @@ type Configuration struct {
 	ReplicaPoints int
 }
 
-type replicapoint int
+type replicaPoint int
 
-func (me replicapoint) Compare(other interface{}) int {
-	return int(me) - int(other.(replicapoint))
+func (r replicaPoint) Compare(other interface{}) int {
+	return int(r) - int(other.(replicaPoint))
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
@@ -143,7 +143,7 @@ func (r *HashRing) addReplicasNoLock(server string) {
 	r.serverSet[server] = struct{}{}
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
-		r.tree.Insert(replicapoint(r.hashfunc(address)), server)
+		r.tree.Insert(replicaPoint(r.hashfunc(address)), server)
 	}
 }
 
@@ -177,7 +177,7 @@ func (r *HashRing) removeReplicasNoLock(server string) {
 	delete(r.serverSet, server)
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
-		r.tree.Delete(replicapoint(r.hashfunc(address)))
+		r.tree.Delete(replicaPoint(r.hashfunc(address)))
 	}
 }
 
@@ -282,9 +282,9 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 	// collected all the servers we want, we have reached the
 	// end of the red-black tree and we need to loop around and inspect the
 	// tree starting at 0.
-	r.tree.LookupNUniqueAt(n, replicapoint(hash), unique)
+	r.tree.LookupNUniqueAt(n, replicaPoint(hash), unique)
 	if len(unique) < n {
-		r.tree.LookupNUniqueAt(n, replicapoint(0), unique)
+		r.tree.LookupNUniqueAt(n, replicaPoint(0), unique)
 	}
 
 	var servers []string

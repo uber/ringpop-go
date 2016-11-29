@@ -165,8 +165,8 @@ func (t *redBlackTree) Insert(key keytype, value valuetype) (ret bool) {
 	return ret
 }
 
-// Delete removes a value from the redBlackTree
-// Returns true on succesful deletion, false if val is not in tree
+// Delete removes the entry for key from the redBlackTree. Returns true on
+// succesful deletion, false if the key is not in tree
 func (t *redBlackTree) Delete(key keytype) bool {
 	if t.root == nil {
 		return false
@@ -258,15 +258,12 @@ func (n *redBlackNode) search(key keytype) (valuetype, bool) {
 	} else if n.right != nil {
 		return n.right.search(key)
 	}
-	return "", false
+	return nil, false
 }
 
-// walk walks the tree in sorted order calling the walking verion on everynode.
-// If the walker function should return wether or not the walk should continue,
-// eg. the first time walker returns false the walk function will exit and no
-// more calls to walker will be made. Since the walk is recursive the walk will
-// respond wether or not the walking has been exited prematurely, eg false is a
-// premature exit, true means natural exit
+// walk Walks the tree in sorted order invoking `walker` for each node. If the
+// walker function returns `false`, walking is stopped and no more nodes will be
+// visited. Returns `true` if all nodes are visited; `false` if not.
 func (n *redBlackNode) walk(walker func(*redBlackNode) bool) bool {
 	if n == nil {
 		// the end of the tree does not signal the end of walking, but we can't
@@ -276,17 +273,17 @@ func (n *redBlackNode) walk(walker func(*redBlackNode) bool) bool {
 
 	// walk left first
 	if !n.left.walk(walker) {
-		// stop if walker indicated to not continue
+		// stop if walker indicated to break
 		return false
 	}
 	// now visit this node
 	if !walker(n) {
-		// stop if walker indicated to not continue
+		// stop if walker indicated to break
 		return false
 	}
 	// lastly visit right
 	if !n.right.walk(walker) {
-		// stop if walker indicated to not continue
+		// stop if walker indicated to break
 		return false
 	}
 
@@ -295,36 +292,36 @@ func (n *redBlackNode) walk(walker func(*redBlackNode) bool) bool {
 	return true
 }
 
-// Search searches for a value in the redBlackTree, returns the string and true
-// if found or the empty string and false if val is not in the tree.
+// Search searches for the entry for key in the redBlackTree, returns the value
+// and true if found or nil and false if there is no entry for key in the tree.
 func (t *redBlackTree) Search(key keytype) (valuetype, bool) {
 	if t.root == nil {
-		return "", false
+		return nil, false
 	}
 	return t.root.search(key)
 }
 
-// LookupNAt iterates through the tree from the node with value val, and
-// returns the next n unique strings. This function is not guaranteed to
-// return n strings.
+// LookupNUniqueAt iterates through the tree from the last node that is smaller
+// than key or equal, and returns the next n unique values. This function is not
+// guaranteed to return n values, less might be returned
 func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[valuetype]struct{}) {
 	findNUniqueAbove(t.root, n, key, result)
 }
 
-// findNUniqueAbove is a recursive search that finds n unique strings
-// with a value bigger or equal than val
+// findNUniqueAbove is a recursive search that finds n unique values with a key
+// bigger or equal than key
 func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[valuetype]struct{}) {
 	if len(result) >= n || node == nil {
 		return
 	}
 
-	// skip left branch when all its values are smaller than val
+	// skip left branch when all its keys are smaller than key
 	cmp := node.key.Compare(key)
 	if cmp >= 0 {
 		findNUniqueAbove(node.left, n, key, result)
 	}
 
-	// Make sure to stop when we have n unique strings
+	// Make sure to stop when we have n unique values
 	if len(result) >= n {
 		return
 	}
