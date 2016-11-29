@@ -81,7 +81,7 @@ func validateRedBlackTree(n *redBlackNode) (int, error) {
 	var err error
 
 	if isRed(n) && (isRed(n.left) || isRed(n.right)) {
-		err = errors.New(fmt.Sprint("red violation at node val ", n.key))
+		err = errors.New(fmt.Sprint("red violation at node key ", n.key))
 		return 0, err
 	}
 
@@ -96,13 +96,13 @@ func validateRedBlackTree(n *redBlackNode) (int, error) {
 
 	if n.left != nil && n.left.key.Compare(n.key) >= 0 ||
 		n.right != nil && n.right.key.Compare(n.key) <= 0 {
-		err = errors.New(fmt.Sprint("binary tree violation at node val ", n.key))
+		err = errors.New(fmt.Sprint("binary tree violation at node key ", n.key))
 		return 0, err
 	}
 
 	if leftHeight != 0 && rightHeight != 0 {
 		if leftHeight != rightHeight {
-			err = errors.New(fmt.Sprint("black height violation at node val ", n.key))
+			err = errors.New(fmt.Sprint("black height violation at node key ", n.key))
 			return 0, err
 		}
 
@@ -125,75 +125,75 @@ func TestInsert(t *testing.T) {
 
 	// 4, B
 	node := tree.root
-	assert.Equal(t, treeTestInt(4), node.key, "expected tree root val to be 4")
-	assert.Equal(t, "four", node.value, "expected tree root str to be 'four'")
+	assert.Equal(t, treeTestInt(4), node.key, "expected tree root key to be 4")
+	assert.Equal(t, "four", node.value, "expected tree root value to be 'four'")
 	assert.Equal(t, false, node.red, "expected tree root to be black")
 	assert.NotNil(t, node.left, "expected tree root to have left child")
 	assert.NotNil(t, node.right, "expected tree root to have right child")
 
 	// 2,R
 	node = tree.root.left
-	assert.Equal(t, treeTestInt(2), node.key, "got unexpected node val")
-	assert.Equal(t, "two", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(2), node.key, "got unexpected node key")
+	assert.Equal(t, "two", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.NotNil(t, node.left, "expected node to have left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 1,B
 	node = tree.root.left.left
-	assert.Equal(t, treeTestInt(1), node.key, "got unexpected node val")
-	assert.Equal(t, "one", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(1), node.key, "got unexpected node key")
+	assert.Equal(t, "one", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 3, B
 	node = tree.root.left.right
-	assert.Equal(t, treeTestInt(3), node.key, "got unexpected node val")
-	assert.Equal(t, "three", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(3), node.key, "got unexpected node key")
+	assert.Equal(t, "three", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 6, R
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(6), node.key, "got unexpected node val")
-	assert.Equal(t, "six", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(6), node.key, "got unexpected node key")
+	assert.Equal(t, "six", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.NotNil(t, node.left, "expected node to have left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 5, B
 	node = tree.root.right.left
-	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node val")
-	assert.Equal(t, "five", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node key")
+	assert.Equal(t, "five", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 7, B
 	node = tree.root.right.right
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 8, R
 	node = tree.root.right.right.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
-	str, found := tree.Search(treeTestInt(7))
-	assert.True(t, found, "expected value to be found in tree")
-	assert.Equal(t, "seven", str, "expected serach return value of 'seven'")
+	value, found := tree.Search(treeTestInt(7))
+	assert.True(t, found, "expected key to be found in tree")
+	assert.Equal(t, "seven", value, "expected search return value of 'seven'")
 
-	str, found = tree.Search(treeTestInt(9))
-	assert.False(t, found, "expected value to not be found in tree")
-	assert.Equal(t, "", str, "expected search to return empty string ''")
+	value, found = tree.Search(treeTestInt(9))
+	assert.False(t, found, "expected key to not be found in tree")
+	assert.Equal(t, nil, value, "expected search to return nil")
 }
 
 func TestDuplicateInsert(t *testing.T) {
@@ -265,56 +265,56 @@ func TestDelete(t *testing.T) {
 
 	// 4,B
 	node := tree.root
-	assert.Equal(t, treeTestInt(4), node.key, "expected tree root val to be 4")
-	assert.Equal(t, "four", node.value, "expected tree root str to be 'four'")
+	assert.Equal(t, treeTestInt(4), node.key, "expected tree root key to be 4")
+	assert.Equal(t, "four", node.value, "expected tree root value to be 'four'")
 	assert.Equal(t, false, node.red, "expected tree root to be black")
 	assert.NotNil(t, node.left, "expected tree root to have left child")
 	assert.NotNil(t, node.right, "expected tree root to have right child")
 
 	// 2,R
 	node = tree.root.left
-	assert.Equal(t, treeTestInt(2), node.key, "got unexpected node val")
-	assert.Equal(t, "two", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(2), node.key, "got unexpected node key")
+	assert.Equal(t, "two", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 3,B
 	node = tree.root.left.right
-	assert.Equal(t, treeTestInt(3), node.key, "got unexpected node val")
-	assert.Equal(t, "three", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(3), node.key, "got unexpected node key")
+	assert.Equal(t, "three", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 6,R
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(6), node.key, "got unexpected node val")
-	assert.Equal(t, "six", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(6), node.key, "got unexpected node key")
+	assert.Equal(t, "six", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour.")
 	assert.NotNil(t, node.left, "expected node to have left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 5, B
 	node = tree.root.right.left
-	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node val")
-	assert.Equal(t, "five", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node key")
+	assert.Equal(t, "five", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 7, B
 	node = tree.root.right.right
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 8, R
 	node = tree.root.right.right.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -335,48 +335,48 @@ func TestDelete(t *testing.T) {
 
 	// 6,B
 	node = tree.root
-	assert.Equal(t, treeTestInt(6), node.key, "expected tree root val to be 6")
-	assert.Equal(t, "six", node.value, "expected tree root str to be 6")
+	assert.Equal(t, treeTestInt(6), node.key, "expected tree root key to be 6")
+	assert.Equal(t, "six", node.value, "expected tree root value to be 6")
 	assert.Equal(t, false, node.red, "expected tree root to be black")
 	assert.NotNil(t, node.left, "expected tree root to have left child")
 	assert.NotNil(t, node.right, "expected tree root to have right child")
 
 	// 4,R
 	node = tree.root.left
-	assert.Equal(t, treeTestInt(4), node.key, "got unexpected node val")
-	assert.Equal(t, "four", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(4), node.key, "got unexpected node key")
+	assert.Equal(t, "four", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.NotNil(t, node.left, "node should have left child")
 	assert.NotNil(t, node.right, "node should have right child")
 
 	// 3,B
 	node = tree.root.left.left
-	assert.Equal(t, treeTestInt(3), node.key, "got unexpected node val")
-	assert.Equal(t, "three", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(3), node.key, "got unexpected node key")
+	assert.Equal(t, "three", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 5,B
 	node = tree.root.left.right
-	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node val")
-	assert.Equal(t, "five", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node key")
+	assert.Equal(t, "five", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 7,B
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 8,R
 	node = tree.root.right.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -397,40 +397,40 @@ func TestDelete(t *testing.T) {
 
 	// 6,B
 	node = tree.root
-	assert.Equal(t, treeTestInt(6), node.key, "expected tree root val to be 6")
-	assert.Equal(t, "six", node.value, "expected tree root str to be 6")
+	assert.Equal(t, treeTestInt(6), node.key, "expected tree root key to be 6")
+	assert.Equal(t, "six", node.value, "expected tree root value to be 6")
 	assert.Equal(t, false, node.red, "expected tree root to be black")
 	assert.NotNil(t, node.left, "expected tree root to have left child")
 	assert.NotNil(t, node.right, "expected tree root to have right child")
 
 	// 4,B
 	node = tree.root.left
-	assert.Equal(t, treeTestInt(4), node.key, "got unexpected node val")
-	assert.Equal(t, "four", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(4), node.key, "got unexpected node key")
+	assert.Equal(t, "four", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 5,R
 	node = tree.root.left.right
-	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node val")
-	assert.Equal(t, "five", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node key")
+	assert.Equal(t, "five", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 7,B
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 8,R
 	node = tree.root.right.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -451,32 +451,32 @@ func TestDelete(t *testing.T) {
 
 	// 6,B
 	node = tree.root
-	assert.Equal(t, treeTestInt(6), node.key, "expected tree root val to be 6")
-	assert.Equal(t, "six", node.value, "expected tree root str to be 6")
+	assert.Equal(t, treeTestInt(6), node.key, "expected tree root key to be 6")
+	assert.Equal(t, "six", node.value, "expected tree root value to be 6")
 	assert.Equal(t, false, node.red, "expected tree root to be black")
 	assert.NotNil(t, node.left, "expected tree root to have left child")
 	assert.NotNil(t, node.right, "expected tree root to have right child")
 
 	// 5,B
 	node = tree.root.left
-	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node val")
-	assert.Equal(t, "five", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(5), node.key, "got unexpected node key")
+	assert.Equal(t, "five", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
 
 	// 7,B
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 8,R
 	node = tree.root.right.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -495,24 +495,24 @@ func TestDelete(t *testing.T) {
 
 	// 7,B
 	node = tree.root
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.NotNil(t, node.left, "expected node to have left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 6,B
 	node = tree.root.left
-	assert.Equal(t, treeTestInt(6), node.key, "expected tree root val to be 6")
-	assert.Equal(t, "six", node.value, "expected tree root str to be 6")
+	assert.Equal(t, treeTestInt(6), node.key, "expected tree root key to be 6")
+	assert.Equal(t, "six", node.value, "expected tree root value to be 6")
 	assert.Equal(t, false, node.red, "expected tree root to be black")
 	assert.Nil(t, node.left, "expected tree root to have left child")
 	assert.Nil(t, node.right, "expected tree root to have right child")
 
 	// 8,R
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -531,16 +531,16 @@ func TestDelete(t *testing.T) {
 
 	// 7,B
 	node = tree.root
-	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node val")
-	assert.Equal(t, "seven", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(7), node.key, "got unexpected node key")
+	assert.Equal(t, "seven", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.NotNil(t, node.right, "expected node to have right child")
 
 	// 8,R
 	node = tree.root.right
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, true, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -557,8 +557,8 @@ func TestDelete(t *testing.T) {
 
 	// 8,B
 	node = tree.root
-	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node val")
-	assert.Equal(t, "eight", node.value, "got unexpected node str")
+	assert.Equal(t, treeTestInt(8), node.key, "got unexpected node key")
+	assert.Equal(t, "eight", node.value, "got unexpected node value")
 	assert.Equal(t, false, node.red, "got unexpected node colour")
 	assert.Nil(t, node.left, "expected node to have no left child")
 	assert.Nil(t, node.right, "expected node to have no right child")
@@ -585,7 +585,7 @@ func TestSearchEmpty(t *testing.T) {
 
 	str, ok := tree.Search(treeTestInt(5))
 	assert.False(t, ok, "expected node to not be found")
-	assert.Equal(t, "", str, "expected str to be empty")
+	assert.Equal(t, nil, str, "expected value to be nil")
 }
 
 func TestSearch(t *testing.T) {
@@ -599,21 +599,21 @@ func TestSearch(t *testing.T) {
 	//                             \
 	//                              8,R
 
-	str, ok := tree.Search(treeTestInt(5))
+	value, ok := tree.Search(treeTestInt(5))
 	assert.True(t, ok, "expected node to be found")
-	assert.Equal(t, "five", str, "expected str to be five")
+	assert.Equal(t, "five", value, "expected value to be 'five'")
 
-	str, ok = tree.Search(treeTestInt(3))
+	value, ok = tree.Search(treeTestInt(3))
 	assert.True(t, ok, "expected node to be found")
-	assert.Equal(t, "three", str, "expected str to be three")
+	assert.Equal(t, "three", value, "expected value to be 'three'")
 
-	str, ok = tree.Search(treeTestInt(8))
+	value, ok = tree.Search(treeTestInt(8))
 	assert.True(t, ok, "expected node to be found")
-	assert.Equal(t, "eight", str, "expected str to be three")
+	assert.Equal(t, "eight", value, "expected value to be 'three'")
 
-	str, ok = tree.Search(treeTestInt(9))
+	value, ok = tree.Search(treeTestInt(9))
 	assert.False(t, ok, "expected node to not be found")
-	assert.Equal(t, "", str, "expected str to be empty")
+	assert.Equal(t, nil, value, "expected value to be nil")
 }
 
 func TestBig(t *testing.T) {
