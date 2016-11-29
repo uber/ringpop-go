@@ -32,8 +32,8 @@ import (
 
 type treeTestInt int
 
-func (me treeTestInt) Compare(other interface{}) int {
-	return int(me) - int(other.(treeTestInt))
+func (t treeTestInt) Compare(other interface{}) int {
+	return int(t) - int(other.(treeTestInt))
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

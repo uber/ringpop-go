@@ -47,8 +47,8 @@ type Configuration struct {
 
 type replicapoint int
 
-func (me replicapoint) Compare(other interface{}) int {
-	return int(me) - int(other.(replicapoint))
+func (r replicapoint) Compare(other interface{}) int {
+	return int(r) - int(other.(replicapoint))
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
