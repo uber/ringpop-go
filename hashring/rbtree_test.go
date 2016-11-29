@@ -637,6 +637,53 @@ func TestBig(t *testing.T) {
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 }
 
+func TestWalkInOrder(t *testing.T) {
+	tree := makeTree()
+
+	//               4,B
+	//             /     \
+	//         2,R         6,R
+	//       /     \     /     \
+	//     1,B    3,B   5,B    7,B
+	//                             \
+	//                              8,R
+
+	var last keytype
+
+	tree.root.walk(func(n *redBlackNode) bool {
+		current := n.key
+		if last != nil {
+			assert.True(t, current.Compare(last) > 0, "expected walk to walk the nodes in natural order as dictated by the Compare function")
+		}
+		last = current
+		return true
+	})
+}
+
+func TestWalkEscape(t *testing.T) {
+	tree := makeTree()
+
+	//               4,B
+	//             /     \
+	//         2,R         6,R
+	//       /     \     /     \
+	//     1,B    3,B   5,B    7,B
+	//                             \
+	//                              8,R
+
+	var visited []int
+
+	tree.root.walk(func(n *redBlackNode) bool {
+		number := int(n.key.(treeTestInt))
+		visited = append(visited, number)
+		// stop at node 5, it should exit on a left, right and visiting node,
+		// this covers all exit cases
+		return number < 5
+	})
+
+	assert.Equal(t, []int{1, 2, 3, 4, 5}, visited, "expected all nodes up to five to be visited")
+}
+
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
 //
 // BENCHMARKS
