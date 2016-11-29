@@ -301,15 +301,15 @@ func (t *redBlackTree) Search(key keytype) (valuetype, bool) {
 	return t.root.search(key)
 }
 
-// LookupNUniqueAt iterates through the tree from the node last node that is
-// smaller than key, and returns the next n unique values. This function is not
+// LookupNUniqueAt iterates through the tree from the last node that is smaller
+// than key or equal, and returns the next n unique values. This function is not
 // guaranteed to return n values, less might be returned
 func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[valuetype]struct{}) {
 	findNUniqueAbove(t.root, n, key, result)
 }
 
-// findNUniqueAbove is a recursive search that finds n unique values
-// with a value bigger or equal than key
+// findNUniqueAbove is a recursive search that finds n unique values with a key
+// bigger or equal than key
 func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[valuetype]struct{}) {
 	if len(result) >= n || node == nil {
 		return
