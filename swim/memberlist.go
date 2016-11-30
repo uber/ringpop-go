@@ -293,12 +293,10 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
-	var before Member
-	m.members.Lock()
-	before = *m.local // make a copy of the before state
-	m.local.Status = status
-	m.members.Unlock()
-	m.postLocalUpdate(before)
+	m.updateLocalMember(func(member *Member) bool {
+		member.Status = status
+		return true
+	})
 }
 
 // SetLocalLabel sets the label identified by key to the new value. This
@@ -349,34 +347,31 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 		return err
 	}
 
-	var before Member
+	m.updateLocalMember(func(member *Member) bool {
+		// ensure that there is a new copy of the labels to work with.
+		labelsCopy := member.Labels.copy()
 
-	m.members.Lock()
-	before = *m.local
+		// keep track if we made changes to the labels
+		changes := false
 
-	// ensure that there is a new copy of the labels on the member to work with.
-	m.local.Labels = m.local.Labels.copy()
+		// copy the key-value pairs to our internal labels. By not setting the map
+		// of labels to the Labels value of the local member we prevent removing labels
+		// that the user did not specify in the new map.
+		for key, value := range labels {
+			old, had := labelsCopy[key]
+			labelsCopy[key] = value
 
-	// keep track if we made changes to the labels
-	changes := false
-
-	// copy the key-value pairs to our internal labels. By not setting the map
-	// of labels to the Labels value of the local member we prevent removing labels
-	// that the user did not specify in the new map.
-	for key, value := range labels {
-		old, had := m.local.Labels[key]
-		m.local.Labels[key] = value
-
-		if !had || old != value {
-			changes = true
+			if !had || old != value {
+				changes = true
+			}
 		}
-	}
 
-	m.members.Unlock()
-
-	if changes {
-		m.postLocalUpdate(before)
-	}
+		if changes {
+			// only if there are changes we put the copied labels on the member.
+			member.Labels = labelsCopy
+		}
+		return changes
+	})
 
 	return nil
 }
@@ -387,50 +382,61 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 // and subsequently be gossiped around. It is a valid operation to remove non-
 // existing keys. It returns true if all (and only all) labels have been removed.
 func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
-	var before Member
-	m.members.Lock()
-	before = *m.local
+	// keep track if all labels are removed, it will be set to false if a label
+	// couldn't be removed.
+	removed := true
 
-	if len(m.local.Labels) == 0 || len(keys) == 0 {
-		m.members.Unlock()
-		// nothing to delete
-		return false
-	}
+	m.updateLocalMember(func(member *Member) bool {
+		// ensure that there is a new copy of the labels to work
+		// with.
+		labelsCopy := member.Labels.copy()
 
-	// ensure that there is a new copy of the labels on the member to work with.
-	m.local.Labels = m.local.Labels.copy()
+		any := false // keep track if we at least removed one label
+		for _, key := range keys {
+			_, has := labelsCopy[key]
+			delete(labelsCopy, key)
+			removed = removed && has
+			any = any || has
+		}
 
-	any := false    // keep track if we at least removed one label
-	removed := true // keep track if all labels are removed
-	for _, key := range keys {
-		_, has := m.local.Labels[key]
-		delete(m.local.Labels, key)
-		removed = removed && has
-		any = any || has
-	}
+		if any {
+			// only if there are changes we put the copied labels on the member.
+			member.Labels = labelsCopy
+		}
 
-	m.members.Unlock()
+		return any
+	})
 
-	if any {
-		// only reincarnate if there is a label removed
-		m.postLocalUpdate(before)
-	}
 	return removed
 }
 
-// postLocalUpdate should be called after the local Member has been updated to
-// make sure that its new state has a higher incarnation number and the change
-// will be recorded as a change to gossip around.
-func (m *memberlist) postLocalUpdate(before Member) {
-	// bump our incarnation for this change to be accepted by all peers
+// updateLocalMember takes an update function to upate the member passed in. The
+// update function can make mutations to the member and should indicate if it
+// made changes, only if changes are made the incarnation number will be bumped
+// and the new state will be gossiped to the peers
+func (m *memberlist) updateLocalMember(update func(*Member) bool) {
+	var changes []Change
+
 	m.members.Lock()
-	change := m.bumpIncarnation()
+
+	before := *m.local
+	didUpdate := update(m.local)
+	if didUpdate {
+		// bump incarnation number if the member has been updated
+		change := m.bumpIncarnation()
+		changes = append(changes, change)
+	}
+	after := *m.local
+
 	m.members.Unlock()
+
+	if !didUpdate {
+		// exit if the update didn't change anything
+		return
+	}
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
-
-	changes := []Change{change}
 
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
@@ -440,8 +446,8 @@ func (m *memberlist) postLocalUpdate(before Member) {
 	if before.isReachable() {
 		memberChange.Before = before
 	}
-	if m.local.isReachable() {
-		memberChange.After = *m.local
+	if after.isReachable() {
+		memberChange.After = after
 	}
 
 	if memberChange.Before != nil || memberChange.After != nil {
