@@ -354,9 +354,8 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 	m.members.Lock()
 	before = *m.local
 
-	// ensure that there is a new copy of the labels on the member to work with,
-	// CopyLabels guarantees a non-nil map so it is safe to work with
-	m.local.Labels = CopyLabels(m.local.Labels)
+	// ensure that there is a new copy of the labels on the member to work with.
+	m.local.Labels = m.local.Labels.copy()
 
 	// keep track if we made changes to the labels
 	changes := false
@@ -398,9 +397,8 @@ func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 		return false
 	}
 
-	// ensure that there is a new copy of the labels on the member to work with,
-	// CopyLabels guarantees a non-nil map so it is safe to work with
-	m.local.Labels = CopyLabels(m.local.Labels)
+	// ensure that there is a new copy of the labels on the member to work with.
+	m.local.Labels = m.local.Labels.copy()
 
 	any := false    // keep track if we at least removed one label
 	removed := true // keep track if all labels are removed
