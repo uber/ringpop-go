@@ -491,6 +491,13 @@ func (s *MemberlistTestSuite) TestRemoveLocalLabels() {
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the removal of an existing label")
 }
 
+// MembershipVisibleTransitions is a matrix of transitions which should and
+// should not show up in the memberlist.ChangeEvent changes. This is used in the
+// tests for remote and local updates to verify all events that should show up
+// are there and all events that should not show up don't. Not all transactions
+// are covered because their behavior is undefined and may change in the future.
+// These are transitions that are non-observable for the membership incl. but
+// not limited to incarnation number changes
 var MembershipVisibleTransitions = map[string]struct {
 	From string
 	To   string
@@ -529,6 +536,9 @@ var MembershipVisibleTransitions = map[string]struct {
 	"192.0.2.0:18": {From: Tombstone, To: Leave, notAllowed: true},
 }
 
+// TestMembershipEventsRemove uses MembershipVisibleTransitions to test
+// transitions that are applied due to incomming gossip events generate the
+// desired membership.ChangeEvent events.
 func (s *MemberlistTestSuite) TestMembershipEventsRemote() {
 	var initialChanges []Change
 	var updateChanges []Change
@@ -605,6 +615,9 @@ func (s *MemberlistTestSuite) TestMembershipEventsRemote() {
 	s.Assert().True(eventFired, "expected membership.ChangeEvent to fire during update")
 }
 
+// TestMembershipEventsLocal uses MembershipVisibleTransitions to test
+// transitions that are applied to the local node to generate the desired
+// membership.ChangeEvent events.
 func (s *MemberlistTestSuite) TestMembershipEventsLocal() {
 	for _, test := range MembershipVisibleTransitions {
 
