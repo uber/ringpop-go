@@ -8,7 +8,7 @@ type Member interface {
 	// can be removed after a refactor of the swim.Member
 	GetAddress() string
 
-	// Label reads the label for a givin key from the member. It also returns
+	// Label reads the label for a given key from the member. It also returns
 	// wether or not the label was present on the member
 	Label(key string) (value string, has bool)
 }

@@ -23,7 +23,6 @@ package swim
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"math/rand"
 	"sort"
 	"sync"
@@ -438,20 +437,16 @@ func (m *memberlist) postLocalUpdate(before Member) {
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
 
-	log.Println("calculating membership chage post local update")
 	// prepare a membership change event for observable state changes
 	var memberChange membership.MemberChange
 	if before.isReachable() {
-		log.Println("before is reachable")
 		memberChange.Before = before
 	}
 	if m.local.isReachable() {
-		log.Println("after is reachable")
 		memberChange.After = *m.local
 	}
 
 	if memberChange.Before != nil || memberChange.After != nil {
-		log.Println("emitting change")
 		m.node.EmitEvent(membership.ChangeEvent{
 			Changes: []membership.MemberChange{
 				memberChange,
@@ -576,7 +571,6 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 					m.members.byAddress[gossip.Address] = &gossip
 					i := m.getJoinPosition()
 					m.members.list = append(m.members.list[:i], append([]*Member{&gossip}, m.members.list[i:]...)...)
-
 				} else {
 					// copy the value of the gossip into the already existing
 					// struct. This operation is by value, not by reference.
