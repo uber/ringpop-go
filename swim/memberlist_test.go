@@ -24,9 +24,12 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/membership"
+	"github.com/uber/ringpop-go/util"
+
 	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/util"
 )
 
 type MemberlistTestSuite struct {
@@ -486,6 +489,157 @@ func (s *MemberlistTestSuite) TestRemoveLocalLabels() {
 	removed = s.m.RemoveLocalLabels("hello")
 	s.Assert().True(removed, "expected to remove a label")
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the removal of an existing label")
+}
+
+var MembershipVisibleTransitions = map[string]struct {
+	From string
+	To   string
+
+	Before bool
+	After  bool
+
+	notAllowed bool
+}{
+	// events that must emit
+	"192.0.2.0:1": {From: Alive, To: Faulty, Before: true, After: false},
+	"192.0.2.0:2": {From: Alive, To: Leave, Before: true, After: false},
+	"192.0.2.0:3": {From: Alive, To: Tombstone, Before: true, After: false},
+
+	"192.0.2.0:4": {From: Suspect, To: Faulty, Before: true, After: false},
+	"192.0.2.0:5": {From: Suspect, To: Leave, Before: true, After: false},
+	"192.0.2.0:6": {From: Suspect, To: Tombstone, Before: true, After: false},
+
+	"192.0.2.0:7": {From: Faulty, To: Alive, Before: false, After: true},
+	"192.0.2.0:8": {From: Faulty, To: Suspect, Before: false, After: true},
+
+	"192.0.2.0:9":  {From: Leave, To: Alive, Before: false, After: true},
+	"192.0.2.0:10": {From: Leave, To: Suspect, Before: false, After: true},
+
+	"192.0.2.0:11": {From: Tombstone, To: Alive, Before: false, After: true},
+	"192.0.2.0:12": {From: Tombstone, To: Suspect, Before: false, After: true},
+
+	// events that must NOT emit
+	"192.0.2.0:13": {From: Faulty, To: Leave, notAllowed: true},
+	"192.0.2.0:14": {From: Faulty, To: Tombstone, notAllowed: true},
+
+	"192.0.2.0:15": {From: Leave, To: Faulty, notAllowed: true},
+	"192.0.2.0:16": {From: Leave, To: Tombstone, notAllowed: true},
+
+	"192.0.2.0:17": {From: Tombstone, To: Faulty, notAllowed: true},
+	"192.0.2.0:18": {From: Tombstone, To: Leave, notAllowed: true},
+}
+
+func (s *MemberlistTestSuite) TestMembershipEventsRemote() {
+	var initialChanges []Change
+	var updateChanges []Change
+
+	for address, test := range MembershipVisibleTransitions {
+		initialChanges = append(initialChanges, Change{
+			Address:     address,
+			Incarnation: s.incarnation,
+			Status:      test.From,
+		})
+
+		updateChanges = append(updateChanges, Change{
+			Address:     address,
+			Incarnation: s.incarnation + 1,
+			Status:      test.To,
+		})
+	}
+
+	// seed the memberlist with intial states
+	s.m.Update(initialChanges)
+
+	eventFired := false
+	s.node.AddListener(on(membership.ChangeEvent{}, func(e events.Event) {
+		changeEvent := e.(membership.ChangeEvent)
+
+		seenMembers := make(map[string]struct{})
+
+		for _, change := range changeEvent.Changes {
+			var address string
+
+			if change.Before != nil {
+				address = change.Before.GetAddress()
+			} else {
+				address = change.After.GetAddress()
+			}
+
+			seenMembers[address] = struct{}{}
+
+			test, has := MembershipVisibleTransitions[address]
+			if !has {
+				// change is not specified and therefore allowed
+				s.Assert().Fail("allowed but not expected, logging during development")
+				continue
+			}
+
+			if test.notAllowed {
+				s.Assert().Fail("member %q is not allowed to show up in membership.ChangeEvent.Changes", address)
+				continue
+			}
+
+			if test.Before {
+				s.Assert().NotNil(change.Before, "Expected before to be set for member %q", address)
+			} else {
+				s.Assert().Nil(change.Before, "Expected before not to be set for member %q", address)
+			}
+
+			if test.After {
+				s.Assert().NotNil(change.After, "Expected after to be set for member %q", address)
+			} else {
+				s.Assert().Nil(change.After, "Expected after not to be set for member %q", address)
+			}
+		}
+
+		for address, test := range MembershipVisibleTransitions {
+			_, seen := seenMembers[address]
+			s.Assert().Equal(!test.notAllowed, seen, "membership update for member %q inconsistency", address)
+		}
+
+		eventFired = true
+	}))
+
+	// now send the updates that should trigger the Membership event
+	s.m.Update(updateChanges)
+	s.Assert().True(eventFired, "expected membership.ChangeEvent to fire during update")
+}
+
+func (s *MemberlistTestSuite) TestMembershipEventsLocal() {
+	for _, test := range MembershipVisibleTransitions {
+
+		// listen for expected event
+		fired := false
+		l := on(membership.ChangeEvent{}, func(e events.Event) {
+			fired = true
+
+			changeEvent := e.(membership.ChangeEvent)
+			change := changeEvent.Changes[0]
+
+			if test.notAllowed {
+				return
+			}
+
+			if test.Before {
+				s.Assert().NotNil(change.Before, "Expected before to be set for change %s->%s", test.From, test.To)
+			} else {
+				s.Assert().Nil(change.Before, "Expected before not to be set for change %s->%s", test.From, test.To)
+			}
+
+			if test.After {
+				s.Assert().NotNil(change.After, "Expected after to be set for change %s->%s", test.From, test.To)
+			} else {
+				s.Assert().Nil(change.After, "Expected after not to be set for member change %s->%s", test.From, test.To)
+			}
+		})
+
+		s.m.SetLocalStatus(test.From)
+		s.node.AddListener(l)
+		s.m.SetLocalStatus(test.To)
+		s.node.RemoveListener(l)
+
+		s.Assert().Equal(!test.notAllowed, fired, "unexpected result for event that fired for change %s->%s", test.From, test.To)
+	}
 }
 
 func TestMemberlistTestSuite(t *testing.T) {
