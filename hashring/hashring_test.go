@@ -186,8 +186,8 @@ func TestLookup(t *testing.T) {
 
 func TestLookupDistribution(t *testing.T) {
 	ring := New(farm.Fingerprint32, 5)
-	addresses := genMembers(1, 1, 1000)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 1000)
+	ring.AddRemoveServers(members, nil)
 
 	keys := make([]string, 40)
 	for i := range keys {
@@ -265,15 +265,15 @@ func TestLookupNNoGaps(t *testing.T) {
 
 func TestLookupNOverflow(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
-	addresses := genMembers(1, 1, 10)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 10)
+	ring.AddRemoveServers(members, nil)
 	assert.Len(t, ring.LookupN("a random key", 20), 10, "expected that LookupN caps results when n is larger than number of servers")
 }
 
 func TestLookupNLoopAround(t *testing.T) {
 	ring := New(farm.Fingerprint32, 1)
-	addresses := genMembers(1, 1, 10)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 10)
+	ring.AddRemoveServers(members, nil)
 
 	unique := make(map[valuetype]struct{})
 	ring.tree.LookupNUniqueAt(1, replicaPoint(0), unique)
@@ -298,8 +298,8 @@ func TestLookupN(t *testing.T) {
 
 	unique := make(map[string]bool)
 
-	addresses := genMembers(1, 1, 10)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 10)
+	ring.AddRemoveServers(members, nil)
 
 	servers = ring.LookupN("key", 5)
 	assert.Len(t, servers, 5, "expected five servers to be returned by lookup")
@@ -319,7 +319,7 @@ func TestLookupN(t *testing.T) {
 
 	unique = make(map[string]bool)
 
-	ring.RemoveServer(addresses[0])
+	ring.RemoveServer(members[0])
 	servers = ring.LookupN("yet another key", 10)
 	assert.Len(t, servers, 9, "expected to get nine servers")
 	for _, server := range servers {
@@ -328,14 +328,13 @@ func TestLookupN(t *testing.T) {
 	assert.Len(t, unique, 9, "expected to get nine unique servers")
 }
 
-func genMembers(host, fromPort, toPort int) []membership.Member {
-	var addresses []membership.Member
+func genMembers(host, fromPort, toPort int) (members []membership.Member) {
 	for i := fromPort; i <= toPort; i++ {
-		addresses = append(addresses, fakeMember{
+		members = append(members, fakeMember{
 			address: fmt.Sprintf("127.0.0.%v:%v", host, 3000+i),
 		})
 	}
-	return addresses
+	return members
 }
 
 func BenchmarkHashRingLookupN(b *testing.B) {
