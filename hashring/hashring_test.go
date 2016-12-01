@@ -27,11 +27,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/membership"
 
 	"github.com/dgryski/go-farm"
-	"github.com/uber/ringpop-go/events"
-
 	"github.com/stretchr/testify/assert"
 )
 

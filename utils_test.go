@@ -27,9 +27,9 @@ import (
 
 	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/util"
 
 	"github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/util"
 )
 
 // fake membership.Member

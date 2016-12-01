@@ -28,12 +28,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
 
 	"github.com/dgryski/go-farm"
+	"github.com/uber-common/bark"
 )
 
 // Configuration is a configuration struct that can be passed to the
