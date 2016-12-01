@@ -119,9 +119,26 @@ func (r *HashRing) replicaPointForServer(server membership.Member, replica int) 
 	return replicaPoint(r.hashfunc(identity))
 }
 
-// AddMember adds a server and its replicas onto the HashRing.
-func (r *HashRing) AddMember(member membership.Member) bool {
-	return r.AddRemoveMembers([]membership.Member{member}, nil)
+// AddMembers adds multiple membership Member's and thus their replicas to the HashRing.
+func (r *HashRing) AddMembers(members ...membership.Member) bool {
+	r.Lock()
+	changed := false
+	var added []string
+	for _, member := range members {
+		if r.addMemberNoLock(member) {
+			added = append(added, member.GetAddress())
+			changed = true
+		}
+	}
+
+	if changed {
+		r.computeChecksumNoLock()
+		r.EmitEvent(events.RingChangedEvent{
+			ServersAdded: added,
+		})
+	}
+	r.Unlock()
+	return changed
 }
 
 // This function isn't thread-safe, only call it when the HashRing is locked.
@@ -142,9 +159,26 @@ func (r *HashRing) addMemberNoLock(member membership.Member) bool {
 	return true
 }
 
-// RemoveMember removes a membership Member thus its replicas from the HashRing.
-func (r *HashRing) RemoveMember(member membership.Member) bool {
-	return r.AddRemoveMembers(nil, []membership.Member{member})
+// RemoveMembers removes multiple membership Member's and thus their replicas from the HashRing.
+func (r *HashRing) RemoveMembers(members ...membership.Member) bool {
+	r.Lock()
+	changed := false
+	var removed []string
+	for _, server := range members {
+		if r.removeMemberNoLock(server) {
+			removed = append(removed, server.GetAddress())
+			changed = true
+		}
+	}
+
+	if changed {
+		r.computeChecksumNoLock()
+		r.EmitEvent(events.RingChangedEvent{
+			ServersRemoved: removed,
+		})
+	}
+	r.Unlock()
+	return changed
 }
 
 // This function isn't thread-safe, only call it when the HashRing is locked.
@@ -196,45 +230,6 @@ func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberCh
 	}
 
 	r.Unlock()
-}
-
-// AddRemoveMembers adds and removes membership Members and all replicas
-// associated to those members to and from the HashRing. Returns whether the
-// HashRing has changed.
-func (r *HashRing) AddRemoveMembers(add []membership.Member, remove []membership.Member) bool {
-	r.Lock()
-	result := r.addRemoveMembersNoLock(add, remove)
-	r.Unlock()
-	return result
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) addRemoveMembersNoLock(add []membership.Member, remove []membership.Member) bool {
-	changed := false
-
-	var added, removed []string
-	for _, server := range add {
-		if r.addMemberNoLock(server) {
-			added = append(added, server.GetAddress())
-			changed = true
-		}
-	}
-
-	for _, server := range remove {
-		if r.removeMemberNoLock(server) {
-			removed = append(removed, server.GetAddress())
-			changed = true
-		}
-	}
-
-	if changed {
-		r.computeChecksumNoLock()
-		r.EmitEvent(events.RingChangedEvent{
-			ServersAdded:   added,
-			ServersRemoved: removed,
-		})
-	}
-	return changed
 }
 
 // HasServer returns whether the HashRing contains the given server.
