@@ -139,20 +139,17 @@ func (r *HashRing) addServerNoLock(server membership.Member) bool {
 	if _, ok := r.serverSet[server.GetAddress()]; ok {
 		return false
 	}
-
-	r.addReplicasNoLock(server)
-	return true
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) addReplicasNoLock(server membership.Member) {
 	r.serverSet[server.GetAddress()] = struct{}{}
+
+	// add all replica points for the server
 	for i := 0; i < r.replicaPoints; i++ {
 		r.tree.Insert(
 			r.replicaPointForServer(server, i),
 			server.GetAddress(),
 		)
 	}
+
+	return true
 }
 
 // RemoveServer removes a server and its replicas from the HashRing.
@@ -175,19 +172,15 @@ func (r *HashRing) removeServerNoLock(server membership.Member) bool {
 	if _, ok := r.serverSet[server.GetAddress()]; !ok {
 		return false
 	}
-
-	r.removeReplicasNoLock(server)
-	return true
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) removeReplicasNoLock(server membership.Member) {
 	delete(r.serverSet, server.GetAddress())
+
 	for i := 0; i < r.replicaPoints; i++ {
 		r.tree.Delete(
 			r.replicaPointForServer(server, i),
 		)
 	}
+
+	return true
 }
 
 // ProcessMembershipChangesServers takes a slice of membership.MemberChange's
