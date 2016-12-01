@@ -556,7 +556,7 @@ func (s *RingpopTestSuite) TestLookupNoDestination() {
 	member := fakeMember{
 		address: address,
 	}
-	s.ringpop.ring.RemoveServer(member)
+	s.ringpop.ring.RemoveMember(member)
 
 	result, err := s.ringpop.Lookup("foo")
 	s.Equal("", result)
@@ -602,7 +602,7 @@ func (s *RingpopTestSuite) TestLookupNNoDestinations() {
 	member := fakeMember{
 		address: address,
 	}
-	s.ringpop.ring.RemoveServer(member)
+	s.ringpop.ring.RemoveMember(member)
 
 	result, err := s.ringpop.LookupN("foo", 5)
 	s.Empty(result)
@@ -619,7 +619,7 @@ func (s *RingpopTestSuite) TestLookupN() {
 	s.Equal(1, len(result), "LookupN returns not more results than number of nodes")
 
 	members := genMembers(genAddresses(1, 10, 20))
-	s.ringpop.ring.AddRemoveServers(members, nil)
+	s.ringpop.ring.AddRemoveMembers(members, nil)
 
 	result, err = s.ringpop.LookupN("foo", 5)
 	s.Nil(err)

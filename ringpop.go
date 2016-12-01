@@ -202,7 +202,7 @@ func (rp *Ringpop) init() error {
 
 	// add all members present in the membership of the node on startup.
 	for _, member := range rp.node.GetReachableMembers() {
-		rp.ring.AddServer(member)
+		rp.ring.AddMember(member)
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
