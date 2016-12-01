@@ -25,10 +25,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
+
+	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/util"
 )
+
+// fake membership.Member
+type fakeMember struct {
+	address string
+}
+
+func (f fakeMember) GetAddress() string {
+	return f.address
+}
+
+func (f fakeMember) Label(key string) (value string, has bool) {
+	return "", false
+}
 
 // fake stats
 type dummyStats struct {
@@ -96,9 +111,7 @@ func genAddresses(host, fromPort, toPort int) []string {
 	return addresses
 }
 
-func genChanges(addresses []string, statuses ...string) []swim.Change {
-	var changes []swim.Change
-
+func genChanges(addresses []string, statuses ...string) (changes []swim.Change) {
 	for _, address := range addresses {
 		for _, status := range statuses {
 			changes = append(changes, swim.Change{
@@ -109,4 +122,36 @@ func genChanges(addresses []string, statuses ...string) []swim.Change {
 	}
 
 	return changes
+}
+
+func genMembers(addresses []string) (members []membership.Member) {
+	for _, address := range addresses {
+		members = append(members, fakeMember{
+			address: address,
+		})
+	}
+	return
+}
+
+type MembershipChangeField int
+
+const (
+	BeforeMemberField MembershipChangeField = 1 << iota
+	AfterMemberField                        = 1 << iota
+)
+
+func genMembershipChanges(members []membership.Member, fields MembershipChangeField) (changes []membership.MemberChange) {
+	for _, member := range members {
+		var change membership.MemberChange
+
+		if fields&BeforeMemberField != 0 {
+			change.Before = member
+		}
+		if fields&AfterMemberField != 0 {
+			change.After = member
+		}
+
+		changes = append(changes, change)
+	}
+	return
 }

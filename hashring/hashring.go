@@ -190,24 +190,36 @@ func (r *HashRing) removeReplicasNoLock(server membership.Member) {
 	}
 }
 
+// ProcessMembershipChangesServers takes a slice of membership.MemberChange's
+// and applies them to the hashring by adding and removing servers accordingly
+// to the changes passed in.
 func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberChange) {
 	r.Lock()
 	changed := false
+	var added, removed []string
 	for _, change := range changes {
 		if change.Before == nil && change.After != nil {
 			// new member
-			r.addServerNoLock(change.After)
-			changed = true
+			if r.addServerNoLock(change.After) {
+				added = append(added, change.After.GetAddress())
+				changed = true
+			}
 		} else if change.Before != nil && change.After == nil {
 			// remove member
-			r.removeServerNoLock(change.Before)
-			changed = true
+			if r.removeServerNoLock(change.Before) {
+				removed = append(removed, change.Before.GetAddress())
+				changed = true
+			}
 		}
 	}
 
 	// recompute checksums on changes
 	if changed {
 		r.computeChecksumNoLock()
+		r.EmitEvent(events.RingChangedEvent{
+			ServersAdded:   added,
+			ServersRemoved: removed,
+		})
 	}
 
 	r.Unlock()
