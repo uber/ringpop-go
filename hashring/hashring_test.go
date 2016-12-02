@@ -302,6 +302,39 @@ func TestLookupN(t *testing.T) {
 	assert.Len(t, unique, 9, "expected to get nine unique servers")
 }
 
+func TestProcessMembershipChanges(t *testing.T) {
+	ring := New(farm.Fingerprint32, 10)
+
+	member1 := fakeMember{address: "192.0.2.0:1"}
+	member2 := fakeMember{address: "192.0.2.0:2"}
+	member3 := fakeMember{address: "192.0.2.0:3"}
+
+	// add member1
+	ring.ProcessMembershipChanges([]membership.MemberChange{
+		membership.MemberChange{After: member1},
+	})
+	assert.Equal(t, 1, ring.ServerCount(), "unexpected count of members in ring")
+
+	// add member2
+	ring.ProcessMembershipChanges([]membership.MemberChange{
+		membership.MemberChange{After: member2},
+	})
+	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+
+	// add member3 remove member1
+	ring.ProcessMembershipChanges([]membership.MemberChange{
+		membership.MemberChange{After: member3},
+		membership.MemberChange{Before: member1},
+	})
+	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+
+	// update member2
+	ring.ProcessMembershipChanges([]membership.MemberChange{
+		membership.MemberChange{Before: member2, After: member2},
+	})
+	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+}
+
 func genMembers(host, fromPort, toPort int) (members []membership.Member) {
 	for i := fromPort; i <= toPort; i++ {
 		members = append(members, fakeMember{

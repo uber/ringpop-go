@@ -454,7 +454,7 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 			rp.statter.IncCounter(rp.getStatKey("membership-update."+status), nil, 1)
 		}
 	case membership.ChangeEvent:
-		rp.ring.ProcessMembershipChangesServers(event.Changes)
+		rp.ring.ProcessMembershipChanges(event.Changes)
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
 		for _, change := range event.Changes {

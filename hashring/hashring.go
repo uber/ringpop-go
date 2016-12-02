@@ -197,10 +197,10 @@ func (r *HashRing) removeMemberNoLock(member membership.Member) bool {
 	return true
 }
 
-// ProcessMembershipChangesServers takes a slice of membership.MemberChange's
-// and applies them to the hashring by adding and removing servers accordingly
-// to the changes passed in.
-func (r *HashRing) ProcessMembershipChangesServers(changes []membership.MemberChange) {
+// ProcessMembershipChanges takes a slice of membership.MemberChange's and
+// applies them to the hashring by adding and removing members accordingly to
+// the changes passed in.
+func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 	r.Lock()
 	changed := false
 	var added, removed []string
