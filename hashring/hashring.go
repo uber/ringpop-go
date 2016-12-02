@@ -107,6 +107,8 @@ func (r *HashRing) Checksum() (checksum uint32) {
 	return
 }
 
+// Checksums returns a map of checksums named by the algorithm used to compute
+// the checksum.
 func (r *HashRing) Checksums() (checksums map[string]uint32) {
 	r.RLock()
 	// even though the map is immutable the pointer to it is not so it requires
