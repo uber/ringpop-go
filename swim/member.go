@@ -70,15 +70,20 @@ type Member struct {
 // string to string mappings containing user data that is gossiped around in SWIM.
 type LabelMap map[string]string
 
+// GetAddress returns the Address of a member.
 func (m Member) GetAddress() string {
 	return m.Address
 }
 
+// Label returns the value of a label named by key. The `has` boolean indicates
+// if the label was set on the member or not
 func (m Member) Label(key string) (value string, has bool) {
 	value, has = m.Labels[key]
 	return
 }
 
+// Identity returns the identity of a member. If a specific identity is not set
+// for the member the address will be used as the identity
 func (m Member) Identity() string {
 	// Read the identity from the labels
 	identity, set := m.Label(membership.IdentityLabelKey)
@@ -115,9 +120,13 @@ func (m Member) checksumString(b *bytes.Buffer) {
 	m.Labels.checksumString(b)
 }
 
-func CopyLabels(labels LabelMap) (result LabelMap) {
-	result = make(map[string]string, len(labels))
-	for key, value := range labels {
+// copy creates a non-nil version of the LabelMap that copies all existing
+// entries of the map. This can be used to create a new version of the labels
+// that can be mutated before putting it on a Member to make updates without
+// mutating the map that was already on a Member
+func (l LabelMap) copy() (result LabelMap) {
+	result = make(map[string]string, len(l))
+	for key, value := range l {
 		result[key] = value
 	}
 	return

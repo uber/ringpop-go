@@ -30,18 +30,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/hashring"
+	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
+	"github.com/uber/ringpop-go/shared"
+	"github.com/uber/ringpop-go/swim"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
-	"github.com/uber/ringpop-go/events"
-	"github.com/uber/ringpop-go/forward"
-	"github.com/uber/ringpop-go/hashring"
-	"github.com/uber/ringpop-go/logging"
-	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/tchannel-go"
 )
 
@@ -202,7 +202,7 @@ func (rp *Ringpop) init() error {
 
 	// add all members present in the membership of the node on startup.
 	for _, member := range rp.node.GetReachableMembers() {
-		rp.ring.AddServer(member)
+		rp.ring.AddMembers(member)
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
@@ -465,7 +465,7 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 			rp.statter.IncCounter(rp.getStatKey("membership-update."+status), nil, 1)
 		}
 	case membership.ChangeEvent:
-		rp.ring.ProcessMembershipChangesServers(event.Changes)
+		rp.ring.ProcessMembershipChanges(event.Changes)
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
 		for _, change := range event.Changes {
@@ -794,6 +794,9 @@ func (rp *Ringpop) Labels() (*swim.NodeLabels, error) {
 	return rp.node.Labels(), nil
 }
 
+// SetIdentity changes the identity for this process. The identity is used by
+// all members of the membership to calculate the position of this node in the
+// hashring.
 func (rp *Ringpop) SetIdentity(identity string) error {
 	if !rp.Ready() {
 		return ErrNotBootstrapped

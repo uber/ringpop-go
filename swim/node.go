@@ -568,6 +568,8 @@ func (n *Node) Labels() *NodeLabels {
 	return &NodeLabels{n}
 }
 
+// SetIdentity changes the identity of the local node. This will change the
+// state of the local node and will be gossiped around in the network.
 func (n *Node) SetIdentity(identity string) error {
 	return n.memberlist.SetLocalLabel(membership.IdentityLabelKey, identity)
 }
