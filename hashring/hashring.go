@@ -47,13 +47,12 @@ type Configuration struct {
 }
 
 type replicaPoint struct {
-	point    int
-	replica  int
-	identity string
+	hash    int
+	address string
 }
 
 func (r replicaPoint) Compare(other interface{}) int {
-	return r.point - other.(replicaPoint).point
+	return r.hash - other.(replicaPoint).hash
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
@@ -119,11 +118,10 @@ func (r *HashRing) computeChecksumNoLock() {
 }
 
 func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
-	identity := fmt.Sprintf("%s%v", server.Identity(), replica)
+	replicaStr := fmt.Sprintf("%s%v", server.Identity(), replica)
 	return replicaPoint{
-		point:    r.hashfunc(identity),
-		replica:  replica,
-		identity: server.Identity(),
+		hash:    r.hashfunc(replicaStr),
+		address: server.GetAddress(),
 	}
 }
 
@@ -313,9 +311,9 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 	// collected all the servers we want, we have reached the
 	// end of the red-black tree and we need to loop around and inspect the
 	// tree starting at 0.
-	r.tree.LookupNUniqueAt(n, replicaPoint{point: hash}, unique)
+	r.tree.LookupNUniqueAt(n, replicaPoint{hash: hash}, unique)
 	if len(unique) < n {
-		r.tree.LookupNUniqueAt(n, replicaPoint{point: 0}, unique)
+		r.tree.LookupNUniqueAt(n, replicaPoint{hash: 0}, unique)
 	}
 
 	var servers []string
