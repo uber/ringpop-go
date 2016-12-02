@@ -228,8 +228,8 @@ func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 		} else {
 			if change.Before.Identity() != change.After.Identity() {
 				// identity has changed, member needs to be removed and readded
-				r.removeServerNoLock(change.Before)
-				r.addServerNoLock(change.After)
+				r.removeMemberNoLock(change.Before)
+				r.addMemberNoLock(change.After)
 				changed = true
 			}
 		}
