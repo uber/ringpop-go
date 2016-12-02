@@ -82,6 +82,8 @@ func (m Member) Label(key string) (value string, has bool) {
 	return
 }
 
+// Identity returns the identity of a member. If a specific identity is not set
+// for the member the address will be used as the identity
 func (m Member) Identity() string {
 	// Read the identity from the labels
 	identity, set := m.Label(membership.IdentityLabelKey)

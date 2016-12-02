@@ -783,6 +783,9 @@ func (rp *Ringpop) Labels() (*swim.NodeLabels, error) {
 	return rp.node.Labels(), nil
 }
 
+// SetIdentity changes the identity for this process. The identity is used by
+// all members of the membership to calculate the position of this node in the
+// hashring.
 func (rp *Ringpop) SetIdentity(identity string) error {
 	if !rp.Ready() {
 		return ErrNotBootstrapped
