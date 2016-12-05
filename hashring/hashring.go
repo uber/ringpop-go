@@ -137,6 +137,7 @@ func (r *HashRing) computeChecksumsNoLock() {
 		r.logger.WithFields(bark.Fields{
 			"checksum":    r.legacyChecksum,
 			"oldChecksum": old,
+			"checksums":   r.checksums,
 		}).Debug("ringpop ring computed new checksum")
 	}
 
