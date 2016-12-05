@@ -575,6 +575,9 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
 		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))
+		for key, value := range event.NewChecksums {
+			rp.statter.UpdateGauge(rp.getStatKey("ring.checksums."+key), nil, int64(value))
+		}
 
 	case events.RingChangedEvent:
 		added := int64(len(event.ServersAdded))

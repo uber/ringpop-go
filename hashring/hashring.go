@@ -121,29 +121,44 @@ func (r *HashRing) Checksums() (checksums map[string]uint32) {
 // computeChecksumsNoLock re-computes all configured checksums for this hashring
 // and updates the in memory map with a new map containing the new checksums.
 func (r *HashRing) computeChecksumsNoLock() {
-	r.checksums = make(map[string]uint32)
+	oldChecksums := r.checksums
 
+	r.checksums = make(map[string]uint32)
+	changed := false
 	// calculate all configured checksums
 	for name, checksummer := range r.checksummers {
-		r.checksums[name] = checksummer.Compute(r)
+		oldChecksum := oldChecksums[name]
+		newChecksum := checksummer.Compute(r)
+		r.checksums[name] = newChecksum
+
+		if oldChecksum != newChecksum {
+			changed = true
+		}
 	}
 
 	// calculate the legacy identity only based checksum
-	legacy := identityChecksum{}
-	old := r.legacyChecksum
-	r.legacyChecksum = legacy.Compute(r)
+	legacyChecksummer := identityChecksum{}
+	oldChecksum := r.legacyChecksum
+	newChecksum := legacyChecksummer.Compute(r)
+	r.legacyChecksum = newChecksum
 
-	if old != r.legacyChecksum {
+	if oldChecksum != newChecksum {
+		changed = true
+	}
+
+	if changed {
 		r.logger.WithFields(bark.Fields{
 			"checksum":    r.legacyChecksum,
-			"oldChecksum": old,
+			"oldChecksum": oldChecksum,
 			"checksums":   r.checksums,
 		}).Debug("ringpop ring computed new checksum")
 	}
 
 	r.EmitEvent(events.RingChecksumEvent{
-		OldChecksum: old,
-		NewChecksum: r.legacyChecksum,
+		OldChecksum:  oldChecksum,
+		NewChecksum:  r.legacyChecksum,
+		OldChecksums: oldChecksums,
+		NewChecksums: r.checksums,
 	})
 }
 
