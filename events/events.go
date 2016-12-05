@@ -159,6 +159,7 @@ func (a *SyncEventEmitter) EmitEvent(event Event) {
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
 type RingChangedEvent struct {
 	ServersAdded   []string
+	ServersUpdated []string
 	ServersRemoved []string
 }
 

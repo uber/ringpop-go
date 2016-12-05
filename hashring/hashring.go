@@ -209,7 +209,7 @@ func (r *HashRing) removeMemberNoLock(member membership.Member) bool {
 func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 	r.Lock()
 	changed := false
-	var added, removed []string
+	var added, updated, removed []string
 	for _, change := range changes {
 		if change.Before == nil && change.After != nil {
 			// new member
@@ -228,6 +228,7 @@ func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 				// identity has changed, member needs to be removed and readded
 				r.removeMemberNoLock(change.Before)
 				r.addMemberNoLock(change.After)
+				updated = append(updated, change.After.GetAddress())
 				changed = true
 			}
 		}
@@ -238,6 +239,7 @@ func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 		r.computeChecksumNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   added,
+			ServersUpdated: updated,
 			ServersRemoved: removed,
 		})
 	}

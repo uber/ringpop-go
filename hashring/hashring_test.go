@@ -28,10 +28,13 @@ import (
 	"testing"
 
 	"github.com/uber/ringpop-go/events"
+	eventsmocks "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/membership"
 
 	"github.com/dgryski/go-farm"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 // fake event listener
@@ -302,54 +305,130 @@ func TestLookupN(t *testing.T) {
 	assert.Len(t, unique, 9, "expected to get nine unique servers")
 }
 
-func TestProcessMembershipChanges(t *testing.T) {
-	ring := New(farm.Fingerprint32, 10)
+type ProcessMembershipChangesSuite struct {
+	suite.Suite
+	ring    *HashRing
+	member1 fakeMember
+	member2 fakeMember
+	member3 fakeMember
+	member4 fakeMember
+	l       *eventsmocks.EventListener
+}
 
-	member1 := fakeMember{address: "192.0.2.0:1"}
-	member2 := fakeMember{address: "192.0.2.0:2"}
-	member3 := fakeMember{address: "192.0.2.0:3"}
+func (s *ProcessMembershipChangesSuite) SetupSuite() {
+	s.ring = New(farm.Fingerprint32, 10)
+	s.member1 = fakeMember{address: "192.0.2.0:1"}
+	s.member2 = fakeMember{address: "192.0.2.0:2"}
+	s.member3 = fakeMember{address: "192.0.2.0:3"}
+	s.member4 = fakeMember{address: "192.0.2.0:4"}
+}
 
-	// add member1
-	ring.ProcessMembershipChanges([]membership.MemberChange{
-		membership.MemberChange{After: member1},
+func (s *ProcessMembershipChangesSuite) SetupTest() {
+	s.l = &eventsmocks.EventListener{}
+	s.ring.AddListener(s.l)
+}
+
+func (s *ProcessMembershipChangesSuite) TearDownTest() {
+	s.ring.RemoveListener(s.l)
+}
+
+func (s *ProcessMembershipChangesSuite) expectRingChangedEvent(event events.RingChangedEvent) {
+	s.l.On("HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.On("HandleEvent", event)
+}
+
+func (s *ProcessMembershipChangesSuite) TestAddMember1() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersAdded: []string{s.member1.GetAddress()},
 	})
-	assert.Equal(t, 1, ring.ServerCount(), "unexpected count of members in ring")
 
-	// add member2
-	ring.ProcessMembershipChanges([]membership.MemberChange{
-		membership.MemberChange{After: member2},
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{After: s.member1},
 	})
-	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(1, s.ring.ServerCount(), "unexpected count of members in ring")
+}
 
-	// add member3 remove member1
-	ring.ProcessMembershipChanges([]membership.MemberChange{
-		membership.MemberChange{After: member3},
-		membership.MemberChange{Before: member1},
+func (s *ProcessMembershipChangesSuite) TestAddMember2() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersAdded: []string{s.member2.GetAddress()},
 	})
-	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
 
-	// update member2
-	ring.ProcessMembershipChanges([]membership.MemberChange{
-		membership.MemberChange{Before: member2, After: member2},
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{After: s.member2},
 	})
-	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
 
-	// change identity
-	result, _ := ring.Lookup(fmt.Sprintf("%s0", member2.Identity()))
-	assert.Equal(t, member2.address, result, "lookup returns member2")
+func (s *ProcessMembershipChangesSuite) TestRemoveMember1AddMember3() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersAdded:   []string{s.member3.GetAddress()},
+		ServersRemoved: []string{s.member1.GetAddress()},
+	})
+
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{After: s.member3},
+		{Before: s.member1},
+	})
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestNoopUpdate() {
+	s.l.On("HandleEvent", mock.Anything).Return()
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.member2, After: s.member2},
+	})
+
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChangedEvent"))
+
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestChangeIdentityMember2() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersUpdated: []string{s.member2.GetAddress()},
+	})
 
 	member2NewIdentity := fakeMember{
 		address:  "192.0.2.0:2",
 		identity: "new_identity",
 	}
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.member2, After: member2NewIdentity},
+	})
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
 
-	ring.ProcessMembershipChanges([]membership.MemberChange{
-		{Before: member2, After: member2NewIdentity},
+func (s *ProcessMembershipChangesSuite) TestRemoveNonExistingMember() {
+	s.l.On("HandleEvent", mock.Anything).Return()
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.member4},
 	})
 
-	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
-	result, _ = ring.Lookup(fmt.Sprintf("%s0", member2NewIdentity.Identity()))
-	assert.Equal(t, member2.address, result, "lookup returns member2")
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChangedEvent"))
+
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestUpdateNonExistingMember() {
+	s.l.On("HandleEvent", mock.Anything).Return()
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.member4, After: s.member4},
+	})
+
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChangedEvent"))
+
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func TestNodeTestSuite(t *testing.T) {
+	suite.Run(t, new(ProcessMembershipChangesSuite))
 }
 
 func TestLookupsWithIdentities(t *testing.T) {
