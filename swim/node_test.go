@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/discovery/statichosts"
+	"github.com/uber/ringpop-go/membership"
 )
 
 type NodeTestSuite struct {
@@ -79,6 +80,17 @@ func (s *NodeTestSuite) TestStoppedBootstrapOption() {
 	// TODO: Should these also be stopped?
 	//s.True(s.testNode.node.Stopped(), "node should be stopped")
 	//s.False(s.testNode.node.stateTransitions.enabled, "suspicion should not be enabled")
+}
+
+func (s *NodeTestSuite) TestSetIdentity() {
+	_, has := s.testNode.node.Labels().Get(membership.IdentityLabelKey)
+	s.False(has, "Identity label not set")
+
+	s.testNode.node.SetIdentity("new_identity")
+
+	value, has := s.testNode.node.Labels().Get(membership.IdentityLabelKey)
+	s.True(has, "Identity label set")
+	s.Equal("new_identity", value, "Identity label contains identity")
 }
 
 func TestNodeTestSuite(t *testing.T) {
