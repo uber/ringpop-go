@@ -175,7 +175,7 @@ func TestIdentityWithoutLabel(t *testing.T) {
 }
 
 func TestIdentityWithIdentityLabel(t *testing.T) {
-		m := Member{
+	m := Member{
 		Address: "192.0.2.1:1234",
 		Labels: LabelMap{
 			"__identity": "identityFromLabel",

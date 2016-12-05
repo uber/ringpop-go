@@ -44,8 +44,9 @@ type Configuration struct {
 }
 
 type replicaPoint struct {
-	hash    int
-	address string
+	hash     int
+	identity string
+	address  string
 }
 
 func (r replicaPoint) Compare(other interface{}) int {
@@ -148,8 +149,9 @@ func (r *HashRing) computeChecksumsNoLock() {
 func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
 	replicaStr := fmt.Sprintf("%s%v", server.Identity(), replica)
 	return replicaPoint{
-		hash:    r.hashfunc(replicaStr),
-		address: server.GetAddress(),
+		hash:     r.hashfunc(replicaStr),
+		identity: server.Identity(),
+		address:  server.GetAddress(),
 	}
 }
 

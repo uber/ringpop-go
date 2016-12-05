@@ -56,7 +56,7 @@ func (r *replicaPointChecksum) Compute(ring *HashRing) uint32 {
 	buffer := bytes.Buffer{}
 
 	ring.tree.root.walk(func(node *redBlackNode) bool {
-		buffer.WriteString(strconv.Itoa(node.key.(replicaPoint).point))
+		buffer.WriteString(strconv.Itoa(node.key.(replicaPoint).hash))
 		buffer.WriteString("-")
 		buffer.WriteString(node.value.(string))
 		buffer.WriteString(";")
