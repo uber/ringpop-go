@@ -160,7 +160,7 @@ func TestLookup(t *testing.T) {
 
 func TestLookupDistribution(t *testing.T) {
 	ring := New(farm.Fingerprint32, 5)
-	members := genMembers(1, 1, 1000)
+	members := genMembers(1, 1, 1000, false)
 	ring.AddMembers(members...)
 
 	keys := make([]string, 40)
@@ -183,7 +183,7 @@ func TestLookupDistribution(t *testing.T) {
 // section of all hashes in the red-black tree.
 func TestLookupNNoGaps(t *testing.T) {
 	ring := New(farm.Fingerprint32, 1)
-	members := genMembers(1, 1, 100)
+	members := genMembers(1, 1, 100, false)
 	ring.AddMembers(members...)
 	key := "key with small hash"
 
@@ -239,14 +239,14 @@ func TestLookupNNoGaps(t *testing.T) {
 
 func TestLookupNOverflow(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
-	members := genMembers(1, 1, 10)
+	members := genMembers(1, 1, 10, false)
 	ring.AddMembers(members...)
 	assert.Len(t, ring.LookupN("a random key", 20), 10, "expected that LookupN caps results when n is larger than number of servers")
 }
 
 func TestLookupNLoopAround(t *testing.T) {
 	ring := New(farm.Fingerprint32, 1)
-	members := genMembers(1, 1, 10)
+	members := genMembers(1, 1, 10, false)
 	ring.AddMembers(members...)
 
 	unique := make(map[valuetype]struct{})
@@ -272,7 +272,7 @@ func TestLookupN(t *testing.T) {
 
 	unique := make(map[string]bool)
 
-	members := genMembers(1, 1, 10)
+	members := genMembers(1, 1, 10, false)
 	ring.AddMembers(members...)
 
 	servers = ring.LookupN("key", 5)
@@ -333,13 +333,78 @@ func TestProcessMembershipChanges(t *testing.T) {
 		membership.MemberChange{Before: member2, After: member2},
 	})
 	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+
+	// change identity
+	result, _ := ring.Lookup(fmt.Sprintf("%s0", member2.Identity()))
+	assert.Equal(t, member2.address, result, "lookup returns member2")
+
+	member2NewIdentity := fakeMember{
+		address:  "192.0.2.0:2",
+		identity: "new_identity",
+	}
+
+	ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: member2, After: member2NewIdentity},
+	})
+
+	assert.Equal(t, 2, ring.ServerCount(), "unexpected count of members in ring")
+	result, _ = ring.Lookup(fmt.Sprintf("%s0", member2NewIdentity.Identity()))
+	assert.Equal(t, member2.address, result, "lookup returns member2")
 }
 
-func genMembers(host, fromPort, toPort int) (members []membership.Member) {
+func TestLookupsWithIdentities(t *testing.T) {
+	numReplicaPoints := 3
+	numServers := 10
+	ring := New(farm.Fingerprint32, numReplicaPoints)
+
+	members := make([]membership.Member, 0, numServers)
+
+	for i := 0; i < numServers; i++ {
+		m := fakeMember{
+			address:  fmt.Sprintf("127.0.0.1:%v", 3000+i),
+			identity: fmt.Sprintf("identity%v", i),
+		}
+		members = append(members, m)
+	}
+
+	ring.AddMembers(members...)
+
+	for _, m := range members {
+		identity := m.Identity()
+
+		for i := 0; i < numReplicaPoints; i++ {
+			key := fmt.Sprintf("%v%v", identity, i)
+
+			value, has := ring.Lookup(key)
+			assert.True(t, has)
+			assert.Equal(t, m.GetAddress(), value)
+		}
+	}
+}
+
+func TestReplicaPointCompare(t *testing.T) {
+	address := "127.0.0.1:3000"
+
+	pointA := replicaPoint{hash: 100, address: address}
+	pointB := replicaPoint{hash: 200, address: address}
+	pointC := replicaPoint{hash: 300, address: address}
+	pointD := replicaPoint{hash: 200, address: address}
+
+	assert.True(t, pointB.Compare(pointA) > 0)
+	assert.True(t, pointB.Compare(pointC) < 0)
+	assert.True(t, pointB.Compare(pointB) == 0)
+	assert.True(t, pointB.Compare(pointD) == 0)
+}
+
+func genMembers(host, fromPort, toPort int, overrideIdentity bool) (members []membership.Member) {
 	for i := fromPort; i <= toPort; i++ {
-		members = append(members, fakeMember{
+		member := fakeMember{
 			address: fmt.Sprintf("127.0.0.%v:%v", host, 3000+i),
-		})
+		}
+		if overrideIdentity {
+			member.identity = fmt.Sprintf("identity%v", i)
+		}
+		members = append(members, member)
 	}
 	return members
 }
@@ -349,12 +414,7 @@ func BenchmarkHashRingLookupN(b *testing.B) {
 
 	ring := New(farm.Fingerprint32, 100)
 
-	members := make([]membership.Member, 1000)
-	for i := range members {
-		members[i] = fakeMember{
-			address: fmt.Sprintf("%d", rand.Int()),
-		}
-	}
+	members := genMembers(1, 1, 10, true)
 	ring.AddMembers(members...)
 
 	keys := make([]string, 100)

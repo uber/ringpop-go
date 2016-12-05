@@ -166,3 +166,20 @@ func TestAcceptGossip(t *testing.T) {
 		assert.Equal(t, test.process, shouldProcessGossip(test.member, test.gossip), "expected to "+test.name)
 	}
 }
+
+func TestIdentityWithoutLabel(t *testing.T) {
+	m := Member{
+		Address: "192.0.2.1:1234",
+	}
+	assert.Equal(t, "192.0.2.1:1234", m.Identity(), "Expected identity to be equal to address")
+}
+
+func TestIdentityWithIdentityLabel(t *testing.T) {
+		m := Member{
+		Address: "192.0.2.1:1234",
+		Labels: LabelMap{
+			"__identity": "identityFromLabel",
+		},
+	}
+	assert.Equal(t, "identityFromLabel", m.Identity(), "Expected identity to be equal to address")
+}
