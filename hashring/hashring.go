@@ -128,7 +128,7 @@ func (r *HashRing) computeChecksumsNoLock() {
 		r.checksums[name] = checksummer.Compute(r)
 	}
 
-	// calculate the legacy identy only based checksum
+	// calculate the legacy identity only based checksum
 	legacy := identityChecksum{}
 	old := r.legacyChecksum
 	r.legacyChecksum = legacy.Compute(r)

@@ -13,8 +13,8 @@ import (
 // checksum can be used to compare two rings for equality.
 type Checksum interface {
 	// Compute calculates the checksum for the hashring that is passed in.
-	// Compute will be called while having atleast a readlock on the hashring so
-	// it is safe to read from the ring, but not safe to chagne the ring. There
+	// Compute will be called while having at least a read-lock on the hashring so
+	// it is safe to read from the ring, but not safe to change the ring. There
 	// might be multiple Checksum Computes initiated at the same time, but every
 	// Checksum will only be called once per hashring at once
 	Compute(ring *HashRing) (checksum uint32)
