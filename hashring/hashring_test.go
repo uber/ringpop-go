@@ -112,6 +112,37 @@ func TestChecksumChanges(t *testing.T) {
 	assert.NotEqual(t, checksum, ring.Checksum(), "expected checksum to have changed on server remove")
 }
 
+func TestHashRing_Checksums(t *testing.T) {
+	getSortedKeys := func(m map[string]uint32) []string {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	}
+
+	ring := New(farm.Fingerprint32, 10)
+	ring.checksummers = map[string]Checksum{
+		"identity":     &identityChecksum{},
+		"address":      &addressChecksum{},
+		"replicaPoint": &replicaPointChecksum{},
+	}
+
+	checkSummers := []string{"identity", "address", "replicaPoint"}
+	sort.Strings(checkSummers)
+
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
+
+	checksums := ring.Checksums()
+	assert.Equal(t, checkSummers, getSortedKeys(checksums), "Expected all checksums to be computed")
+	ring.RemoveMembers(fakeMember{address: "server1"})
+
+	assert.NotEqual(t, checksums, ring.Checksums(), "expected checksums to have changed on server remove")
+	assert.Equal(t, checkSummers, getSortedKeys(checksums), "Expected all checksums to be computed")
+}
+
 func TestServerCount(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	assert.Equal(t, 0, ring.ServerCount(), "expected one server to be in ring")
