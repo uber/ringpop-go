@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"code.uber.internal/rt/cag.git/Godeps/_workspace/src/code.uber.internal/go-common.git/Godeps/_workspace/src/github.com/dgryski/go-farm"
+	"github.com/dgryski/go-farm"
 	"github.com/stretchr/testify/assert"
 )
 
