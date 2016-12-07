@@ -187,6 +187,7 @@ func (s *ForwarderTestSuite) TestForwardThrift() {
 	var response pingpong.PingPongPingResult
 
 	err = DeserializeThrift(res, &response)
+	s.NoError(err)
 
 	s.Equal("correct pinging host", response.Success.Source)
 }
@@ -211,6 +212,7 @@ func (s *ForwarderTestSuite) TestForwardThriftErrorResponse() {
 	var response pingpong.PingPongPingResult
 
 	err = DeserializeThrift(res, &response)
+	s.NoError(err)
 
 	s.NotNil(response.PingError, "expected a pingerror")
 }
