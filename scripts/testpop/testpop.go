@@ -70,7 +70,7 @@ func main() {
 	}
 
 	options := []ringpop.Option{ringpop.Channel(ch),
-		ringpop.Identity(*hostport),
+		ringpop.Address(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 
 		ringpop.SuspectPeriod(time.Duration(*suspectPeriod) * time.Millisecond),

@@ -7,10 +7,10 @@ var (
 	// be bootstrapped before they can operate correctly.
 	ErrNotBootstrapped = errors.New("ringpop is not bootstrapped")
 
-	// ErrEphemeralIdentity is returned by the identity resolver if TChannel is
+	// ErrEphemeralAddress is returned by the address resolver if TChannel is
 	// using port 0 and is not listening (and thus has not been assigned a port by
 	// the OS).
-	ErrEphemeralIdentity = errors.New("unable to resolve this node's identity from channel that is not yet listening")
+	ErrEphemeralAddress = errors.New("unable to resolve this node's address from channel that is not yet listening")
 
 	// ErrChannelNotListening is returned on bootstrap if TChannel is not
 	// listening.

@@ -1,6 +1,24 @@
 ringpop-go changes
 ==================
 
+NEXT
+------
+
+### Release notes
+
+#### Change to identity-option
+
+Prior to ringpop NEXT the address was used as the identity of a member. Starting with version NEXT, it's possible to
+configure a separate identity. As a result, the behaviour of the `Identity` and `IdentityResolverFunc` has been changed.
+The `Identity` option now configures the identity of a member and will return an error when it matches an ip:port; services 
+that were using `Identity` or `IdentityResolverFunc` should now use the `Address` and `AddressResolverFunc` options.
+You could use the following `gofmt` snippets to easily refactor:
+
+```
+gofmt -r 'ringpop.Identity(a) -> ringpop.Address(a)' -w .
+gofmt -r 'ringpop.IdentityResolverFunc(a) -> ringpop.AddressResolverFunc(a)' -w .
+```
+
 v0.7.0
 ------
 

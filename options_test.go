@@ -73,9 +73,9 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	s.Equal(testRingpop.configHashRing, rp.configHashRing)
 }
 
-// TestDefaultIdentityResolver tests that Ringpop gets the identity from the
+// TestDefaultAddressResolver tests that Ringpop gets the address from the
 // TChannel object by default.
-func (s *RingpopOptionsTestSuite) TestDefaultIdentityResolver() {
+func (s *RingpopOptionsTestSuite) TestDefaultAddressResolver() {
 	// Start listening, to get a hostport assigned
 	s.channel.ListenAndServe("127.0.0.1:0")
 	hostport := s.channel.PeerInfo().HostPort
@@ -85,10 +85,10 @@ func (s *RingpopOptionsTestSuite) TestDefaultIdentityResolver() {
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	identity, err := rp.identity()
+	address, err := rp.address()
 
-	// Check that the identity of Ringpop matches the TChannel hostport
-	s.Equal(hostport, identity)
+	// Check that the address of Ringpop matches the TChannel hostport
+	s.Equal(hostport, address)
 	s.NoError(err)
 }
 
@@ -158,27 +158,27 @@ func (s *RingpopOptionsTestSuite) TestHashRingConfig() {
 	s.Equal(rp.configHashRing.ReplicaPoints, 42)
 }
 
-// TestIdentityResolverFunc tests the func that's passed gets applied to the
+// TestAddressResolverFunc tests the func that's passed gets applied to the
 // Ringpop instance.
-func (s *RingpopOptionsTestSuite) TestIdentityResolverFunc() {
+func (s *RingpopOptionsTestSuite) TestAddressResolverFunc() {
 	f := func() (string, error) {
 		return "127.0.0.1:3001", nil
 	}
 
-	rp, err := New("test", Channel(s.channel), IdentityResolverFunc(f))
+	rp, err := New("test", Channel(s.channel), AddressResolverFunc(f))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	identity, err := rp.identityResolver()
+	address, err := rp.addressResolver()
 
-	s.Equal("127.0.0.1:3001", identity)
+	s.Equal("127.0.0.1:3001", address)
 	s.NoError(err)
 }
 
-// TestMissingIdentityResolver tests the Ringpop constructor throws an error
-// if the user sets the identity resolver to nil
-func (s *RingpopOptionsTestSuite) TestMissingIdentityResolver() {
-	rp, err := New("test", Channel(s.channel), IdentityResolverFunc(nil))
+// TestMissingAddressResolver tests the Ringpop constructor throws an error
+// if the user sets the address resolver to nil
+func (s *RingpopOptionsTestSuite) TestMissingAddressResolver() {
+	rp, err := New("test", Channel(s.channel), AddressResolverFunc(nil))
 	s.Nil(rp)
 	s.Error(err)
 }

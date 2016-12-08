@@ -88,8 +88,8 @@ func checkOptions(rp *Ringpop) []error {
 	if rp.channel == nil {
 		errs = append(errs, errors.New("channel is required"))
 	}
-	if rp.identityResolver == nil {
-		errs = append(errs, errors.New("identity resolver is nil"))
+	if rp.addressResolver == nil {
+		errs = append(errs, errors.New("address resolver is nil"))
 	}
 	return errs
 }
@@ -173,37 +173,37 @@ func Statter(s log.StatsReporter) Option {
 	}
 }
 
-// Identity is used to specify a static hostport string as this Ringpop
-// instance's identity.
+// Address is used to specify a static hostport string as this Ringpop
+// instance's address.
 //
 // Example:
 //
 //     ringpop.New("my-app",
 //         ringpop.Channel(myChannel),
-//         ringpop.Identity("10.32.12.2:21130"),
+//         ringpop.Address("10.32.12.2:21130"),
 //     )
 //
-// You should make sure the identity matches the listening address of the
+// You should make sure the address matches the listening address of the
 // TChannel object.
 //
-// By default, you do not need to provide an identity. If you do not provide
-// one, the identity will be resolved automatically by the default resolver.
-func Identity(hostport string) Option {
-	return IdentityResolverFunc(func() (string, error) {
-		return hostport, nil
+// By default, you do not need to provide an address. If you do not provide
+// one, the address will be resolved automatically by the default resolver.
+func Address(address string) Option {
+	return AddressResolverFunc(func() (string, error) {
+		return address, nil
 	})
 }
 
-// IdentityResolver is a function that returns the listen interface/port
-// that Ringpop should identify as.
-type IdentityResolver func() (string, error)
+// AddressResolver is a function that returns the listen interface/port
+// that Ringpop should use as its address.
+type AddressResolver func() (string, error)
 
-// IdentityResolverFunc is used to specify a function that will called when
-// the Ringpop instance needs to resolve its identity (typically, on
+// AddressResolverFunc is used to specify a function that will called when
+// the Ringpop instance needs to resolve its address (typically, on
 // bootstrap).
-func IdentityResolverFunc(resolver IdentityResolver) Option {
+func AddressResolverFunc(resolver AddressResolver) Option {
 	return func(r *Ringpop) error {
-		r.identityResolver = resolver
+		r.addressResolver = resolver
 		return nil
 	}
 }
@@ -339,9 +339,9 @@ func defaultClock(r *Ringpop) error {
 	return Clock(clock.New())(r)
 }
 
-// defaultIdentityResolver sets the default identityResolver
-func defaultIdentityResolver(r *Ringpop) error {
-	r.identityResolver = r.channelIdentityResolver
+// defaultAddressResolver sets the default addressResolver
+func defaultAddressResolver(r *Ringpop) error {
+	r.addressResolver = r.channelAddressResolver
 	return nil
 }
 
@@ -378,7 +378,7 @@ func defaultRingChecksumStatPeriod(r *Ringpop) error {
 // can be overridden at runtime.
 var defaultOptions = []Option{
 	defaultClock,
-	defaultIdentityResolver,
+	defaultAddressResolver,
 	defaultLogLevels,
 	defaultStatter,
 	defaultMembershipChecksumStatPeriod,

@@ -135,8 +135,8 @@ func NewReplicator(s Sender, channel shared.SubChannel, logger log.Logger,
 
 	opts = mergeDefaultOptions(opts, &Options{3, 1, 3, Parallel})
 	logger = logging.Logger("replicator")
-	if identity, err := s.WhoAmI(); err == nil {
-		logger = logger.WithField("local", identity)
+	if address, err := s.WhoAmI(); err == nil {
+		logger = logger.WithField("local", address)
 	}
 	return &Replicator{s, channel, f, logger, opts}
 }

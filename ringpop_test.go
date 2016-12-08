@@ -101,7 +101,7 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.stats = newDummyStats()
 
 	s.ringpop, err = New("test",
-		Identity("127.0.0.1:3001"),
+		Address("127.0.0.1:3001"),
 		Channel(ch),
 		Clock(s.mockClock),
 		Statter(s.stats),
@@ -489,17 +489,17 @@ func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
 // a ready state.
 func (s *RingpopTestSuite) TestWhoAmI() {
 	s.NotEqual(ready, s.ringpop.state)
-	identity, err := s.ringpop.WhoAmI()
-	s.Equal("", identity)
+	address, err := s.ringpop.WhoAmI()
+	s.Equal("", address)
 	s.Error(err)
 
 	err = createSingleNodeCluster(s.ringpop)
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	s.Equal(ready, s.ringpop.state)
-	identity, err = s.ringpop.WhoAmI()
+	address, err = s.ringpop.WhoAmI()
 	s.NoError(err)
-	s.Equal("127.0.0.1:3001", identity)
+	s.Equal("127.0.0.1:3001", address)
 }
 
 // TestUptime tests that Uptime only operates when the Ringpop instance is in
@@ -552,7 +552,7 @@ func (s *RingpopTestSuite) TestLookupNoDestination() {
 	err := createSingleNodeCluster(s.ringpop)
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
-	address, _ := s.ringpop.identity()
+	address, _ := s.ringpop.address()
 	member := fakeMember{
 		address: address,
 	}
@@ -598,7 +598,7 @@ func (s *RingpopTestSuite) TestLookupNNoDestinations() {
 	err := createSingleNodeCluster(s.ringpop)
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
-	address, _ := s.ringpop.identity()
+	address, _ := s.ringpop.address()
 	member := fakeMember{
 		address: address,
 	}
@@ -637,23 +637,23 @@ func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
 func (s *RingpopTestSuite) TestGetReachableMembers() {
 	createSingleNodeCluster(s.ringpop)
 
-	identity, err := s.ringpop.WhoAmI()
+	address, err := s.ringpop.WhoAmI()
 	s.Require().NoError(err)
 
 	result, err := s.ringpop.GetReachableMembers()
 	s.NoError(err)
-	s.Equal([]string{identity}, result)
+	s.Equal([]string{address}, result)
 }
 
 func (s *RingpopTestSuite) TestGetReachableMembersNotMePredicate() {
 	createSingleNodeCluster(s.ringpop)
 
-	identity, err := s.ringpop.WhoAmI()
+	address, err := s.ringpop.WhoAmI()
 	s.Require().NoError(err)
 
 	// get reachable members without me (non in this test)
 	result, err := s.ringpop.GetReachableMembers(func(member swim.Member) bool {
-		return member.Address != identity
+		return member.Address != address
 	})
 
 	s.NoError(err)
@@ -676,12 +676,12 @@ func (s *RingpopTestSuite) TestCountReachableMembers() {
 func (s *RingpopTestSuite) TestCountReachableMembersNotMePredicate() {
 	createSingleNodeCluster(s.ringpop)
 
-	identity, err := s.ringpop.WhoAmI()
+	address, err := s.ringpop.WhoAmI()
 	s.Require().NoError(err)
 
 	// get reachable members without me (non in this test)
 	result, err := s.ringpop.CountReachableMembers(func(member swim.Member) bool {
-		return member.Address != identity
+		return member.Address != address
 	})
 
 	s.NoError(err)
@@ -689,7 +689,7 @@ func (s *RingpopTestSuite) TestCountReachableMembersNotMePredicate() {
 }
 
 // TestAddSelfToBootstrapList tests that Ringpop automatically adds its own
-// identity to the bootstrap host list.
+// address to the bootstrap host list.
 func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
 	// Init ringpop, but then override the swim node with mock node
 	s.ringpop.init()
@@ -724,7 +724,7 @@ func (s *RingpopTestSuite) TestErrorOnChannelNotListening() {
 	s.Require().NoError(err)
 
 	nodesJoined, err := rp.Bootstrap(&swim.BootstrapOptions{})
-	s.Exactly(err, ErrEphemeralIdentity)
+	s.Exactly(err, ErrEphemeralAddress)
 	s.Nil(nodesJoined)
 }
 
@@ -900,9 +900,9 @@ func (s *RingpopTestSuite) TestDontAllowBootstrapWithoutChannelListening() {
 	s.channel = ch
 
 	// Bug #146 meant that you could bootstrap ringpop without a listening
-	// channel IF you provided the Identity argument (or a custom Identity)
+	// channel IF you provided the Address argument (or a custom Identity)
 	// provider.
-	s.ringpop, err = New("test", Channel(ch), Identity("127.0.0.1:3001"))
+	s.ringpop, err = New("test", Channel(ch), Address("127.0.0.1:3001"))
 	s.NoError(err, "Ringpop must create successfully")
 
 	// Calls bootstrap
