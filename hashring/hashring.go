@@ -171,7 +171,7 @@ func (r *HashRing) removeReplicasNoLock(server string) {
 	delete(r.serverSet, server)
 	for i := 0; i < r.replicaPoints; i++ {
 		address := fmt.Sprintf("%s%v", server, i)
-		r.tree.Delete(r.hashfunc(address))
+		r.tree.Delete(r.hashfunc(address), server)
 	}
 }
 
