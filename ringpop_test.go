@@ -532,7 +532,7 @@ func (s *RingpopTestSuite) TestChecksum() {
 	s.Equal(ready, s.ringpop.state)
 	checksum, err = s.ringpop.Checksum()
 	s.NoError(err)
-	//s.NotZero(checksum)
+	s.NotZero(checksum)
 }
 
 // TestApp tests that App() returns the correct app name.
