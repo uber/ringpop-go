@@ -71,6 +71,7 @@ run-test-for-cluster-size() {
         --enable-feature partition-healing \
         --enable-feature labels \
         --enable-feature self-eviction \
+        --enable-feature identity \
         "${project_root}/testpop" &>$output_file || err=$?
 
     if [ $PIPESTATUS -gt 0 ]; then
