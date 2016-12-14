@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -179,6 +180,31 @@ func (s *RingpopOptionsTestSuite) TestAddressResolverFunc() {
 // if the user sets the address resolver to nil
 func (s *RingpopOptionsTestSuite) TestMissingAddressResolver() {
 	rp, err := New("test", Channel(s.channel), AddressResolverFunc(nil))
+	s.Nil(rp)
+	s.Error(err)
+}
+
+func (s *RingpopOptionsTestSuite) TestIdentity() {
+	rp, err := New("test", Channel(s.channel), Identity("identity"))
+	s.Require().NotNil(rp)
+	s.Require().NoError(err)
+
+	identity, has := rp.config.InitialLabels[membership.IdentityLabelKey]
+	s.Equal(true, has, "Identity label set")
+	s.Equal("identity", identity)
+}
+
+func (s *RingpopOptionsTestSuite) TestDefaultIdentity() {
+	rp, err := New("test", Channel(s.channel))
+	s.Require().NotNil(rp)
+	s.Require().NoError(err)
+
+	_, has := rp.config.InitialLabels[membership.IdentityLabelKey]
+	s.Equal(false, has, "Identity label not set")
+}
+
+func (s *RingpopOptionsTestSuite) TestHostPortIdentity() {
+	rp, err := New("test", Channel(s.channel), Identity("127.0.0.1:1234"))
 	s.Nil(rp)
 	s.Error(err)
 }

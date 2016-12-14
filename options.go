@@ -28,8 +28,10 @@ import (
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/util"
 )
 
 type configuration struct {
@@ -172,6 +174,19 @@ func LogLevels(levels map[string]logging.Level) Option {
 func Statter(s log.StatsReporter) Option {
 	return func(r *Ringpop) error {
 		r.statter = s
+		return nil
+	}
+}
+
+// Identity is used to specify an identity as this Ringpop instance's identity.
+// Since a ringpop instance is by default identified by its hostport, it's not allowed to manually specify a
+// hostport as its identity.
+func Identity(identity string) Option {
+	return func(r *Ringpop) error {
+		if util.HostportPattern.MatchString(identity) {
+			return errors.New("a hostport is not valid as an identity")
+		}
+		r.config.InitialLabels[membership.IdentityLabelKey] = identity
 		return nil
 	}
 }

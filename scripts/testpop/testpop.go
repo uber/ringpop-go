@@ -48,6 +48,8 @@ var (
 	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "The lifetime of a faulty member in ms. After that the member becomes a tombstone.")
 	tombstonePeriod = flag.Int("tombstone-period", 5000, "The lifetime of a tombstone member in ms. After that the member is removed from the membership.")
 
+	identity = flag.String("identity", "", "specify an identity")
+
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 )
 
@@ -76,6 +78,10 @@ func main() {
 		ringpop.SuspectPeriod(time.Duration(*suspectPeriod) * time.Millisecond),
 		ringpop.FaultyPeriod(time.Duration(*faultyPeriod) * time.Millisecond),
 		ringpop.TombstonePeriod(time.Duration(*tombstonePeriod) * time.Millisecond),
+	}
+
+	if *identity != "" {
+		options = append(options, ringpop.Identity(*identity))
 	}
 
 	if *statsUDP != "" && *statsFile != "" {
