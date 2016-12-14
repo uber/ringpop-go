@@ -144,7 +144,8 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 
 	ringpop := &Ringpop{
 		config: &configuration{
-			App: app,
+			App:           app,
+			InitialLabels: make(swim.LabelMap),
 		},
 		logger: logging.Logger("ringpop"),
 	}
@@ -193,6 +194,7 @@ func (rp *Ringpop) init() error {
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
 		LabelLimits:   rp.config.LabelLimits,
+		InitialLabels: rp.config.InitialLabels,
 		SelfEvict:     rp.config.SelfEvict,
 	})
 	rp.node.AddListener(rp)

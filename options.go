@@ -52,6 +52,9 @@ type configuration struct {
 	// number of labels and the size of key and value can be configured.
 	LabelLimits swim.LabelOptions
 
+	// InitialLabels configures the initial labels.
+	InitialLabels swim.LabelMap
+
 	// SelfEvict holds the settings with regards to self eviction
 	SelfEvict swim.SelfEvictOptions
 }

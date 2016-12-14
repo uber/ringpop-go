@@ -754,6 +754,14 @@ func (s *RingpopTestSuite) TestStartTimersIdempotance() {
 	s.ringpop.stopTimers()
 }
 
+func (s *RingpopTestSuite) TestInitialLabels() {
+	s.ringpop.config.InitialLabels["key"] = "value"
+	s.ringpop.init()
+	value, has := s.ringpop.node.Labels().Get("key")
+	s.Equal("value", value, "Label correctly set on local node")
+	s.True(has, "Label correctly set on local node")
+}
+
 func (s *RingpopTestSuite) TestReadyEvent() {
 	called := make(chan bool, 1)
 
