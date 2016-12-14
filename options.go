@@ -178,9 +178,14 @@ func Statter(s log.StatsReporter) Option {
 	}
 }
 
-// Identity is used to specify an identity as this Ringpop instance's identity.
-// Since a ringpop instance is by default identified by its hostport, it's not allowed to manually specify a
-// hostport as its identity.
+// Identity can be used to specify a custom string as the unique identifier for
+// this node. The identity should be unique amongst other Ringpop instances; it
+// is used in the hashring.
+//
+// By default, the hostport/address of the node is used as the identity in the
+// hashring. An error is thrown if a hostport is manually specified using this
+// option, as this would lead to unexpected behaviour. If you want to override
+// the node's listening address, use the `Address` option.
 func Identity(identity string) Option {
 	return func(r *Ringpop) error {
 		if util.HostportPattern.MatchString(identity) {
