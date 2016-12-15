@@ -43,10 +43,16 @@ type Configuration struct {
 	ReplicaPoints int
 }
 
+// replicaPoint contains the address where a specific point in the hashring maps to
 type replicaPoint struct {
-	hash     int
-	identity string
-	address  string
+	// hash of the point in the hashring
+	hash int
+
+    // identity of the member that owns this replicaPoint.
+    identity string
+
+	// address of the member that owns this replicaPoint.
+	address string
 }
 
 func (r replicaPoint) Compare(other interface{}) int {
@@ -70,7 +76,7 @@ type HashRing struct {
 	legacyChecksum uint32
 
 	// checksummers is map of named Checksum calculators for the hashring
-	checksummers map[string]Checksum
+	checksummers map[string]Checksummer
 	// checksums is a map containing the checksums that are representing this
 	// hashring. The map should never be altered in place so it is safe to pass
 	// a copy to components that need the checksums
@@ -88,8 +94,8 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 		},
 		logger: logging.Logger("ring"),
 
-		checksummers: map[string]Checksum{
-			"replica": &replicaPointChecksum{},
+		checksummers: map[string]Checksummer{
+			"replica": &replicaPointChecksummer{},
 		},
 	}
 
@@ -128,7 +134,7 @@ func (r *HashRing) computeChecksumsNoLock() {
 	// calculate all configured checksums
 	for name, checksummer := range r.checksummers {
 		oldChecksum := oldChecksums[name]
-		newChecksum := checksummer.Compute(r)
+		newChecksum := checksummer.Checksum(r)
 		r.checksums[name] = newChecksum
 
 		if oldChecksum != newChecksum {
@@ -137,9 +143,9 @@ func (r *HashRing) computeChecksumsNoLock() {
 	}
 
 	// calculate the legacy identity only based checksum
-	legacyChecksummer := identityChecksum{}
+	legacyChecksummer := identityChecksummer{}
 	oldChecksum := r.legacyChecksum
-	newChecksum := legacyChecksummer.Compute(r)
+	newChecksum := legacyChecksummer.Checksum(r)
 	r.legacyChecksum = newChecksum
 
 	if oldChecksum != newChecksum {

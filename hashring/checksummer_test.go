@@ -29,11 +29,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// addressChecksum implements the now obsolete checksum method that didn't support identities.
+// It's moved to this test file to test backwards compatibility of the identityChecksummer
+type addressChecksummer struct{}
+
+func (i *addressChecksummer) Checksum(ring *HashRing) uint32 {
+	addresses := ring.copyServersNoLock()
+	sort.Strings(addresses)
+	bytes := []byte(strings.Join(addresses, ";"))
+	return farm.Fingerprint32(bytes)
+}
+
 func TestAddressChecksum_Compute(t *testing.T) {
 	members := genMembers(1, 1, 10, false)
 	ring := New(farm.Fingerprint32, 1)
 	ring.AddMembers(members...)
-	checksum := &addressChecksum{}
+	checksum := &addressChecksummer{}
 
 	addresses := make([]string, 0, 10)
 	for _, members := range members {
@@ -44,32 +55,32 @@ func TestAddressChecksum_Compute(t *testing.T) {
 	bytes := []byte(strings.Join(addresses, ";"))
 
 	expected := farm.Fingerprint32(bytes)
-	actual := checksum.Compute(ring)
+	actual := checksum.Checksum(ring)
 
 	assert.Equal(t, expected, actual)
 }
 
 func TestIdentityChecksum_Compute(t *testing.T) {
-	identityChecksummer := &identityChecksum{}
+	identityChecksummer := &identityChecksummer{}
 
 	ringWithoutIdentities := New(farm.Fingerprint32, 1)
 	ringWithoutIdentities.AddMembers(genMembers(1, 1, 10, false)...)
 
-	legacyChecksum := (&addressChecksum{}).Compute(ringWithoutIdentities)
-	identityChecksum := identityChecksummer.Compute(ringWithoutIdentities)
+	legacyChecksum := (&addressChecksummer{}).Checksum(ringWithoutIdentities)
+	identityChecksum := identityChecksummer.Checksum(ringWithoutIdentities)
 
 	assert.Equal(t, legacyChecksum, identityChecksum, "Identity checksum should be the same as legacy on ring without identities")
 
 	ringWithIdentities := New(farm.Fingerprint32, 1)
 	ringWithIdentities.AddMembers(genMembers(1, 1, 10, true)...)
 
-	identityChecksum = identityChecksummer.Compute(ringWithIdentities)
+	identityChecksum = identityChecksummer.Checksum(ringWithIdentities)
 
 	assert.NotEqual(t, legacyChecksum, identityChecksum, "IdentityChecksummer should not match legacy checksummer on ring with identites ")
 }
 
 func TestReplicaPointChecksum_Compute(t *testing.T) {
-	replicaPointChecksummer := &replicaPointChecksum{}
+	replicaPointChecksummer := &replicaPointChecksummer{}
 	members := genMembers(1, 1, 10, false)
 
 	ring1ReplicaPoint := New(farm.Fingerprint32, 1)
@@ -78,8 +89,8 @@ func TestReplicaPointChecksum_Compute(t *testing.T) {
 	ring2ReplicaPoints := New(farm.Fingerprint32, 2)
 	ring2ReplicaPoints.AddMembers(members...)
 
-	checksum1ReplicaPoint := replicaPointChecksummer.Compute(ring1ReplicaPoint)
-	checksum2ReplicaPoints := replicaPointChecksummer.Compute(ring2ReplicaPoints)
+	checksum1ReplicaPoint := replicaPointChecksummer.Checksum(ring1ReplicaPoint)
+	checksum2ReplicaPoints := replicaPointChecksummer.Checksum(ring2ReplicaPoints)
 
 	assert.NotEqual(t, checksum1ReplicaPoint, checksum2ReplicaPoints, "Checksum should not match with different replica point counts")
 }
