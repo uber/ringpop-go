@@ -189,7 +189,7 @@ func Statter(s log.StatsReporter) Option {
 func Identity(identity string) Option {
 	return func(r *Ringpop) error {
 		if util.HostportPattern.MatchString(identity) {
-			return errors.New("a hostport is not valid as an identity")
+			return ErrInvalidIdentity
 		}
 		r.config.InitialLabels[membership.IdentityLabelKey] = identity
 		return nil

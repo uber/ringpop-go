@@ -15,4 +15,7 @@ var (
 	// ErrChannelNotListening is returned on bootstrap if TChannel is not
 	// listening.
 	ErrChannelNotListening = errors.New("tchannel is not listening")
+
+	// ErrInvalidIdentity is returned when the identity value is invalid.
+	ErrInvalidIdentity = errors.New("a hostport is not valid as an identity")
 )
