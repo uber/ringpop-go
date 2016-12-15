@@ -9,31 +9,20 @@ import (
 	"github.com/dgryski/go-farm"
 )
 
-// Checksum computes a checksum for an instance of a HashRing. The
+// Checksummer computes a checksum for an instance of a HashRing. The
 // checksum can be used to compare two rings for equality.
-type Checksum interface {
-	// Compute calculates the checksum for the hashring that is passed in.
+type Checksummer interface {
+	// Checksum calculates the checksum for the hashring that is passed in.
 	// Compute will be called while having at least a read-lock on the hashring so
 	// it is safe to read from the ring, but not safe to change the ring. There
 	// might be multiple Checksum Computes initiated at the same time, but every
 	// Checksum will only be called once per hashring at once
-	Compute(ring *HashRing) (checksum uint32)
+	Checksum(ring *HashRing) (checksum uint32)
 }
 
-// addressChecksum calculates checksums for all addresses that are added to the
-// hashring.
-type addressChecksum struct{}
+type identityChecksummer struct{}
 
-func (i *addressChecksum) Compute(ring *HashRing) uint32 {
-	addresses := ring.copyServersNoLock()
-	sort.Strings(addresses)
-	bytes := []byte(strings.Join(addresses, ";"))
-	return farm.Fingerprint32(bytes)
-}
-
-type identityChecksum struct{}
-
-func (i *identityChecksum) Compute(ring *HashRing) uint32 {
+func (i *identityChecksummer) Checksum(ring *HashRing) uint32 {
 	identitySet := make(map[string]struct{})
 	ring.tree.root.walk(func(node *redBlackNode) bool {
 		identitySet[node.key.(replicaPoint).identity] = struct{}{}
@@ -50,9 +39,9 @@ func (i *identityChecksum) Compute(ring *HashRing) uint32 {
 	return farm.Fingerprint32(bytes)
 }
 
-type replicaPointChecksum struct{}
+type replicaPointChecksummer struct{}
 
-func (r *replicaPointChecksum) Compute(ring *HashRing) uint32 {
+func (r *replicaPointChecksummer) Checksum(ring *HashRing) uint32 {
 	buffer := bytes.Buffer{}
 
 	ring.tree.root.walk(func(node *redBlackNode) bool {

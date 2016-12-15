@@ -123,10 +123,10 @@ func TestHashRing_Checksums(t *testing.T) {
 	}
 
 	ring := New(farm.Fingerprint32, 10)
-	ring.checksummers = map[string]Checksum{
-		"identity":     &identityChecksum{},
-		"address":      &addressChecksum{},
-		"replicaPoint": &replicaPointChecksum{},
+	ring.checksummers = map[string]Checksummer{
+		"identity":     &identityChecksummer{},
+		"address":      &addressChecksummer{},
+		"replicaPoint": &replicaPointChecksummer{},
 	}
 
 	checkSummers := []string{"identity", "address", "replicaPoint"}
