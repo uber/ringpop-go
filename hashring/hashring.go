@@ -46,8 +46,12 @@ type Configuration struct {
 	ReplicaPoints int
 }
 
+// replicaPoint contains the address where a specific point in the hashring maps to
 type replicaPoint struct {
-	hash    int
+	// hash of the point in the hashring
+	hash int
+
+	// address of the member that owns this replicaPoint.
 	address string
 }
 
