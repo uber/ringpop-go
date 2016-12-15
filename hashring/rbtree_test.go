@@ -637,7 +637,7 @@ func TestBig(t *testing.T) {
 	assert.NoError(t, err, "expected tree to be a valid red black tree")
 }
 
-func TestWalkInOrder(t *testing.T) {
+func TestTraverseOrder(t *testing.T) {
 	tree := makeTree()
 
 	//               4,B
@@ -650,7 +650,7 @@ func TestWalkInOrder(t *testing.T) {
 
 	var last keytype
 
-	tree.root.walk(func(n *redBlackNode) bool {
+	tree.root.traverseUntil(func(n *redBlackNode) bool {
 		current := n.key
 		if last != nil {
 			assert.True(t, current.Compare(last) > 0, "expected walk to walk the nodes in natural order as dictated by the Compare function")
@@ -660,7 +660,7 @@ func TestWalkInOrder(t *testing.T) {
 	})
 }
 
-func TestWalkEscape(t *testing.T) {
+func TestTraverseEscape(t *testing.T) {
 	tree := makeTree()
 
 	//               4,B
@@ -673,7 +673,7 @@ func TestWalkEscape(t *testing.T) {
 
 	var visited []int
 
-	tree.root.walk(func(n *redBlackNode) bool {
+	tree.root.traverseUntil(func(n *redBlackNode) bool {
 		number := int(n.key.(treeTestInt))
 		visited = append(visited, number)
 		// stop at node 5, it should exit on a left, right and visiting node,
