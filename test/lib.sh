@@ -1,8 +1,8 @@
 # Common functions for test code
 
 declare project_root="${0%/*}/.."
-declare ringpop_common_dir="${0%/*}/master"
-declare ringpop_common_branch="menno/allow-multi-checksum"
+declare ringpop_common_dir="${0%/*}/ringpop-common"
+declare ringpop_common_branch="master"
 
 #
 # Clones or updates the ringpop-common repository.
