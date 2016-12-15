@@ -43,10 +43,16 @@ type Configuration struct {
 	ReplicaPoints int
 }
 
+// replicaPoint contains the address where a specific point in the hashring maps to
 type replicaPoint struct {
-	hash     int
-	identity string
-	address  string
+	// hash of the point in the hashring
+	hash int
+
+    // identity of the member that owns this replicaPoint.
+    identity string
+
+	// address of the member that owns this replicaPoint.
+	address string
 }
 
 func (r replicaPoint) Compare(other interface{}) int {

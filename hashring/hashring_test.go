@@ -339,19 +339,16 @@ func TestLookupN(t *testing.T) {
 type ProcessMembershipChangesSuite struct {
 	suite.Suite
 	ring    *HashRing
-	member1 fakeMember
-	member2 fakeMember
-	member3 fakeMember
-	member4 fakeMember
+	members [4]fakeMember
 	l       *eventsmocks.EventListener
 }
 
 func (s *ProcessMembershipChangesSuite) SetupSuite() {
 	s.ring = New(farm.Fingerprint32, 10)
-	s.member1 = fakeMember{address: "192.0.2.0:1"}
-	s.member2 = fakeMember{address: "192.0.2.0:2"}
-	s.member3 = fakeMember{address: "192.0.2.0:3"}
-	s.member4 = fakeMember{address: "192.0.2.0:4"}
+	s.members[0] = fakeMember{address: "192.0.2.0:1"}
+	s.members[1] = fakeMember{address: "192.0.2.0:2"}
+	s.members[2] = fakeMember{address: "192.0.2.0:3"}
+	s.members[3] = fakeMember{address: "192.0.2.0:4"}
 }
 
 func (s *ProcessMembershipChangesSuite) SetupTest() {
@@ -368,39 +365,39 @@ func (s *ProcessMembershipChangesSuite) expectRingChangedEvent(event events.Ring
 	s.l.On("HandleEvent", event)
 }
 
-func (s *ProcessMembershipChangesSuite) TestAddMember1() {
+func (s *ProcessMembershipChangesSuite) TestAddMember0() {
 	s.expectRingChangedEvent(events.RingChangedEvent{
-		ServersAdded: []string{s.member1.GetAddress()},
+		ServersAdded: []string{s.members[0].GetAddress()},
 	})
 
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{After: s.member1},
+		{After: s.members[0]},
 	})
 	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(1, s.ring.ServerCount(), "unexpected count of members in ring")
 }
 
-func (s *ProcessMembershipChangesSuite) TestAddMember2() {
+func (s *ProcessMembershipChangesSuite) TestAddMember1() {
 	s.expectRingChangedEvent(events.RingChangedEvent{
-		ServersAdded: []string{s.member2.GetAddress()},
+		ServersAdded: []string{s.members[1].GetAddress()},
 	})
 
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{After: s.member2},
+		{After: s.members[1]},
 	})
 	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
 }
 
-func (s *ProcessMembershipChangesSuite) TestRemoveMember1AddMember3() {
+func (s *ProcessMembershipChangesSuite) TestRemoveMember0AddMember2() {
 	s.expectRingChangedEvent(events.RingChangedEvent{
-		ServersAdded:   []string{s.member3.GetAddress()},
-		ServersRemoved: []string{s.member1.GetAddress()},
+		ServersAdded:   []string{s.members[2].GetAddress()},
+		ServersRemoved: []string{s.members[0].GetAddress()},
 	})
 
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{After: s.member3},
-		{Before: s.member1},
+		{After: s.members[2]},
+		{Before: s.members[0]},
 	})
 	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
@@ -409,7 +406,7 @@ func (s *ProcessMembershipChangesSuite) TestRemoveMember1AddMember3() {
 func (s *ProcessMembershipChangesSuite) TestNoopUpdate() {
 	s.l.On("HandleEvent", mock.Anything).Return()
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{Before: s.member2, After: s.member2},
+		{Before: s.members[1], After: s.members[1]},
 	})
 
 	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
@@ -420,15 +417,15 @@ func (s *ProcessMembershipChangesSuite) TestNoopUpdate() {
 
 func (s *ProcessMembershipChangesSuite) TestChangeIdentityMember2() {
 	s.expectRingChangedEvent(events.RingChangedEvent{
-		ServersUpdated: []string{s.member2.GetAddress()},
+		ServersUpdated: []string{s.members[1].GetAddress()},
 	})
 
-	member2NewIdentity := fakeMember{
+	memberNewIdentity := fakeMember{
 		address:  "192.0.2.0:2",
 		identity: "new_identity",
 	}
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{Before: s.member2, After: member2NewIdentity},
+		{Before: s.members[1], After: memberNewIdentity},
 	})
 	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
@@ -437,7 +434,7 @@ func (s *ProcessMembershipChangesSuite) TestChangeIdentityMember2() {
 func (s *ProcessMembershipChangesSuite) TestRemoveNonExistingMember() {
 	s.l.On("HandleEvent", mock.Anything).Return()
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{Before: s.member4},
+		{Before: s.members[3]},
 	})
 
 	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
@@ -449,7 +446,7 @@ func (s *ProcessMembershipChangesSuite) TestRemoveNonExistingMember() {
 func (s *ProcessMembershipChangesSuite) TestUpdateNonExistingMember() {
 	s.l.On("HandleEvent", mock.Anything).Return()
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
-		{Before: s.member4, After: s.member4},
+		{Before: s.members[3], After: s.members[3]},
 	})
 
 	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))

@@ -415,25 +415,25 @@ func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
 // made changes, only if changes are made the incarnation number will be bumped
 // and the new state will be gossiped to the peers
 func (m *memberlist) updateLocalMember(update func(*Member) bool) {
-	var changes []Change
-
 	m.members.Lock()
 
 	before := *m.local
 	didUpdate := update(m.local)
-	if didUpdate {
-		// bump incarnation number if the member has been updated
-		change := m.bumpIncarnation()
-		changes = append(changes, change)
+
+	// exit if the update didn't change anything
+	if !didUpdate {
+		m.members.Unlock()
+		return
 	}
+
+	// bump incarnation number if the member has been updated
+	change := m.bumpIncarnation()
+
+	changes := []Change{change}
+
 	after := *m.local
 
 	m.members.Unlock()
-
-	if !didUpdate {
-		// exit if the update didn't change anything
-		return
-	}
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
