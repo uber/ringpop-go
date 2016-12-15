@@ -221,7 +221,7 @@ func Address(address string) Option {
 // that Ringpop should use as its address.
 type AddressResolver func() (string, error)
 
-// AddressResolverFunc is used to specify a function that will called when
+// AddressResolverFunc is used to specify a function that will be called when
 // the Ringpop instance needs to resolve its address (typically, on
 // bootstrap).
 func AddressResolverFunc(resolver AddressResolver) Option {
