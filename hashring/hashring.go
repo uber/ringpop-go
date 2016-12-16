@@ -169,10 +169,21 @@ func (r *HashRing) computeChecksumsNoLock() {
 }
 
 func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
-	replicaStr := fmt.Sprintf("%s%v", server.Identity(), replica)
+	identity := server.Identity()
+	var replicaStr string
+	if identity == server.GetAddress() {
+		// If identity and address are the same, we need to be backwards compatible
+		// this older replicaStr format will cause replica point collisions when there are
+		// multiple instances running on the same host (e.g. on port 2100 and 21001).
+		replicaStr = fmt.Sprintf("%s%v", identity, replica)
+	} else {
+		// This is the "new and improved" version.
+		// Due to backwards compatibility it's only used when we got an identity.
+		replicaStr = fmt.Sprintf("%s#%v", identity, replica)
+	}
 	return replicaPoint{
 		hash:     r.hashfunc(replicaStr),
-		identity: server.Identity(),
+		identity: identity,
 		address:  server.GetAddress(),
 	}
 }
