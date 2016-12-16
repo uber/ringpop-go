@@ -261,10 +261,10 @@ func (n *redBlackNode) search(key keytype) (valuetype, bool) {
 	return nil, false
 }
 
-// traverseUntil traverses the nodes in the tree in-order invoking `traverse` for each node. If the
-// traverse function returns `false`, traversal is stopped and no more nodes will be
+// traverseWhile traverses the nodes in the tree in-order invoking the `condition`-function argument for each node.
+// If the condition-function returns `false` traversal is stopped and no more nodes will be
 // visited. Returns `true` if all nodes are visited; `false` if not.
-func (n *redBlackNode) traverseUntil(traverse func(*redBlackNode) bool) bool {
+func (n *redBlackNode) traverseWhile(condition func(*redBlackNode) bool) bool {
 	if n == nil {
 		// the end of the tree does not signal the end of walking, but we can't
 		// walk this node (nil) nor left or right anymore
@@ -272,17 +272,17 @@ func (n *redBlackNode) traverseUntil(traverse func(*redBlackNode) bool) bool {
 	}
 
 	// walk left first
-	if !n.left.traverseUntil(traverse) {
+	if !n.left.traverseWhile(condition) {
 		// stop if walker indicated to break
 		return false
 	}
 	// now visit this node
-	if !traverse(n) {
+	if !condition(n) {
 		// stop if walker indicated to break
 		return false
 	}
 	// lastly visit right
-	if !n.right.traverseUntil(traverse) {
+	if !n.right.traverseWhile(condition) {
 		// stop if walker indicated to break
 		return false
 	}
