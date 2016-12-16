@@ -24,7 +24,7 @@ type identityChecksummer struct{}
 
 func (i *identityChecksummer) Checksum(ring *HashRing) uint32 {
 	identitySet := make(map[string]struct{})
-	ring.tree.root.walk(func(node *redBlackNode) bool {
+	ring.tree.root.traverseWhile(func(node *redBlackNode) bool {
 		identitySet[node.key.(replicaPoint).identity] = struct{}{}
 		return true
 	})
@@ -44,7 +44,7 @@ type replicaPointChecksummer struct{}
 func (r *replicaPointChecksummer) Checksum(ring *HashRing) uint32 {
 	buffer := bytes.Buffer{}
 
-	ring.tree.root.walk(func(node *redBlackNode) bool {
+	ring.tree.root.traverseWhile(func(node *redBlackNode) bool {
 		buffer.WriteString(strconv.Itoa(node.key.(replicaPoint).hash))
 		buffer.WriteString("-")
 		buffer.WriteString(node.value.(string))

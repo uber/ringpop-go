@@ -48,8 +48,8 @@ type replicaPoint struct {
 	// hash of the point in the hashring
 	hash int
 
-    // identity of the member that owns this replicaPoint.
-    identity string
+	// identity of the member that owns this replicaPoint.
+	identity string
 
 	// address of the member that owns this replicaPoint.
 	address string
