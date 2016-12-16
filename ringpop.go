@@ -247,10 +247,10 @@ func (rp *Ringpop) startTimers() {
 					int64(rp.ring.Checksum()),
 				)
 
-				// emit all named checksums aswell
+				// emit all named checksums as well
 				for name, checksum := range rp.ring.Checksums() {
 					rp.statter.UpdateGauge(
-						rp.getStatKey("ring.checksum-periodic."+name),
+						rp.getStatKey("ring.checksums-periodic."+name),
 						nil,
 						int64(checksum),
 					)
