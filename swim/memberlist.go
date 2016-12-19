@@ -61,7 +61,7 @@ type memberlist struct {
 }
 
 // newMemberlist returns a new member list
-func newMemberlist(n *Node) *memberlist {
+func newMemberlist(n *Node, initialLabels LabelMap) *memberlist {
 	m := &memberlist{
 		node:   n,
 		logger: logging.Logger("membership").WithField("local", n.address),
@@ -71,6 +71,7 @@ func newMemberlist(n *Node) *memberlist {
 			Address:     n.Address(),
 			Incarnation: nowInMillis(n.clock),
 			Status:      Alive,
+			Labels:      initialLabels,
 		},
 	}
 

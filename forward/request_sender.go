@@ -71,8 +71,8 @@ func newRequestSender(sender Sender, emitter events.EventEmitter, channel shared
 	destination, service, endpoint string, format tchannel.Format, opts *Options) *requestSender {
 
 	logger := logging.Logger("sender")
-	if identity, err := sender.WhoAmI(); err != nil {
-		logger = logger.WithField("local", identity)
+	if address, err := sender.WhoAmI(); err != nil {
+		logger = logger.WithField("local", address)
 	}
 
 	return &requestSender{
@@ -118,10 +118,10 @@ func (s *requestSender) Send() (res []byte, err error) {
 			return s.ScheduleRetry()
 		}
 
-		identity, _ := s.sender.WhoAmI()
+		address, _ := s.sender.WhoAmI()
 
 		s.logger.WithFields(log.Fields{
-			"local":       identity,
+			"local":       address,
 			"destination": s.destination,
 			"service":     s.service,
 			"endpoint":    s.endpoint,
@@ -132,10 +132,10 @@ func (s *requestSender) Send() (res []byte, err error) {
 		return nil, errors.New("max retries exceeded")
 	case <-ctx.Done(): // request timed out
 
-		identity, _ := s.sender.WhoAmI()
+		address, _ := s.sender.WhoAmI()
 
 		s.logger.WithFields(log.Fields{
-			"local":       identity,
+			"local":       address,
 			"destination": s.destination,
 			"service":     s.service,
 			"endpoint":    s.endpoint,

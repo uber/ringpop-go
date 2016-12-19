@@ -68,7 +68,8 @@ type Options struct {
 	PartitionHealPeriod           time.Duration
 	PartitionHealBaseProbabillity float64
 
-	LabelLimits LabelOptions
+	LabelLimits   LabelOptions
+	InitialLabels LabelMap
 
 	Clock clock.Clock
 
@@ -250,7 +251,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 
 	node.labelLimits = opts.LabelLimits
 
-	node.memberlist = newMemberlist(node)
+	node.memberlist = newMemberlist(node, opts.InitialLabels)
 	node.memberiter = newMemberlistIter(node.memberlist)
 	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
 

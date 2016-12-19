@@ -90,7 +90,7 @@ type Ringpop struct {
 	config         *configuration
 	configHashRing *hashring.Configuration
 
-	identityResolver IdentityResolver
+	addressResolver AddressResolver
 
 	state      state
 	stateMutex sync.RWMutex
@@ -144,7 +144,8 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 
 	ringpop := &Ringpop{
 		config: &configuration{
-			App: app,
+			App:           app,
+			InitialLabels: make(swim.LabelMap),
 		},
 		logger: logging.Logger("ringpop"),
 	}
@@ -175,7 +176,7 @@ func (rp *Ringpop) init() error {
 		return errors.New("Missing channel")
 	}
 
-	address, err := rp.identity()
+	address, err := rp.address()
 	if err != nil {
 		return err
 	}
@@ -193,6 +194,7 @@ func (rp *Ringpop) init() error {
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
 		LabelLimits:   rp.config.LabelLimits,
+		InitialLabels: rp.config.InitialLabels,
 		SelfEvict:     rp.config.SelfEvict,
 	})
 	rp.node.AddListener(rp)
@@ -270,15 +272,15 @@ func (rp *Ringpop) stopTimers() {
 	}
 }
 
-// identity returns a host:port string of the address that Ringpop should
-// use as its identifier.
-func (rp *Ringpop) identity() (string, error) {
-	return rp.identityResolver()
+// address returns a host:port string of the address that Ringpop should
+// use as its address.
+func (rp *Ringpop) address() (string, error) {
+	return rp.addressResolver()
 }
 
-// r.channelIdentityResolver resolves the hostport identity from the current
+// r.channelAddressResolver resolves the hostport from the current
 // TChannel object on the Ringpop instance.
-func (rp *Ringpop) channelIdentityResolver() (string, error) {
+func (rp *Ringpop) channelAddressResolver() (string, error) {
 	peerInfo := rp.channel.PeerInfo()
 	// Check that TChannel is listening on a real hostport. By default,
 	// TChannel listens on an ephemeral host/port. The real port is then
@@ -286,7 +288,7 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 	// ephemeral, it means TChannel is not yet listening and the hostport
 	// cannot be resolved.
 	if peerInfo.IsEphemeralHostPort() {
-		return "", ErrEphemeralIdentity
+		return "", ErrEphemeralAddress
 	}
 	return peerInfo.HostPort, nil
 }
@@ -322,7 +324,7 @@ func (rp *Ringpop) WhoAmI() (string, error) {
 	if !rp.Ready() {
 		return "", ErrNotBootstrapped
 	}
-	return rp.identity()
+	return rp.address()
 }
 
 // Uptime returns the amount of time that this Ringpop instance has been
@@ -764,12 +766,12 @@ func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte,
 		return false, err
 	}
 
-	identity, err := rp.WhoAmI()
+	address, err := rp.WhoAmI()
 	if err != nil {
 		return false, err
 	}
 
-	if dest == identity {
+	if dest == address {
 		return true, nil
 	}
 
@@ -795,18 +797,6 @@ func (rp *Ringpop) Labels() (*swim.NodeLabels, error) {
 	}
 
 	return rp.node.Labels(), nil
-}
-
-// SetIdentity changes the identity for this process. The identity is used by
-// all members of the membership to calculate the position of this node in the
-// hashring.
-func (rp *Ringpop) SetIdentity(identity string) error {
-	if !rp.Ready() {
-		return ErrNotBootstrapped
-	}
-
-	rp.node.SetIdentity(identity)
-	return nil
 }
 
 // SerializeThrift takes a thrift struct and returns the serialized bytes

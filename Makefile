@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
+.PHONY: clean clean-common clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
 
 SHELL = /bin/bash
 
@@ -23,6 +23,9 @@ out:	test
 
 clean:
 	rm -f testpop
+
+clean-common:
+	rm -rf test/ringpop-common
 
 clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go

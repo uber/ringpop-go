@@ -84,11 +84,11 @@ func (w *worker) PingHandler(ctx json.Context, request *Ping) (*Pong, error) {
 	forwardOptions := &forward.Options{Headers: []byte(marshaledHeaders)}
 	handle, err := w.ringpop.HandleOrForward(request.Key, request.Bytes(), &res, "pingchannel", "/ping", tchannel.JSON, forwardOptions)
 	if handle {
-		identity, err := w.ringpop.WhoAmI()
+		address, err := w.ringpop.WhoAmI()
 		if err != nil {
 			return nil, err
 		}
-		return &Pong{"Hello, world!", identity, headers["p"]}, nil
+		return &Pong{"Hello, world!", address, headers["p"]}, nil
 	}
 
 	if err := json2.Unmarshal(res, &pong); err != nil {
@@ -111,7 +111,7 @@ func main() {
 
 	rp, err := ringpop.New("ping-app",
 		ringpop.Channel(ch),
-		ringpop.Identity(*hostport),
+		ringpop.Address(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
 	if err != nil {
