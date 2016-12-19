@@ -24,15 +24,12 @@ package hashring
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
 
-	"github.com/dgryski/go-farm"
 	"github.com/uber-common/bark"
 )
 
@@ -50,6 +47,9 @@ type Configuration struct {
 type replicaPoint struct {
 	// hash of the point in the hashring
 	hash int
+
+	// identity of the member that owns this replicaPoint.
+	identity string
 
 	// address of the member that owns this replicaPoint.
 	address string
@@ -70,7 +70,17 @@ type HashRing struct {
 
 	serverSet map[string]struct{}
 	tree      *redBlackTree
-	checksum  uint32
+
+	// legacyChecksum is the old checksum that is calculated only from the
+	// identities being added.
+	legacyChecksum uint32
+
+	// checksummers is map of named Checksum calculators for the hashring
+	checksummers map[string]Checksummer
+	// checksums is a map containing the checksums that are representing this
+	// hashring. The map should never be altered in place so it is safe to pass
+	// a copy to components that need the checksums
+	checksums map[string]uint32
 
 	logger bark.Logger
 }
@@ -83,6 +93,10 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 			return int(hashfunc([]byte(str)))
 		},
 		logger: logging.Logger("ring"),
+
+		checksummers: map[string]Checksummer{
+			"replica": &replicaPointChecksummer{},
+		},
 	}
 
 	r.serverSet = make(map[string]struct{})
@@ -92,40 +106,74 @@ func New(hashfunc func([]byte) uint32, replicaPoints int) *HashRing {
 
 // Checksum returns the checksum of all stored servers in the HashRing
 // Use this value to find out if the HashRing is mutated.
-func (r *HashRing) Checksum() uint32 {
+func (r *HashRing) Checksum() (checksum uint32) {
 	r.RLock()
-	checksum := r.checksum
+	checksum = r.legacyChecksum
 	r.RUnlock()
-	return checksum
+	return
 }
 
-// computeChecksum computes checksum of all servers in the ring.
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) computeChecksumNoLock() {
-	addresses := r.copyServersNoLock()
-	sort.Strings(addresses)
-	bytes := []byte(strings.Join(addresses, ";"))
-	old := r.checksum
-	r.checksum = farm.Fingerprint32(bytes)
+// Checksums returns a map of checksums named by the algorithm used to compute
+// the checksum.
+func (r *HashRing) Checksums() (checksums map[string]uint32) {
+	r.RLock()
+	// even though the map is immutable the pointer to it is not so it requires
+	// a readlock
+	checksums = r.checksums
+	r.RUnlock()
+	return
+}
 
-	if r.checksum != old {
+// computeChecksumsNoLock re-computes all configured checksums for this hashring
+// and updates the in memory map with a new map containing the new checksums.
+func (r *HashRing) computeChecksumsNoLock() {
+	oldChecksums := r.checksums
+
+	r.checksums = make(map[string]uint32)
+	changed := false
+	// calculate all configured checksums
+	for name, checksummer := range r.checksummers {
+		oldChecksum := oldChecksums[name]
+		newChecksum := checksummer.Checksum(r)
+		r.checksums[name] = newChecksum
+
+		if oldChecksum != newChecksum {
+			changed = true
+		}
+	}
+
+	// calculate the legacy identity only based checksum
+	legacyChecksummer := identityChecksummer{}
+	oldChecksum := r.legacyChecksum
+	newChecksum := legacyChecksummer.Checksum(r)
+	r.legacyChecksum = newChecksum
+
+	if oldChecksum != newChecksum {
+		changed = true
+	}
+
+	if changed {
 		r.logger.WithFields(bark.Fields{
-			"checksum":    r.checksum,
-			"oldChecksum": old,
+			"checksum":    r.legacyChecksum,
+			"oldChecksum": oldChecksum,
+			"checksums":   r.checksums,
 		}).Debug("ringpop ring computed new checksum")
 	}
 
 	r.EmitEvent(events.RingChecksumEvent{
-		OldChecksum: old,
-		NewChecksum: r.checksum,
+		OldChecksum:  oldChecksum,
+		NewChecksum:  r.legacyChecksum,
+		OldChecksums: oldChecksums,
+		NewChecksums: r.checksums,
 	})
 }
 
 func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
 	replicaStr := fmt.Sprintf("%s%v", server.Identity(), replica)
 	return replicaPoint{
-		hash:    r.hashfunc(replicaStr),
-		address: server.GetAddress(),
+		hash:     r.hashfunc(replicaStr),
+		identity: server.Identity(),
+		address:  server.GetAddress(),
 	}
 }
 
@@ -142,7 +190,7 @@ func (r *HashRing) AddMembers(members ...membership.Member) bool {
 	}
 
 	if changed {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded: added,
 		})
@@ -182,7 +230,7 @@ func (r *HashRing) RemoveMembers(members ...membership.Member) bool {
 	}
 
 	if changed {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersRemoved: removed,
 		})
@@ -240,7 +288,7 @@ func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 
 	// recompute checksums on changes
 	if changed {
-		r.computeChecksumNoLock()
+		r.computeChecksumsNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   added,
 			ServersUpdated: updated,

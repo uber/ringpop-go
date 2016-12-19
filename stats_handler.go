@@ -52,8 +52,9 @@ func handleStats(rp *Ringpop) map[string]interface{} {
 		},
 		"protocol": rp.node.ProtocolStats(),
 		"ring": stats{
-			"servers":  servers,
-			"checksum": rp.ring.Checksum(),
+			"servers":   servers,
+			"checksum":  rp.ring.Checksum(),
+			"checksums": rp.ring.Checksums(),
 		},
 		"version":         "???", // TODO: version!
 		"timestamp":       time.Now().Unix(),
