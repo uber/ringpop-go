@@ -32,6 +32,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 	eventsmocks "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -143,34 +144,26 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 	// Fake bootstrap
 	s.ringpop.init()
 
-	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: genMembershipChanges(genMembers(genAddresses(1, 1, 10)), AfterMemberField),
 	})
 
-	s.Equal(s.ringpop.ring.ServerCount(), 10)
+	s.Equal(10, s.ringpop.ring.ServerCount())
 
 	alive, faulty := genAddresses(1, 11, 15), genAddresses(1, 1, 5)
-	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: append(genChanges(alive, swim.Alive), genChanges(faulty, swim.Faulty)...),
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: append(
+			genMembershipChanges(genMembers(alive), AfterMemberField),
+			genMembershipChanges(genMembers(faulty), BeforeMemberField)...,
+		),
 	})
 
-	s.Equal(s.ringpop.ring.ServerCount(), 10)
+	s.Equal(10, s.ringpop.ring.ServerCount())
 	for _, address := range alive {
 		s.True(s.ringpop.ring.HasServer(address))
 	}
 	for _, address := range faulty {
 		s.False(s.ringpop.ring.HasServer(address))
-	}
-
-	leave, suspect := genAddresses(1, 7, 10), genAddresses(1, 11, 15)
-	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: append(genChanges(leave, swim.Leave), genChanges(suspect, swim.Suspect)...),
-	})
-	for _, address := range leave {
-		s.False(s.ringpop.ring.HasServer(address))
-	}
-	for _, address := range suspect {
-		s.True(s.ringpop.ring.HasServer(address))
 	}
 }
 
@@ -200,9 +193,14 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// remove stats from init phase
 	s.stats.clear()
 
+	alive := genAddresses(1, 1, 10)
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
+		Changes: genChanges(alive, swim.Alive),
 	})
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: genMembershipChanges(genMembers(alive), AfterMemberField),
+	})
+
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.changes.apply"), "missing stats for applied changes")
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.updates"), "missing updates stats")
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ring.checksum-computed"), "missing stats for checksums being computed")
@@ -211,7 +209,10 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.membership-set.alive"), "missing stats for member being set to alive")
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: genChanges(genAddresses(1, 1, 1), swim.Faulty, swim.Leave, swim.Suspect),
+		Changes: genChanges(alive[0:1], swim.Faulty, swim.Leave, swim.Suspect),
+	})
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: genMembershipChanges(genMembers(alive[0:1]), BeforeMemberField),
 	})
 	s.Equal(int64(3), s.stats.read("ringpop.127_0_0_1_3001.changes.apply"), "missing stats for applied changes for three status changes")
 	s.Equal(int64(13), s.stats.read("ringpop.127_0_0_1_3001.updates"), "missing updates stats for three status changes")
@@ -317,15 +318,15 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.refuted-update"), "missing refuted-update stat")
 
 	// double check the counts before the event
-	s.Equal(int64(11), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "incorrect count for ring.server-added before RingChangedEvent")
-	s.Equal(int64(2), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "incorrect count for ring.server-removed before RingChangedEvent")
+	s.Equal(int64(9), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "incorrect count for ring.server-added before RingChangedEvent")
+	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "incorrect count for ring.server-removed before RingChangedEvent")
 	s.Equal(int64(2), s.stats.read("ringpop.127_0_0_1_3001.ring.changed"), "incorrect count for ring.changed before RingChangedEvent")
 	s.ringpop.HandleEvent(events.RingChangedEvent{
 		ServersAdded:   genAddresses(1, 2, 5),
 		ServersRemoved: genAddresses(1, 6, 8),
 	})
-	s.Equal(int64(15), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "missing ring.server-added stat")
-	s.Equal(int64(5), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "missing ring.server-removed stat")
+	s.Equal(int64(13), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "missing ring.server-added stat")
+	s.Equal(int64(4), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "missing ring.server-removed stat")
 	s.Equal(int64(3), s.stats.read("ringpop.127_0_0_1_3001.ring.changed"), "missing ring.changed stat")
 
 	s.ringpop.HandleEvent(forward.RequestForwardedEvent{})
@@ -552,7 +553,10 @@ func (s *RingpopTestSuite) TestLookupNoDestination() {
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	address, _ := s.ringpop.identity()
-	s.ringpop.ring.RemoveServer(address)
+	member := fakeMember{
+		address: address,
+	}
+	s.ringpop.ring.RemoveMembers(member)
 
 	result, err := s.ringpop.Lookup("foo")
 	s.Equal("", result)
@@ -595,10 +599,13 @@ func (s *RingpopTestSuite) TestLookupNNoDestinations() {
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	address, _ := s.ringpop.identity()
-	s.ringpop.ring.RemoveServer(address)
+	member := fakeMember{
+		address: address,
+	}
+	s.ringpop.ring.RemoveMembers(member)
 
 	result, err := s.ringpop.LookupN("foo", 5)
-	s.Nil(result)
+	s.Empty(result)
 	s.Error(err)
 }
 
@@ -611,8 +618,8 @@ func (s *RingpopTestSuite) TestLookupN() {
 	s.Nil(err)
 	s.Equal(1, len(result), "LookupN returns not more results than number of nodes")
 
-	addresses := genAddresses(1, 10, 20)
-	s.ringpop.ring.AddRemoveServers(addresses, nil)
+	members := genMembers(genAddresses(1, 10, 20))
+	s.ringpop.ring.AddMembers(members...)
 
 	result, err = s.ringpop.LookupN("foo", 5)
 	s.Nil(err)

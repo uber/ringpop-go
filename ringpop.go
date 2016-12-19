@@ -30,16 +30,18 @@ import (
 	"sync"
 	"time"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/benbjohnson/clock"
-	"github.com/dgryski/go-farm"
-	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
+
+	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/benbjohnson/clock"
+	"github.com/dgryski/go-farm"
+	log "github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 )
 
@@ -200,7 +202,7 @@ func (rp *Ringpop) init() error {
 
 	// add all members present in the membership of the node on startup.
 	for _, member := range rp.node.GetReachableMembers() {
-		rp.ring.AddServer(member.Address)
+		rp.ring.AddMembers(member)
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
@@ -451,10 +453,10 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 			}
 			rp.statter.IncCounter(rp.getStatKey("membership-update."+status), nil, 1)
 		}
-
+	case membership.ChangeEvent:
+		rp.ring.ProcessMembershipChanges(event.Changes)
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
-		rp.handleChanges(event.Changes)
 		for _, change := range event.Changes {
 			status := change.Status
 			if len(status) == 0 {
@@ -605,21 +607,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case forward.RetrySuccessEvent:
 		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.succeeded"), nil, 1)
 	}
-}
-
-func (rp *Ringpop) handleChanges(changes []swim.Change) {
-	var serversToAdd, serversToRemove []string
-
-	for _, change := range changes {
-		switch change.Status {
-		case swim.Alive, swim.Suspect:
-			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave, swim.Tombstone:
-			serversToRemove = append(serversToRemove, change.Address)
-		}
-	}
-
-	rp.ring.AddRemoveServers(serversToAdd, serversToRemove)
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =

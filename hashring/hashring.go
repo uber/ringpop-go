@@ -28,11 +28,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
 
 	"github.com/dgryski/go-farm"
+	"github.com/uber-common/bark"
 )
 
 // Configuration is a configuration struct that can be passed to the
@@ -113,95 +114,19 @@ func (r *HashRing) computeChecksumNoLock() {
 	})
 }
 
-// AddServer adds a server and its replicas onto the HashRing.
-func (r *HashRing) AddServer(address string) bool {
+func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
+	identity := fmt.Sprintf("%s%v", server.GetAddress(), replica)
+	return replicaPoint(r.hashfunc(identity))
+}
+
+// AddMembers adds multiple membership Member's and thus their replicas to the HashRing.
+func (r *HashRing) AddMembers(members ...membership.Member) bool {
 	r.Lock()
-	ok := r.addServerNoLock(address)
-	if ok {
-		r.computeChecksumNoLock()
-		r.EmitEvent(events.RingChangedEvent{
-			ServersAdded:   []string{address},
-			ServersRemoved: nil,
-		})
-	}
-	r.Unlock()
-	return ok
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) addServerNoLock(address string) bool {
-	if _, ok := r.serverSet[address]; ok {
-		return false
-	}
-
-	r.addReplicasNoLock(address)
-	return true
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) addReplicasNoLock(server string) {
-	r.serverSet[server] = struct{}{}
-	for i := 0; i < r.replicaPoints; i++ {
-		address := fmt.Sprintf("%s%v", server, i)
-		r.tree.Insert(replicaPoint(r.hashfunc(address)), server)
-	}
-}
-
-// RemoveServer removes a server and its replicas from the HashRing.
-func (r *HashRing) RemoveServer(address string) bool {
-	r.Lock()
-	ok := r.removeServerNoLock(address)
-	if ok {
-		r.computeChecksumNoLock()
-		r.EmitEvent(events.RingChangedEvent{
-			ServersAdded:   nil,
-			ServersRemoved: []string{address},
-		})
-	}
-	r.Unlock()
-	return ok
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) removeServerNoLock(address string) bool {
-	if _, ok := r.serverSet[address]; !ok {
-		return false
-	}
-
-	r.removeReplicasNoLock(address)
-	return true
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) removeReplicasNoLock(server string) {
-	delete(r.serverSet, server)
-	for i := 0; i < r.replicaPoints; i++ {
-		address := fmt.Sprintf("%s%v", server, i)
-		r.tree.Delete(replicaPoint(r.hashfunc(address)))
-	}
-}
-
-// AddRemoveServers adds and removes servers and all replicas associated to those
-// servers to and from the HashRing. Returns whether the HashRing has changed.
-func (r *HashRing) AddRemoveServers(add []string, remove []string) bool {
-	r.Lock()
-	result := r.addRemoveServersNoLock(add, remove)
-	r.Unlock()
-	return result
-}
-
-// This function isn't thread-safe, only call it when the HashRing is locked.
-func (r *HashRing) addRemoveServersNoLock(add []string, remove []string) bool {
 	changed := false
-
-	for _, server := range add {
-		if r.addServerNoLock(server) {
-			changed = true
-		}
-	}
-
-	for _, server := range remove {
-		if r.removeServerNoLock(server) {
+	var added []string
+	for _, member := range members {
+		if r.addMemberNoLock(member) {
+			added = append(added, member.GetAddress())
 			changed = true
 		}
 	}
@@ -209,11 +134,102 @@ func (r *HashRing) addRemoveServersNoLock(add []string, remove []string) bool {
 	if changed {
 		r.computeChecksumNoLock()
 		r.EmitEvent(events.RingChangedEvent{
-			ServersAdded:   add,
-			ServersRemoved: remove,
+			ServersAdded: added,
 		})
 	}
+	r.Unlock()
 	return changed
+}
+
+// This function isn't thread-safe, only call it when the HashRing is locked.
+func (r *HashRing) addMemberNoLock(member membership.Member) bool {
+	if _, ok := r.serverSet[member.GetAddress()]; ok {
+		return false
+	}
+	r.serverSet[member.GetAddress()] = struct{}{}
+
+	// add all replica points for the member
+	for i := 0; i < r.replicaPoints; i++ {
+		r.tree.Insert(
+			r.replicaPointForServer(member, i),
+			member.GetAddress(),
+		)
+	}
+
+	return true
+}
+
+// RemoveMembers removes multiple membership Member's and thus their replicas from the HashRing.
+func (r *HashRing) RemoveMembers(members ...membership.Member) bool {
+	r.Lock()
+	changed := false
+	var removed []string
+	for _, server := range members {
+		if r.removeMemberNoLock(server) {
+			removed = append(removed, server.GetAddress())
+			changed = true
+		}
+	}
+
+	if changed {
+		r.computeChecksumNoLock()
+		r.EmitEvent(events.RingChangedEvent{
+			ServersRemoved: removed,
+		})
+	}
+	r.Unlock()
+	return changed
+}
+
+// This function isn't thread-safe, only call it when the HashRing is locked.
+func (r *HashRing) removeMemberNoLock(member membership.Member) bool {
+	if _, ok := r.serverSet[member.GetAddress()]; !ok {
+		return false
+	}
+	delete(r.serverSet, member.GetAddress())
+
+	for i := 0; i < r.replicaPoints; i++ {
+		r.tree.Delete(
+			r.replicaPointForServer(member, i),
+		)
+	}
+
+	return true
+}
+
+// ProcessMembershipChanges takes a slice of membership.MemberChange's and
+// applies them to the hashring by adding and removing members accordingly to
+// the changes passed in.
+func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
+	r.Lock()
+	changed := false
+	var added, removed []string
+	for _, change := range changes {
+		if change.Before == nil && change.After != nil {
+			// new member
+			if r.addMemberNoLock(change.After) {
+				added = append(added, change.After.GetAddress())
+				changed = true
+			}
+		} else if change.Before != nil && change.After == nil {
+			// remove member
+			if r.removeMemberNoLock(change.Before) {
+				removed = append(removed, change.Before.GetAddress())
+				changed = true
+			}
+		}
+	}
+
+	// recompute checksums on changes
+	if changed {
+		r.computeChecksumNoLock()
+		r.EmitEvent(events.RingChangedEvent{
+			ServersAdded:   added,
+			ServersRemoved: removed,
+		})
+	}
+
+	r.Unlock()
 }
 
 // HasServer returns whether the HashRing contains the given server.
@@ -234,7 +250,7 @@ func (r *HashRing) Servers() []string {
 
 // This function isn't thread-safe, only call it when the HashRing is locked.
 func (r *HashRing) copyServersNoLock() []string {
-	var servers []string
+	servers := make([]string, 0, len(r.serverSet))
 	for server := range r.serverSet {
 		servers = append(servers, server)
 	}
