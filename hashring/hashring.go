@@ -24,13 +24,12 @@ package hashring
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
-
-	"strings"
 
 	"github.com/uber-common/bark"
 )
