@@ -61,16 +61,19 @@ type replicaPoint struct {
 
 func (r replicaPoint) Compare(other interface{}) (result int) {
 	o := other.(replicaPoint)
+
 	result = r.hash - o.hash
-	if result == 0 {
-		result = strings.Compare(r.address, o.address)
+	if result != 0 {
+		return
 	}
 
-	if result == 0 {
-		result = r.index - o.index
+	result = strings.Compare(r.address, o.address)
+	if result != 0 {
+		return
 	}
 
-	return result
+	result = r.index - o.index
+	return
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
