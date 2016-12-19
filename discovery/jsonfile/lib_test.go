@@ -57,5 +57,6 @@ func TestNiceJSONFile(t *testing.T) {
 	// Now actually test the DiscoverProvider:Hosts() will return the two
 	provider := New(tmpfile.Name())
 	res, err := provider.Hosts()
+	assert.NoError(t, err, "hosts call failed")
 	assert.Equal(t, []string{"127.0.0.1:3000", "127.0.0.1:3042"}, res)
 }
