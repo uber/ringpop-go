@@ -480,7 +480,7 @@ func TestLookupsWithIdentities(t *testing.T) {
 		identity := m.Identity()
 
 		for i := 0; i < numReplicaPoints; i++ {
-			key := fmt.Sprintf("%v%v", identity, i)
+			key := fmt.Sprintf("%v#%v", identity, i)
 
 			value, has := ring.Lookup(key)
 			assert.True(t, has)
