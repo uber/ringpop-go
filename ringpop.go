@@ -783,6 +783,18 @@ func (rp *Ringpop) Labels() (*swim.NodeLabels, error) {
 	return rp.node.Labels(), nil
 }
 
+// SetIdentity changes the identity for this process. The identity is used by
+// all members of the membership to calculate the position of this node in the
+// hashring.
+func (rp *Ringpop) SetIdentity(identity string) error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+
+	rp.node.SetIdentity(identity)
+	return nil
+}
+
 // SerializeThrift takes a thrift struct and returns the serialized bytes
 // of that struct using the thrift binary protocol. This is a temporary
 // measure before frames can forwarded directly past the endpoint to the proper

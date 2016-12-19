@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/membership"
+
 	"github.com/uber/ringpop-go/discovery"
 	"github.com/uber/ringpop-go/events"
 
@@ -166,6 +168,10 @@ type NodeInterface interface {
 	// embedded therefore the definitions are copied here.
 	RegisterSelfEvictHook(hooks SelfEvictHook) error
 	SelfEvict() error
+
+	// SetIdentity changes the identity of the local node to a different
+	// identity
+	SetIdentity(identity string) error
 }
 
 // A Node is a SWIM member
@@ -560,4 +566,10 @@ func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
 // and gossip those changes around.
 func (n *Node) Labels() *NodeLabels {
 	return &NodeLabels{n}
+}
+
+// SetIdentity changes the identity of the local node. This will change the
+// state of the local node and will be gossiped around in the network.
+func (n *Node) SetIdentity(identity string) error {
+	return n.memberlist.SetLocalLabel(membership.IdentityLabelKey, identity)
 }

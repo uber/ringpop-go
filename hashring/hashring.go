@@ -46,10 +46,17 @@ type Configuration struct {
 	ReplicaPoints int
 }
 
-type replicaPoint int
+// replicaPoint contains the address where a specific point in the hashring maps to
+type replicaPoint struct {
+	// hash of the point in the hashring
+	hash int
+
+	// address of the member that owns this replicaPoint.
+	address string
+}
 
 func (r replicaPoint) Compare(other interface{}) int {
-	return int(r) - int(other.(replicaPoint))
+	return r.hash - other.(replicaPoint).hash
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
@@ -115,8 +122,11 @@ func (r *HashRing) computeChecksumNoLock() {
 }
 
 func (r *HashRing) replicaPointForServer(server membership.Member, replica int) replicaPoint {
-	identity := fmt.Sprintf("%s%v", server.GetAddress(), replica)
-	return replicaPoint(r.hashfunc(identity))
+	replicaStr := fmt.Sprintf("%s%v", server.Identity(), replica)
+	return replicaPoint{
+		hash:    r.hashfunc(replicaStr),
+		address: server.GetAddress(),
+	}
 }
 
 // AddMembers adds multiple membership Member's and thus their replicas to the HashRing.
@@ -203,7 +213,7 @@ func (r *HashRing) removeMemberNoLock(member membership.Member) bool {
 func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 	r.Lock()
 	changed := false
-	var added, removed []string
+	var added, updated, removed []string
 	for _, change := range changes {
 		if change.Before == nil && change.After != nil {
 			// new member
@@ -217,6 +227,14 @@ func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 				removed = append(removed, change.Before.GetAddress())
 				changed = true
 			}
+		} else {
+			if change.Before.Identity() != change.After.Identity() {
+				// identity has changed, member needs to be removed and readded
+				r.removeMemberNoLock(change.Before)
+				r.addMemberNoLock(change.After)
+				updated = append(updated, change.After.GetAddress())
+				changed = true
+			}
 		}
 	}
 
@@ -225,6 +243,7 @@ func (r *HashRing) ProcessMembershipChanges(changes []membership.MemberChange) {
 		r.computeChecksumNoLock()
 		r.EmitEvent(events.RingChangedEvent{
 			ServersAdded:   added,
+			ServersUpdated: updated,
 			ServersRemoved: removed,
 		})
 	}
@@ -298,9 +317,9 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 	// collected all the servers we want, we have reached the
 	// end of the red-black tree and we need to loop around and inspect the
 	// tree starting at 0.
-	r.tree.LookupNUniqueAt(n, replicaPoint(hash), unique)
+	r.tree.LookupNUniqueAt(n, replicaPoint{hash: hash}, unique)
 	if len(unique) < n {
-		r.tree.LookupNUniqueAt(n, replicaPoint(0), unique)
+		r.tree.LookupNUniqueAt(n, replicaPoint{hash: 0}, unique)
 	}
 
 	var servers []string

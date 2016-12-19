@@ -34,7 +34,8 @@ import (
 
 // fake membership.Member
 type fakeMember struct {
-	address string
+	address  string
+	identity string
 }
 
 func (f fakeMember) GetAddress() string {
@@ -43,6 +44,13 @@ func (f fakeMember) GetAddress() string {
 
 func (f fakeMember) Label(key string) (value string, has bool) {
 	return "", false
+}
+
+func (f fakeMember) Identity() string {
+	if f.identity != "" {
+		return f.identity
+	}
+	return f.address
 }
 
 // fake stats
