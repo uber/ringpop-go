@@ -518,15 +518,17 @@ func TestLookupsWithIdentities(t *testing.T) {
 func TestReplicaPointCompare(t *testing.T) {
 	address := "127.0.0.1:3000"
 
-	pointA := replicaPoint{hash: 100, address: address}
-	pointB := replicaPoint{hash: 200, address: address}
-	pointC := replicaPoint{hash: 300, address: address}
-	pointD := replicaPoint{hash: 200, address: address}
+	pointA := replicaPoint{hash: 100, address: address, index: 0}
+	pointB := replicaPoint{hash: 200, address: address, index: 0}
+	pointC := replicaPoint{hash: 300, address: address, index: 0}
+	pointD := replicaPoint{hash: 200, address: address, index: 0}
+	pointE := replicaPoint{hash: 200, address: address, index: 1}
 
 	assert.True(t, pointB.Compare(pointA) > 0)
 	assert.True(t, pointB.Compare(pointC) < 0)
 	assert.True(t, pointB.Compare(pointB) == 0)
 	assert.True(t, pointB.Compare(pointD) == 0)
+	assert.True(t, pointB.Compare(pointE) < 0)
 }
 
 func genMembers(host, fromPort, toPort int, overrideIdentity bool) (members []membership.Member) {

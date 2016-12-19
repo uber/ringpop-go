@@ -55,16 +55,23 @@ type replicaPoint struct {
 
 	// address of the member that owns this replicaPoint.
 	address string
+
+	// index of the replica point for a member
+	index int
 }
 
-func (r replicaPoint) Compare(other interface{}) int {
+func (r replicaPoint) Compare(other interface{}) (result int) {
 	o := other.(replicaPoint)
-	result := r.hash - o.hash
-	if result != 0 {
-		return result
+	result = r.hash - o.hash
+	if result == 0 {
+		result = strings.Compare(r.address, o.address)
 	}
 
-	return strings.Compare(r.address, o.address)
+	if result == 0 {
+		result = r.index - o.index
+	}
+
+	return result
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
@@ -193,6 +200,7 @@ func (r *HashRing) replicaPointForServer(server membership.Member, replica int) 
 		hash:     r.hashfunc(replicaStr),
 		identity: identity,
 		address:  server.GetAddress(),
+		index:    replica,
 	}
 }
 
