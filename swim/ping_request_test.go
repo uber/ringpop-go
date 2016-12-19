@@ -172,7 +172,9 @@ func TestIndirectPing2(t *testing.T) {
 	cont := make(chan bool, 1)
 
 	tnodes := genChannelNodes(t, 4)
-	defer destroyNodes(tnodes...)
+	defer func() {
+		destroyNodes(tnodes...)
+	}()
 
 	// don't bootstrap the target
 	sender, helper1, helper2, target := tnodes[0], tnodes[1], tnodes[2], tnodes[3]
