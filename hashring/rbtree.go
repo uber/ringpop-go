@@ -26,10 +26,16 @@ type redBlackTree struct {
 	size int
 }
 
+type keytype interface {
+	Compare(other interface{}) int
+}
+
+type valuetype interface{}
+
 // redBlackNode is a node of the redBlackTree
 type redBlackNode struct {
-	val   int
-	str   string
+	key   keytype
+	value valuetype
 	left  *redBlackNode
 	right *redBlackNode
 	red   bool
@@ -80,9 +86,12 @@ func doubleRotate(root *redBlackNode, dir bool) *redBlackNode {
 
 // Insert inserts a value and string into the tree
 // Returns true on succesful insertion, false if duplicate exists
-func (t *redBlackTree) Insert(val int, str string) (ret bool) {
+func (t *redBlackTree) Insert(key keytype, value valuetype) (ret bool) {
 	if t.root == nil {
-		t.root = &redBlackNode{val: val, str: str}
+		t.root = &redBlackNode{
+			key:   key,
+			value: value,
+		}
 		ret = true
 	} else {
 		var head = &redBlackNode{}
@@ -100,7 +109,11 @@ func (t *redBlackTree) Insert(val int, str string) (ret bool) {
 		for {
 			if node == nil {
 				// insert new node at bottom
-				node = &redBlackNode{val: val, str: str, red: true}
+				node = &redBlackNode{
+					key:   key,
+					value: value,
+					red:   true,
+				}
 				parent.setChild(dir, node)
 				ret = true
 			} else if isRed(node.left) && isRed(node.right) {
@@ -119,7 +132,7 @@ func (t *redBlackTree) Insert(val int, str string) (ret bool) {
 				}
 			}
 
-			cmp := node.val - val
+			cmp := node.key.Compare(key)
 
 			// stop if found
 			if cmp == 0 {
@@ -152,9 +165,9 @@ func (t *redBlackTree) Insert(val int, str string) (ret bool) {
 	return ret
 }
 
-// Delete removes a value from the redBlackTree
-// Returns true on succesful deletion, false if val is not in tree
-func (t *redBlackTree) Delete(val int) bool {
+// Delete removes the entry for key from the redBlackTree. Returns true on
+// succesful deletion, false if the key is not in tree
+func (t *redBlackTree) Delete(key keytype) bool {
 	if t.root == nil {
 		return false
 	}
@@ -177,7 +190,7 @@ func (t *redBlackTree) Delete(val int) bool {
 		parent = node
 		node = node.Child(dir)
 
-		cmp := node.val - val
+		cmp := node.key.Compare(key)
 
 		dir = cmp < 0
 
@@ -220,8 +233,8 @@ func (t *redBlackTree) Delete(val int) bool {
 
 	// get rid of node if we've found one
 	if found != nil {
-		found.val = node.val
-		found.str = node.str
+		found.key = node.key
+		found.value = node.value
 		parent.setChild(parent.right == node, node.Child(node.left == nil))
 		t.size--
 	}
@@ -234,55 +247,88 @@ func (t *redBlackTree) Delete(val int) bool {
 	return found != nil
 }
 
-func (n *redBlackNode) search(val int) (string, bool) {
-	if n.val == val {
-		return n.str, true
-	} else if val < n.val {
+func (n *redBlackNode) search(key keytype) (valuetype, bool) {
+	cmp := n.key.Compare(key)
+	if cmp == 0 {
+		return n.value, true
+	} else if 0 < cmp {
 		if n.left != nil {
-			return n.left.search(val)
+			return n.left.search(key)
 		}
 	} else if n.right != nil {
-		return n.right.search(val)
+		return n.right.search(key)
 	}
-	return "", false
+	return nil, false
 }
 
-// Search searches for a value in the redBlackTree, returns the string and true
-// if found or the empty string and false if val is not in the tree.
-func (t *redBlackTree) Search(val int) (string, bool) {
+// traverseWhile traverses the nodes in the tree in-order invoking the `condition`-function argument for each node.
+// If the condition-function returns `false` traversal is stopped and no more nodes will be
+// visited. Returns `true` if all nodes are visited; `false` if not.
+func (n *redBlackNode) traverseWhile(condition func(*redBlackNode) bool) bool {
+	if n == nil {
+		// the end of the tree does not signal the end of walking, but we can't
+		// walk this node (nil) nor left or right anymore
+		return true
+	}
+
+	// walk left first
+	if !n.left.traverseWhile(condition) {
+		// stop if walker indicated to break
+		return false
+	}
+	// now visit this node
+	if !condition(n) {
+		// stop if walker indicated to break
+		return false
+	}
+	// lastly visit right
+	if !n.right.traverseWhile(condition) {
+		// stop if walker indicated to break
+		return false
+	}
+
+	// signal that we reached the end and walking should continue till we hit
+	// end of tree
+	return true
+}
+
+// Search searches for the entry for key in the redBlackTree, returns the value
+// and true if found or nil and false if there is no entry for key in the tree.
+func (t *redBlackTree) Search(key keytype) (valuetype, bool) {
 	if t.root == nil {
-		return "", false
+		return nil, false
 	}
-	return t.root.search(val)
+	return t.root.search(key)
 }
 
-// LookupNAt iterates through the tree from the node with value val, and
-// returns the next n unique strings. This function is not guaranteed to
-// return n strings.
-func (t *redBlackTree) LookupNUniqueAt(n int, val int, result map[string]struct{}) {
-	findNUniqueAbove(t.root, n, val, result)
+// LookupNUniqueAt iterates through the tree from the last node that is smaller
+// than key or equal, and returns the next n unique values. This function is not
+// guaranteed to return n values, less might be returned
+func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[valuetype]struct{}) {
+	findNUniqueAbove(t.root, n, key, result)
 }
 
-// findNUniqueAbove is a recursive search that finds n unique strings
-// with a value bigger or equal than val
-func findNUniqueAbove(node *redBlackNode, n int, val int, result map[string]struct{}) {
+// findNUniqueAbove is a recursive search that finds n unique values with a key
+// bigger or equal than key
+func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[valuetype]struct{}) {
 	if len(result) >= n || node == nil {
 		return
 	}
 
-	// skip left branch when all its values are smaller than val
-	if node.val >= val {
-		findNUniqueAbove(node.left, n, val, result)
+	// skip left branch when all its keys are smaller than key
+	cmp := node.key.Compare(key)
+	if cmp >= 0 {
+		findNUniqueAbove(node.left, n, key, result)
 	}
 
-	// Make sure to stop when we have n unique strings
+	// Make sure to stop when we have n unique values
 	if len(result) >= n {
 		return
 	}
 
-	if node.val >= val {
-		result[node.str] = struct{}{}
+	if cmp >= 0 {
+		result[node.value] = struct{}{}
 	}
 
-	findNUniqueAbove(node.right, n, val, result)
+	findNUniqueAbove(node.right, n, key, result)
 }
