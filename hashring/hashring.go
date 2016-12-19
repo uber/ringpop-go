@@ -30,6 +30,8 @@ import (
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
 
+	"strings"
+
 	"github.com/uber-common/bark"
 )
 
@@ -56,7 +58,13 @@ type replicaPoint struct {
 }
 
 func (r replicaPoint) Compare(other interface{}) int {
-	return r.hash - other.(replicaPoint).hash
+	o := other.(replicaPoint)
+	result := r.hash - o.hash
+	if result != 0 {
+		return result
+	}
+
+	return strings.Compare(r.address, o.address)
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses

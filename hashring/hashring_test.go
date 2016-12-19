@@ -98,6 +98,32 @@ func TestRemoveMembers(t *testing.T) {
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 }
 
+func TestConsistentLookupsOnDuplicates(t *testing.T) {
+	ring1 := New(farm.Fingerprint32, 10)
+	ring2 := New(farm.Fingerprint32, 10)
+
+	member1 := fakeMember{
+		address:  "server1",
+		identity: "id",
+	}
+	member2 := fakeMember{
+		address:  "server2",
+		identity: "id",
+	}
+
+	ring1.AddMembers(member1)
+	ring1.AddMembers(member2)
+
+	// add in different order
+	ring2.AddMembers(member2)
+	ring2.AddMembers(member1)
+
+	lookup1, _ := ring1.Lookup("id#1")
+	lookup2, _ := ring2.Lookup("id#1")
+	assert.Equal(t, lookup1, lookup2, "Order of adds does not affect lookups")
+	assert.Equal(t, ring1.checksums["replica"], ring2.checksums["replica"], "Order of adds does not affect checksums")
+}
+
 func TestChecksumChanges(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	checksum := ring.Checksum()
