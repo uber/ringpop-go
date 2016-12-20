@@ -24,6 +24,7 @@ package hashring
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/uber/ringpop-go/events"
@@ -53,10 +54,26 @@ type replicaPoint struct {
 
 	// address of the member that owns this replicaPoint.
 	address string
+
+	// index of the replica point for a member
+	index int
 }
 
-func (r replicaPoint) Compare(other interface{}) int {
-	return r.hash - other.(replicaPoint).hash
+func (r replicaPoint) Compare(other interface{}) (result int) {
+	o := other.(replicaPoint)
+
+	result = r.hash - o.hash
+	if result != 0 {
+		return
+	}
+
+	result = strings.Compare(r.address, o.address)
+	if result != 0 {
+		return
+	}
+
+	result = r.index - o.index
+	return
 }
 
 // HashRing stores strings on a consistent hash ring. HashRing internally uses
@@ -185,6 +202,7 @@ func (r *HashRing) replicaPointForServer(server membership.Member, replica int) 
 		hash:     r.hashfunc(replicaStr),
 		identity: identity,
 		address:  server.GetAddress(),
+		index:    replica,
 	}
 }
 
