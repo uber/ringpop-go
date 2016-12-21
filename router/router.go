@@ -36,12 +36,15 @@ type router struct {
 	channel *tchannel.Channel
 
 	rw          sync.RWMutex
-	clientCache map[string]interface{}
+	clientCache map[string]struct {
+		client   interface{}
+		isRemote bool
+	}
 }
 
 // A Router creates instances of TChannel Thrift Clients via the help of the ClientFactory
 type Router interface {
-	GetClient(key string) (interface{}, error)
+	GetClient(key string) (client interface{}, isRemote bool, err error)
 }
 
 // A ClientFactory is able to provide an implementation of a TChan[Service]
@@ -58,10 +61,13 @@ type ClientFactory interface {
 // distributed microservice.
 func New(rp ringpop.Interface, f ClientFactory, ch *tchannel.Channel) Router {
 	r := &router{
-		ringpop:     rp,
-		factory:     f,
-		clientCache: make(map[string]interface{}),
-		channel:     ch,
+		ringpop: rp,
+		factory: f,
+		clientCache: make(map[string]struct {
+			client   interface{}
+			isRemote bool
+		}),
+		channel: ch,
 	}
 	rp.AddListener(r)
 	return r
@@ -85,17 +91,19 @@ func (r *router) handleChange(change swim.Change) {
 
 // Get the client for a certain destination from our internal cache, or
 // delegates the creation to the ClientFactory.
-func (r *router) GetClient(key string) (interface{}, error) {
+func (r *router) GetClient(key string) (client interface{}, isRemote bool, err error) {
 	dest, err := r.ringpop.Lookup(key)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	r.rw.RLock()
-	client, ok := r.clientCache[dest]
+	cache, ok := r.clientCache[dest]
 	r.rw.RUnlock()
 	if ok {
-		return client, nil
+		client = cache.client
+		isRemote = cache.isRemote
+		return
 	}
 
 	// no match so far, get a complete lock for creation
@@ -105,18 +113,22 @@ func (r *router) GetClient(key string) (interface{}, error) {
 	// double check it is not created between read and complete lock
 	client, ok = r.clientCache[dest]
 	if ok {
-		return client, nil
+		client = cache.client
+		isRemote = cache.isRemote
+		return
 	}
 
 	me, err := r.ringpop.WhoAmI()
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// use the ClientFactory to get the client
 	if dest == me {
+		isRemote = false
 		client = r.factory.GetLocalClient()
 	} else {
+		isRemote = true
 		thriftClient := thrift.NewClient(
 			r.channel,
 			r.channel.ServiceName(),
@@ -128,8 +140,14 @@ func (r *router) GetClient(key string) (interface{}, error) {
 	}
 
 	// cache the client
-	r.clientCache[dest] = client
-	return client, nil
+	r.clientCache[dest] = struct {
+		client   interface{}
+		isRemote bool
+	}{
+		client:   client,
+		isRemote: isRemote,
+	}
+	return
 }
 
 func (r *router) removeClient(hostport string) {

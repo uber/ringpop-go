@@ -174,12 +174,16 @@ var (
 // checks needs to be applied. By not forwarding already forwarded calls we
 // prevent unbound forwarding in the ring in case of memebership disagreement.
 func SetForwardedHeader(ctx thrift.Context) thrift.Context {
-	headers := ctx.Headers()
-	if len(headers) == 0 {
-		return thrift.WithHeaders(ctx, staticForwardHeaders)
+	// copy headers to make sure two calls do not leak headers to each other
+	headers := make(map[string]string, len(ctx.Headers())+1)
+	for key, value := range ctx.Headers() {
+		headers[key] = value
 	}
 
+	// set the header indicating the call is forwarded.
 	headers[ForwardedHeaderName] = "true"
+
+	// return the ctx with new headrs
 	return thrift.WithHeaders(ctx, headers)
 }
 
@@ -189,5 +193,8 @@ func SetForwardedHeader(ctx thrift.Context) thrift.Context {
 // forwarding logic should not be used to prevent unbound forwarding.
 func HasForwardedHeader(ctx thrift.Context) bool {
 	_, ok := ctx.Headers()[ForwardedHeaderName]
+	if ok {
+		delete(ctx.Headers(), ForwardedHeaderName)
+	}
 	return ok
 }

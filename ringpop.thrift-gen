@@ -138,13 +138,15 @@ func (a *{{ $Adapter }}) {{ $PublicName }} ({{ template "arguments" $Method }}) 
         return {{ if $Method.ReturnType }}r, {{ end }}fmt.Errorf("could not get key: %q", err)
     }
 
-    clientInterface, err := a.router.GetClient(ringpopKey)
+    clientInterface, isRemote, err := a.router.GetClient(ringpopKey)
     if err != nil {
         return {{ if $Method.ReturnType }}r, {{ end }}err
     }
 
     client := clientInterface.({{ $TChanInterface }})
-    ctx = forward.SetForwardedHeader(ctx)
+    if isRemote{
+        ctx = forward.SetForwardedHeader(ctx)
+    }
     return client.{{ $PublicName }}({{ template "call" $Method }})
 }
 {{ end}}
