@@ -145,7 +145,7 @@ func (a *{{ $Adapter }}) {{ $PublicName }} ({{ template "arguments" $Method }}) 
 
     client := clientInterface.({{ $TChanInterface }})
     if isRemote{
-        ctx = forward.SetForwardedHeader(ctx)
+        ctx = forward.SetForwardedHeader(ctx, []string{ringpopKey})
     }
     return client.{{ $PublicName }}({{ template "call" $Method }})
 }

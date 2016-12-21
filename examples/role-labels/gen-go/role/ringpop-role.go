@@ -128,7 +128,7 @@ func (a *RingpopRoleServiceAdapter) GetMembers(ctx thrift.Context, role string) 
 
 	client := clientInterface.(TChanRoleService)
 	if isRemote {
-		ctx = forward.SetForwardedHeader(ctx)
+		ctx = forward.SetForwardedHeader(ctx, []string{ringpopKey})
 	}
 	return client.GetMembers(ctx, role)
 }
@@ -159,7 +159,7 @@ func (a *RingpopRoleServiceAdapter) SetRole(ctx thrift.Context, role string) (er
 
 	client := clientInterface.(TChanRoleService)
 	if isRemote {
-		ctx = forward.SetForwardedHeader(ctx)
+		ctx = forward.SetForwardedHeader(ctx, []string{ringpopKey})
 	}
 	return client.SetRole(ctx, role)
 }

@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -337,23 +339,18 @@ func TestForwarderTestSuite(t *testing.T) {
 
 func TestSetForwardedHeader(t *testing.T) {
 	ctx, _ := thrift.NewContext(0 * time.Second)
-	ctx = SetForwardedHeader(ctx)
-	if ctx.Headers()["ringpop-forwarded"] != "true" {
-		t.Errorf("ringpop forwarding header is not set")
-	}
+	ctx = SetForwardedHeader(ctx, nil)
+
+	assert.Equal(t, "[]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set and be an empty array instead of null for the nil pointer")
 
 	ctx, _ = thrift.NewContext(0 * time.Second)
 	ctx = thrift.WithHeaders(ctx, map[string]string{
 		"keep": "this key",
 	})
-	ctx = SetForwardedHeader(ctx)
+	ctx = SetForwardedHeader(ctx, []string{"foo"})
 
-	if ctx.Headers()["ringpop-forwarded"] != "true" {
-		t.Errorf("ringpop forwarding header is not set if there were headers set already")
-	}
-	if ctx.Headers()["keep"] != "this key" {
-		t.Errorf("ringpop forwarding header removed a header that was already present")
-	}
+	assert.Equal(t, "[\"foo\"]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set to a serialized array of keys used in forwarding")
+	assert.Equal(t, "this key", ctx.Headers()["keep"], "expected the header set before the forwarding header to still exist")
 }
 
 func TestHasForwardedHeader(t *testing.T) {
@@ -361,7 +358,7 @@ func TestHasForwardedHeader(t *testing.T) {
 	if HasForwardedHeader(ctx) {
 		t.Errorf("ringpop claimed that the forwarded header was set before it was set")
 	}
-	ctx = SetForwardedHeader(ctx)
+	ctx = SetForwardedHeader(ctx, nil)
 	if !HasForwardedHeader(ctx) {
 		t.Errorf("ringpop was not able to identify that the forwarded header was set")
 	}
@@ -373,7 +370,7 @@ func TestHasForwardedHeader(t *testing.T) {
 	if HasForwardedHeader(ctx) {
 		t.Errorf("ringpop claimed that the forwarded header was set before it was set in the case of alread present headers")
 	}
-	ctx = SetForwardedHeader(ctx)
+	ctx = SetForwardedHeader(ctx, nil)
 	if !HasForwardedHeader(ctx) {
 		t.Errorf("ringpop was not able to identify that the forwarded header was set in the case of alread present headers")
 	}

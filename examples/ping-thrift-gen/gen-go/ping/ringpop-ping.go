@@ -116,7 +116,7 @@ func (a *RingpopPingPongServiceAdapter) Ping(ctx thrift.Context, request *Ping) 
 
 	client := clientInterface.(TChanPingPongService)
 	if isRemote {
-		ctx = forward.SetForwardedHeader(ctx)
+		ctx = forward.SetForwardedHeader(ctx, []string{ringpopKey})
 	}
 	return client.Ping(ctx, request)
 }

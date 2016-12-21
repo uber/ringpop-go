@@ -139,7 +139,10 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
+	// THIS IS NOT CALLED AS IT IS THE LOCAL IMPLEMENTATION, NEED TO FIND A WAY TO MOCK THE REMOTE CLIENT TO TEST THIS
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		t.Fail()
+
 		ctx := args[0].(thrift.Context)
 		headers := ctx.Headers()
 
@@ -168,13 +171,18 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 }
 
 func TestRingpopRemoteServiceAdapterCallRemotePerservingHeaders(t *testing.T) {
+	t.Skip("The data passed to the remote call is not verified in any test at this moment, can't verify the perserving of the headers")
+
 	rp := &mocks.Ringpop{}
 	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
+	// THIS IS NOT CALLED AS IT IS THE LOCAL IMPLEMENTATION, NEED TO FIND A WAY TO MOCK THE REMOTE CLIENT TO TEST THIS
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		t.Fail()
+
 		ctx := args[0].(thrift.Context)
 		headers := ctx.Headers()
 
@@ -235,10 +243,7 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCall(t *testing.T) {
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
-	// change the contents to a list of keys used for forwarding.
-	ctx = thrift.WithHeaders(ctx, map[string]string{
-		forward.ForwardedHeaderName: "true",
-	})
+	ctx = forward.SetForwardedHeader(ctx, []string{"hello"})
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
@@ -277,15 +282,15 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCallPerservingHeaders(t *t
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
-	// change the contents to a list of keys used for forwarding.
+	// set headers for the call
 	ctx = thrift.WithHeaders(ctx, map[string]string{
-		forward.ForwardedHeaderName: "true",
-
 		// headers that should be perserved
 		"hello": "world",
 		"foo":   "bar",
 		"baz":   "42",
 	})
+	// add the forwarding header
+	ctx = forward.SetForwardedHeader(ctx, []string{"hello"})
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
