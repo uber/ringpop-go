@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uber/ringpop-go/forward"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/uber/ringpop-go/router"
@@ -62,8 +64,58 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
-	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		ctx := args[0].(thrift.Context)
+		headers := ctx.Headers()
+
+		_, has := headers[forward.ForwardedHeaderName]
+		assert.False(t, has, "expected the forwarding header %q to not be present in the call to the local implementation of the service when calling the local client", forward.ForwardedHeaderName)
+	}).Return(nil)
+
 	ctx, _ := thrift.NewContext(0 * time.Second)
+
+	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
+		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
+				return string(name), nil
+			},
+		},
+	})
+	assert.Equal(t, err, nil, "creation of adator gave an error")
+
+	err = adapter.RemoteCall(ctx, shared.Name("hello"))
+	assert.Equal(t, err, nil, "calling RemoteCall gave an error")
+
+	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
+}
+
+func TestRingpopRemoteServiceAdapterCallLocalPerservingHeaders(t *testing.T) {
+	rp := &mocks.Ringpop{}
+	rp.On("AddListener", mock.Anything).Return(false)
+	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
+
+	serviceImpl := &servicemocks.TChanRemoteService{}
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		ctx := args[0].(thrift.Context)
+		headers := ctx.Headers()
+
+		_, has := headers[forward.ForwardedHeaderName]
+		assert.False(t, has, "expected the forwarding header %q to not be present in the call to the local implementation of the service when calling the local client", forward.ForwardedHeaderName)
+
+		assert.Equal(t, map[string]string{
+			"hello": "world",
+			"foo":   "bar",
+			"baz":   "42",
+		}, headers, "exected existing headers to be perserved")
+	}).Return(nil)
+
+	ctx, _ := thrift.NewContext(0 * time.Second)
+	ctx = thrift.WithHeaders(ctx, map[string]string{
+		"hello": "world",
+		"foo":   "bar",
+		"baz":   "42",
+	})
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
@@ -87,7 +139,13 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
 	serviceImpl := &servicemocks.TChanRemoteService{}
-	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		ctx := args[0].(thrift.Context)
+		headers := ctx.Headers()
+
+		_, has := headers[forward.ForwardedHeaderName]
+		assert.True(t, has, "expected the forwarding header %q to be present in the call to the remote implementation of the service", forward.ForwardedHeaderName)
+	}).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
 	ch, err := tchannel.NewChannel("remote", nil)
@@ -107,6 +165,141 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	err = adapter.RemoteCall(ctx, "hello")
 	assert.NotEqual(t, err, nil, "we expected an error from the remote call since it could not reach anything over the network")
 	serviceImpl.AssertNotCalled(t, "RemoteCall", mock.Anything, "hello")
+}
+
+func TestRingpopRemoteServiceAdapterCallRemotePerservingHeaders(t *testing.T) {
+	rp := &mocks.Ringpop{}
+	rp.On("AddListener", mock.Anything).Return(false)
+	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
+
+	serviceImpl := &servicemocks.TChanRemoteService{}
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		ctx := args[0].(thrift.Context)
+		headers := ctx.Headers()
+
+		_, has := headers[forward.ForwardedHeaderName]
+		assert.True(t, has, "expected the forwarding header %q to be present in the call to the remote implementation of the service", forward.ForwardedHeaderName)
+
+		assert.Equal(t, map[string]string{
+			// the forwarded header is expected here because it will be sent
+			// over the wire and will be picked up on the other side at the
+			// adapter level again
+			forward.ForwardedHeaderName: "true",
+
+			"hello": "world",
+			"foo":   "bar",
+			"baz":   "42",
+		}, headers, "exected existing headers to be perserved")
+	}).Return(nil)
+
+	ctx, _ := thrift.NewContext(0 * time.Second)
+	ctx = thrift.WithHeaders(ctx, map[string]string{
+		"hello": "world",
+		"foo":   "bar",
+		"baz":   "42",
+	})
+
+	ch, err := tchannel.NewChannel("remote", nil)
+	assert.Equal(t, err, nil, "could not create tchannel")
+
+	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
+		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
+				return string(name), nil
+			},
+		},
+	})
+	assert.Equal(t, err, nil, "creation of adator gave an error")
+
+	// Because it is not easily possible to stub a remote call we assert that the remote call failed.
+	// If it didn't fail it is likely that the serviceImpl was called, which we assert that it isn't called either
+	err = adapter.RemoteCall(ctx, "hello")
+	assert.NotEqual(t, err, nil, "we expected an error from the remote call since it could not reach anything over the network")
+	serviceImpl.AssertNotCalled(t, "RemoteCall", mock.Anything, "hello")
+}
+
+func TestRingpopRemoteServiceAdapterReceivingForwardedCall(t *testing.T) {
+	rp := &mocks.Ringpop{}
+	rp.On("AddListener", mock.Anything).Return(false)
+	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
+
+	serviceImpl := &servicemocks.TChanRemoteService{}
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		ctx := args[0].(thrift.Context)
+		headers := ctx.Headers()
+
+		_, has := headers[forward.ForwardedHeaderName]
+		assert.False(t, has, "expected the forwarding header %q to not be present in dispatching after being forwarded", forward.ForwardedHeaderName)
+	}).Return(nil)
+
+	ctx, _ := thrift.NewContext(0 * time.Second)
+	// change the contents to a list of keys used for forwarding.
+	ctx = thrift.WithHeaders(ctx, map[string]string{
+		forward.ForwardedHeaderName: "true",
+	})
+
+	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
+		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
+				return string(name), nil
+			},
+		},
+	})
+	assert.Equal(t, err, nil, "creation of adator gave an error")
+
+	err = adapter.RemoteCall(ctx, shared.Name("hello"))
+	assert.Equal(t, err, nil, "calling RemoteCall gave an error")
+
+	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
+}
+
+func TestRingpopRemoteServiceAdapterReceivingForwardedCallPerservingHeaders(t *testing.T) {
+	rp := &mocks.Ringpop{}
+	rp.On("AddListener", mock.Anything).Return(false)
+	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
+	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
+
+	serviceImpl := &servicemocks.TChanRemoteService{}
+	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
+		ctx := args[0].(thrift.Context)
+		headers := ctx.Headers()
+
+		_, has := headers[forward.ForwardedHeaderName]
+		assert.False(t, has, "expected the forwarding header %q to not be present in dispatching after being forwarded", forward.ForwardedHeaderName)
+
+		assert.Equal(t, map[string]string{
+			"hello": "world",
+			"foo":   "bar",
+			"baz":   "42",
+		}, headers, "exected existing headers to be perserved")
+	}).Return(nil)
+
+	ctx, _ := thrift.NewContext(0 * time.Second)
+	// change the contents to a list of keys used for forwarding.
+	ctx = thrift.WithHeaders(ctx, map[string]string{
+		forward.ForwardedHeaderName: "true",
+
+		// headers that should be perserved
+		"hello": "world",
+		"foo":   "bar",
+		"baz":   "42",
+	})
+
+	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
+		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
+				return string(name), nil
+			},
+		},
+	})
+	assert.Equal(t, err, nil, "creation of adator gave an error")
+
+	err = adapter.RemoteCall(ctx, shared.Name("hello"))
+	assert.Equal(t, err, nil, "calling RemoteCall gave an error")
+
+	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
 }
 
 func TestGetLocalClient(t *testing.T) {
@@ -135,7 +328,6 @@ func TestGetLocalClient(t *testing.T) {
 	err = localClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the local client gave an error")
 	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
-
 }
 
 func TestMakeRemoteClient(t *testing.T) {

@@ -162,8 +162,10 @@ func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoin
 }
 
 var (
-	forwardedHeaderName  = "ringpop-forwarded"
-	staticForwardHeaders = map[string]string{forwardedHeaderName: "true"}
+	// ForwardedHeaderName is the name used by the ringpop adapter to indicate
+	// it is a forwarded request.
+	ForwardedHeaderName  = "ringpop-forwarded"
+	staticForwardHeaders = map[string]string{ForwardedHeaderName: "true"}
 )
 
 // SetForwardedHeader adds a header to the current thrift context indicating
@@ -177,7 +179,7 @@ func SetForwardedHeader(ctx thrift.Context) thrift.Context {
 		return thrift.WithHeaders(ctx, staticForwardHeaders)
 	}
 
-	headers[forwardedHeaderName] = "true"
+	headers[ForwardedHeaderName] = "true"
 	return thrift.WithHeaders(ctx, headers)
 }
 
@@ -186,6 +188,6 @@ func SetForwardedHeader(ctx thrift.Context) thrift.Context {
 // the message. When a message has already been forwarded by ringpop the
 // forwarding logic should not be used to prevent unbound forwarding.
 func HasForwardedHeader(ctx thrift.Context) bool {
-	_, ok := ctx.Headers()[forwardedHeaderName]
+	_, ok := ctx.Headers()[ForwardedHeaderName]
 	return ok
 }
