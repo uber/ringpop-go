@@ -109,12 +109,14 @@ func (a *RingpopPingPongServiceAdapter) Ping(ctx thrift.Context, request *Ping) 
 		return r, fmt.Errorf("could not get key: %q", err)
 	}
 
-	clientInterface, err := a.router.GetClient(ringpopKey)
+	clientInterface, isRemote, err := a.router.GetClient(ringpopKey)
 	if err != nil {
 		return r, err
 	}
 
 	client := clientInterface.(TChanPingPongService)
-	ctx = forward.SetForwardedHeader(ctx)
+	if isRemote {
+		ctx = forward.SetForwardedHeader(ctx)
+	}
 	return client.Ping(ctx, request)
 }

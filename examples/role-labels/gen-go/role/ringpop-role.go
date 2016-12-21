@@ -121,13 +121,15 @@ func (a *RingpopRoleServiceAdapter) GetMembers(ctx thrift.Context, role string) 
 		return r, fmt.Errorf("could not get key: %q", err)
 	}
 
-	clientInterface, err := a.router.GetClient(ringpopKey)
+	clientInterface, isRemote, err := a.router.GetClient(ringpopKey)
 	if err != nil {
 		return r, err
 	}
 
 	client := clientInterface.(TChanRoleService)
-	ctx = forward.SetForwardedHeader(ctx)
+	if isRemote {
+		ctx = forward.SetForwardedHeader(ctx)
+	}
 	return client.GetMembers(ctx, role)
 }
 
@@ -150,12 +152,14 @@ func (a *RingpopRoleServiceAdapter) SetRole(ctx thrift.Context, role string) (er
 		return fmt.Errorf("could not get key: %q", err)
 	}
 
-	clientInterface, err := a.router.GetClient(ringpopKey)
+	clientInterface, isRemote, err := a.router.GetClient(ringpopKey)
 	if err != nil {
 		return err
 	}
 
 	client := clientInterface.(TChanRoleService)
-	ctx = forward.SetForwardedHeader(ctx)
+	if isRemote {
+		ctx = forward.SetForwardedHeader(ctx)
+	}
 	return client.SetRole(ctx, role)
 }
