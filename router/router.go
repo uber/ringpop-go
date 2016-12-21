@@ -36,10 +36,7 @@ type router struct {
 	channel *tchannel.Channel
 
 	rw          sync.RWMutex
-	clientCache map[string]struct {
-		client   interface{}
-		isRemote bool
-	}
+	clientCache map[string]cacheEntry
 }
 
 // A Router creates instances of TChannel Thrift Clients via the help of the
@@ -105,11 +102,11 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	}
 
 	r.rw.RLock()
-	cachedClient, ok := r.clientCache[dest]
+	cachedEntry, ok := r.clientCache[dest]
 	r.rw.RUnlock()
 	if ok {
-		client = cachedClient.client
-		isRemote = cachedClient.isRemote
+		client = cachedEntry.client
+		isRemote = cachedEntry.isRemote
 		return
 	}
 
@@ -118,10 +115,10 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	defer r.rw.Unlock()
 
 	// double check it is not created between read and complete lock
-	cachedClient, ok = r.clientCache[dest]
+	cachedEntry, ok = r.clientCache[dest]
 	if ok {
-		client = cachedClient.client
-		isRemote = cachedClient.isRemote
+		client = cachedEntry.client
+		isRemote = cachedEntry.isRemote
 		return
 	}
 
