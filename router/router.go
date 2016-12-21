@@ -42,8 +42,12 @@ type router struct {
 	}
 }
 
-// A Router creates instances of TChannel Thrift Clients via the help of the ClientFactory
+// A Router creates instances of TChannel Thrift Clients via the help of the
+// ClientFactory
 type Router interface {
+	// GetClient provides the caller with a client for a given key. At the same
+	// time it will inform the caller if the client is a remote client or a
+	// local client via the isRemote return value.
 	GetClient(key string) (client interface{}, isRemote bool, err error)
 }
 
@@ -56,6 +60,11 @@ type ClientFactory interface {
 	MakeRemoteClient(client thrift.TChanClient) interface{}
 }
 
+type cacheEntry struct {
+	client   interface{}
+	isRemote bool
+}
+
 // New creates an instance that validates the Router interface. A Router
 // will be used to get implementations of service interfaces that implement a
 // distributed microservice.
@@ -63,11 +72,9 @@ func New(rp ringpop.Interface, f ClientFactory, ch *tchannel.Channel) Router {
 	r := &router{
 		ringpop: rp,
 		factory: f,
-		clientCache: make(map[string]struct {
-			client   interface{}
-			isRemote bool
-		}),
 		channel: ch,
+
+		clientCache: make(map[string]cacheEntry),
 	}
 	rp.AddListener(r)
 	return r
@@ -98,11 +105,11 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	}
 
 	r.rw.RLock()
-	cache, ok := r.clientCache[dest]
+	cachedClient, ok := r.clientCache[dest]
 	r.rw.RUnlock()
 	if ok {
-		client = cache.client
-		isRemote = cache.isRemote
+		client = cachedClient.client
+		isRemote = cachedClient.isRemote
 		return
 	}
 
@@ -111,10 +118,10 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	defer r.rw.Unlock()
 
 	// double check it is not created between read and complete lock
-	client, ok = r.clientCache[dest]
+	cachedClient, ok = r.clientCache[dest]
 	if ok {
-		client = cache.client
-		isRemote = cache.isRemote
+		client = cachedClient.client
+		isRemote = cachedClient.isRemote
 		return
 	}
 
@@ -140,10 +147,7 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	}
 
 	// cache the client
-	r.clientCache[dest] = struct {
-		client   interface{}
-		isRemote bool
-	}{
+	r.clientCache[dest] = cacheEntry{
 		client:   client,
 		isRemote: isRemote,
 	}
