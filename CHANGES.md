@@ -4,21 +4,21 @@ ringpop-go changes
 v0.8.0
 ------
 
-* Feature: Self-eviction [#177](https://github.com/uber/ringpop-go/pull/177)
-* Travis: Remove Go 1.5 support [#187](https://github.com/uber/ringpop-go/pull/187)
 * Fix: ineffectual assignments [#193](https://github.com/uber/ringpop-go/pull/193)
-* Feature: Identity Carry Over [#188](https://github.com/uber/ringpop-go/pull/188) [#189](https://github.com/uber/ringpop-go/pull/189) [#190](https://github.com/uber/ringpop-go/pull/190) [#191](https://github.com/uber/ringpop-go/pull/191) [#192](https://github.com/uber/ringpop-go/pull/192) [#194](https://github.com/uber/ringpop-go/pull/194) [#195](https://github.com/uber/ringpop-go/pull/195)
 * Fix: Make lookups consistent on hash collisions [#196](https://github.com/uber/ringpop-go/pull/196)   
+* Feature: Self-eviction [#177](https://github.com/uber/ringpop-go/pull/177)
+* Feature: Identity Carry Over [#188](https://github.com/uber/ringpop-go/pull/188) [#189](https://github.com/uber/ringpop-go/pull/189) [#190](https://github.com/uber/ringpop-go/pull/190) [#191](https://github.com/uber/ringpop-go/pull/191) [#192](https://github.com/uber/ringpop-go/pull/192) [#194](https://github.com/uber/ringpop-go/pull/194) [#195](https://github.com/uber/ringpop-go/pull/195)
+* Travis: Remove Go 1.5 support [#187](https://github.com/uber/ringpop-go/pull/187)
 
 ### Release notes
 
 #### Identity Carry Over
-Identity carry over provides a way to manually configure the identity of a member on a hashring. 
+Identity carry over provides a way to manually configure the identity of a member on the hashring. 
 By changing the identity to be something else than it's address, it becomes possible to guarantee ring equality before and after deploys in a dynamic environment (e.g. mesos).
 
 #### Self Eviction 
 By calling `ringpop.SelfEvict` on shutdown, a member will declare itself as `faulty` and gossips this to the other members.
-This removes the time window where it was marked as `suspect`; in this way removing the time where other members 
+This removes the time window where it would be marked as `suspect`; in this way removing the time where other members 
 considered it to be part of the ring while it was not responding anymore. 
 
 #### Breaking change to the `identity`-option
