@@ -32,19 +32,27 @@ Set some reference keys that are sharded around the cluster using [tcurl][2]:
 
 Use GetAll on the node that should answer to make sure self requests work if the first call is not forwarded
 
-	$ tcurl keyvalue -p 127.0.0.1:3004 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020"]}'
-	{"ok":true,"head":{},"body":{"127.0.0.1:30010":"foo","127.0.0.1:30020":"bar"},"headers":{"as":"thrift"},"trace":"*"}
+    $ tcurl keyvalue -p 127.0.0.1:3004 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020"]}'
+    {"ok":true,"head":{},"body":["foo","bar"],"headers":{"as":"thrift"},"trace":"*"} (glob)
 
 Use GetAll on the node that should not answer to make sure self requests work after forwarding
 
-	$ tcurl keyvalue -p 127.0.0.1:3000 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020"]}'
-	{"ok":true,"head":{},"body":{"127.0.0.1:30010":"foo","127.0.0.1:30020":"bar"},"headers":{"as":"thrift"},"trace":"*"}
+    $ tcurl keyvalue -p 127.0.0.1:3000 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020"]}'
+    {"ok":true,"head":{},"body":["foo","bar"],"headers":{"as":"thrift"},"trace":"*"} (glob)
 
 Now do the same but also with a key stored on the node executing the fanout
-	$ tcurl keyvalue -p 127.0.0.1:3004 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020","127.0.0.1:30040"]}'
-	{"ok":true,"head":{},"body":{"127.0.0.1:30010":"foo","127.0.0.1:30020":"bar","127.0.0.1:30040":"baz"},"headers":{"as":"thrift"},"trace":"*"}
-	$ tcurl keyvalue -p 127.0.0.1:3000 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020","127.0.0.1:30040"]}'
-	{"ok":true,"head":{},"body":{"127.0.0.1:30010":"foo","127.0.0.1:30020":"bar","127.0.0.1:30040":"baz"},"headers":{"as":"thrift"},"trace":"*"}
+
+    $ tcurl keyvalue -p 127.0.0.1:3004 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020","127.0.0.1:30040"]}'
+    {"ok":true,"head":{},"body":["foo","bar","baz"],"headers":{"as":"thrift"},"trace":"*"} (glob)
+    $ tcurl keyvalue -p 127.0.0.1:3000 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30010","127.0.0.1:30020","127.0.0.1:30040"]}'
+    {"ok":true,"head":{},"body":["foo","bar","baz"],"headers":{"as":"thrift"},"trace":"*"} (glob)
+
+And to top it off we will now lookup the local key first
+
+    $ tcurl keyvalue -p 127.0.0.1:3004 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30040","127.0.0.1:30010","127.0.0.1:30020"]}'
+    {"ok":true,"head":{},"body":["baz","foo","bar"],"headers":{"as":"thrift"},"trace":"*"} (glob)
+    $ tcurl keyvalue -p 127.0.0.1:3000 --thrift ./keyvalue.thrift KeyValueService::GetAll '{"keys":["127.0.0.1:30040","127.0.0.1:30010","127.0.0.1:30020"]}'
+    {"ok":true,"head":{},"body":["baz","foo","bar"],"headers":{"as":"thrift"},"trace":"*"} (glob)
 
 In the end you should kill tick cluster via:
 

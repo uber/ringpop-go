@@ -15,7 +15,7 @@ import (
 // TChanKeyValueService is the interface that defines the server handler and client interface.
 type TChanKeyValueService interface {
 	Get(ctx thrift.Context, key string) (string, error)
-	GetAll(ctx thrift.Context, keys []string) (map[string]string, error)
+	GetAll(ctx thrift.Context, keys []string) ([]string, error)
 	Set(ctx thrift.Context, key string, value string) error
 }
 
@@ -50,7 +50,7 @@ func (c *tchanKeyValueServiceClient) Get(ctx thrift.Context, key string) (string
 	return resp.GetSuccess(), err
 }
 
-func (c *tchanKeyValueServiceClient) GetAll(ctx thrift.Context, keys []string) (map[string]string, error) {
+func (c *tchanKeyValueServiceClient) GetAll(ctx thrift.Context, keys []string) ([]string, error) {
 	var resp KeyValueServiceGetAllResult
 	args := KeyValueServiceGetAllArgs{
 		Keys: keys,

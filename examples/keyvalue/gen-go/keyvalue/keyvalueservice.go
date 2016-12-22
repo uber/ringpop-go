@@ -24,7 +24,7 @@ type KeyValueService interface {
 	Get(key string) (r string, err error)
 	// Parameters:
 	//  - Keys
-	GetAll(keys []string) (r map[string]string, err error)
+	GetAll(keys []string) (r []string, err error)
 }
 
 type KeyValueServiceClient struct {
@@ -210,7 +210,7 @@ func (p *KeyValueServiceClient) recvGet() (value string, err error) {
 
 // Parameters:
 //  - Keys
-func (p *KeyValueServiceClient) GetAll(keys []string) (r map[string]string, err error) {
+func (p *KeyValueServiceClient) GetAll(keys []string) (r []string, err error) {
 	if err = p.sendGetAll(keys); err != nil {
 		return
 	}
@@ -239,7 +239,7 @@ func (p *KeyValueServiceClient) sendGetAll(keys []string) (err error) {
 	return oprot.Flush()
 }
 
-func (p *KeyValueServiceClient) recvGetAll() (value map[string]string, err error) {
+func (p *KeyValueServiceClient) recvGetAll() (value []string, err error) {
 	iprot := p.InputProtocol
 	if iprot == nil {
 		iprot = p.ProtocolFactory.GetProtocol(p.Transport)
@@ -442,7 +442,7 @@ func (p *keyValueServiceProcessorGetAll) Process(seqId int32, iprot, oprot thrif
 
 	iprot.ReadMessageEnd()
 	result := KeyValueServiceGetAllResult{}
-	var retval map[string]string
+	var retval []string
 	var err2 error
 	if retval, err2 = p.handler.GetAll(args.Keys); err2 != nil {
 		x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing GetAll: "+err2.Error())
@@ -961,16 +961,16 @@ func (p *KeyValueServiceGetAllArgs) String() string {
 // Attributes:
 //  - Success
 type KeyValueServiceGetAllResult struct {
-	Success map[string]string `thrift:"success,0" json:"success,omitempty"`
+	Success []string `thrift:"success,0" json:"success,omitempty"`
 }
 
 func NewKeyValueServiceGetAllResult() *KeyValueServiceGetAllResult {
 	return &KeyValueServiceGetAllResult{}
 }
 
-var KeyValueServiceGetAllResult_Success_DEFAULT map[string]string
+var KeyValueServiceGetAllResult_Success_DEFAULT []string
 
-func (p *KeyValueServiceGetAllResult) GetSuccess() map[string]string {
+func (p *KeyValueServiceGetAllResult) GetSuccess() []string {
 	return p.Success
 }
 func (p *KeyValueServiceGetAllResult) IsSetSuccess() bool {
@@ -1011,29 +1011,23 @@ func (p *KeyValueServiceGetAllResult) Read(iprot thrift.TProtocol) error {
 }
 
 func (p *KeyValueServiceGetAllResult) readField0(iprot thrift.TProtocol) error {
-	_, _, size, err := iprot.ReadMapBegin()
+	_, size, err := iprot.ReadListBegin()
 	if err != nil {
-		return thrift.PrependError("error reading map begin: ", err)
+		return thrift.PrependError("error reading list begin: ", err)
 	}
-	tMap := make(map[string]string, size)
-	p.Success = tMap
+	tSlice := make([]string, 0, size)
+	p.Success = tSlice
 	for i := 0; i < size; i++ {
-		var _key9 string
+		var _elem9 string
 		if v, err := iprot.ReadString(); err != nil {
 			return thrift.PrependError("error reading field 0: ", err)
 		} else {
-			_key9 = v
+			_elem9 = v
 		}
-		var _val10 string
-		if v, err := iprot.ReadString(); err != nil {
-			return thrift.PrependError("error reading field 0: ", err)
-		} else {
-			_val10 = v
-		}
-		p.Success[_key9] = _val10
+		p.Success = append(p.Success, _elem9)
 	}
-	if err := iprot.ReadMapEnd(); err != nil {
-		return thrift.PrependError("error reading map end: ", err)
+	if err := iprot.ReadListEnd(); err != nil {
+		return thrift.PrependError("error reading list end: ", err)
 	}
 	return nil
 }
@@ -1056,22 +1050,19 @@ func (p *KeyValueServiceGetAllResult) Write(oprot thrift.TProtocol) error {
 
 func (p *KeyValueServiceGetAllResult) writeField0(oprot thrift.TProtocol) (err error) {
 	if p.IsSetSuccess() {
-		if err := oprot.WriteFieldBegin("success", thrift.MAP, 0); err != nil {
+		if err := oprot.WriteFieldBegin("success", thrift.LIST, 0); err != nil {
 			return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err)
 		}
-		if err := oprot.WriteMapBegin(thrift.STRING, thrift.STRING, len(p.Success)); err != nil {
-			return thrift.PrependError("error writing map begin: ", err)
+		if err := oprot.WriteListBegin(thrift.STRING, len(p.Success)); err != nil {
+			return thrift.PrependError("error writing list begin: ", err)
 		}
-		for k, v := range p.Success {
-			if err := oprot.WriteString(string(k)); err != nil {
-				return thrift.PrependError(fmt.Sprintf("%T. (0) field write error: ", p), err)
-			}
+		for _, v := range p.Success {
 			if err := oprot.WriteString(string(v)); err != nil {
 				return thrift.PrependError(fmt.Sprintf("%T. (0) field write error: ", p), err)
 			}
 		}
-		if err := oprot.WriteMapEnd(); err != nil {
-			return thrift.PrependError("error writing map end: ", err)
+		if err := oprot.WriteListEnd(); err != nil {
+			return thrift.PrependError("error writing list end: ", err)
 		}
 		if err := oprot.WriteFieldEnd(); err != nil {
 			return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err)

@@ -152,7 +152,7 @@ type KeyValueServiceGetAllConfiguration struct {
 }
 
 // GetAll satisfies the TChanKeyValueService interface. This function uses the configuration for GetAll to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
-func (a *RingpopKeyValueServiceAdapter) GetAll(ctx thrift.Context, keys []string) (r map[string]string, err error) {
+func (a *RingpopKeyValueServiceAdapter) GetAll(ctx thrift.Context, keys []string) (r []string, err error) {
 	// check if the function should be called locally
 	if a.config.GetAll == nil || forward.HasForwardedHeader(ctx) {
 		return a.impl.GetAll(ctx, keys)

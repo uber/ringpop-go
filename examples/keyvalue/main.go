@@ -73,17 +73,17 @@ func (w *worker) Get(ctx thrift.Context, key string) (string, error) {
 	return value, nil
 }
 
-func (w *worker) GetAll(ctx thrift.Context, keys []string) (map[string]string, error) {
+func (w *worker) GetAll(ctx thrift.Context, keys []string) ([]string, error) {
 	log.Printf("getting keys: %v", keys)
 
-	m := make(map[string]string)
+	m := make([]string, 0, len(keys))
 	for _, key := range keys {
 		// sharded self call
 		value, err := w.adapter.Get(ctx, key)
 		if err != nil {
 			return nil, err
 		}
-		m[key] = value
+		m = append(m, value)
 	}
 	return m, nil
 }
