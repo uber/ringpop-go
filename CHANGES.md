@@ -14,7 +14,7 @@ v0.8.0
 
 #### Identity Carry Over
 Identity carry over provides a way to manually configure the identity of a member on the hashring. 
-By changing the identity to be something else than it's address, it becomes possible to guarantee ring equality before and after deploys in a dynamic environment (e.g. mesos).
+By changing the identity to be something else than its address, it becomes possible to guarantee ring equality before and after deploys in a dynamic environment (e.g. mesos).
 
 #### Self Eviction 
 By calling `ringpop.SelfEvict` on shutdown, a member will declare itself as `faulty` and gossips this to the other members.
