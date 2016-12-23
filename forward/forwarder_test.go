@@ -28,11 +28,13 @@ import (
 	"testing"
 	"time"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
 	events "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/test/thrift/pingpong"
+
+	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"github.com/uber/tchannel-go/thrift"
@@ -338,33 +340,33 @@ func TestForwarderTestSuite(t *testing.T) {
 }
 
 func TestSetForwardedHeader(t *testing.T) {
+	// empty keys array test
 	ctx, _ := thrift.NewContext(0 * time.Second)
-	ctx = SetForwardedHeader(ctx)
-	if ctx.Headers()["ringpop-forwarded"] != "true" {
-		t.Errorf("ringpop forwarding header is not set")
-	}
+	ctx = SetForwardedHeader(ctx, nil)
+	assert.Equal(t, "[]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set and be an empty array instead of null for the nil pointer")
 
+	// preserve existing headers
 	ctx, _ = thrift.NewContext(0 * time.Second)
 	ctx = thrift.WithHeaders(ctx, map[string]string{
 		"keep": "this key",
 	})
-	ctx = SetForwardedHeader(ctx)
+	ctx = SetForwardedHeader(ctx, []string{"foo"})
+	assert.Equal(t, "[\"foo\"]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set to a serialized array of keys used in forwarding")
+	assert.Equal(t, "this key", ctx.Headers()["keep"], "expected the header set before the forwarding header to still exist")
 
-	if ctx.Headers()["ringpop-forwarded"] != "true" {
-		t.Errorf("ringpop forwarding header is not set if there were headers set already")
-	}
-	if ctx.Headers()["keep"] != "this key" {
-		t.Errorf("ringpop forwarding header removed a header that was already present")
-	}
+	// multiple keys encoded in the header
+	ctx, _ = thrift.NewContext(0 * time.Second)
+	ctx = SetForwardedHeader(ctx, []string{"key1", "key2"})
+	assert.Equal(t, "[\"key1\",\"key2\"]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set with both keys encoded")
 }
 
-func TestHasForwardedHeader(t *testing.T) {
+func TestDeleteForwardedHeader(t *testing.T) {
 	ctx, _ := thrift.NewContext(0 * time.Second)
-	if HasForwardedHeader(ctx) {
+	if DeleteForwardedHeader(ctx) {
 		t.Errorf("ringpop claimed that the forwarded header was set before it was set")
 	}
-	ctx = SetForwardedHeader(ctx)
-	if !HasForwardedHeader(ctx) {
+	ctx = SetForwardedHeader(ctx, nil)
+	if !DeleteForwardedHeader(ctx) {
 		t.Errorf("ringpop was not able to identify that the forwarded header was set")
 	}
 
@@ -372,11 +374,11 @@ func TestHasForwardedHeader(t *testing.T) {
 	ctx = thrift.WithHeaders(ctx, map[string]string{
 		"keep": "this key",
 	})
-	if HasForwardedHeader(ctx) {
+	if DeleteForwardedHeader(ctx) {
 		t.Errorf("ringpop claimed that the forwarded header was set before it was set in the case of alread present headers")
 	}
-	ctx = SetForwardedHeader(ctx)
-	if !HasForwardedHeader(ctx) {
+	ctx = SetForwardedHeader(ctx, nil)
+	if !DeleteForwardedHeader(ctx) {
 		t.Errorf("ringpop was not able to identify that the forwarded header was set in the case of alread present headers")
 	}
 }
