@@ -22,6 +22,7 @@
 package forward
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -162,30 +163,49 @@ func (f *Forwarder) ForwardRequest(request []byte, destination, service, endpoin
 }
 
 var (
-	forwardedHeaderName  = "ringpop-forwarded"
-	staticForwardHeaders = map[string]string{forwardedHeaderName: "true"}
+	// ForwardedHeaderName is the name used by the ringpop adapter to indicate
+	// it is a forwarded request.
+	ForwardedHeaderName = "ringpop-forward-keys"
 )
 
 // SetForwardedHeader adds a header to the current thrift context indicating
-// that the call has been forwarded by another node in the ringpop ring.
-// This header is used when a remote call is received to determine if forwarding
+// that the call has been forwarded by another node in the ringpop ring. This
+// header is used when a remote call is received to determine if forwarding
 // checks needs to be applied. By not forwarding already forwarded calls we
 // prevent unbound forwarding in the ring in case of memebership disagreement.
-func SetForwardedHeader(ctx thrift.Context) thrift.Context {
-	headers := ctx.Headers()
-	if len(headers) == 0 {
-		return thrift.WithHeaders(ctx, staticForwardHeaders)
+// The keys provided will be serialized as the value of the key and can be used
+// in the future to check if key inconsistencies are found while forwarding.
+// Currently this is not checked
+func SetForwardedHeader(ctx thrift.Context, keys []string) thrift.Context {
+	// copy headers to make sure two calls do not leak headers to each other
+	headers := make(map[string]string, len(ctx.Headers())+1)
+	for key, value := range ctx.Headers() {
+		headers[key] = value
 	}
 
-	headers[forwardedHeaderName] = "true"
+	if keys == nil {
+		// prevent null serialization, but use an empty array instead
+		keys = []string{}
+	}
+	keysBytes, _ := json.Marshal(keys)
+	keysString := string(keysBytes)
+
+	// set the header indicating the call is forwarded for the provided keys
+	headers[ForwardedHeaderName] = keysString
+
+	// return the ctx with new headrs
 	return thrift.WithHeaders(ctx, headers)
 }
 
-// HasForwardedHeader takes the headers that came in via TChannel and looks for
-// the precense of a specific ringpop header to see if ringpop already forwarded
-// the message. When a message has already been forwarded by ringpop the
-// forwarding logic should not be used to prevent unbound forwarding.
-func HasForwardedHeader(ctx thrift.Context) bool {
-	_, ok := ctx.Headers()[forwardedHeaderName]
+// DeleteForwardedHeader takes the headers that came in via TChannel and looks
+// for the precense of a specific ringpop header to see if ringpop already
+// forwarded the message. If the header is present it will delete the header
+// from the context. The return value indicates if the header was present and
+// deleted
+func DeleteForwardedHeader(ctx thrift.Context) bool {
+	_, ok := ctx.Headers()[ForwardedHeaderName]
+	if ok {
+		delete(ctx.Headers(), ForwardedHeaderName)
+	}
 	return ok
 }
