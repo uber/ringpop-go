@@ -71,45 +71,23 @@ func (s *tchanPingPongServiceServer) Methods() []string {
 }
 
 func (s *tchanPingPongServiceServer) Handle(ctx thrift.Context, methodName string, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
-	args, err := s.GetArgs(methodName, protocol)
-	if err != nil {
-		return false, nil, err
-	}
-	return s.HandleArgs(ctx, methodName, args)
-}
-
-func (s *tchanPingPongServiceServer) GetArgs(methodName string, protocol athrift.TProtocol) (args interface{}, err error) {
 	switch methodName {
 	case "Ping":
-		args, err = s.readPing(protocol)
-
-	default:
-		err = fmt.Errorf("method %v not found in service %v", methodName, s.Service())
-	}
-	return
-}
-
-func (s *tchanPingPongServiceServer) HandleArgs(ctx thrift.Context, methodName string, args interface{}) (bool, athrift.TStruct, error) {
-	switch methodName {
-	case "Ping":
-		return s.handlePing(ctx, args.(PingPongServicePingArgs))
+		return s.handlePing(ctx, protocol)
 
 	default:
 		return false, nil, fmt.Errorf("method %v not found in service %v", methodName, s.Service())
 	}
 }
 
-func (s *tchanPingPongServiceServer) readPing(protocol athrift.TProtocol) (interface{}, error) {
+func (s *tchanPingPongServiceServer) handlePing(ctx thrift.Context, protocol athrift.TProtocol) (bool, athrift.TStruct, error) {
 	var req PingPongServicePingArgs
+	var res PingPongServicePingResult
 
 	if err := req.Read(protocol); err != nil {
-		return nil, err
+		return false, nil, err
 	}
-	return req, nil
-}
 
-func (s *tchanPingPongServiceServer) handlePing(ctx thrift.Context, req PingPongServicePingArgs) (bool, athrift.TStruct, error) {
-	var res PingPongServicePingResult
 	r, err :=
 		s.handler.Ping(ctx, req.Request)
 

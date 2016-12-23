@@ -60,70 +60,80 @@ func (s *RouterTestSuite) SetupTest() {
 }
 
 func (s *RouterTestSuite) TestRingpopRouterGetLocalClient() {
-	client, err := s.router.GetClient("local")
+	client, isRemote, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.Equal("local client", client)
+	s.False(isRemote, "local key should not be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "GetLocalClient")
 }
 
 func (s *RouterTestSuite) TestRingpopRouterGetLocalClientCached() {
-	client, err := s.router.GetClient("local")
+	client, isRemote, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.Equal("local client", client)
+	s.False(isRemote, "local key should not be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "GetLocalClient")
 
-	client, err = s.router.GetClient("local")
+	client, isRemote, err = s.router.GetClient("local")
 	s.NoError(err)
 	s.Equal("local client", client)
+	s.False(isRemote, "local key should not be a remote client (cached)")
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterGetLocalClientCachedWithDifferentKey() {
-	client, err := s.router.GetClient("local")
+	client, isRemote, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.Equal("local client", client)
+	s.False(isRemote, "local key should not be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "GetLocalClient")
 
-	client, err = s.router.GetClient("local2")
+	client, isRemote, err = s.router.GetClient("local2")
 	s.NoError(err)
 	s.Equal("local client", client)
+	s.False(isRemote, "local key should not be a remote client (cached)")
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterMakeRemoteClient() {
-	client, err := s.router.GetClient("remote")
+	client, isRemote, err := s.router.GetClient("remote")
 	s.NoError(err)
 	s.Equal("remote client", client, "expected the remote client to be returned")
+	s.True(isRemote, "remote key should be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "MakeRemoteClient", mock.Anything)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterMakeRemoteClientCached() {
-	client, err := s.router.GetClient("remote")
+	client, isRemote, err := s.router.GetClient("remote")
 	s.NoError(err)
 	s.Equal("remote client", client)
+	s.True(isRemote, "remote key should be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "MakeRemoteClient", mock.Anything)
 
-	client, err = s.router.GetClient("remote")
+	client, isRemote, err = s.router.GetClient("remote")
 	s.NoError(err)
 	s.Equal("remote client", client)
+	s.True(isRemote, "remote key should be a remote client (cached)")
 	s.clientFactory.AssertNumberOfCalls(s.T(), "MakeRemoteClient", 1)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterMakeRemoteClientCachedWithDifferentKey() {
-	client, err := s.router.GetClient("remote")
+	client, isRemote, err := s.router.GetClient("remote")
 	s.NoError(err)
 	s.Equal("remote client", client)
+	s.True(isRemote, "remote key should be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "MakeRemoteClient", mock.Anything)
 
-	client, err = s.router.GetClient("remote2")
+	client, isRemote, err = s.router.GetClient("remote2")
 	s.NoError(err)
 	s.Equal("remote client", client)
+	s.True(isRemote, "remote key should be a remote client (cached)")
 	s.clientFactory.AssertNumberOfCalls(s.T(), "MakeRemoteClient", 1)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterRemoveExistingClient() {
 	// populate cache
-	_, err := s.router.GetClient("local")
+	_, _, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 
@@ -133,7 +143,7 @@ func (s *RouterTestSuite) TestRingpopRouterRemoveExistingClient() {
 	s.internal.removeClient(dest)
 
 	// repopulate and test if a new client has been created or that the cache stayed alive
-	_, err = s.router.GetClient("local")
+	_, _, err = s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 2)
 }
@@ -150,7 +160,7 @@ func (s *RouterTestSuite) TestRingpopRouterRemoveNonExistingClient() {
 
 func (s *RouterTestSuite) TestRingpopRouterRemoveClientOnSwimFaultyEvent() {
 	// populate cache
-	_, err := s.router.GetClient("local")
+	_, _, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 
@@ -166,14 +176,14 @@ func (s *RouterTestSuite) TestRingpopRouterRemoveClientOnSwimFaultyEvent() {
 	})
 
 	// repopulate and test if a new client has been created or that the cache stayed alive
-	_, err = s.router.GetClient("local")
+	_, _, err = s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 2)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterRemoveClientOnSwimLeaveEvent() {
 	// populate cache
-	_, err := s.router.GetClient("local")
+	_, _, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 
@@ -189,14 +199,14 @@ func (s *RouterTestSuite) TestRingpopRouterRemoveClientOnSwimLeaveEvent() {
 	})
 
 	// repopulate and test if a new client has been created or that the cache stayed alive
-	_, err = s.router.GetClient("local")
+	_, _, err = s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 2)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterNotRemoveClientOnSwimSuspectEvent() {
 	// populate cache
-	_, err := s.router.GetClient("local")
+	_, _, err := s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 
@@ -212,13 +222,13 @@ func (s *RouterTestSuite) TestRingpopRouterNotRemoveClientOnSwimSuspectEvent() {
 	})
 
 	// repopulate and test if a new client has been created or that the cache stayed alive
-	_, err = s.router.GetClient("local")
+	_, _, err = s.router.GetClient("local")
 	s.NoError(err)
 	s.clientFactory.AssertNumberOfCalls(s.T(), "GetLocalClient", 1)
 }
 
 func (s *RouterTestSuite) TestRingpopRouterGetClientForwardLookupError() {
-	_, err := s.router.GetClient("error")
+	_, _, err := s.router.GetClient("error")
 	s.EqualError(err, "ringpop not ready")
 }
 
@@ -235,7 +245,7 @@ func TestRingpopRouterGetClientForwardWhoAmIError(t *testing.T) {
 
 	router := New(rp, cf, nil)
 
-	_, err := router.GetClient("hello")
+	_, _, err := router.GetClient("hello")
 	assert.EqualError(t, err, "ringpop not ready")
 }
 

@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+//go:generate thrift-gen --generateThrift --outputDir gen-go --inputFile ping.thrift --template github.com/uber/ringpop-go/ringpop.thrift-gen
+
 package main
 
 import (
