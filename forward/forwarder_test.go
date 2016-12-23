@@ -28,13 +28,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
-	athrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
 	events "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/test/thrift/pingpong"
+
+	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
 	"github.com/uber/tchannel-go/thrift"
@@ -338,19 +338,24 @@ func TestForwarderTestSuite(t *testing.T) {
 }
 
 func TestSetForwardedHeader(t *testing.T) {
+	// empty keys array test
 	ctx, _ := thrift.NewContext(0 * time.Second)
 	ctx = SetForwardedHeader(ctx, nil)
-
 	assert.Equal(t, "[]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set and be an empty array instead of null for the nil pointer")
 
+	// preserve existing headers
 	ctx, _ = thrift.NewContext(0 * time.Second)
 	ctx = thrift.WithHeaders(ctx, map[string]string{
 		"keep": "this key",
 	})
 	ctx = SetForwardedHeader(ctx, []string{"foo"})
-
 	assert.Equal(t, "[\"foo\"]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set to a serialized array of keys used in forwarding")
 	assert.Equal(t, "this key", ctx.Headers()["keep"], "expected the header set before the forwarding header to still exist")
+
+	// multiple keys encoded in the header
+	ctx, _ = thrift.NewContext(0 * time.Second)
+	ctx = SetForwardedHeader(ctx, []string{"key1", "key2"})
+	assert.Equal(t, "[\"key1\",\"key2\"]", ctx.Headers()[ForwardedHeaderName], "expected the forwarding header to be set with both keys encoded")
 }
 
 func TestHasForwardedHeader(t *testing.T) {
