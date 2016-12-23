@@ -1,4 +1,4 @@
-This application shows a complex example where a node makes requests to its self from a sharded endpoint.
+This application shows a complex example where a node makes requests to itself from a sharded endpoint.
 
 Note: this file can be [cram][3]-executed using `make test-examples`. That's why some of the example outputs below are a bit unusual.
 
@@ -23,7 +23,7 @@ Start a custer of 5 nodes using [tick-cluster][1]:
 
 Set some reference keys that are sharded around the cluster using [tcurl][2]:
 
-    $ tcurl keyvalue -P hosts.json --thrift ./keyvalue.thrift KeyValueService::Set '{"key":"127.0.0.1:30010", "value": "foo"}'
+    $ tcurl keyvalue -P hosts.json --thrift ./keyvalue.thrift KeyValueService::Set '{"key":"127.0.0.1:30010", "value": "foo"}' # key 127.0.0.1:30010 is the first replica point on the node with identity `127.0.0.1:3001`. The identity is comprised of the host:port + replica index eg '127.0.0.1:3001' + '0'
     {"ok":true,"head":{},"headers":{"as":"thrift"},"trace":"*"} (glob)
     $ tcurl keyvalue -P hosts.json --thrift ./keyvalue.thrift KeyValueService::Set '{"key":"127.0.0.1:30020", "value": "bar"}'
     {"ok":true,"head":{},"headers":{"as":"thrift"},"trace":"*"} (glob)
