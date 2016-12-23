@@ -12,7 +12,7 @@ All commands are relative to this directory:
 
 (optional, the files are already included) Generate the thrift code:
 
-    $ thrift-gen --generateThrift --outputDir gen-go --inputFile ping.thrift --template github.com/uber/ringpop-go/ringpop.thrift-gen
+    $ go generate
 
 Build the example binary:
 
