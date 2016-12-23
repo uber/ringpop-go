@@ -74,14 +74,14 @@ func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) 
 	forwardOptions := &forward.Options{Headers: marshaledHeaders.Bytes()}
 	handle, err := w.ringpop.HandleOrForward(request.Key, req, &res, "pingchannel", "PingPongService::Ping", tchannel.Thrift, forwardOptions)
 	if handle {
-		identity, err := w.ringpop.WhoAmI()
+		address, err := w.ringpop.WhoAmI()
 		if err != nil {
 			return nil, err
 		}
 		pHeader := headers["p"]
 		return &gen.Pong{
 			Message: "Hello, world!",
-			From_:   identity,
+			From_:   address,
 			Pheader: &pHeader,
 		}, nil
 	}
@@ -106,7 +106,7 @@ func main() {
 
 	rp, err := ringpop.New("ping-app",
 		ringpop.Channel(ch),
-		ringpop.Identity(*hostport),
+		ringpop.Address(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
 	if err != nil {

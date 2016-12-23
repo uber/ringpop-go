@@ -100,8 +100,8 @@ type Forwarder struct {
 func NewForwarder(s Sender, ch shared.SubChannel) *Forwarder {
 
 	logger := logging.Logger("forwarder")
-	if identity, err := s.WhoAmI(); err == nil {
-		logger = logger.WithField("local", identity)
+	if address, err := s.WhoAmI(); err == nil {
+		logger = logger.WithField("local", address)
 	}
 
 	return &Forwarder{

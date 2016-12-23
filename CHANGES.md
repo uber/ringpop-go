@@ -1,6 +1,39 @@
 ringpop-go changes
 ==================
 
+v0.8.0
+------
+
+* Fix: ineffectual assignments [#193](https://github.com/uber/ringpop-go/pull/193)
+* Fix: Make lookups consistent on hash collisions [#196](https://github.com/uber/ringpop-go/pull/196)   
+* Feature: Self-eviction [#177](https://github.com/uber/ringpop-go/pull/177)
+* Feature: Identity Carry Over [#188](https://github.com/uber/ringpop-go/pull/188) [#189](https://github.com/uber/ringpop-go/pull/189) [#190](https://github.com/uber/ringpop-go/pull/190) [#191](https://github.com/uber/ringpop-go/pull/191) [#192](https://github.com/uber/ringpop-go/pull/192) [#194](https://github.com/uber/ringpop-go/pull/194) [#195](https://github.com/uber/ringpop-go/pull/195)
+* Travis: Remove Go 1.5 support [#187](https://github.com/uber/ringpop-go/pull/187)
+
+### Release notes
+
+#### Identity Carry Over
+Identity carry over provides a way to manually configure the identity of a member on the hashring. 
+By changing the identity to be something else than its address, it becomes possible to guarantee ring equality before and after deploys in a dynamic environment (e.g. mesos).
+
+#### Self Eviction 
+By calling `ringpop.SelfEvict` on shutdown, a member will declare itself as `faulty` and gossips this to the other members.
+This removes the time window where it would be marked as `suspect`; in this way removing the time where other members 
+considered it to be part of the ring while it was not responding anymore. 
+
+#### Breaking change to the `identity`-option
+
+Prior to ringpop v0.8.0 the address was used as the identity of a member. Starting with version v0.8.0, it's possible to
+configure a separate identity. As a result, the behaviour of the `Identity` and `IdentityResolverFunc` has been changed.
+The `Identity` option now configures the identity of a member and will return an error when it matches an ip:port; services 
+that were using `Identity` or `IdentityResolverFunc` should now use the `Address` and `AddressResolverFunc` options.
+You could use the following `gofmt` snippets to easily refactor:
+
+```
+gofmt -r 'ringpop.Identity(a) -> ringpop.Address(a)' -w .
+gofmt -r 'ringpop.IdentityResolverFunc(a) -> ringpop.AddressResolverFunc(a)' -w .
+```
+
 v0.7.1
 ------
 

@@ -166,3 +166,45 @@ func (_m *SwimNode) RemoveListener(_a0 events.EventListener) bool {
 
 	return r0
 }
+
+// RegisterSelfEvictHook provides a mock function with given fields: hooks
+func (_m *SwimNode) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
+	ret := _m.Called(hooks)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(swim.SelfEvictHook) error); ok {
+		r0 = rf(hooks)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SelfEvict provides a mock function with given fields:
+func (_m *SwimNode) SelfEvict() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SetIdentity provides a mock function with given fields: identity
+func (_m *SwimNode) SetIdentity(identity string) error {
+	ret := _m.Called(identity)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(identity)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

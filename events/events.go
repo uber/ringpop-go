@@ -159,14 +159,21 @@ func (a *SyncEventEmitter) EmitEvent(event Event) {
 // A RingChangedEvent is sent when servers are added and/or removed from the ring
 type RingChangedEvent struct {
 	ServersAdded   []string
+	ServersUpdated []string
 	ServersRemoved []string
 }
 
 // RingChecksumEvent is sent when a server is removed or added and a new checksum
 // for the ring is calculated
 type RingChecksumEvent struct {
+	// OldChecksum contains the previous legacy checksum. Note: might be deprecated in the future.
 	OldChecksum uint32
+	// NewChecksum contains the new legacy checksum. Note: might be deprecated in the future.
 	NewChecksum uint32
+	// OldChecksums contains the map of previous checksums
+	OldChecksums map[string]uint32
+	// NewChecksums contains the map with new checksums
+	NewChecksums map[string]uint32
 }
 
 // A LookupEvent is sent when a lookup is performed on the Ringpop's ring

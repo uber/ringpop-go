@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/membership"
+
 	"github.com/benbjohnson/clock"
 	"github.com/dgryski/go-farm"
 	"github.com/uber-common/bark"
@@ -59,7 +61,7 @@ type memberlist struct {
 }
 
 // newMemberlist returns a new member list
-func newMemberlist(n *Node) *memberlist {
+func newMemberlist(n *Node, initialLabels LabelMap) *memberlist {
 	m := &memberlist{
 		node:   n,
 		logger: logging.Logger("membership").WithField("local", n.address),
@@ -69,6 +71,7 @@ func newMemberlist(n *Node) *memberlist {
 			Address:     n.Address(),
 			Incarnation: nowInMillis(n.clock),
 			Status:      Alive,
+			Labels:      initialLabels,
 		},
 	}
 
@@ -291,10 +294,10 @@ func (m *memberlist) MakeFaulty(address string, incarnation int64) []Change {
 }
 
 func (m *memberlist) SetLocalStatus(status string) {
-	m.members.Lock()
-	m.local.Status = status
-	m.members.Unlock()
-	m.postLocalUpdate()
+	m.updateLocalMember(func(member *Member) bool {
+		member.Status = status
+		return true
+	})
 }
 
 // SetLocalLabel sets the label identified by key to the new value. This
@@ -345,32 +348,31 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 		return err
 	}
 
-	m.members.Lock()
-	// ensure that there is a labels map
-	if m.local.Labels == nil {
-		m.local.Labels = make(map[string]string, len(labels))
-	}
+	m.updateLocalMember(func(member *Member) bool {
+		// ensure that there is a new copy of the labels to work with.
+		labelsCopy := member.Labels.copy()
 
-	// keep track if we made changes to the labels
-	changes := false
+		// keep track if we made changes to the labels
+		changes := false
 
-	// copy the key-value pairs to our internal labels. By not setting the map
-	// of labels to the Labels value of the local member we prevent removing labels
-	// that the user did not specify in the new map.
-	for key, value := range labels {
-		old, had := m.local.Labels[key]
-		m.local.Labels[key] = value
+		// copy the key-value pairs to our internal labels. By not setting the map
+		// of labels to the Labels value of the local member we prevent removing labels
+		// that the user did not specify in the new map.
+		for key, value := range labels {
+			old, had := labelsCopy[key]
+			labelsCopy[key] = value
 
-		if !had || old != value {
-			changes = true
+			if !had || old != value {
+				changes = true
+			}
 		}
-	}
 
-	m.members.Unlock()
-
-	if changes {
-		m.postLocalUpdate()
-	}
+		if changes {
+			// only if there are changes we put the copied labels on the member.
+			member.Labels = labelsCopy
+		}
+		return changes
+	})
 
 	return nil
 }
@@ -381,47 +383,81 @@ func (m *memberlist) SetLocalLabels(labels map[string]string) error {
 // and subsequently be gossiped around. It is a valid operation to remove non-
 // existing keys. It returns true if all (and only all) labels have been removed.
 func (m *memberlist) RemoveLocalLabels(keys ...string) bool {
-	m.members.Lock()
-	if len(m.local.Labels) == 0 || len(keys) == 0 {
-		m.members.Unlock()
-		// nothing to delete
-		return false
-	}
+	// keep track if all labels are removed, it will be set to false if a label
+	// couldn't be removed.
+	removed := true
 
-	any := false    // keep track if we at least removed one label
-	removed := true // keep track if all labels are removed
-	for _, key := range keys {
-		_, has := m.local.Labels[key]
-		delete(m.local.Labels, key)
-		removed = removed && has
-		any = any || has
-	}
+	m.updateLocalMember(func(member *Member) bool {
+		// ensure that there is a new copy of the labels to work
+		// with.
+		labelsCopy := member.Labels.copy()
 
-	m.members.Unlock()
+		any := false // keep track if we at least removed one label
+		for _, key := range keys {
+			_, has := labelsCopy[key]
+			delete(labelsCopy, key)
+			removed = removed && has
+			any = any || has
+		}
 
-	if any {
-		// only reincarnate if there is a label removed
-		m.postLocalUpdate()
-	}
+		if any {
+			// only if there are changes we put the copied labels on the member.
+			member.Labels = labelsCopy
+		}
+
+		return any
+	})
+
 	return removed
 }
 
-// postLocalUpdate should be called after the local Member has been updated to
-// make sure that its new state has a higher incarnation number and the change
-// will be recorded as a change to gossip around.
-func (m *memberlist) postLocalUpdate() {
-	// bump our incarnation for this change to be accepted by all peers
+// updateLocalMember takes an update function to upate the member passed in. The
+// update function can make mutations to the member and should indicate if it
+// made changes, only if changes are made the incarnation number will be bumped
+// and the new state will be gossiped to the peers
+func (m *memberlist) updateLocalMember(update func(*Member) bool) {
 	m.members.Lock()
+
+	before := *m.local
+	didUpdate := update(m.local)
+
+	// exit if the update didn't change anything
+	if !didUpdate {
+		m.members.Unlock()
+		return
+	}
+
+	// bump incarnation number if the member has been updated
 	change := m.bumpIncarnation()
+
+	changes := []Change{change}
+
+	after := *m.local
+
 	m.members.Unlock()
 
 	// since we changed our local state we need to update our checksum
 	m.ComputeChecksum()
 
-	changes := []Change{change}
-
 	// kick in our updating mechanism
 	m.node.handleChanges(changes)
+
+	// prepare a membership change event for observable state changes
+	var memberChange membership.MemberChange
+	if before.isReachable() {
+		memberChange.Before = before
+	}
+	if after.isReachable() {
+		memberChange.After = after
+	}
+
+	if memberChange.Before != nil || memberChange.After != nil {
+		m.node.EmitEvent(membership.ChangeEvent{
+			Changes: []membership.MemberChange{
+				memberChange,
+			},
+		})
+	}
 }
 
 // MakeTombstone declares the node with the provided address in the tombstone state
@@ -492,6 +528,8 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 
 	m.node.EmitEvent(MemberlistChangesReceivedEvent{changes})
 
+	var memberChanges []membership.MemberChange
+
 	m.Lock()
 
 	// run through all changes received and figure out if they need to be accepted
@@ -516,6 +554,20 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 				m.node.EmitEvent(RefuteUpdateEvent{})
 			} else {
 				// otherwise it can be applied to the memberlist
+
+				// prepare the change and collect if there is an outside
+				// observable change eg. changes that involve active
+				// participants of the membership (pingable)
+				memberChange := membership.MemberChange{}
+				if has && member.isReachable() {
+					memberChange.Before = *member
+				}
+				if gossip.isReachable() {
+					memberChange.After = gossip
+				}
+				if memberChange.Before != nil || memberChange.After != nil {
+					memberChanges = append(memberChanges, memberChange)
+				}
 
 				if !has {
 					// if the member was not already present in the list we will
@@ -561,6 +613,15 @@ func (m *memberlist) Update(changes []Change) (applied []Change) {
 			NumMembers:  m.NumMembers(),
 		})
 		m.node.handleChanges(applied)
+
+	}
+
+	// if there are changes that are important for outside observers of the
+	// membership emit those
+	if len(memberChanges) > 0 {
+		m.node.EmitEvent(membership.ChangeEvent{
+			Changes: memberChanges,
+		})
 	}
 
 	m.Unlock()

@@ -8,6 +8,8 @@ addons:
     packages:
     - python-virtualenv
 
+go_import_path: github.com/uber/ringpop-go
+
 install:
   - go get -u github.com/Masterminds/glide
   - go get github.com/axw/gocov/gocov
@@ -20,9 +22,8 @@ install:
   - make setup
 
 env:
-  - RUN="make test-unit test-examples lint coveralls"
+  - RUN="make test-unit test-race test-examples lint coveralls"
   - RUN="make test-integration"
-  - RUN="make test-race"
 
 matrix:
   fast_finish: true

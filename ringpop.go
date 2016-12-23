@@ -30,16 +30,18 @@ import (
 	"sync"
 	"time"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/benbjohnson/clock"
-	"github.com/dgryski/go-farm"
-	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/forward"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
+
+	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/benbjohnson/clock"
+	"github.com/dgryski/go-farm"
+	log "github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 )
 
@@ -71,6 +73,12 @@ type Interface interface {
 	// DEPRECATED, use AddListener (!) kept around for backwards compatibility
 	// but will start logging warnings
 	RegisterListener(events.EventListener)
+
+	// swim.SelfEvict
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
+	RegisterSelfEvictHook(hooks swim.SelfEvictHook) error
+	SelfEvict() error
 }
 
 // Ringpop is a consistent hashring that uses a gossip protocol to disseminate
@@ -82,7 +90,7 @@ type Ringpop struct {
 	config         *configuration
 	configHashRing *hashring.Configuration
 
-	identityResolver IdentityResolver
+	addressResolver AddressResolver
 
 	state      state
 	stateMutex sync.RWMutex
@@ -136,7 +144,8 @@ func New(app string, opts ...Option) (*Ringpop, error) {
 
 	ringpop := &Ringpop{
 		config: &configuration{
-			App: app,
+			App:           app,
+			InitialLabels: make(swim.LabelMap),
 		},
 		logger: logging.Logger("ringpop"),
 	}
@@ -167,7 +176,7 @@ func (rp *Ringpop) init() error {
 		return errors.New("Missing channel")
 	}
 
-	address, err := rp.identity()
+	address, err := rp.address()
 	if err != nil {
 		return err
 	}
@@ -185,6 +194,8 @@ func (rp *Ringpop) init() error {
 		StateTimeouts: rp.config.StateTimeouts,
 		Clock:         rp.clock,
 		LabelLimits:   rp.config.LabelLimits,
+		InitialLabels: rp.config.InitialLabels,
+		SelfEvict:     rp.config.SelfEvict,
 	})
 	rp.node.AddListener(rp)
 
@@ -193,7 +204,7 @@ func (rp *Ringpop) init() error {
 
 	// add all members present in the membership of the node on startup.
 	for _, member := range rp.node.GetReachableMembers() {
-		rp.ring.AddServer(member.Address)
+		rp.ring.AddMembers(member)
 	}
 
 	rp.forwarder = forward.NewForwarder(rp, rp.subChannel)
@@ -221,7 +232,8 @@ func (rp *Ringpop) startTimers() {
 				rp.statter.UpdateGauge(
 					rp.getStatKey("membership.checksum-periodic"),
 					nil,
-					int64(rp.node.GetChecksum()))
+					int64(rp.node.GetChecksum()),
+				)
 			}
 		}()
 	}
@@ -234,7 +246,17 @@ func (rp *Ringpop) startTimers() {
 				rp.statter.UpdateGauge(
 					rp.getStatKey("ring.checksum-periodic"),
 					nil,
-					int64(rp.ring.Checksum()))
+					int64(rp.ring.Checksum()),
+				)
+
+				// emit all named checksums as well
+				for name, checksum := range rp.ring.Checksums() {
+					rp.statter.UpdateGauge(
+						rp.getStatKey("ring.checksums-periodic."+name),
+						nil,
+						int64(checksum),
+					)
+				}
 			}
 		}()
 	}
@@ -250,15 +272,15 @@ func (rp *Ringpop) stopTimers() {
 	}
 }
 
-// identity returns a host:port string of the address that Ringpop should
-// use as its identifier.
-func (rp *Ringpop) identity() (string, error) {
-	return rp.identityResolver()
+// address returns a host:port string of the address that Ringpop should
+// use as its address.
+func (rp *Ringpop) address() (string, error) {
+	return rp.addressResolver()
 }
 
-// r.channelIdentityResolver resolves the hostport identity from the current
+// r.channelAddressResolver resolves the hostport from the current
 // TChannel object on the Ringpop instance.
-func (rp *Ringpop) channelIdentityResolver() (string, error) {
+func (rp *Ringpop) channelAddressResolver() (string, error) {
 	peerInfo := rp.channel.PeerInfo()
 	// Check that TChannel is listening on a real hostport. By default,
 	// TChannel listens on an ephemeral host/port. The real port is then
@@ -266,7 +288,7 @@ func (rp *Ringpop) channelIdentityResolver() (string, error) {
 	// ephemeral, it means TChannel is not yet listening and the hostport
 	// cannot be resolved.
 	if peerInfo.IsEphemeralHostPort() {
-		return "", ErrEphemeralIdentity
+		return "", ErrEphemeralAddress
 	}
 	return peerInfo.HostPort, nil
 }
@@ -302,7 +324,7 @@ func (rp *Ringpop) WhoAmI() (string, error) {
 	if !rp.Ready() {
 		return "", ErrNotBootstrapped
 	}
-	return rp.identity()
+	return rp.address()
 }
 
 // Uptime returns the amount of time that this Ringpop instance has been
@@ -350,6 +372,31 @@ func (rp *Ringpop) setState(s state) {
 			rp.EmitEvent(events.Destroyed{})
 		}
 	}
+}
+
+// RegisterSelfEvictHook registers the eviction hooks that need to be executed
+// before and after self eviction from the membership. An error will be returned
+// if ringpop was unable to register the hooks. This could happen in the following
+// cases:
+// - Ringpop has not been bootstrapped yet
+// - SelfEvict has already been called
+// - The hook is already registered
+func (rp *Ringpop) RegisterSelfEvictHook(hooks swim.SelfEvictHook) error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+	return rp.node.RegisterSelfEvictHook(hooks)
+}
+
+// SelfEvict should be called before shutting down the application. When calling
+// this function ringpop will gracefully evict itself from the network. Utilities
+// that hook into ringpop will have the opportunity to hook into this system to
+// gracefully handle the shutdown of ringpop.
+func (rp *Ringpop) SelfEvict() error {
+	if !rp.Ready() {
+		return ErrNotBootstrapped
+	}
+	return rp.node.SelfEvict()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -419,10 +466,10 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 			}
 			rp.statter.IncCounter(rp.getStatKey("membership-update."+status), nil, 1)
 		}
-
+	case membership.ChangeEvent:
+		rp.ring.ProcessMembershipChanges(event.Changes)
 	case swim.MemberlistChangesAppliedEvent:
 		rp.statter.UpdateGauge(rp.getStatKey("changes.apply"), nil, int64(len(event.Changes)))
-		rp.handleChanges(event.Changes)
 		for _, change := range event.Changes {
 			status := change.Status
 			if len(status) == 0 {
@@ -524,9 +571,15 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case swim.RefuteUpdateEvent:
 		rp.statter.IncCounter(rp.getStatKey("refuted-update"), nil, 1)
 
+	case swim.SelfEvictedEvent:
+		rp.statter.RecordTimer(rp.getStatKey("self-eviction"), nil, event.Duration)
+
 	case events.RingChecksumEvent:
 		rp.statter.IncCounter(rp.getStatKey("ring.checksum-computed"), nil, 1)
 		rp.statter.UpdateGauge(rp.getStatKey("ring.checksum"), nil, int64((event.NewChecksum)))
+		for key, value := range event.NewChecksums {
+			rp.statter.UpdateGauge(rp.getStatKey("ring.checksums."+key), nil, int64(value))
+		}
 
 	case events.RingChangedEvent:
 		added := int64(len(event.ServersAdded))
@@ -570,21 +623,6 @@ func (rp *Ringpop) HandleEvent(event events.Event) {
 	case forward.RetrySuccessEvent:
 		rp.statter.IncCounter(rp.getStatKey("requestProxy.retry.succeeded"), nil, 1)
 	}
-}
-
-func (rp *Ringpop) handleChanges(changes []swim.Change) {
-	var serversToAdd, serversToRemove []string
-
-	for _, change := range changes {
-		switch change.Status {
-		case swim.Alive, swim.Suspect:
-			serversToAdd = append(serversToAdd, change.Address)
-		case swim.Faulty, swim.Leave, swim.Tombstone:
-			serversToRemove = append(serversToRemove, change.Address)
-		}
-	}
-
-	rp.ring.AddRemoveServers(serversToAdd, serversToRemove)
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -728,12 +766,12 @@ func (rp *Ringpop) HandleOrForward(key string, request []byte, response *[]byte,
 		return false, err
 	}
 
-	identity, err := rp.WhoAmI()
+	address, err := rp.WhoAmI()
 	if err != nil {
 		return false, err
 	}
 
-	if dest == identity {
+	if dest == address {
 		return true, nil
 	}
 

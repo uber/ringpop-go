@@ -88,7 +88,7 @@ func (w *worker) RegisterPing() error {
 }
 
 func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) {
-	identity, err := w.ringpop.WhoAmI()
+	address, err := w.ringpop.WhoAmI()
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (w *worker) Ping(ctx thrift.Context, request *gen.Ping) (*gen.Pong, error) 
 	pHeader := headers["p"]
 	return &gen.Pong{
 		Message: "Hello, world!",
-		From_:   identity,
+		From_:   address,
 		Pheader: &pHeader,
 	}, nil
 }
@@ -113,7 +113,7 @@ func main() {
 
 	rp, err := ringpop.New("ping-app",
 		ringpop.Channel(ch),
-		ringpop.Identity(*hostport),
+		ringpop.Address(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
 	if err != nil {

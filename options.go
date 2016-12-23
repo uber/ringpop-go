@@ -28,8 +28,10 @@ import (
 	log "github.com/uber-common/bark"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
+	"github.com/uber/ringpop-go/util"
 )
 
 type configuration struct {
@@ -51,6 +53,12 @@ type configuration struct {
 	// LabelLimits keeps track of configured limits on labels. Among things the
 	// number of labels and the size of key and value can be configured.
 	LabelLimits swim.LabelOptions
+
+	// InitialLabels configures the initial labels.
+	InitialLabels swim.LabelMap
+
+	// SelfEvict holds the settings with regards to self eviction
+	SelfEvict swim.SelfEvictOptions
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -85,8 +93,8 @@ func checkOptions(rp *Ringpop) []error {
 	if rp.channel == nil {
 		errs = append(errs, errors.New("channel is required"))
 	}
-	if rp.identityResolver == nil {
-		errs = append(errs, errors.New("identity resolver is nil"))
+	if rp.addressResolver == nil {
+		errs = append(errs, errors.New("address resolver is nil"))
 	}
 	return errs
 }
@@ -170,37 +178,55 @@ func Statter(s log.StatsReporter) Option {
 	}
 }
 
-// Identity is used to specify a static hostport string as this Ringpop
-// instance's identity.
+// Identity can be used to specify a custom string as the unique identifier for
+// this node. The identity should be unique amongst other Ringpop instances; it
+// is used in the hashring.
+//
+// By default, the hostport/address of the node is used as the identity in the
+// hashring. An error is thrown if a hostport is manually specified using this
+// option, as this would lead to unexpected behaviour. If you want to override
+// the node's listening address, use the `Address` option.
+func Identity(identity string) Option {
+	return func(r *Ringpop) error {
+		if util.HostportPattern.MatchString(identity) {
+			return ErrInvalidIdentity
+		}
+		r.config.InitialLabels[membership.IdentityLabelKey] = identity
+		return nil
+	}
+}
+
+// Address is used to specify a static hostport string as this Ringpop
+// instance's address.
 //
 // Example:
 //
 //     ringpop.New("my-app",
 //         ringpop.Channel(myChannel),
-//         ringpop.Identity("10.32.12.2:21130"),
+//         ringpop.Address("10.32.12.2:21130"),
 //     )
 //
-// You should make sure the identity matches the listening address of the
+// You should make sure the address matches the listening address of the
 // TChannel object.
 //
-// By default, you do not need to provide an identity. If you do not provide
-// one, the identity will be resolved automatically by the default resolver.
-func Identity(hostport string) Option {
-	return IdentityResolverFunc(func() (string, error) {
-		return hostport, nil
+// By default, you do not need to provide an address. If you do not provide
+// one, the address will be resolved automatically by the default resolver.
+func Address(address string) Option {
+	return AddressResolverFunc(func() (string, error) {
+		return address, nil
 	})
 }
 
-// IdentityResolver is a function that returns the listen interface/port
-// that Ringpop should identify as.
-type IdentityResolver func() (string, error)
+// AddressResolver is a function that returns the listen interface/port
+// that Ringpop should use as its address.
+type AddressResolver func() (string, error)
 
-// IdentityResolverFunc is used to specify a function that will called when
-// the Ringpop instance needs to resolve its identity (typically, on
+// AddressResolverFunc is used to specify a function that will be called when
+// the Ringpop instance needs to resolve its address (typically, on
 // bootstrap).
-func IdentityResolverFunc(resolver IdentityResolver) Option {
+func AddressResolverFunc(resolver AddressResolver) Option {
 	return func(r *Ringpop) error {
-		r.identityResolver = resolver
+		r.addressResolver = resolver
 		return nil
 	}
 }
@@ -309,6 +335,26 @@ func LabelLimitValueSize(size int) Option {
 	}
 }
 
+// SelfEvictPingRatio configures the maximum percentage/ratio of the members to
+// actively ping while self evicting. A bigger ratio would allow for bigger
+// batch sizes during restarts without the self eviction being lost due to all
+// nodes having the knowledge being shutdown at the same time.
+//
+// A smaller ratio will cause less network traffic and therefore slightly faster
+// shutdown times. A ratio that exceeds 1 will be capped to one when the self
+// eviction is executed as it does not make sense to send the gossip to the same
+// node twice. A negative value will cause no pings to be sent out during self
+// eviction.
+//
+// In no case will there be more pings sent then makes sense by the limit of the
+// current piggyback count
+func SelfEvictPingRatio(ratio float64) Option {
+	return func(r *Ringpop) error {
+		r.config.SelfEvict.PingRatio = ratio
+		return nil
+	}
+}
+
 // Default options
 
 // defaultClock sets the ringpop clock interface to use the system clock
@@ -316,9 +362,9 @@ func defaultClock(r *Ringpop) error {
 	return Clock(clock.New())(r)
 }
 
-// defaultIdentityResolver sets the default identityResolver
-func defaultIdentityResolver(r *Ringpop) error {
-	r.identityResolver = r.channelIdentityResolver
+// defaultAddressResolver sets the default addressResolver
+func defaultAddressResolver(r *Ringpop) error {
+	r.addressResolver = r.channelAddressResolver
 	return nil
 }
 
@@ -355,7 +401,7 @@ func defaultRingChecksumStatPeriod(r *Ringpop) error {
 // can be overridden at runtime.
 var defaultOptions = []Option{
 	defaultClock,
-	defaultIdentityResolver,
+	defaultAddressResolver,
 	defaultLogLevels,
 	defaultStatter,
 	defaultMembershipChecksumStatPeriod,

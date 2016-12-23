@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber/ringpop-go/membership"
+
 	"github.com/uber/ringpop-go/discovery"
 	"github.com/uber/ringpop-go/events"
 
@@ -66,9 +68,12 @@ type Options struct {
 	PartitionHealPeriod           time.Duration
 	PartitionHealBaseProbabillity float64
 
-	LabelLimits LabelOptions
+	LabelLimits   LabelOptions
+	InitialLabels LabelMap
 
 	Clock clock.Clock
+
+	SelfEvict SelfEvictOptions
 }
 
 func defaultOptions() *Options {
@@ -98,6 +103,10 @@ func defaultOptions() *Options {
 		Clock: clock.New(),
 
 		MaxReverseFullSyncJobs: 5,
+
+		SelfEvict: SelfEvictOptions{
+			PingRatio: .4,
+		},
 	}
 
 	return opts
@@ -130,6 +139,8 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.MaxReverseFullSyncJobs = util.SelectInt(opts.MaxReverseFullSyncJobs, def.MaxReverseFullSyncJobs)
 
+	opts.SelfEvict = mergeSelfEvictOptions(opts.SelfEvict, def.SelfEvict)
+
 	if opts.Clock == nil {
 		opts.Clock = def.Clock
 	}
@@ -152,6 +163,16 @@ type NodeInterface interface {
 
 	AddListener(events.EventListener) bool
 	RemoveListener(events.EventListener) bool
+
+	// swim.SelfEvict
+	// mockery has troubles generating a working mock when the interface is
+	// embedded therefore the definitions are copied here.
+	RegisterSelfEvictHook(hooks SelfEvictHook) error
+	SelfEvict() error
+
+	// SetIdentity changes the identity of the local node to a different
+	// identity
+	SetIdentity(identity string) error
 }
 
 // A Node is a SWIM member
@@ -197,6 +218,9 @@ type Node struct {
 	// clock is used to generate incarnation numbers; it is typically the
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
+
+	selfEvict        *selfEvict
+	selfEvictOptions SelfEvictOptions
 }
 
 // NewNode returns a new SWIM Node.
@@ -223,10 +247,11 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		totalRate:  metrics.NewMeter(),
 		clock:      opts.Clock,
 	}
+	node.selfEvict = newSelfEvict(node, opts.SelfEvict)
 
 	node.labelLimits = opts.LabelLimits
 
-	node.memberlist = newMemberlist(node)
+	node.memberlist = newMemberlist(node, opts.InitialLabels)
 	node.memberiter = newMemberlistIter(node.memberlist)
 	node.stateTransitions = newStateTransitions(node, opts.StateTimeouts)
 
@@ -338,6 +363,19 @@ func (n *Node) Ready() bool {
 	n.state.RUnlock()
 
 	return ready
+}
+
+// RegisterSelfEvictHook registers systems that want to hook into the eviction
+// sequence of the swim protocol.
+func (n *Node) RegisterSelfEvictHook(hooks SelfEvictHook) error {
+	return n.selfEvict.RegisterSelfEvictHook(hooks)
+}
+
+// SelfEvict initiates the self eviction sequence of ringpop, it will mark the
+// node as faulty and calls systems that want to hook in to the sequence at the
+// corresponding times.
+func (n *Node) SelfEvict() error {
+	return n.selfEvict.SelfEvict()
 }
 
 //= = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -529,4 +567,10 @@ func (n *Node) CountReachableMembers(predicates ...MemberPredicate) int {
 // and gossip those changes around.
 func (n *Node) Labels() *NodeLabels {
 	return &NodeLabels{n}
+}
+
+// SetIdentity changes the identity of the local node. This will change the
+// state of the local node and will be gossiped around in the network.
+func (n *Node) SetIdentity(identity string) error {
+	return n.memberlist.SetLocalLabel(membership.IdentityLabelKey, identity)
 }

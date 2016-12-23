@@ -1,4 +1,4 @@
-.PHONY: clean clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
+.PHONY: clean clean-common clean-mocks coveralls testpop lint mocks out setup test test-integration test-unit test-race
 
 SHELL = /bin/bash
 
@@ -24,6 +24,9 @@ out:	test
 clean:
 	rm -f testpop
 
+clean-common:
+	rm -rf test/ringpop-common
+
 clean-mocks:
 	rm -f test/mocks/*.go forward/mock_*.go
 	rm -rf test/thrift/pingpong/
@@ -47,8 +50,8 @@ mocks:
 	test/gen-testfiles
 
 dev_deps:
-	go get github.com/uber/tchannel-go/thrift/thrift-gen
-	./scripts/go-get-version.sh github.com/golang/lint/golint/.../@c6242afa
+	go get -u github.com/uber/tchannel-go/thrift/thrift-gen
+	go get -u github.com/golang/lint/golint/...
 	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps
@@ -60,7 +63,9 @@ setup: dev_deps
 
 	ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
 
-test:	test-unit test-integration
+# lint should happen after test-unit and test-examples as it relies on objects
+# being created during these phases
+test: test-unit test-race test-examples lint test-integration
 
 test-integration: vendor
 	test/run-integration-tests

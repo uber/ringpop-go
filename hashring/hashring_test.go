@@ -27,10 +27,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dgryski/go-farm"
 	"github.com/uber/ringpop-go/events"
+	eventsmocks "github.com/uber/ringpop-go/events/test/mocks"
+	"github.com/uber/ringpop-go/membership"
 
+	"github.com/dgryski/go-farm"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 // fake event listener
@@ -52,73 +56,130 @@ func (d *dummyListener) HandleEvent(event events.Event) {
 	d.l.Unlock()
 }
 
-func TestAddServer(t *testing.T) {
+func TestAddMembers(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	l := &dummyListener{}
 	ring.AddListener(l)
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
 	assert.Equal(t, 4, l.EventCount())
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 
-	ring.AddServer("server1")
+	ring.AddMembers(fakeMember{address: "server1"})
 	assert.Equal(t, 4, l.EventCount())
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 }
 
-func TestRemoveServer(t *testing.T) {
+func TestRemoveMembers(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	l := &dummyListener{}
 	ring.AddListener(l)
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
 	assert.Equal(t, 4, l.EventCount())
 	assert.True(t, ring.HasServer("server1"), "expected server to be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 
-	ring.RemoveServer("server1")
+	ring.RemoveMembers(fakeMember{address: "server1"})
 	assert.Equal(t, 6, l.EventCount())
 	assert.False(t, ring.HasServer("server1"), "expected server to not be in ring")
 	assert.True(t, ring.HasServer("server2"), "expected server to be in ring")
 
-	ring.RemoveServer("server3")
+	ring.RemoveMembers(fakeMember{address: "server3"})
 	assert.Equal(t, 6, l.EventCount())
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
 
-	ring.RemoveServer("server1")
+	ring.RemoveMembers(fakeMember{address: "server1"})
 	assert.Equal(t, 6, l.EventCount())
 	assert.False(t, ring.HasServer("server3"), "expected server to not be in ring")
+}
+
+func TestConsistentLookupsOnDuplicates(t *testing.T) {
+	ring1 := New(farm.Fingerprint32, 10)
+	ring2 := New(farm.Fingerprint32, 10)
+
+	member1 := fakeMember{
+		address:  "server1",
+		identity: "id",
+	}
+	member2 := fakeMember{
+		address:  "server2",
+		identity: "id",
+	}
+
+	ring1.AddMembers(member1)
+	ring1.AddMembers(member2)
+
+	// add in different order
+	ring2.AddMembers(member2)
+	ring2.AddMembers(member1)
+
+	lookup1, _ := ring1.Lookup("id#1")
+	lookup2, _ := ring2.Lookup("id#1")
+	assert.Equal(t, lookup1, lookup2, "Order of adds does not affect lookups")
+	assert.Equal(t, ring1.checksums["replica"], ring2.checksums["replica"], "Order of adds does not affect checksums")
 }
 
 func TestChecksumChanges(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	checksum := ring.Checksum()
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
 	assert.NotEqual(t, checksum, ring.Checksum(), "expected checksum to have changed on server add")
 
 	checksum = ring.Checksum()
-	ring.RemoveServer("server1")
+	ring.RemoveMembers(fakeMember{address: "server1"})
 
 	assert.NotEqual(t, checksum, ring.Checksum(), "expected checksum to have changed on server remove")
+}
+
+func TestHashRing_Checksums(t *testing.T) {
+	getSortedKeys := func(m map[string]uint32) []string {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	}
+
+	ring := New(farm.Fingerprint32, 10)
+	ring.checksummers = map[string]Checksummer{
+		"identity":     &identityChecksummer{},
+		"address":      &addressChecksummer{},
+		"replicaPoint": &replicaPointChecksummer{},
+	}
+
+	checkSummers := []string{"identity", "address", "replicaPoint"}
+	sort.Strings(checkSummers)
+
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
+
+	checksums := ring.Checksums()
+	assert.Equal(t, checkSummers, getSortedKeys(checksums), "Expected all checksums to be computed")
+	ring.RemoveMembers(fakeMember{address: "server1"})
+
+	assert.NotEqual(t, checksums, ring.Checksums(), "expected checksums to have changed on server remove")
+	assert.Equal(t, checkSummers, getSortedKeys(checksums), "Expected all checksums to be computed")
 }
 
 func TestServerCount(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	assert.Equal(t, 0, ring.ServerCount(), "expected one server to be in ring")
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
-	ring.AddServer("server3")
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
+	ring.AddMembers(fakeMember{address: "server3"})
 
 	assert.Equal(t, 3, ring.ServerCount(), "expected three servers to be in ring")
 
-	ring.RemoveServer("server1")
+	ring.RemoveMembers(fakeMember{address: "server1"})
 
 	assert.Equal(t, 2, ring.ServerCount(), "expected two servers to be in ring")
 }
@@ -127,9 +188,9 @@ func TestServers(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
 	assert.Equal(t, 0, ring.ServerCount(), "expected one server to be in ring")
 
-	ring.AddServer("server1")
-	ring.AddServer("server2")
-	ring.AddServer("server3")
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
+	ring.AddMembers(fakeMember{address: "server3"})
 
 	servers := ring.Servers()
 	sort.Strings(servers)
@@ -140,37 +201,17 @@ func TestServers(t *testing.T) {
 	assert.Equal(t, "server3", servers[2], "expected server3")
 }
 
-func TestAddRemoveServers(t *testing.T) {
-	ring := New(farm.Fingerprint32, 10)
-	l := &dummyListener{}
-	ring.AddListener(l)
-	add := []string{"server1", "server2"}
-	remove := []string{"server3", "server4"}
-
-	ring.AddRemoveServers(remove, nil)
-	assert.Equal(t, 2, l.EventCount())
-	assert.Equal(t, 2, ring.ServerCount(), "expected two servers to be in ring")
-
-	oldChecksum := ring.Checksum()
-
-	ring.AddRemoveServers(add, remove)
-	assert.Equal(t, 4, l.EventCount())
-	assert.Equal(t, 2, ring.ServerCount(), "expected two servers to be in ring")
-
-	assert.NotEqual(t, oldChecksum, ring.Checksum(), "expected checksum to change")
-}
-
 func TestLookup(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
-	ring.AddServer("server1")
-	ring.AddServer("server2")
+	ring.AddMembers(fakeMember{address: "server1"})
+	ring.AddMembers(fakeMember{address: "server2"})
 
 	_, ok := ring.Lookup("key")
 
 	assert.True(t, ok, "expected Lookup to hash key to a server")
 
-	ring.RemoveServer("server1")
-	ring.RemoveServer("server2")
+	ring.RemoveMembers(fakeMember{address: "server1"})
+	ring.RemoveMembers(fakeMember{address: "server2"})
 
 	_, ok = ring.Lookup("key")
 
@@ -179,8 +220,8 @@ func TestLookup(t *testing.T) {
 
 func TestLookupDistribution(t *testing.T) {
 	ring := New(farm.Fingerprint32, 5)
-	addresses := genAddresses(1, 1, 1000)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 1000, false)
+	ring.AddMembers(members...)
 
 	keys := make([]string, 40)
 	for i := range keys {
@@ -202,8 +243,8 @@ func TestLookupDistribution(t *testing.T) {
 // section of all hashes in the red-black tree.
 func TestLookupNNoGaps(t *testing.T) {
 	ring := New(farm.Fingerprint32, 1)
-	addresses := genAddresses(1, 1, 100)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 100, false)
+	ring.AddMembers(members...)
 	key := "key with small hash"
 
 	servers := ring.LookupN(key, 20)
@@ -243,11 +284,11 @@ func TestLookupNNoGaps(t *testing.T) {
 	// aren't part of the lookup should be stored under a value either smaller,
 	// or larger than the values of the servers that are part of the lookup.
 	allExcluded := true
-	for _, ad := range addresses {
-		if _, ok := serversSet[ad]; ok {
+	for _, member := range members {
+		if _, ok := serversSet[member.GetAddress()]; ok {
 			continue
 		}
-		adHash := ring.hashfunc(ad + "0")
+		adHash := ring.hashfunc(member.GetAddress() + "0")
 		if adHash >= min && adHash <= max {
 			allExcluded = false
 		}
@@ -258,19 +299,19 @@ func TestLookupNNoGaps(t *testing.T) {
 
 func TestLookupNOverflow(t *testing.T) {
 	ring := New(farm.Fingerprint32, 10)
-	addresses := genAddresses(1, 1, 10)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 10, false)
+	ring.AddMembers(members...)
 	assert.Len(t, ring.LookupN("a random key", 20), 10, "expected that LookupN caps results when n is larger than number of servers")
 }
 
 func TestLookupNLoopAround(t *testing.T) {
 	ring := New(farm.Fingerprint32, 1)
-	addresses := genAddresses(1, 1, 10)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 10, false)
+	ring.AddMembers(members...)
 
-	unique := make(map[string]struct{})
-	ring.tree.LookupNUniqueAt(1, 0, unique)
-	var firstInTree string
+	unique := make(map[valuetype]struct{})
+	ring.tree.LookupNUniqueAt(1, replicaPoint{hash: 0}, unique)
+	var firstInTree valuetype
 	for server := range unique {
 		firstInTree = server
 		break
@@ -291,8 +332,8 @@ func TestLookupN(t *testing.T) {
 
 	unique := make(map[string]bool)
 
-	addresses := genAddresses(1, 1, 10)
-	ring.AddRemoveServers(addresses, nil)
+	members := genMembers(1, 1, 10, false)
+	ring.AddMembers(members...)
 
 	servers = ring.LookupN("key", 5)
 	assert.Len(t, servers, 5, "expected five servers to be returned by lookup")
@@ -312,7 +353,7 @@ func TestLookupN(t *testing.T) {
 
 	unique = make(map[string]bool)
 
-	ring.RemoveServer(addresses[0])
+	ring.RemoveMembers(members[0])
 	servers = ring.LookupN("yet another key", 10)
 	assert.Len(t, servers, 9, "expected to get nine servers")
 	for _, server := range servers {
@@ -321,12 +362,186 @@ func TestLookupN(t *testing.T) {
 	assert.Len(t, unique, 9, "expected to get nine unique servers")
 }
 
-func genAddresses(host, fromPort, toPort int) []string {
-	var addresses []string
-	for i := fromPort; i <= toPort; i++ {
-		addresses = append(addresses, fmt.Sprintf("127.0.0.%v:%v", host, 3000+i))
+type ProcessMembershipChangesSuite struct {
+	suite.Suite
+	ring    *HashRing
+	members [4]fakeMember
+	l       *eventsmocks.EventListener
+}
+
+func (s *ProcessMembershipChangesSuite) SetupSuite() {
+	s.ring = New(farm.Fingerprint32, 10)
+	s.members[0] = fakeMember{address: "192.0.2.0:1"}
+	s.members[1] = fakeMember{address: "192.0.2.0:2"}
+	s.members[2] = fakeMember{address: "192.0.2.0:3"}
+	s.members[3] = fakeMember{address: "192.0.2.0:4"}
+}
+
+func (s *ProcessMembershipChangesSuite) SetupTest() {
+	s.l = &eventsmocks.EventListener{}
+	s.ring.AddListener(s.l)
+}
+
+func (s *ProcessMembershipChangesSuite) TearDownTest() {
+	s.ring.RemoveListener(s.l)
+}
+
+func (s *ProcessMembershipChangesSuite) expectRingChangedEvent(event events.RingChangedEvent) {
+	s.l.On("HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.On("HandleEvent", event)
+}
+
+func (s *ProcessMembershipChangesSuite) TestAddMember0() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersAdded: []string{s.members[0].GetAddress()},
+	})
+
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{After: s.members[0]},
+	})
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(1, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestAddMember1() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersAdded: []string{s.members[1].GetAddress()},
+	})
+
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{After: s.members[1]},
+	})
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestRemoveMember0AddMember2() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersAdded:   []string{s.members[2].GetAddress()},
+		ServersRemoved: []string{s.members[0].GetAddress()},
+	})
+
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{After: s.members[2]},
+		{Before: s.members[0]},
+	})
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestNoopUpdate() {
+	s.l.On("HandleEvent", mock.Anything).Return()
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.members[1], After: s.members[1]},
+	})
+
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChangedEvent"))
+
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestChangeIdentityMember2() {
+	s.expectRingChangedEvent(events.RingChangedEvent{
+		ServersUpdated: []string{s.members[1].GetAddress()},
+	})
+
+	memberNewIdentity := fakeMember{
+		address:  "192.0.2.0:2",
+		identity: "new_identity",
 	}
-	return addresses
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.members[1], After: memberNewIdentity},
+	})
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestRemoveNonExistingMember() {
+	s.l.On("HandleEvent", mock.Anything).Return()
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.members[3]},
+	})
+
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChangedEvent"))
+
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func (s *ProcessMembershipChangesSuite) TestUpdateNonExistingMember() {
+	s.l.On("HandleEvent", mock.Anything).Return()
+	s.ring.ProcessMembershipChanges([]membership.MemberChange{
+		{Before: s.members[3], After: s.members[3]},
+	})
+
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChecksumEvent"))
+	s.l.AssertNotCalled(s.T(), "HandleEvent", mock.AnythingOfType("RingChangedEvent"))
+
+	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
+}
+
+func TestNodeTestSuite(t *testing.T) {
+	suite.Run(t, new(ProcessMembershipChangesSuite))
+}
+
+func TestLookupsWithIdentities(t *testing.T) {
+	numReplicaPoints := 3
+	numServers := 10
+	ring := New(farm.Fingerprint32, numReplicaPoints)
+
+	members := make([]membership.Member, 0, numServers)
+
+	for i := 0; i < numServers; i++ {
+		m := fakeMember{
+			address:  fmt.Sprintf("127.0.0.1:%v", 3000+i),
+			identity: fmt.Sprintf("identity%v", i),
+		}
+		members = append(members, m)
+	}
+
+	ring.AddMembers(members...)
+
+	for _, m := range members {
+		identity := m.Identity()
+
+		for i := 0; i < numReplicaPoints; i++ {
+			key := fmt.Sprintf("%v#%v", identity, i)
+
+			value, has := ring.Lookup(key)
+			assert.True(t, has)
+			assert.Equal(t, m.GetAddress(), value)
+		}
+	}
+}
+
+func TestReplicaPointCompare(t *testing.T) {
+	address := "127.0.0.1:3000"
+
+	pointA := replicaPoint{hash: 100, address: address, index: 0}
+	pointB := replicaPoint{hash: 200, address: address, index: 0}
+	pointC := replicaPoint{hash: 300, address: address, index: 0}
+	pointD := replicaPoint{hash: 200, address: address, index: 0}
+	pointE := replicaPoint{hash: 200, address: address, index: 1}
+
+	assert.True(t, pointB.Compare(pointA) > 0)
+	assert.True(t, pointB.Compare(pointC) < 0)
+	assert.True(t, pointB.Compare(pointB) == 0)
+	assert.True(t, pointB.Compare(pointD) == 0)
+	assert.True(t, pointB.Compare(pointE) < 0)
+}
+
+func genMembers(host, fromPort, toPort int, overrideIdentity bool) (members []membership.Member) {
+	for i := fromPort; i <= toPort; i++ {
+		member := fakeMember{
+			address: fmt.Sprintf("127.0.0.%v:%v", host, 3000+i),
+		}
+		if overrideIdentity {
+			member.identity = fmt.Sprintf("identity%v", i)
+		}
+		members = append(members, member)
+	}
+	return members
 }
 
 func BenchmarkHashRingLookupN(b *testing.B) {
@@ -334,11 +549,8 @@ func BenchmarkHashRingLookupN(b *testing.B) {
 
 	ring := New(farm.Fingerprint32, 100)
 
-	servers := make([]string, 1000)
-	for i := range servers {
-		servers[i] = fmt.Sprintf("%d", rand.Int())
-	}
-	ring.AddRemoveServers(servers, nil)
+	members := genMembers(1, 1, 10, true)
+	ring.AddMembers(members...)
 
 	keys := make([]string, 100)
 	for i := range keys {

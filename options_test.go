@@ -28,6 +28,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
+	"github.com/uber/ringpop-go/membership"
+	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
@@ -72,9 +74,9 @@ func (s *RingpopOptionsTestSuite) TestDefaults() {
 	s.Equal(testRingpop.configHashRing, rp.configHashRing)
 }
 
-// TestDefaultIdentityResolver tests that Ringpop gets the identity from the
+// TestDefaultAddressResolver tests that Ringpop gets the address from the
 // TChannel object by default.
-func (s *RingpopOptionsTestSuite) TestDefaultIdentityResolver() {
+func (s *RingpopOptionsTestSuite) TestDefaultAddressResolver() {
 	// Start listening, to get a hostport assigned
 	s.channel.ListenAndServe("127.0.0.1:0")
 	hostport := s.channel.PeerInfo().HostPort
@@ -84,10 +86,10 @@ func (s *RingpopOptionsTestSuite) TestDefaultIdentityResolver() {
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	identity, err := rp.identity()
+	address, err := rp.address()
 
-	// Check that the identity of Ringpop matches the TChannel hostport
-	s.Equal(hostport, identity)
+	// Check that the address of Ringpop matches the TChannel hostport
+	s.Equal(hostport, address)
 	s.NoError(err)
 }
 
@@ -157,27 +159,52 @@ func (s *RingpopOptionsTestSuite) TestHashRingConfig() {
 	s.Equal(rp.configHashRing.ReplicaPoints, 42)
 }
 
-// TestIdentityResolverFunc tests the func that's passed gets applied to the
+// TestAddressResolverFunc tests the func that's passed gets applied to the
 // Ringpop instance.
-func (s *RingpopOptionsTestSuite) TestIdentityResolverFunc() {
+func (s *RingpopOptionsTestSuite) TestAddressResolverFunc() {
 	f := func() (string, error) {
 		return "127.0.0.1:3001", nil
 	}
 
-	rp, err := New("test", Channel(s.channel), IdentityResolverFunc(f))
+	rp, err := New("test", Channel(s.channel), AddressResolverFunc(f))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	identity, err := rp.identityResolver()
+	address, err := rp.addressResolver()
 
-	s.Equal("127.0.0.1:3001", identity)
+	s.Equal("127.0.0.1:3001", address)
 	s.NoError(err)
 }
 
-// TestMissingIdentityResolver tests the Ringpop constructor throws an error
-// if the user sets the identity resolver to nil
-func (s *RingpopOptionsTestSuite) TestMissingIdentityResolver() {
-	rp, err := New("test", Channel(s.channel), IdentityResolverFunc(nil))
+// TestMissingAddressResolver tests the Ringpop constructor throws an error
+// if the user sets the address resolver to nil
+func (s *RingpopOptionsTestSuite) TestMissingAddressResolver() {
+	rp, err := New("test", Channel(s.channel), AddressResolverFunc(nil))
+	s.Nil(rp)
+	s.Error(err)
+}
+
+func (s *RingpopOptionsTestSuite) TestIdentity() {
+	rp, err := New("test", Channel(s.channel), Identity("identity"))
+	s.Require().NotNil(rp)
+	s.Require().NoError(err)
+
+	identity, has := rp.config.InitialLabels[membership.IdentityLabelKey]
+	s.Equal(true, has, "Identity label set")
+	s.Equal("identity", identity)
+}
+
+func (s *RingpopOptionsTestSuite) TestDefaultIdentity() {
+	rp, err := New("test", Channel(s.channel))
+	s.Require().NotNil(rp)
+	s.Require().NoError(err)
+
+	_, has := rp.config.InitialLabels[membership.IdentityLabelKey]
+	s.Equal(false, has, "Identity label not set")
+}
+
+func (s *RingpopOptionsTestSuite) TestHostPortIdentity() {
+	rp, err := New("test", Channel(s.channel), Identity("127.0.0.1:1234"))
 	s.Nil(rp)
 	s.Error(err)
 }
@@ -272,6 +299,49 @@ func (s *RingpopOptionsTestSuite) TestCombinedPeriodConfig() {
 	s.Equal(rp.config.StateTimeouts.Suspect, 1*time.Second)
 	s.Equal(rp.config.StateTimeouts.Faulty, 2*time.Second)
 	s.Equal(rp.config.StateTimeouts.Tombstone, 3*time.Second)
+}
+
+func (s *RingpopOptionsTestSuite) TestSelfEvictOptions() {
+	var tableTest = []struct {
+		options []Option
+		result  swim.SelfEvictOptions
+	}{
+		{[]Option{
+			SelfEvictPingRatio(.2),
+		}, swim.SelfEvictOptions{
+			PingRatio: .2,
+		}},
+		{[]Option{
+			SelfEvictPingRatio(.3),
+		}, swim.SelfEvictOptions{
+			PingRatio: .3,
+		}},
+		{[]Option{
+			SelfEvictPingRatio(.4),
+		}, swim.SelfEvictOptions{
+			PingRatio: .4,
+		}},
+		{[]Option{
+			SelfEvictPingRatio(-1),
+		}, swim.SelfEvictOptions{
+			PingRatio: -1,
+		}},
+	}
+
+	for _, test := range tableTest {
+		options := []Option{Channel(s.channel)}
+		options = append(options, test.options...)
+		rp, err := New(
+			"test",
+			options...,
+		)
+
+		s.Require().NoError(err)
+		s.Require().NotNil(rp)
+
+		s.Equal(test.result, rp.config.SelfEvict)
+	}
+
 }
 
 func TestRingpopOptionsTestSuite(t *testing.T) {

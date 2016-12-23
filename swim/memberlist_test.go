@@ -24,9 +24,12 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/uber/ringpop-go/events"
+	"github.com/uber/ringpop-go/membership"
+	"github.com/uber/ringpop-go/util"
+
 	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/suite"
-	"github.com/uber/ringpop-go/util"
 )
 
 type MemberlistTestSuite struct {
@@ -486,6 +489,329 @@ func (s *MemberlistTestSuite) TestRemoveLocalLabels() {
 	removed = s.m.RemoveLocalLabels("hello")
 	s.Assert().True(removed, "expected to remove a label")
 	s.Assert().Equal(1, s.node.disseminator.ChangesCount(), "expected to have 1 change recorded in the disseminator after the removal of an existing label")
+}
+
+// MembershipVisibleTransitions is a matrix of transitions which should and
+// should not show up in the memberlist.ChangeEvent changes. This is used in the
+// tests for remote and local updates to verify all events that should show up
+// are there and all events that should not show up don't. Not all transactions
+// are covered because their behavior is undefined and may change in the future.
+// These are transitions that are non-observable for the membership incl. but
+// not limited to incarnation number changes
+var MembershipVisibleTransitions = map[string]struct {
+	From string
+	To   string
+
+	Before bool
+	After  bool
+
+	notAllowed bool
+}{
+	// events that must emit
+	"192.0.2.0:1": {From: Alive, To: Faulty, Before: true, After: false},
+	"192.0.2.0:2": {From: Alive, To: Leave, Before: true, After: false},
+	"192.0.2.0:3": {From: Alive, To: Tombstone, Before: true, After: false},
+
+	"192.0.2.0:4": {From: Suspect, To: Faulty, Before: true, After: false},
+	"192.0.2.0:5": {From: Suspect, To: Leave, Before: true, After: false},
+	"192.0.2.0:6": {From: Suspect, To: Tombstone, Before: true, After: false},
+
+	"192.0.2.0:7": {From: Faulty, To: Alive, Before: false, After: true},
+	"192.0.2.0:8": {From: Faulty, To: Suspect, Before: false, After: true},
+
+	"192.0.2.0:9":  {From: Leave, To: Alive, Before: false, After: true},
+	"192.0.2.0:10": {From: Leave, To: Suspect, Before: false, After: true},
+
+	"192.0.2.0:11": {From: Tombstone, To: Alive, Before: false, After: true},
+	"192.0.2.0:12": {From: Tombstone, To: Suspect, Before: false, After: true},
+
+	// events that must NOT emit
+	"192.0.2.0:13": {From: Faulty, To: Leave, notAllowed: true},
+	"192.0.2.0:14": {From: Faulty, To: Tombstone, notAllowed: true},
+
+	"192.0.2.0:15": {From: Leave, To: Faulty, notAllowed: true},
+	"192.0.2.0:16": {From: Leave, To: Tombstone, notAllowed: true},
+
+	"192.0.2.0:17": {From: Tombstone, To: Faulty, notAllowed: true},
+	"192.0.2.0:18": {From: Tombstone, To: Leave, notAllowed: true},
+}
+
+// TestMembershipEventsRemoteState uses MembershipVisibleTransitions to test
+// transitions that are applied due to incomming gossip events generate the
+// desired membership.ChangeEvent events.
+func (s *MemberlistTestSuite) TestMembershipEventsRemoteState() {
+	var initialChanges []Change
+	var updateChanges []Change
+
+	for address, test := range MembershipVisibleTransitions {
+		initialChanges = append(initialChanges, Change{
+			Address:     address,
+			Incarnation: s.incarnation,
+			Status:      test.From,
+		})
+
+		updateChanges = append(updateChanges, Change{
+			Address:     address,
+			Incarnation: s.incarnation + 1,
+			Status:      test.To,
+		})
+	}
+
+	// seed the memberlist with intial states
+	s.m.Update(initialChanges)
+
+	eventFired := false
+	s.node.AddListener(on(membership.ChangeEvent{}, func(e events.Event) {
+		changeEvent := e.(membership.ChangeEvent)
+
+		seenMembers := make(map[string]struct{})
+
+		for _, change := range changeEvent.Changes {
+			var address string
+
+			if change.Before != nil {
+				address = change.Before.GetAddress()
+			} else {
+				address = change.After.GetAddress()
+			}
+
+			seenMembers[address] = struct{}{}
+
+			test, has := MembershipVisibleTransitions[address]
+			if !has {
+				// change is not specified and therefore allowed
+				s.Assert().Fail("allowed but not expected, logging during development")
+				continue
+			}
+
+			if test.notAllowed {
+				s.Assert().Fail("member %q is not allowed to show up in membership.ChangeEvent.Changes", address)
+				continue
+			}
+
+			if test.Before {
+				s.Assert().NotNil(change.Before, "Expected before to be set for member %q", address)
+			} else {
+				s.Assert().Nil(change.Before, "Expected before not to be set for member %q", address)
+			}
+
+			if test.After {
+				s.Assert().NotNil(change.After, "Expected after to be set for member %q", address)
+			} else {
+				s.Assert().Nil(change.After, "Expected after not to be set for member %q", address)
+			}
+		}
+
+		for address, test := range MembershipVisibleTransitions {
+			_, seen := seenMembers[address]
+			s.Assert().Equal(!test.notAllowed, seen, "membership update for member %q inconsistency", address)
+		}
+
+		eventFired = true
+	}))
+
+	// now send the updates that should trigger the Membership event
+	s.m.Update(updateChanges)
+	s.Assert().True(eventFired, "expected membership.ChangeEvent to fire during update")
+}
+
+// TestMembershipEventsLocalState uses MembershipVisibleTransitions to test
+// transitions that are applied to the local node to generate the desired
+// membership.ChangeEvent events.
+func (s *MemberlistTestSuite) TestMembershipEventsLocalState() {
+	for _, test := range MembershipVisibleTransitions {
+
+		// listen for expected event
+		fired := false
+		l := on(membership.ChangeEvent{}, func(e events.Event) {
+			fired = true
+
+			changeEvent := e.(membership.ChangeEvent)
+			change := changeEvent.Changes[0]
+
+			if test.notAllowed {
+				return
+			}
+
+			if test.Before {
+				s.Assert().NotNil(change.Before, "Expected before to be set for change %s->%s", test.From, test.To)
+			} else {
+				s.Assert().Nil(change.Before, "Expected before not to be set for change %s->%s", test.From, test.To)
+			}
+
+			if test.After {
+				s.Assert().NotNil(change.After, "Expected after to be set for change %s->%s", test.From, test.To)
+			} else {
+				s.Assert().Nil(change.After, "Expected after not to be set for member change %s->%s", test.From, test.To)
+			}
+		})
+
+		s.m.SetLocalStatus(test.From)
+		s.node.AddListener(l)
+		s.m.SetLocalStatus(test.To)
+		s.node.RemoveListener(l)
+
+		s.Assert().Equal(!test.notAllowed, fired, "unexpected result for event that fired for change %s->%s", test.From, test.To)
+	}
+}
+
+// MembershipVisibleLabelChangeStates contains a matrix of states and their
+// Observability during label updates from the standpoint of the
+// membership.ChangeEvent
+var MembershipVisibleLabelChangeStates = map[string]struct {
+	State      string
+	Observable bool
+}{
+	"192.0.2.0:1": {State: Alive, Observable: true},
+	"192.0.2.0:2": {State: Suspect, Observable: true},
+	"192.0.2.0:3": {State: Faulty, Observable: false},
+	"192.0.2.0:4": {State: Leave, Observable: false},
+	"192.0.2.0:5": {State: Tombstone, Observable: false},
+}
+
+// TestMembershipEventsRemoteLabels uses MembershipVisibleLabelChangeStates to
+// test for the correct events being emitted during label changes on members
+// that are processed after a gossip
+func (s *MemberlistTestSuite) TestMembershipEventsRemoteLabels() {
+	labelsStart := map[string]string{
+		"hello": "world",
+	}
+
+	labelsEnd := map[string]string{
+		"hello": "universe",
+		"foo":   "bar",
+	}
+
+	var initialChanges []Change
+	var updateChanges []Change
+
+	expectedHostsInUpdate := make(map[string]struct{})
+
+	for address, test := range MembershipVisibleLabelChangeStates {
+		initialChanges = append(initialChanges, Change{
+			Address:     address,
+			Incarnation: s.incarnation,
+			Status:      test.State,
+			Labels:      labelsStart,
+		})
+
+		updateChanges = append(updateChanges, Change{
+			Address:     address,
+			Incarnation: s.incarnation + 1,
+			Status:      test.State,
+			Labels:      labelsEnd,
+		})
+
+		if test.Observable {
+			expectedHostsInUpdate[address] = struct{}{}
+		}
+	}
+
+	s.m.Update(initialChanges)
+	fired := false
+	s.node.AddListener(on(membership.ChangeEvent{}, func(e events.Event) {
+		fired = true
+
+		changeEvent := e.(membership.ChangeEvent)
+
+		for _, change := range changeEvent.Changes {
+			var address string
+			if change.Before != nil {
+				address = change.Before.GetAddress()
+			} else {
+				address = change.After.GetAddress()
+			}
+
+			_, expected := expectedHostsInUpdate[address]
+			s.Assert().True(expected, "the change for member %q was unexpected in the membership.ChangeEvent", address)
+			delete(expectedHostsInUpdate, address)
+
+			key := "hello"
+			expectedValue := "world"
+			value, has := change.Before.Label(key)
+			s.Assert().True(has, "expected %q label to be in the before state for member %q", key, address)
+			s.Assert().Equal(expectedValue, value, "expected the %q label to be set to %q in the before state for member %q", key, expectedValue, address)
+
+			key = "foo"
+			value, has = change.Before.Label(key)
+			s.Assert().False(has, "expected %q label to not be in the before state for member %q", key, address)
+
+			key = "hello"
+			expectedValue = "universe"
+			value, has = change.After.Label(key)
+			s.Assert().True(has, "expected %q label to be in the before state for member %q", key, address)
+			s.Assert().Equal(expectedValue, value, "expected the %q label to be set to %q in the before state for member %q", key, expectedValue, address)
+
+			key = "foo"
+			expectedValue = "bar"
+			value, has = change.After.Label(key)
+			s.Assert().True(has, "expected %q label to be in the before state for member %q", key, address)
+			s.Assert().Equal(expectedValue, value, "expected the %q label to be set to %q in the before state for member %q", key, expectedValue, address)
+		}
+	}))
+	s.m.Update(updateChanges)
+
+	s.Assert().True(fired, "expected the membership.ChangeEvent to fire on the updates")
+	s.Assert().Empty(expectedHostsInUpdate, "expected all expected hosts to be removed during the processing of the event, an event is missing")
+}
+
+// TestMembershipEventsLocalLabels uses MembershipVisibleLabelChangeStates to
+// test for the correct events being emitted during label changes on the local
+// node
+func (s *MemberlistTestSuite) TestMembershipEventsLocalLabels() {
+	labelsStart := map[string]string{
+		"hello": "world",
+	}
+
+	labelsEnd := map[string]string{
+		"hello": "universe",
+		"foo":   "bar",
+	}
+
+	usedLabelKeys := []string{"hello", "foo"}
+
+	for _, test := range MembershipVisibleLabelChangeStates {
+		s.m.RemoveLocalLabels(usedLabelKeys...)
+		s.m.SetLocalStatus(test.State)
+		s.m.SetLocalLabels(labelsStart)
+
+		fired := false
+		l := on(membership.ChangeEvent{}, func(e events.Event) {
+			fired = true
+
+			changeEvent := e.(membership.ChangeEvent)
+			change := changeEvent.Changes[0]
+
+			key := "hello"
+			expectedValue := "world"
+			value, has := change.Before.Label(key)
+			s.Assert().True(has, "expected %q label to be in the before state for member %q", key)
+			s.Assert().Equal(expectedValue, value, "expected the %q label to be set to %q in the before state", key, expectedValue)
+
+			key = "foo"
+			value, has = change.Before.Label(key)
+			s.Assert().False(has, "expected %q label to not be in the before state", key)
+
+			key = "hello"
+			expectedValue = "universe"
+			value, has = change.After.Label(key)
+			s.Assert().True(has, "expected %q label to be in the before state", key)
+			s.Assert().Equal(expectedValue, value, "expected the %q label to be set to %q in the before state", key, expectedValue)
+
+			key = "foo"
+			expectedValue = "bar"
+			value, has = change.After.Label(key)
+			s.Assert().True(has, "expected %q label to be in the before state", key)
+			s.Assert().Equal(expectedValue, value, "expected the %q label to be set to %q in the before state", key, expectedValue)
+		})
+		s.node.AddListener(l)
+
+		s.m.SetLocalLabels(labelsEnd)
+
+		s.node.RemoveListener(l)
+
+		s.Assert().Equal(test.Observable, fired, "unexpected result for event being fired compared to observability of change")
+	}
 }
 
 func TestMemberlistTestSuite(t *testing.T) {

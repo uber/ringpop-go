@@ -22,7 +22,10 @@ package main
 
 import (
 	"flag"
+	"os"
+	"os/signal"
 	"regexp"
+	"syscall"
 	"time"
 
 	"github.com/cactus/go-statsd-client/statsd"
@@ -44,6 +47,8 @@ var (
 	suspectPeriod   = flag.Int("suspect-period", 5000, "The lifetime of a suspect member in ms. After that the member becomes faulty.")
 	faultyPeriod    = flag.Int("faulty-period", 24*60*60*1000, "The lifetime of a faulty member in ms. After that the member becomes a tombstone.")
 	tombstonePeriod = flag.Int("tombstone-period", 5000, "The lifetime of a tombstone member in ms. After that the member is removed from the membership.")
+
+	identity = flag.String("identity", "", "specify an identity for this node in the hashring.")
 
 	hostportPattern = regexp.MustCompile(`^(\d+.\d+.\d+.\d+):\d+$`)
 )
@@ -67,12 +72,16 @@ func main() {
 	}
 
 	options := []ringpop.Option{ringpop.Channel(ch),
-		ringpop.Identity(*hostport),
+		ringpop.Address(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 
 		ringpop.SuspectPeriod(time.Duration(*suspectPeriod) * time.Millisecond),
 		ringpop.FaultyPeriod(time.Duration(*faultyPeriod) * time.Millisecond),
 		ringpop.TombstonePeriod(time.Duration(*tombstonePeriod) * time.Millisecond),
+	}
+
+	if *identity != "" {
+		options = append(options, ringpop.Identity(*identity))
 	}
 
 	if *statsUDP != "" && *statsFile != "" {
@@ -114,6 +123,44 @@ func main() {
 		log.Fatalf("bootstrap failed: %v", err)
 	}
 
+	go signalHandler(rp, true)  // handle SIGINT
+	go signalHandler(rp, false) // handle SIGTERM
+
 	// block
 	select {}
+}
+
+func signalHandler(rp *ringpop.Ringpop, interactive bool) {
+	sigchan := make(chan os.Signal, 1)
+
+	var s os.Signal
+	if interactive {
+		s = syscall.SIGINT
+	} else {
+		s = syscall.SIGTERM
+	}
+
+	signal.Notify(sigchan, s)
+
+	// wait on a signal
+	receivedSignal := <-sigchan
+	log.Printf("received signal %q, initiating self eviction\n", receivedSignal)
+
+	if interactive {
+		log.Error("triggered graceful shutdown. Press Ctrl+C again to force exit.")
+		go func() {
+			// exit on second signal
+			<-sigchan
+			log.Error("Force exiting...")
+			os.Exit(2)
+		}()
+	}
+
+	err := rp.SelfEvict()
+	if err != nil {
+		log.Errorf("Error during self-eviction: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(0)
 }

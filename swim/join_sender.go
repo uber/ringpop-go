@@ -56,10 +56,11 @@ var errJoinTimeout = errors.New("join timed out")
 
 // A joinRequest is used to request a join to a remote node
 type joinRequest struct {
-	App         string        `json:"app"`
-	Source      string        `json:"source"`
-	Incarnation int64         `json:"incarnationNumber"`
-	Timeout     time.Duration `json:"timeout"`
+	App         string            `json:"app"`
+	Source      string            `json:"source"`
+	Incarnation int64             `json:"incarnationNumber"`
+	Timeout     time.Duration     `json:"timeout"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // joinOpts are opts to perform a join with
@@ -446,6 +447,7 @@ func sendJoinRequest(node *Node, target string, timeout time.Duration) (*joinRes
 		Source:      node.address,
 		Incarnation: node.Incarnation(),
 		Timeout:     timeout,
+		Labels:      node.Labels().AsMap(),
 	}
 	res := &joinResponse{}
 

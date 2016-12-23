@@ -82,7 +82,7 @@ func main() {
 
 	rp, err := ringpop.New("ping-app",
 		ringpop.Channel(ch),
-		ringpop.Identity(*hostport),
+		ringpop.Address(*hostport),
 		ringpop.Logger(bark.NewLoggerFromLogrus(logger)),
 	)
 	if err != nil {

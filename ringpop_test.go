@@ -32,6 +32,7 @@ import (
 	"github.com/uber/ringpop-go/events"
 	eventsmocks "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/forward"
+	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
@@ -100,7 +101,7 @@ func (s *RingpopTestSuite) SetupTest() {
 	s.stats = newDummyStats()
 
 	s.ringpop, err = New("test",
-		Identity("127.0.0.1:3001"),
+		Address("127.0.0.1:3001"),
 		Channel(ch),
 		Clock(s.mockClock),
 		Statter(s.stats),
@@ -143,34 +144,26 @@ func (s *RingpopTestSuite) TestHandlesMemberlistChangeEvent() {
 	// Fake bootstrap
 	s.ringpop.init()
 
-	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: genMembershipChanges(genMembers(genAddresses(1, 1, 10)), AfterMemberField),
 	})
 
-	s.Equal(s.ringpop.ring.ServerCount(), 10)
+	s.Equal(10, s.ringpop.ring.ServerCount())
 
 	alive, faulty := genAddresses(1, 11, 15), genAddresses(1, 1, 5)
-	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: append(genChanges(alive, swim.Alive), genChanges(faulty, swim.Faulty)...),
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: append(
+			genMembershipChanges(genMembers(alive), AfterMemberField),
+			genMembershipChanges(genMembers(faulty), BeforeMemberField)...,
+		),
 	})
 
-	s.Equal(s.ringpop.ring.ServerCount(), 10)
+	s.Equal(10, s.ringpop.ring.ServerCount())
 	for _, address := range alive {
 		s.True(s.ringpop.ring.HasServer(address))
 	}
 	for _, address := range faulty {
 		s.False(s.ringpop.ring.HasServer(address))
-	}
-
-	leave, suspect := genAddresses(1, 7, 10), genAddresses(1, 11, 15)
-	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: append(genChanges(leave, swim.Leave), genChanges(suspect, swim.Suspect)...),
-	})
-	for _, address := range leave {
-		s.False(s.ringpop.ring.HasServer(address))
-	}
-	for _, address := range suspect {
-		s.True(s.ringpop.ring.HasServer(address))
 	}
 }
 
@@ -200,9 +193,14 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	// remove stats from init phase
 	s.stats.clear()
 
+	alive := genAddresses(1, 1, 10)
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: genChanges(genAddresses(1, 1, 10), swim.Alive),
+		Changes: genChanges(alive, swim.Alive),
 	})
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: genMembershipChanges(genMembers(alive), AfterMemberField),
+	})
+
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.changes.apply"), "missing stats for applied changes")
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.updates"), "missing updates stats")
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ring.checksum-computed"), "missing stats for checksums being computed")
@@ -211,7 +209,10 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(10), s.stats.read("ringpop.127_0_0_1_3001.membership-set.alive"), "missing stats for member being set to alive")
 
 	s.ringpop.HandleEvent(swim.MemberlistChangesAppliedEvent{
-		Changes: genChanges(genAddresses(1, 1, 1), swim.Faulty, swim.Leave, swim.Suspect),
+		Changes: genChanges(alive[0:1], swim.Faulty, swim.Leave, swim.Suspect),
+	})
+	s.ringpop.HandleEvent(membership.ChangeEvent{
+		Changes: genMembershipChanges(genMembers(alive[0:1]), BeforeMemberField),
 	})
 	s.Equal(int64(3), s.stats.read("ringpop.127_0_0_1_3001.changes.apply"), "missing stats for applied changes for three status changes")
 	s.Equal(int64(13), s.stats.read("ringpop.127_0_0_1_3001.updates"), "missing updates stats for three status changes")
@@ -317,15 +318,15 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.refuted-update"), "missing refuted-update stat")
 
 	// double check the counts before the event
-	s.Equal(int64(11), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "incorrect count for ring.server-added before RingChangedEvent")
-	s.Equal(int64(2), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "incorrect count for ring.server-removed before RingChangedEvent")
+	s.Equal(int64(9), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "incorrect count for ring.server-added before RingChangedEvent")
+	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "incorrect count for ring.server-removed before RingChangedEvent")
 	s.Equal(int64(2), s.stats.read("ringpop.127_0_0_1_3001.ring.changed"), "incorrect count for ring.changed before RingChangedEvent")
 	s.ringpop.HandleEvent(events.RingChangedEvent{
 		ServersAdded:   genAddresses(1, 2, 5),
 		ServersRemoved: genAddresses(1, 6, 8),
 	})
-	s.Equal(int64(15), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "missing ring.server-added stat")
-	s.Equal(int64(5), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "missing ring.server-removed stat")
+	s.Equal(int64(13), s.stats.read("ringpop.127_0_0_1_3001.ring.server-added"), "missing ring.server-added stat")
+	s.Equal(int64(4), s.stats.read("ringpop.127_0_0_1_3001.ring.server-removed"), "missing ring.server-removed stat")
 	s.Equal(int64(3), s.stats.read("ringpop.127_0_0_1_3001.ring.changed"), "missing ring.changed stat")
 
 	s.ringpop.HandleEvent(forward.RequestForwardedEvent{})
@@ -375,6 +376,12 @@ func (s *RingpopTestSuite) TestHandleEvents() {
 
 	s.ringpop.HandleEvent(forward.RetrySuccessEvent{NumRetries: 1})
 	s.Equal(int64(1), s.stats.read("ringpop.127_0_0_1_3001.requestProxy.retry.succeeded"), "missing requestProxy.retry.reroute.remote stat")
+
+	s.ringpop.HandleEvent(swim.SelfEvictedEvent{
+		PhasesCount: 4,
+		Duration:    time.Duration(1) * time.Second,
+	})
+	s.Equal(int64(1000), s.stats.read("ringpop.127_0_0_1_3001.self-eviction"), "missing self-eviction stat")
 
 }
 
@@ -482,17 +489,17 @@ func (s *RingpopTestSuite) TestDestroyIsIdempotent() {
 // a ready state.
 func (s *RingpopTestSuite) TestWhoAmI() {
 	s.NotEqual(ready, s.ringpop.state)
-	identity, err := s.ringpop.WhoAmI()
-	s.Equal("", identity)
+	address, err := s.ringpop.WhoAmI()
+	s.Equal("", address)
 	s.Error(err)
 
 	err = createSingleNodeCluster(s.ringpop)
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
 	s.Equal(ready, s.ringpop.state)
-	identity, err = s.ringpop.WhoAmI()
+	address, err = s.ringpop.WhoAmI()
 	s.NoError(err)
-	s.Equal("127.0.0.1:3001", identity)
+	s.Equal("127.0.0.1:3001", address)
 }
 
 // TestUptime tests that Uptime only operates when the Ringpop instance is in
@@ -545,8 +552,11 @@ func (s *RingpopTestSuite) TestLookupNoDestination() {
 	err := createSingleNodeCluster(s.ringpop)
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
-	address, _ := s.ringpop.identity()
-	s.ringpop.ring.RemoveServer(address)
+	address, _ := s.ringpop.address()
+	member := fakeMember{
+		address: address,
+	}
+	s.ringpop.ring.RemoveMembers(member)
 
 	result, err := s.ringpop.Lookup("foo")
 	s.Equal("", result)
@@ -588,11 +598,14 @@ func (s *RingpopTestSuite) TestLookupNNoDestinations() {
 	err := createSingleNodeCluster(s.ringpop)
 	s.Require().NoError(err, "unable to bootstrap single node cluster")
 
-	address, _ := s.ringpop.identity()
-	s.ringpop.ring.RemoveServer(address)
+	address, _ := s.ringpop.address()
+	member := fakeMember{
+		address: address,
+	}
+	s.ringpop.ring.RemoveMembers(member)
 
 	result, err := s.ringpop.LookupN("foo", 5)
-	s.Nil(result)
+	s.Empty(result)
 	s.Error(err)
 }
 
@@ -605,8 +618,8 @@ func (s *RingpopTestSuite) TestLookupN() {
 	s.Nil(err)
 	s.Equal(1, len(result), "LookupN returns not more results than number of nodes")
 
-	addresses := genAddresses(1, 10, 20)
-	s.ringpop.ring.AddRemoveServers(addresses, nil)
+	members := genMembers(genAddresses(1, 10, 20))
+	s.ringpop.ring.AddMembers(members...)
 
 	result, err = s.ringpop.LookupN("foo", 5)
 	s.Nil(err)
@@ -624,23 +637,23 @@ func (s *RingpopTestSuite) TestGetReachableMembersNotReady() {
 func (s *RingpopTestSuite) TestGetReachableMembers() {
 	createSingleNodeCluster(s.ringpop)
 
-	identity, err := s.ringpop.WhoAmI()
+	address, err := s.ringpop.WhoAmI()
 	s.Require().NoError(err)
 
 	result, err := s.ringpop.GetReachableMembers()
 	s.NoError(err)
-	s.Equal([]string{identity}, result)
+	s.Equal([]string{address}, result)
 }
 
 func (s *RingpopTestSuite) TestGetReachableMembersNotMePredicate() {
 	createSingleNodeCluster(s.ringpop)
 
-	identity, err := s.ringpop.WhoAmI()
+	address, err := s.ringpop.WhoAmI()
 	s.Require().NoError(err)
 
 	// get reachable members without me (non in this test)
 	result, err := s.ringpop.GetReachableMembers(func(member swim.Member) bool {
-		return member.Address != identity
+		return member.Address != address
 	})
 
 	s.NoError(err)
@@ -663,12 +676,12 @@ func (s *RingpopTestSuite) TestCountReachableMembers() {
 func (s *RingpopTestSuite) TestCountReachableMembersNotMePredicate() {
 	createSingleNodeCluster(s.ringpop)
 
-	identity, err := s.ringpop.WhoAmI()
+	address, err := s.ringpop.WhoAmI()
 	s.Require().NoError(err)
 
 	// get reachable members without me (non in this test)
 	result, err := s.ringpop.CountReachableMembers(func(member swim.Member) bool {
-		return member.Address != identity
+		return member.Address != address
 	})
 
 	s.NoError(err)
@@ -676,7 +689,7 @@ func (s *RingpopTestSuite) TestCountReachableMembersNotMePredicate() {
 }
 
 // TestAddSelfToBootstrapList tests that Ringpop automatically adds its own
-// identity to the bootstrap host list.
+// address to the bootstrap host list.
 func (s *RingpopTestSuite) TestAddSelfToBootstrapList() {
 	// Init ringpop, but then override the swim node with mock node
 	s.ringpop.init()
@@ -711,7 +724,7 @@ func (s *RingpopTestSuite) TestErrorOnChannelNotListening() {
 	s.Require().NoError(err)
 
 	nodesJoined, err := rp.Bootstrap(&swim.BootstrapOptions{})
-	s.Exactly(err, ErrEphemeralIdentity)
+	s.Exactly(err, ErrEphemeralAddress)
 	s.Nil(nodesJoined)
 }
 
@@ -739,6 +752,14 @@ func (s *RingpopTestSuite) TestStartTimersIdempotance() {
 
 	// idempotent stop
 	s.ringpop.stopTimers()
+}
+
+func (s *RingpopTestSuite) TestInitialLabels() {
+	s.ringpop.config.InitialLabels["key"] = "value"
+	s.ringpop.init()
+	value, has := s.ringpop.node.Labels().Get("key")
+	s.Equal("value", value, "Label correctly set on local node")
+	s.True(has, "Label correctly set on local node")
 }
 
 func (s *RingpopTestSuite) TestReadyEvent() {
@@ -887,9 +908,9 @@ func (s *RingpopTestSuite) TestDontAllowBootstrapWithoutChannelListening() {
 	s.channel = ch
 
 	// Bug #146 meant that you could bootstrap ringpop without a listening
-	// channel IF you provided the Identity argument (or a custom Identity)
+	// channel IF you provided the Address argument (or a custom Identity)
 	// provider.
-	s.ringpop, err = New("test", Channel(ch), Identity("127.0.0.1:3001"))
+	s.ringpop, err = New("test", Channel(ch), Address("127.0.0.1:3001"))
 	s.NoError(err, "Ringpop must create successfully")
 
 	// Calls bootstrap
