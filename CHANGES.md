@@ -10,7 +10,7 @@ NEXT
 
 Prior to ringpop NEXT the address was used as the identity of a member. Starting with version NEXT, it's possible to
 configure a separate identity. As a result, the behaviour of the `Identity` and `IdentityResolverFunc` has been changed.
-The `Identity` option now configures the identity of a member and will return an error when it matches an ip:port; services 
+The `Identity` option now configures the identity of a member and will return an error when it matches an ip:port; services
 that were using `Identity` or `IdentityResolverFunc` should now use the `Address` and `AddressResolverFunc` options.
 You could use the following `gofmt` snippets to easily refactor:
 
@@ -18,6 +18,28 @@ You could use the following `gofmt` snippets to easily refactor:
 gofmt -r 'ringpop.Identity(a) -> ringpop.Address(a)' -w .
 gofmt -r 'ringpop.IdentityResolverFunc(a) -> ringpop.AddressResolverFunc(a)' -w .
 ```
+
+v0.7.1
+------
+
+* Fix: Header leaking on the forwarding path caused calls to own endpoints to not be sharded when the same context was used while making the call [#197](https://github.com/uber/ringpop-go/pull/197)
+
+### Release notes
+
+#### Header leaking
+
+When applications use their incoming context blindly in an outgoing call it uses
+the same tchannel headers for the outgoing call as the incoming call had,
+causing incoming headers to be leaked in the outgoing call. Since most
+applications don't use headers there is nothing to worry about. However the
+forwarding path of ringpop uses a header to indicate a call has been forwarded.
+This header prevents indefinite forwarding loops to occur when applications fail
+to converge on ownership.
+
+With this fix the header indicating a forwarded call will not be leaked to the
+application. This makes it possible for applications to use the incoming context
+on a call to a sharded endpoint on their own or another ringpop servers service
+an correctly route the request.
 
 v0.7.0
 ------
