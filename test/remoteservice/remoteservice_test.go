@@ -107,7 +107,7 @@ func TestRingpopRemoteServiceAdapterCallLocalPreservingHeaders(t *testing.T) {
 			"hello": "world",
 			"foo":   "bar",
 			"baz":   "42",
-		}, headers, "exected existing headers to be preserved")
+		}, headers, "expected existing headers to be preserved")
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
@@ -198,7 +198,7 @@ func TestRingpopRemoteServiceAdapterCallRemotePreservingHeaders(t *testing.T) {
 			"hello": "world",
 			"foo":   "bar",
 			"baz":   "42",
-		}, headers, "exected existing headers to be preserved")
+		}, headers, "expected existing headers to be preserved")
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
@@ -278,7 +278,7 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCallPreservingHeaders(t *t
 			"hello": "world",
 			"foo":   "bar",
 			"baz":   "42",
-		}, headers, "exected existing headers to be preserved")
+		}, headers, "expected existing headers to be preserved")
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
