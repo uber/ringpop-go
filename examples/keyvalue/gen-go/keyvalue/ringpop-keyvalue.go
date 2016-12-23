@@ -123,7 +123,7 @@ type KeyValueServiceGetConfiguration struct {
 // Get satisfies the TChanKeyValueService interface. This function uses the configuration for Get to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopKeyValueServiceAdapter) Get(ctx thrift.Context, key string) (r string, err error) {
 	// check if the function should be called locally
-	if a.config.Get == nil || forward.HasForwardedHeader(ctx) {
+	if a.config.Get == nil || forward.DeleteForwardedHeader(ctx) {
 		return a.impl.Get(ctx, key)
 	}
 
@@ -154,7 +154,7 @@ type KeyValueServiceGetAllConfiguration struct {
 // GetAll satisfies the TChanKeyValueService interface. This function uses the configuration for GetAll to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopKeyValueServiceAdapter) GetAll(ctx thrift.Context, keys []string) (r []string, err error) {
 	// check if the function should be called locally
-	if a.config.GetAll == nil || forward.HasForwardedHeader(ctx) {
+	if a.config.GetAll == nil || forward.DeleteForwardedHeader(ctx) {
 		return a.impl.GetAll(ctx, keys)
 	}
 
@@ -185,7 +185,7 @@ type KeyValueServiceSetConfiguration struct {
 // Set satisfies the TChanKeyValueService interface. This function uses the configuration for Set to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopKeyValueServiceAdapter) Set(ctx thrift.Context, key string, value string) (err error) {
 	// check if the function should be called locally
-	if a.config.Set == nil || forward.HasForwardedHeader(ctx) {
+	if a.config.Set == nil || forward.DeleteForwardedHeader(ctx) {
 		return a.impl.Set(ctx, key, value)
 	}
 

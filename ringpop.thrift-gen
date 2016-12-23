@@ -128,7 +128,7 @@ type {{ $RingpopRouterConfiguration }} struct {
 // {{ $PublicName }} satisfies the {{ $TChanInterface }} interface. This function uses the configuration for {{ $PublicName }} to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *{{ $Adapter }}) {{ $PublicName }} ({{ template "arguments" $Method }}) ({{ template "returnType" $Method }}) {
     // check if the function should be called locally
-    if a.{{ $cfg }} == nil || forward.HasForwardedHeader(ctx) {
+    if a.{{ $cfg }} == nil || forward.DeleteForwardedHeader(ctx) {
         return a.impl.{{ $PublicName }}({{ template "call" $Method }})
     }
 

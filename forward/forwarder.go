@@ -197,11 +197,12 @@ func SetForwardedHeader(ctx thrift.Context, keys []string) thrift.Context {
 	return thrift.WithHeaders(ctx, headers)
 }
 
-// HasForwardedHeader takes the headers that came in via TChannel and looks for
-// the precense of a specific ringpop header to see if ringpop already forwarded
-// the message. When a message has already been forwarded by ringpop the
-// forwarding logic should not be used to prevent unbound forwarding.
-func HasForwardedHeader(ctx thrift.Context) bool {
+// DeleteForwardedHeader takes the headers that came in via TChannel and looks
+// for the precense of a specific ringpop header to see if ringpop already
+// forwarded the message. If the header is present it will delete the header
+// from the context. The return value indicates if the header was present and
+// deleted
+func DeleteForwardedHeader(ctx thrift.Context) bool {
 	_, ok := ctx.Headers()[ForwardedHeaderName]
 	if ok {
 		delete(ctx.Headers(), ForwardedHeaderName)

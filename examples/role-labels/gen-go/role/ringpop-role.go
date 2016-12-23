@@ -111,7 +111,7 @@ type RoleServiceGetMembersConfiguration struct {
 // GetMembers satisfies the TChanRoleService interface. This function uses the configuration for GetMembers to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopRoleServiceAdapter) GetMembers(ctx thrift.Context, role string) (r []string, err error) {
 	// check if the function should be called locally
-	if a.config.GetMembers == nil || forward.HasForwardedHeader(ctx) {
+	if a.config.GetMembers == nil || forward.DeleteForwardedHeader(ctx) {
 		return a.impl.GetMembers(ctx, role)
 	}
 
@@ -142,7 +142,7 @@ type RoleServiceSetRoleConfiguration struct {
 // SetRole satisfies the TChanRoleService interface. This function uses the configuration for SetRole to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopRoleServiceAdapter) SetRole(ctx thrift.Context, role string) (err error) {
 	// check if the function should be called locally
-	if a.config.SetRole == nil || forward.HasForwardedHeader(ctx) {
+	if a.config.SetRole == nil || forward.DeleteForwardedHeader(ctx) {
 		return a.impl.SetRole(ctx, role)
 	}
 

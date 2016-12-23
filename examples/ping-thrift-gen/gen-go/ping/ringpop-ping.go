@@ -99,7 +99,7 @@ type PingPongServicePingConfiguration struct {
 // Ping satisfies the TChanPingPongService interface. This function uses the configuration for Ping to determine the host to execute the call on. When it decides the call needs to be executed in the current process it will forward the invocation to its local implementation.
 func (a *RingpopPingPongServiceAdapter) Ping(ctx thrift.Context, request *Ping) (r *Pong, err error) {
 	// check if the function should be called locally
-	if a.config.Ping == nil || forward.HasForwardedHeader(ctx) {
+	if a.config.Ping == nil || forward.DeleteForwardedHeader(ctx) {
 		return a.impl.Ping(ctx, request)
 	}
 
