@@ -89,7 +89,7 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
 }
 
-func TestRingpopRemoteServiceAdapterCallLocalPerservingHeaders(t *testing.T) {
+func TestRingpopRemoteServiceAdapterCallLocalPreservingHeaders(t *testing.T) {
 	rp := &mocks.Ringpop{}
 	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
@@ -107,7 +107,7 @@ func TestRingpopRemoteServiceAdapterCallLocalPerservingHeaders(t *testing.T) {
 			"hello": "world",
 			"foo":   "bar",
 			"baz":   "42",
-		}, headers, "exected existing headers to be perserved")
+		}, headers, "exected existing headers to be preserved")
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
@@ -170,8 +170,8 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	serviceImpl.AssertNotCalled(t, "RemoteCall", mock.Anything, "hello")
 }
 
-func TestRingpopRemoteServiceAdapterCallRemotePerservingHeaders(t *testing.T) {
-	t.Skip("The data passed to the remote call is not verified in any test at this moment, can't verify the perserving of the headers")
+func TestRingpopRemoteServiceAdapterCallRemotePreservingHeaders(t *testing.T) {
+	t.Skip("The data passed to the remote call is not verified in any test at this moment, can't verify the preserving of the headers")
 
 	rp := &mocks.Ringpop{}
 	rp.On("AddListener", mock.Anything).Return(false)
@@ -198,7 +198,7 @@ func TestRingpopRemoteServiceAdapterCallRemotePerservingHeaders(t *testing.T) {
 			"hello": "world",
 			"foo":   "bar",
 			"baz":   "42",
-		}, headers, "exected existing headers to be perserved")
+		}, headers, "exected existing headers to be preserved")
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
@@ -260,7 +260,7 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCall(t *testing.T) {
 	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
 }
 
-func TestRingpopRemoteServiceAdapterReceivingForwardedCallPerservingHeaders(t *testing.T) {
+func TestRingpopRemoteServiceAdapterReceivingForwardedCallPreservingHeaders(t *testing.T) {
 	rp := &mocks.Ringpop{}
 	rp.On("AddListener", mock.Anything).Return(false)
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
@@ -278,13 +278,13 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCallPerservingHeaders(t *t
 			"hello": "world",
 			"foo":   "bar",
 			"baz":   "42",
-		}, headers, "exected existing headers to be perserved")
+		}, headers, "exected existing headers to be preserved")
 	}).Return(nil)
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
 	// set headers for the call
 	ctx = thrift.WithHeaders(ctx, map[string]string{
-		// headers that should be perserved
+		// headers that should be preserved
 		"hello": "world",
 		"foo":   "bar",
 		"baz":   "42",
