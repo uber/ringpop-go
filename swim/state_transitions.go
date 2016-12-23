@@ -123,7 +123,7 @@ func (s *stateTransitions) schedule(subject subject, state string, timeout time.
 	}
 
 	if s.node.Address() == subject.address() {
-		s.logger.WithField("member", subject.address()).Warn("cannot schedule a state transition for the local member")
+		s.logger.WithField("member", subject.address()).Debug("cannot schedule a state transition for the local member")
 		return
 	}
 
