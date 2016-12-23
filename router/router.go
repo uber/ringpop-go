@@ -98,7 +98,7 @@ func (r *router) handleChange(change swim.Change) {
 func (r *router) GetClient(key string) (client interface{}, isRemote bool, err error) {
 	dest, err := r.ringpop.Lookup(key)
 	if err != nil {
-		return
+		return nil, false, err
 	}
 
 	r.rw.RLock()
@@ -107,7 +107,7 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	if ok {
 		client = cachedEntry.client
 		isRemote = cachedEntry.isRemote
-		return
+		return client, isRemote, nil
 	}
 
 	// no match so far, get a complete lock for creation
@@ -119,12 +119,12 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 	if ok {
 		client = cachedEntry.client
 		isRemote = cachedEntry.isRemote
-		return
+		return client, isRemote, nil
 	}
 
 	me, err := r.ringpop.WhoAmI()
 	if err != nil {
-		return
+		return nil, false, err
 	}
 
 	// use the ClientFactory to get the client
@@ -148,7 +148,7 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 		client:   client,
 		isRemote: isRemote,
 	}
-	return
+	return client, isRemote, nil
 }
 
 func (r *router) removeClient(hostport string) {
