@@ -109,7 +109,7 @@ func (l *namedLogger) WithFields(fields bark.LogFields) bark.Logger {
 func (l *namedLogger) WithError(err error) bark.Logger {
 	return &namedLogger{
 		name:      l.name,
-		forwardTo: l.ForwardTo,
+		forwardTo: l.forwardTo,
 		err:       err,
 		fields:    l.Fields(),
 	}
