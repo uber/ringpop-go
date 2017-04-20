@@ -47,4 +47,4 @@ func (l noLogger) Fields() bark.Fields                                 { return 
 
 // NoLogger is the default logger used by logging facilities when a logger
 // is not passed.
-var NoLogger = noLogger{}
+var NoLogger bark.Logger = noLogger{}
