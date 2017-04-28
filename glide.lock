@@ -1,5 +1,5 @@
-hash: 4ccda5624a1c3a632cb019d8e2e953856637534b7dba0b735a8f729f23778750
-updated: 2016-08-30T14:48:58.602347073+02:00
+hash: e12513affb2c18d45db0866ec31b46508afaee6157cc5aec35fad18ab3b634c2
+updated: 2017-04-28T16:09:03.624550619-07:00
 imports:
 - name: github.com/apache/thrift
   version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
@@ -12,7 +12,7 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  version: 346938d642f2ec3594ed81d874461961cd0faa76
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
@@ -21,6 +21,8 @@ imports:
   version: 77a31d686003349e89c89e58408aafcd20003f41
   subpackages:
   - ext
+- name: github.com/pkg/errors
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/pmezard/go-difflib
   version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
@@ -32,13 +34,14 @@ imports:
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: d77da356e56a7428ad25149ca77381849a6a5232
+  version: 4d4bfba8f1d1027c4fdbe371823030df51419987
   subpackages:
   - assert
   - mock
   - require
+  - suite
 - name: github.com/uber-common/bark
-  version: d52ffa061726911f47fcd3d9e8b9b55f22794772
+  version: 148dd9dfbd0feb293fc81593a8c10c99877f81bc
 - name: github.com/uber-go/atomic
   version: 0c9e689d64f004564b79d9a663634756df322902
 - name: github.com/uber/tchannel-go
@@ -46,15 +49,17 @@ imports:
   subpackages:
   - json
   - raw
-  - thrift
-  - thrift/thrift-gen
   - relay
+  - thrift
+  - thrift/gen-go/meta
+  - thrift/thrift-gen
   - tnet
   - trand
   - typed
-  - thrift/gen-go/meta
 - name: golang.org/x/net
-  version: 6250b412798208e6c90b03b7c4f226de5aa299e2
+  version: da118f7b8e5954f39d0d2130ab35d4bf0e3cb344
   subpackages:
   - context
-devImports: []
+- name: gopkg.in/yaml.v2
+  version: a83829b6f1293c91addabc89d0571c246397bbf4
+testImports: []
