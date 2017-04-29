@@ -103,6 +103,10 @@ func (l *namedLogger) WithFields(fields bark.LogFields) bark.Logger {
 	}
 }
 
+func (l *namedLogger) WithError(err error) bark.Logger {
+	return l.WithField("error", err)
+}
+
 // This is needed to fully implement the bark.Logger interface.
 func (l *namedLogger) Fields() bark.Fields {
 	return l.fields
