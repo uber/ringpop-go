@@ -1,60 +1,69 @@
-hash: 4ccda5624a1c3a632cb019d8e2e953856637534b7dba0b735a8f729f23778750
-updated: 2016-08-30T14:48:58.602347073+02:00
+hash: e12513affb2c18d45db0866ec31b46508afaee6157cc5aec35fad18ab3b634c2
+updated: 2017-04-28T23:48:42.457467898Z
 imports:
 - name: github.com/apache/thrift
-  version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
+  version: 19baeefd8c38d62085891d7956349601f79448b3
   subpackages:
   - lib/go/thrift
 - name: github.com/benbjohnson/clock
-  version: a620c1cc9866f84a2550ad53f4f353ec030fa26b
+  version: 7dc76406b6d3c05b5f71a86293cbcf3c4ea03b19
 - name: github.com/cactus/go-statsd-client
-  version: 91c326c3f7bd20f0226d3d1c289dd9f8ce28d33d
+  version: d8eabe07bc70ff9ba6a56836cde99d1ea3d005f7
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  version: 346938d642f2ec3594ed81d874461961cd0faa76
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
-  version: fc41e106ee0e4394f69a56046e5c5adbaf29d912
+  version: 83948bc0eb076b6b72c28abe5282fa8cf5240db6
 - name: github.com/opentracing/opentracing-go
-  version: 77a31d686003349e89c89e58408aafcd20003f41
+  version: 1949ddbfd147afd4d964a9f00b24eb291e0e7c38
   subpackages:
   - ext
+  - log
 - name: github.com/pmezard/go-difflib
   version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
   - difflib
 - name: github.com/rcrowley/go-metrics
-  version: dee209f2455f101a5e4e593dea94872d2c62d85d
+  version: 1f30fe9094a513ce4c700b9a54458bbb0c96996c
 - name: github.com/Sirupsen/logrus
-  version: 82c8de1af23b25ba5a468d801f29077f4f483bce
+  version: 10f801ebc38b33738c9d17d50860f484a0988ff5
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: d77da356e56a7428ad25149ca77381849a6a5232
+  version: 4d4bfba8f1d1027c4fdbe371823030df51419987
   subpackages:
   - assert
   - mock
   - require
 - name: github.com/uber-common/bark
-  version: d52ffa061726911f47fcd3d9e8b9b55f22794772
+  version: 148dd9dfbd0feb293fc81593a8c10c99877f81bc
 - name: github.com/uber-go/atomic
-  version: 0c9e689d64f004564b79d9a663634756df322902
+  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
 - name: github.com/uber/tchannel-go
-  version: 1a0e35378f6f721bc07f6c4466bc9701ed70b506
+  version: cf1a62434b88e95060a0e5668457d30a05fe127b
   subpackages:
   - json
   - raw
   - thrift
   - thrift/thrift-gen
+  - internal/argreader
   - relay
   - tnet
+  - tos
   - trand
   - typed
   - thrift/gen-go/meta
 - name: golang.org/x/net
-  version: 6250b412798208e6c90b03b7c4f226de5aa299e2
+  version: da118f7b8e5954f39d0d2130ab35d4bf0e3cb344
   subpackages:
   - context
+  - ipv4
+  - ipv6
+- name: golang.org/x/sys
+  version: 9ccfe848b9db8435a24c424abbc07a921adf1df5
+  subpackages:
+  - unix
 devImports: []

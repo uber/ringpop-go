@@ -34,6 +34,15 @@ mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -
     | sed 's/package mocks/package forward/g' \
     > "${0%/*}/../forward/mock_logger_test.go"
 
+# mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -print \
+#    > "${0%/*}/../swim/test/mocks/Logger.go"
+
+mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -print \
+    | sed 's/package mocks/package logging/g' \
+    | gofmt -r 'Logger -> MockLogger' \
+    | gofmt -r 'bark.MockLogger -> bark.Logger' \
+    > "${0%/*}/../logging/mock_logger_test.go"
+
 # mocks used in forward cannot go into test/mocks because circular dependency
 mockery -name Sender -dir forward -recursive -testonly -case=underscore -inpkg
 
@@ -42,6 +51,7 @@ mockery -name EventListener -dir events -testonly -case=underscore -inpkg
 
 # mocks used in forward cannot go into test/mocks because circular dependency
 mockery -name SelfEvictHook -dir swim -recursive -testonly -case=underscore -inpkg
+mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "${0%/*}/../swim/test/mocks"
 
 # Mocks for events need to go in the events package to avoid circular deps
 mockery -case=underscore -dir events -output "${0%/*}/../events/test/mocks" -name EventListener

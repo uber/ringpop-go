@@ -43,8 +43,11 @@ func (c *tchanPingPongClient) Ping(ctx thrift.Context, request *Ping) (*Pong, er
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "Ping", &args, &resp)
 	if err == nil && !success {
-		if e := resp.PingError; e != nil {
-			err = e
+		switch {
+		case resp.PingError != nil:
+			err = resp.PingError
+		default:
+			err = fmt.Errorf("received no result or unknown exception for Ping")
 		}
 	}
 

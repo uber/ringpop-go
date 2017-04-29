@@ -24,6 +24,11 @@ import (
 	"github.com/uber-common/bark"
 )
 
+var (
+	// ErrorKey is the name of the field to store WithError log fields into
+	ErrorKey = "error"
+)
+
 // namedLogger is a bark.Logger implementation that has a name. It forwards all
 // log requests to a logReceiver, adding its own name in the process.
 type namedLogger struct {
@@ -101,6 +106,11 @@ func (l *namedLogger) WithFields(fields bark.LogFields) bark.Logger {
 		forwardTo: l.forwardTo,
 		fields:    newFields,
 	}
+}
+
+// WithError adds an error to the standard error field defined in bark.ErrorKey
+func (l *namedLogger) WithError(err error) bark.Logger {
+	return l.WithField(ErrorKey, err)
 }
 
 // This is needed to fully implement the bark.Logger interface.
