@@ -1,6 +1,11 @@
 ringpop-go changes
 ==================
 
+v0.8.2
+------
+
+* Fix: Add WithError() to NoLogger [#203](https://github.com/uber/ringpop-go/pull/203)
+
 v0.8.1
 ------
 
