@@ -42,8 +42,9 @@ func (l noLogger) Panic(args ...interface{})                           {}
 func (l noLogger) Panicf(format string, args ...interface{})           {}
 func (l noLogger) WithField(key string, value interface{}) bark.Logger { return l }
 func (l noLogger) WithFields(keyValues bark.LogFields) bark.Logger     { return l }
+func (l noLogger) WithError(err error) bark.Logger                     { return l }
 func (l noLogger) Fields() bark.Fields                                 { return nil }
 
 // NoLogger is the default logger used by logging facilities when a logger
 // is not passed.
-var NoLogger = noLogger{}
+var NoLogger bark.Logger = noLogger{}

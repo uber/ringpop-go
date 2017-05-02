@@ -18,7 +18,7 @@ install:
   - ./scripts/travis/get-thrift.sh
   - ./scripts/travis/get-thrift-gen.sh
   - ./scripts/travis/get-cram.sh
-  - npm install -g tcurl
+  - npm install -g tcurl@v4.22.2
   - make setup
 
 env:

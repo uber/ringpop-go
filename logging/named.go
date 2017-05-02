@@ -29,6 +29,7 @@ import (
 type namedLogger struct {
 	name      string
 	forwardTo logReceiver
+	err       error
 	fields    bark.Fields
 }
 
@@ -100,6 +101,17 @@ func (l *namedLogger) WithFields(fields bark.LogFields) bark.Logger {
 		name:      l.name,
 		forwardTo: l.forwardTo,
 		fields:    newFields,
+	}
+}
+
+// Return a new named logger with the error set to be included in a subsequent
+// normal logging call
+func (l *namedLogger) WithError(err error) bark.Logger {
+	return &namedLogger{
+		name:      l.name,
+		forwardTo: l.forwardTo,
+		err:       err,
+		fields:    l.Fields(),
 	}
 }
 
