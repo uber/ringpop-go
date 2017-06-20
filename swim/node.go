@@ -74,6 +74,9 @@ type Options struct {
 	Clock clock.Clock
 
 	SelfEvict SelfEvictOptions
+
+	// If set to true, ping requests without app name return error
+	RequiresAppInPing bool
 }
 
 func defaultOptions() *Options {
@@ -221,6 +224,7 @@ type Node struct {
 
 	selfEvict        *selfEvict
 	selfEvictOptions SelfEvictOptions
+	requiresAppInPing bool
 }
 
 // NewNode returns a new SWIM Node.
@@ -248,6 +252,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 		clock:      opts.Clock,
 	}
 	node.selfEvict = newSelfEvict(node, opts.SelfEvict)
+	node.requiresAppInPing = opts.RequiresAppInPing
 
 	node.labelLimits = opts.LabelLimits
 

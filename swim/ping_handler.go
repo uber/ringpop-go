@@ -20,7 +20,12 @@
 
 package swim
 
-import "time"
+import (
+	"errors"
+	"time"
+
+	log "github.com/uber-common/bark"
+)
 
 func handlePing(node *Node, req *ping) (*ping, error) {
 	if !node.Ready() {
@@ -33,6 +38,23 @@ func handlePing(node *Node, req *ping) (*ping, error) {
 		Source:  req.Source,
 		Changes: req.Changes,
 	})
+
+	if req.App == "" {
+		if node.requiresAppInPing {
+			node.logger.WithFields(log.Fields{
+				"source": req.Source,
+			}).Warn("Rejected ping from unknown ringpop app")
+			return nil, errors.New("Pinged ringpop requires app name")
+		}
+	} else {
+		if req.App != node.app {
+			node.logger.WithFields(log.Fields{
+				"app":    req.App,
+				"source": req.Source,
+			}).Warn("Rejected ping from wrong ringpop app")
+			return nil, errors.New("Pinged ringpop has a different app name")
+		}
+	}
 
 	node.serverRate.Mark(1)
 	node.totalRate.Mark(1)

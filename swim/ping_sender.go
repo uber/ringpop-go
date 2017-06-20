@@ -37,6 +37,7 @@ type ping struct {
 	Checksum          uint32   `json:"checksum"`
 	Source            string   `json:"source"`
 	SourceIncarnation int64    `json:"sourceIncarnationNumber"`
+	App               string   `json:"app"`
 }
 
 // sendPing sends a ping to target node that times out after timeout
@@ -63,6 +64,7 @@ func sendPingWithChanges(node *Node, target string, changes []Change, timeout ti
 		Changes:           changes,
 		Source:            node.Address(),
 		SourceIncarnation: node.Incarnation(),
+		App:               node.app,
 	}
 
 	node.EmitEvent(PingSendEvent{
