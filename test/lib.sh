@@ -1,3 +1,4 @@
+#!/bin/bash
 # Common functions for test code
 
 declare project_root="${0%/*}/.."
