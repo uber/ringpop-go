@@ -227,6 +227,83 @@ func (s *HandlerTestSuite) TestPingRequestHandler() {
 	s.True(res.Ok, "expected ok response from ping")
 }
 
+func (s *HandlerTestSuite) TestPingHandler() {
+	// Bootstrap the test node, so it's ready to receive pings
+	node := s.testNode.node
+	node.Bootstrap(&BootstrapOptions{
+		DiscoverProvider: statichosts.New(node.Address()),
+	})
+
+	req := &ping{
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           nil,
+		App:               node.app,
+	}
+
+	_, err := node.pingHandler(s.ctx, req)
+	s.NoError(err, "No error pinging with same app name")
+}
+
+func (s *HandlerTestSuite) TestPingHandlerAllowsEmptyApp() {
+	// Bootstrap the test node, so it's ready to receive pings
+	node := s.testNode.node
+	node.Bootstrap(&BootstrapOptions{
+		DiscoverProvider: statichosts.New(node.Address()),
+	})
+
+	req := &ping{
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           nil,
+	}
+
+	_, err := node.pingHandler(s.ctx, req)
+	s.NoError(err, "No error pinging with empty app name if not required")
+}
+
+func (s *HandlerTestSuite) TestPingHandlerRejectsEmptyApp() {
+	// Bootstrap the test node, so it's ready to receive pings
+	node := s.testNode.node
+	node.Bootstrap(&BootstrapOptions{
+		DiscoverProvider: statichosts.New(node.Address()),
+	})
+	node.requiresAppInPing = true
+
+	req := &ping{
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           nil,
+	}
+
+	_, err := node.pingHandler(s.ctx, req)
+
+	s.Error(err, "expected error when node requires app")
+}
+
+func (s *HandlerTestSuite) TestPingHandlerError() {
+	// Bootstrap the test node, so it's ready to receive pings
+	node := s.testNode.node
+	node.Bootstrap(&BootstrapOptions{
+		DiscoverProvider: statichosts.New(node.Address()),
+	})
+
+	req := &ping{
+		Source:            node.Address(),
+		SourceIncarnation: node.Incarnation(),
+		Checksum:          node.memberlist.Checksum(),
+		Changes:           nil,
+		App:               node.app + node.app,
+	}
+
+	_, err := node.pingHandler(s.ctx, req)
+
+	s.Error(err, "expected error when app doesn't match")
+}
+
 func (s *HandlerTestSuite) TestPingRequestHandlerFail() {
 	// Node is not ready to receive pings when it's not bootstrapped
 	node := s.testNode.node
