@@ -59,6 +59,10 @@ type configuration struct {
 
 	// SelfEvict holds the settings with regards to self eviction
 	SelfEvict swim.SelfEvictOptions
+
+	// RequiresAppInPing configures if ringpop node should reject pings
+	// that don't contain app name
+	RequiresAppInPing bool
 }
 
 // An Option is a modifier functions that configure/modify a real Ringpop
@@ -351,6 +355,15 @@ func LabelLimitValueSize(size int) Option {
 func SelfEvictPingRatio(ratio float64) Option {
 	return func(r *Ringpop) error {
 		r.config.SelfEvict.PingRatio = ratio
+		return nil
+	}
+}
+
+// RequiresAppInPing configures if ringpop node should reject pings
+// that don't contain app name
+func RequiresAppInPing(requiresAppInPing bool) Option {
+	return func(r *Ringpop) error {
+		r.config.RequiresAppInPing = requiresAppInPing
 		return nil
 	}
 }

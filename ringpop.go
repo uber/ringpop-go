@@ -191,11 +191,12 @@ func (rp *Ringpop) init() error {
 	rp.registerHandlers()
 
 	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		StateTimeouts: rp.config.StateTimeouts,
-		Clock:         rp.clock,
-		LabelLimits:   rp.config.LabelLimits,
-		InitialLabels: rp.config.InitialLabels,
-		SelfEvict:     rp.config.SelfEvict,
+		StateTimeouts:     rp.config.StateTimeouts,
+		Clock:             rp.clock,
+		LabelLimits:       rp.config.LabelLimits,
+		InitialLabels:     rp.config.InitialLabels,
+		SelfEvict:         rp.config.SelfEvict,
+		RequiresAppInPing: rp.config.RequiresAppInPing,
 	})
 	rp.node.AddListener(rp)
 
