@@ -27,7 +27,7 @@ imports:
   - difflib
 - name: github.com/rcrowley/go-metrics
   version: dee209f2455f101a5e4e593dea94872d2c62d85d
-- name: github.com/Sirupsen/logrus
+- name: github.com/sirupsen/logrus
   version: 82c8de1af23b25ba5a468d801f29077f4f483bce
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
