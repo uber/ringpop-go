@@ -222,8 +222,8 @@ type Node struct {
 	// system clock, wrapped via clock.New()
 	clock clock.Clock
 
-	selfEvict        *selfEvict
-	selfEvictOptions SelfEvictOptions
+	selfEvict         *selfEvict
+	selfEvictOptions  SelfEvictOptions
 	requiresAppInPing bool
 }
 
