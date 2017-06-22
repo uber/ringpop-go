@@ -110,6 +110,7 @@ func (s *RingpopTestSuite) SetupTest() {
 		LabelLimitCount(1),
 		LabelLimitKeySize(5),
 		LabelLimitValueSize(5),
+		RequiresAppInPing(true),
 	)
 	s.NoError(err, "Ringpop must create successfully")
 
