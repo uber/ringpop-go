@@ -400,7 +400,7 @@ func (s *ProcessMembershipChangesSuite) TestAddMember0() {
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
 		{After: s.members[0]},
 	})
-	mock.AssertExpectationsForObjects(s.T(), &s.l.Mock)
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(1, s.ring.ServerCount(), "unexpected count of members in ring")
 }
 
@@ -412,7 +412,7 @@ func (s *ProcessMembershipChangesSuite) TestAddMember1() {
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
 		{After: s.members[1]},
 	})
-	mock.AssertExpectationsForObjects(s.T(), &s.l.Mock)
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
 }
 
@@ -426,7 +426,7 @@ func (s *ProcessMembershipChangesSuite) TestRemoveMember0AddMember2() {
 		{After: s.members[2]},
 		{Before: s.members[0]},
 	})
-	mock.AssertExpectationsForObjects(s.T(), &s.l.Mock)
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
 }
 
@@ -454,7 +454,7 @@ func (s *ProcessMembershipChangesSuite) TestChangeIdentityMember2() {
 	s.ring.ProcessMembershipChanges([]membership.MemberChange{
 		{Before: s.members[1], After: memberNewIdentity},
 	})
-	mock.AssertExpectationsForObjects(s.T(), &s.l.Mock)
+	mock.AssertExpectationsForObjects(s.T(), s.l.Mock)
 	s.Equal(2, s.ring.ServerCount(), "unexpected count of members in ring")
 }
 
