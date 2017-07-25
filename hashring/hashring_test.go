@@ -363,6 +363,79 @@ func TestLookupN(t *testing.T) {
 	assert.Len(t, unique, 9, "expected to get nine unique servers")
 }
 
+func TestLookupNOrder(t *testing.T) {
+	tests := []struct {
+		n              int
+		replicaPoints  int
+		serverQuantity int
+		label          string
+	}{
+		{
+			n:              10,
+			replicaPoints:  5,
+			serverQuantity: 10,
+			label:          "some_uuid_1",
+		},
+		{
+			n:              5,
+			replicaPoints:  3,
+			serverQuantity: 10,
+			label:          "some_uuid_2",
+		},
+		{
+			n:              5,
+			replicaPoints:  2,
+			serverQuantity: 1,
+			label:          "some_uuid_3",
+		},
+		{
+			n:              100,
+			replicaPoints:  7,
+			serverQuantity: 10,
+			label:          "some_uuid_4",
+		},
+	}
+
+	for _, tt := range tests {
+		ring := New(farm.Fingerprint32, tt.replicaPoints)
+		members := genMembers(1, 1, tt.serverQuantity, true)
+		ring.AddMembers(members...)
+
+		unique := make(map[string]bool)
+
+		key := replicaPoint{hash: ring.hashfunc(tt.label)}
+		var expectedServers []string
+		ring.tree.root.traverseWhile(func(node *redBlackNode) bool {
+			server := node.value.(string)
+			if node.key.Compare(key) >= 0 && !unique[server] {
+				expectedServers = append(expectedServers, server)
+				unique[server] = true
+			}
+			if len(expectedServers) >= tt.n {
+				return false
+			}
+			return true
+		})
+
+		baseKey := replicaPoint{hash: 0}
+		if len(expectedServers) < tt.n {
+			ring.tree.root.traverseWhile(func(node *redBlackNode) bool {
+				server := node.value.(string)
+				if node.key.Compare(baseKey) >= 0 && !unique[server] {
+					expectedServers = append(expectedServers, server)
+					unique[server] = true
+				}
+				if len(expectedServers) >= tt.n {
+					return false
+				}
+				return true
+			})
+		}
+
+		assert.Equal(t, expectedServers, ring.LookupN(tt.label, tt.n), tt.label)
+	}
+}
+
 type ProcessMembershipChangesSuite struct {
 	suite.Suite
 	ring    *HashRing

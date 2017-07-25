@@ -383,10 +383,6 @@ func (r *HashRing) LookupN(key string, n int) []string {
 
 // This function isn't thread-safe, only call it when the HashRing is locked.
 func (r *HashRing) lookupNNoLock(key string, n int) []string {
-	if n >= len(r.serverSet) {
-		return r.copyServersNoLock()
-	}
-
 	hash := r.hashfunc(key)
 	unique := make(map[valuetype]struct{})
 	orderedUnique := make([]valuetype, 0, n)
