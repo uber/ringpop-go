@@ -310,7 +310,8 @@ func TestLookupNLoopAround(t *testing.T) {
 	ring.AddMembers(members...)
 
 	unique := make(map[valuetype]struct{})
-	ring.tree.LookupNUniqueAt(1, replicaPoint{hash: 0}, unique)
+	orderedUnique := make([]valuetype, 0, 1)
+	ring.tree.LookupNUniqueAt(1, replicaPoint{hash: 0}, unique, orderedUnique)
 	var firstInTree valuetype
 	for server := range unique {
 		firstInTree = server
