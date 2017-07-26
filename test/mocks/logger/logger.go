@@ -1,4 +1,4 @@
-package mocks
+package mocklogger
 
 import "github.com/uber-common/bark"
 import "github.com/stretchr/testify/mock"

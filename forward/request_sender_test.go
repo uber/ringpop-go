@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/test/mocks"
+	"github.com/uber/ringpop-go/test/mocks/logger"
 	"github.com/uber/tchannel-go"
 )
 
@@ -76,8 +76,8 @@ func (s *requestSenderTestSuite) newDummies(mockSender *MockSender) *dummies {
 	}
 }
 
-func newDummyLogger() *mocks.Logger {
-	logger := &mocks.Logger{}
+func newDummyLogger() *mocklogger.Logger {
+	logger := &mocklogger.Logger{}
 	logger.On("WithFields", mock.Anything).Return(logger)
 	logger.On("Warn", mock.Anything).Return(nil)
 	return logger
