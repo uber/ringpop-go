@@ -391,9 +391,9 @@ func (r *HashRing) lookupNNoLock(key string, n int) []string {
 	// collected all the servers we want, we have reached the
 	// end of the red-black tree and we need to loop around and inspect the
 	// tree starting at 0.
-	r.tree.LookupNUniqueAt(n, replicaPoint{hash: hash}, unique, &orderedUnique)
+	r.tree.LookupOrderedNUniqueAt(n, replicaPoint{hash: hash}, unique, &orderedUnique)
 	if len(unique) < n {
-		r.tree.LookupNUniqueAt(n, replicaPoint{hash: 0}, unique, &orderedUnique)
+		r.tree.LookupOrderedNUniqueAt(n, replicaPoint{hash: 0}, unique, &orderedUnique)
 	}
 
 	var servers []string

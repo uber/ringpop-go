@@ -303,8 +303,18 @@ func (t *redBlackTree) Search(key keytype) (valuetype, bool) {
 
 // LookupNUniqueAt iterates through the tree from the last node that is smaller
 // than key or equal, and returns the next n unique values. This function is not
-// guaranteed to return n values, less might be returned
-func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[valuetype]struct{}, orderedResult *[]valuetype) {
+// guaranteed to return n values, less might be returned. Because this function
+// relies on writing the unique values to a golang map type, order cannot be
+// inferred. DEPRECATED, but maintained for backwards compatibility.
+func (t *redBlackTree) LookupNUniqueAt(n int, key keytype, result map[valuetype]struct{}) {
+	findNUniqueAbove(t.root, n, key, result, nil)
+}
+
+// LookupOrderedNUniqueAt iterates through the tree from the last node that is
+// smaller than key or equal, and returns the next n unique values. This function
+// is not guaranteed to return n values, less might be returned. This method
+// replaces LookupNUniqueAt since it uses a slice to guarantee order.
+func (t *redBlackTree) LookupOrderedNUniqueAt(n int, key keytype, result map[valuetype]struct{}, orderedResult *[]valuetype) {
 	findNUniqueAbove(t.root, n, key, result, orderedResult)
 }
 
@@ -327,7 +337,7 @@ func findNUniqueAbove(node *redBlackNode, n int, key keytype, result map[valuety
 	}
 
 	if cmp >= 0 {
-		if _, ok := result[node.value]; !ok {
+		if _, ok := result[node.value]; !ok && orderedResult != nil {
 			*orderedResult = append(*orderedResult, node.value)
 		}
 		result[node.value] = struct{}{}
