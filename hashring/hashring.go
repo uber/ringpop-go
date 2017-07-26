@@ -383,24 +383,21 @@ func (r *HashRing) LookupN(key string, n int) []string {
 
 // This function isn't thread-safe, only call it when the HashRing is locked.
 func (r *HashRing) lookupNNoLock(key string, n int) []string {
-	if n >= len(r.serverSet) {
-		return r.copyServersNoLock()
-	}
-
 	hash := r.hashfunc(key)
 	unique := make(map[valuetype]struct{})
+	orderedUnique := make([]valuetype, 0, n)
 
 	// lookup N unique servers from the red-black tree. If we have not
 	// collected all the servers we want, we have reached the
 	// end of the red-black tree and we need to loop around and inspect the
 	// tree starting at 0.
-	r.tree.LookupNUniqueAt(n, replicaPoint{hash: hash}, unique)
+	r.tree.LookupOrderedNUniqueAt(n, replicaPoint{hash: hash}, unique, &orderedUnique)
 	if len(unique) < n {
-		r.tree.LookupNUniqueAt(n, replicaPoint{hash: 0}, unique)
+		r.tree.LookupOrderedNUniqueAt(n, replicaPoint{hash: 0}, unique, &orderedUnique)
 	}
 
 	var servers []string
-	for server := range unique {
+	for _, server := range orderedUnique {
 		servers = append(servers, server.(string))
 	}
 	return servers
