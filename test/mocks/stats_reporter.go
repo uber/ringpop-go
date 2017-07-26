@@ -1,6 +1,6 @@
 package mocks
 
-import "github.com/uber/ringpop-go/vendor/github.com/uber-common/bark"
+import "github.com/uber-common/bark"
 import "github.com/stretchr/testify/mock"
 
 import "time"
