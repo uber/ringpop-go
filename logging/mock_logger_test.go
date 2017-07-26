@@ -3,47 +3,72 @@ package logging
 import "github.com/uber-common/bark"
 import "github.com/stretchr/testify/mock"
 
-type MockLogger struct {
+type Logger struct {
 	mock.Mock
 }
 
-func (_m *MockLogger) Debug(args ...interface{}) {
+// Debug provides a mock function with given fields: args
+func (_m *Logger) Debug(args ...interface{}) {
 	_m.Called(args)
 }
-func (_m *MockLogger) Debugf(format string, args ...interface{}) {
+
+// Debugf provides a mock function with given fields: format, args
+func (_m *Logger) Debugf(format string, args ...interface{}) {
 	_m.Called(format, args)
 }
-func (_m *MockLogger) Info(args ...interface{}) {
+
+// Info provides a mock function with given fields: args
+func (_m *Logger) Info(args ...interface{}) {
 	_m.Called(args)
 }
-func (_m *MockLogger) Infof(format string, args ...interface{}) {
+
+// Infof provides a mock function with given fields: format, args
+func (_m *Logger) Infof(format string, args ...interface{}) {
 	_m.Called(format, args)
 }
-func (_m *MockLogger) Warn(args ...interface{}) {
+
+// Warn provides a mock function with given fields: args
+func (_m *Logger) Warn(args ...interface{}) {
 	_m.Called(args)
 }
-func (_m *MockLogger) Warnf(format string, args ...interface{}) {
+
+// Warnf provides a mock function with given fields: format, args
+func (_m *Logger) Warnf(format string, args ...interface{}) {
 	_m.Called(format, args)
 }
-func (_m *MockLogger) Error(args ...interface{}) {
+
+// Error provides a mock function with given fields: args
+func (_m *Logger) Error(args ...interface{}) {
 	_m.Called(args)
 }
-func (_m *MockLogger) Errorf(format string, args ...interface{}) {
+
+// Errorf provides a mock function with given fields: format, args
+func (_m *Logger) Errorf(format string, args ...interface{}) {
 	_m.Called(format, args)
 }
-func (_m *MockLogger) Fatal(args ...interface{}) {
+
+// Fatal provides a mock function with given fields: args
+func (_m *Logger) Fatal(args ...interface{}) {
 	_m.Called(args)
 }
-func (_m *MockLogger) Fatalf(format string, args ...interface{}) {
+
+// Fatalf provides a mock function with given fields: format, args
+func (_m *Logger) Fatalf(format string, args ...interface{}) {
 	_m.Called(format, args)
 }
-func (_m *MockLogger) Panic(args ...interface{}) {
+
+// Panic provides a mock function with given fields: args
+func (_m *Logger) Panic(args ...interface{}) {
 	_m.Called(args)
 }
-func (_m *MockLogger) Panicf(format string, args ...interface{}) {
+
+// Panicf provides a mock function with given fields: format, args
+func (_m *Logger) Panicf(format string, args ...interface{}) {
 	_m.Called(format, args)
 }
-func (_m *MockLogger) WithField(key string, value interface{}) bark.Logger {
+
+// WithField provides a mock function with given fields: key, value
+func (_m *Logger) WithField(key string, value interface{}) bark.Logger {
 	ret := _m.Called(key, value)
 
 	var r0 bark.Logger
@@ -55,7 +80,9 @@ func (_m *MockLogger) WithField(key string, value interface{}) bark.Logger {
 
 	return r0
 }
-func (_m *MockLogger) WithFields(keyValues bark.LogFields) bark.Logger {
+
+// WithFields provides a mock function with given fields: keyValues
+func (_m *Logger) WithFields(keyValues bark.LogFields) bark.Logger {
 	ret := _m.Called(keyValues)
 
 	var r0 bark.Logger
@@ -67,7 +94,23 @@ func (_m *MockLogger) WithFields(keyValues bark.LogFields) bark.Logger {
 
 	return r0
 }
-func (_m *MockLogger) Fields() bark.Fields {
+
+// WithError provides a mock function with given fields: err
+func (_m *Logger) WithError(err error) bark.Logger {
+	ret := _m.Called(err)
+
+	var r0 bark.Logger
+	if rf, ok := ret.Get(0).(func(error) bark.Logger); ok {
+		r0 = rf(err)
+	} else {
+		r0 = ret.Get(0).(bark.Logger)
+	}
+
+	return r0
+}
+
+// Fields provides a mock function with given fields:
+func (_m *Logger) Fields() bark.Fields {
 	ret := _m.Called()
 
 	var r0 bark.Fields
