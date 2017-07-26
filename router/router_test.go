@@ -52,6 +52,9 @@ func (s *RouterTestSuite) SetupTest() {
 	s.ringpop.On("Lookup", "remote2").Return("127.0.0.1:3001", nil)
 	s.ringpop.On("Lookup", "error").Return("", errors.New("ringpop not ready"))
 
+	s.ringpop.On("LookupN", "localfirst", 2).Return([]string{"127.0.0.1:3000", "127.0.0.1:3001"}, nil)
+	s.ringpop.On("LookupN", "remotefirst", 2).Return([]string{"127.0.0.1:3001", "127.0.0.1:3000"}, nil)
+
 	ch, err := tchannel.NewChannel("remote", nil)
 	s.NoError(err)
 
@@ -65,6 +68,28 @@ func (s *RouterTestSuite) TestRingpopRouterGetLocalClient() {
 	s.Equal("local client", client)
 	s.False(isRemote, "local key should not be a remote client")
 	s.clientFactory.AssertCalled(s.T(), "GetLocalClient")
+}
+
+func (s *RouterTestSuite) TestRingpopRouterGetNClientsLocalFirst() {
+	clients, err := s.router.GetNClients("localfirst", 2)
+	s.NoError(err)
+
+	s.Equal("local client", clients[0].Client)
+	s.Equal("remote client", clients[1].Client)
+
+	s.False(clients[0].IsRemote, "first client for localfirst key should not be a remote client")
+	s.True(clients[1].IsRemote, "second client for localfirst key should not be a local client")
+}
+
+func (s *RouterTestSuite) TestRingpopRouterGetNClientsRemoteFirst() {
+	clients, err := s.router.GetNClients("remotefirst", 2)
+	s.NoError(err)
+
+	s.Equal("remote client", clients[0].Client)
+	s.Equal("local client", clients[1].Client)
+
+	s.True(clients[0].IsRemote, "first client for localfirst key should not be a local client")
+	s.False(clients[1].IsRemote, "second client for localfirst key should not be a remote client")
 }
 
 func (s *RouterTestSuite) TestRingpopRouterGetLocalClientCached() {
@@ -168,7 +193,7 @@ func (s *RouterTestSuite) TestRingpopRouterRemoveClientOnSwimFaultyEvent() {
 	s.NoError(err)
 	s.internal.HandleEvent(swim.MemberlistChangesReceivedEvent{
 		Changes: []swim.Change{
-			swim.Change{
+			{
 				Address: dest,
 				Status:  swim.Faulty,
 			},
@@ -191,7 +216,7 @@ func (s *RouterTestSuite) TestRingpopRouterRemoveClientOnSwimLeaveEvent() {
 	s.NoError(err)
 	s.internal.HandleEvent(swim.MemberlistChangesReceivedEvent{
 		Changes: []swim.Change{
-			swim.Change{
+			{
 				Address: dest,
 				Status:  swim.Leave,
 			},
@@ -214,7 +239,7 @@ func (s *RouterTestSuite) TestRingpopRouterNotRemoveClientOnSwimSuspectEvent() {
 	s.NoError(err)
 	s.internal.HandleEvent(swim.MemberlistChangesReceivedEvent{
 		Changes: []swim.Change{
-			swim.Change{
+			{
 				Address: dest,
 				Status:  swim.Suspect,
 			},
