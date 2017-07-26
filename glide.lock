@@ -1,5 +1,5 @@
 hash: 81dea72207381ddfa6c441ae89ae4a7c93b597ded0912f972fdb11298130b8d6
-updated: 2017-07-26T15:09:17.161841779-07:00
+updated: 2017-07-26T15:42:22.720701352-07:00
 imports:
 - name: github.com/apache/thrift
   version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
@@ -12,7 +12,7 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  version: adab96458c51a58dc1783b3335dcce5461522e75
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
@@ -34,7 +34,7 @@ imports:
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: e964b172ca7f4c322ee4c39ea605ff53fab44f79
+  version: 05e8a0eda380579888eb53c394909df027f06991
   subpackages:
   - assert
   - mock
@@ -57,7 +57,7 @@ imports:
   - trand
   - typed
 - name: golang.org/x/net
-  version: ab5485076ff3407ad2d02db054635913f017b0ed
+  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
   - context
 - name: golang.org/x/sys

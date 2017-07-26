@@ -4,17 +4,21 @@
 #
 set -eo pipefail
 
+
+
 mock_directory="${0%/*}/mocks"
 thrift_directory="${0%/*}/thrift"
+
+CWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+VENDORPATH=$CWD/../vendor
 
 thrift-gen -generateThrift -inputFile "$thrift_directory"/pingpong.thrift -outputDir "$thrift_directory"
 mockery -case=underscore -dir "$thrift_directory" -recursive -inpkg -name TChanPingPong
 
-
 # Generate mocks for dependencies
-mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
-mockery -case=underscore -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -output "$mock_directory" -name StatsReporter
-mockery -case=underscore -dir "$GOPATH"/src/github.com/uber/tchannel-go/thrift -recursive -output "$mock_directory" -name TChanClient
+mockery -case=underscore -dir "$VENDORPATH"/github.com/uber-common/bark -recursive -output "$mock_directory" -name Logger
+mockery -case=underscore -dir "$VENDORPATH"/github.com/uber-common/bark -recursive -output "$mock_directory" -name StatsReporter
+mockery -case=underscore -dir "$VENDORPATH"/github.com/uber/tchannel-go/thrift -recursive -output "$mock_directory" -name TChanClient
 
 # Generate mock file for ringpop.Interface, but rename the mocked object to
 # mocks.Ringpop
@@ -30,7 +34,7 @@ mockery -name NodeInterface -recursive -print \
 
 mockery -case=underscore -dir router -recursive -output "$mock_directory" -name ClientFactory
 
-mockery -name Logger -dir "$GOPATH"/src/github.com/uber-common/bark -recursive -print \
+mockery -name Logger -dir "$VENDORPATH"/github.com/uber-common/bark -recursive -print \
     | sed 's/package mocks/package forward/g' \
     > "${0%/*}/../forward/mock_logger_test.go"
 
