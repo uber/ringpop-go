@@ -1,6 +1,11 @@
 ringpop-go changes
 ==================
 
+v0.8.3
+------
+
+* Fix: change github.com/Sirupsen/logrus to lower case
+
 v0.8.2
 ------
 
