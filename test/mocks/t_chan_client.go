@@ -1,6 +1,6 @@
 package mocks
 
-import "github.com/uber/ringpop-go/vendor/github.com/uber/tchannel-go/thrift"
+import "github.com/uber/tchannel-go/thrift"
 import "github.com/stretchr/testify/mock"
 
 import athrift "github.com/uber/tchannel-go/thirdparty/github.com/apache/thrift/lib/go/thrift"
