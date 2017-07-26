@@ -27,16 +27,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber-common/bark"
+	"github.com/uber/ringpop-go/test/mocks"
 )
 
 type LogFacilityTestSuite struct {
 	suite.Suite
-	mockLogger *MockLogger
+	mockLogger *mocks.Logger
 	facility   *Facility
 }
 
 func (s *LogFacilityTestSuite) SetupTest() {
-	s.mockLogger = &MockLogger{}
+	s.mockLogger = &mocks.Logger{}
 	s.facility = NewFacility(s.mockLogger)
 	// Set expected calls
 	for _, meth := range []string{"Debug", "Info", "Warn", "Error", "Fatal", "Panic"} {
@@ -66,7 +67,7 @@ func (s *LogFacilityTestSuite) TestForwarding() {
 }
 
 func (s *LogFacilityTestSuite) TestSetLogger() {
-	newLogger := &MockLogger{}
+	newLogger := &mocks.Logger{}
 	s.facility.SetLogger(newLogger)
 	newLogger.On("Debug", mock.Anything)
 	msg := []interface{}{"msg"}

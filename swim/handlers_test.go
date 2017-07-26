@@ -34,7 +34,7 @@ import (
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim/test/mocks"
+	"github.com/uber/ringpop-go/test/mocks"
 	"github.com/uber/tchannel-go"
 )
 
