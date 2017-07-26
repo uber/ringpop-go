@@ -34,10 +34,6 @@ mockery -name NodeInterface -recursive -print \
 
 mockery -case=underscore -dir router -recursive -output "$mock_directory" -name ClientFactory
 
-mockery -name Logger -dir "$VENDORPATH"/github.com/uber-common/bark -recursive -print \
-    | sed 's/package mocks/package forward/g' \
-    > "${0%/*}/../forward/mock_logger_test.go"
-
 # mocks used in forward cannot go into test/mocks because circular dependency
 mockery -name Sender -dir forward -recursive -testonly -case=underscore -inpkg
 
