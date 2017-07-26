@@ -38,7 +38,7 @@ imports:
   - mock
   - require
 - name: github.com/uber-common/bark
-  version: d52ffa061726911f47fcd3d9e8b9b55f22794772
+  version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
 - name: github.com/uber-go/atomic
   version: 0c9e689d64f004564b79d9a663634756df322902
 - name: github.com/uber/tchannel-go
