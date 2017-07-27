@@ -116,18 +116,20 @@ type ClientResult struct {
 	IsRemote bool
 }
 
-func (r *router) GetNClients(key string, n int) (clients []ClientResult, err error) {
+func (r *router) GetNClients(key string, n int) ([]ClientResult, error) {
 	dests, err := r.ringpop.LookupN(key, n)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, dest := range dests {
+	clients make([]ClientResult, 0, n)
+
+	for i, dest := range dests {
 		client, isRemote, err := r.getClientByHost(dest)
 		if err != nil {
 			return nil, err
 		}
-		clients = append(clients, ClientResult{client, isRemote})
+		clients[i] = ClientResult{client, isRemote}
 	}
 	return clients, nil
 }
