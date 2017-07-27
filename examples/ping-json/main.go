@@ -24,7 +24,7 @@ import (
 	json2 "encoding/json"
 	"flag"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/uber-common/bark"
 	"github.com/uber/ringpop-go"
 	"github.com/uber/ringpop-go/discovery/jsonfile"

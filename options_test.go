@@ -31,6 +31,7 @@ import (
 	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
+	"github.com/uber/ringpop-go/test/mocks/logger"
 	"github.com/uber/tchannel-go"
 )
 
@@ -104,7 +105,7 @@ func (s *RingpopOptionsTestSuite) TestChannelRequired() {
 // TestLogger tests that the logger that's passed in gets applied correctly to
 // the Ringpop instance.
 func (s *RingpopOptionsTestSuite) TestLogger() {
-	mockLogger := &mocks.Logger{}
+	mockLogger := &mocklogger.Logger{}
 	// Ignore random ringpop messages
 	for _, meth := range []string{"Debug", "Info", "Warn", "Error"} {
 		mockLogger.On(meth, mock.Anything)

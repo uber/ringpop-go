@@ -1,4 +1,4 @@
-package mocks
+package mocklogger
 
 import "github.com/uber-common/bark"
 import "github.com/stretchr/testify/mock"
@@ -88,6 +88,20 @@ func (_m *Logger) WithFields(keyValues bark.LogFields) bark.Logger {
 	var r0 bark.Logger
 	if rf, ok := ret.Get(0).(func(bark.LogFields) bark.Logger); ok {
 		r0 = rf(keyValues)
+	} else {
+		r0 = ret.Get(0).(bark.Logger)
+	}
+
+	return r0
+}
+
+// WithError provides a mock function with given fields: err
+func (_m *Logger) WithError(err error) bark.Logger {
+	ret := _m.Called(err)
+
+	var r0 bark.Logger
+	if rf, ok := ret.Get(0).(func(error) bark.Logger); ok {
+		r0 = rf(err)
 	} else {
 		r0 = ret.Get(0).(bark.Logger)
 	}
