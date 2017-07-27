@@ -46,6 +46,11 @@ type Router interface {
 	// time it will inform the caller if the client is a remote client or a
 	// local client via the isRemote return value.
 	GetClient(key string) (client interface{}, isRemote bool, err error)
+	// GetNClients provides the caller with an ordered slice of clients for a
+	// given key. Each result is a struct with a reference to the actual client
+	// and a bool indicating whether or not that client is a remote client or a
+	// local client.
+	GetNClients(key string, n int) (clients []ClientResult, err error)
 }
 
 // A ClientFactory is able to provide an implementation of a TChan[Service]
@@ -101,6 +106,36 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 		return nil, false, err
 	}
 
+	return r.getClientByHost(dest)
+}
+
+// ClientResult is a struct that contains a reference to the actual callable
+// client and a bool indicating whether or not that client is local or remote.
+type ClientResult struct {
+	HostPort string
+	Client   interface{}
+	IsRemote bool
+}
+
+func (r *router) GetNClients(key string, n int) ([]ClientResult, error) {
+	dests, err := r.ringpop.LookupN(key, n)
+	if err != nil {
+		return nil, err
+	}
+
+	clients := make([]ClientResult, n, n)
+
+	for i, dest := range dests {
+		client, isRemote, err := r.getClientByHost(dest)
+		if err != nil {
+			return nil, err
+		}
+		clients[i] = ClientResult{dest, client, isRemote}
+	}
+	return clients, nil
+}
+
+func (r *router) getClientByHost(dest string) (client interface{}, isRemote bool, err error) {
 	r.rw.RLock()
 	cachedEntry, ok := r.clientCache[dest]
 	r.rw.RUnlock()
