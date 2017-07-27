@@ -14,6 +14,7 @@ packages="$(find . -type d -maxdepth 3 \
 	! -path '*/_*' \
 	! -path './Godeps*' \
 	! -path './test*' \
+  ! -path './vendor*' \
 )"
 
 # Standard go tooling behavior is to ignore dirs with leading underscores
