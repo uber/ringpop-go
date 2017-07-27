@@ -1,6 +1,23 @@
 ringpop-go changes
 ==================
 
+v0.8.5
+------
+
+* Fix: LookupN returns ring node destinations in ring order [#211](https://github.com/uber/ringpop-go/pull/211)
+* Fix: Use lower case sirupsen/logrus import [#208](https://github.com/uber/ringpop-go/pull/208)
+* Feature: Added GetNClients to router [#212](https://github.com/uber/ringpop-go/pull/212)
+
+v0.8.4
+------
+
+* Allow requiresAppInPing to be configured [#209](https://github.com/uber/ringpop-go/pull/209)
+
+v0.8.3
+------
+
+* Fix: Add option to enforce identical app name in pings [#206](https://github.com/uber/ringpop-go/pull/206)
+
 v0.8.2
 ------
 
