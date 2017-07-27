@@ -112,6 +112,7 @@ func (r *router) GetClient(key string) (client interface{}, isRemote bool, err e
 // ClientResult is a struct that contains a reference to the actual callable
 // client and a bool indicating whether or not that client is local or remote.
 type ClientResult struct {
+	HostPort string
 	Client   interface{}
 	IsRemote bool
 }
@@ -129,7 +130,7 @@ func (r *router) GetNClients(key string, n int) ([]ClientResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		clients[i] = ClientResult{client, isRemote}
+		clients[i] = ClientResult{dest, client, isRemote}
 	}
 	return clients, nil
 }
