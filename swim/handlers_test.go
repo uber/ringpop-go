@@ -34,7 +34,7 @@ import (
 	"github.com/uber/ringpop-go/discovery/statichosts"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
-	"github.com/uber/ringpop-go/swim/test/mocks"
+	"github.com/uber/ringpop-go/test/mocks/logger"
 	"github.com/uber/tchannel-go"
 )
 
@@ -161,7 +161,7 @@ func (s *HandlerTestSuite) TestNotImplementedHandler() {
 
 // TestErrorHandler tests that the errorHandler logs the correct error message.
 func (s *HandlerTestSuite) TestErrorHandler() {
-	logger := &mocks.Logger{}
+	logger := &mocklogger.Logger{}
 
 	// Make sure random log messages can be sent to this logger while it
 	// replaces the existing one.

@@ -1,5 +1,5 @@
-hash: 4ccda5624a1c3a632cb019d8e2e953856637534b7dba0b735a8f729f23778750
-updated: 2016-08-30T14:48:58.602347073+02:00
+hash: 81dea72207381ddfa6c441ae89ae4a7c93b597ded0912f972fdb11298130b8d6
+updated: 2017-07-26T17:10:07.640390059-07:00
 imports:
 - name: github.com/apache/thrift
   version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
@@ -12,7 +12,7 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  version: adab96458c51a58dc1783b3335dcce5461522e75
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
@@ -21,24 +21,27 @@ imports:
   version: 77a31d686003349e89c89e58408aafcd20003f41
   subpackages:
   - ext
+- name: github.com/pkg/errors
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/pmezard/go-difflib
   version: 792786c7400a136282c1664665ae0a8db921c6c2
   subpackages:
   - difflib
 - name: github.com/rcrowley/go-metrics
   version: dee209f2455f101a5e4e593dea94872d2c62d85d
-- name: github.com/Sirupsen/logrus
-  version: 82c8de1af23b25ba5a468d801f29077f4f483bce
+- name: github.com/sirupsen/logrus
+  version: abee6f9b0679f8044f5fca552eb6a9691a55d4ac
 - name: github.com/stretchr/objx
   version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
 - name: github.com/stretchr/testify
-  version: d77da356e56a7428ad25149ca77381849a6a5232
+  version: 05e8a0eda380579888eb53c394909df027f06991
   subpackages:
   - assert
   - mock
   - require
+  - suite
 - name: github.com/uber-common/bark
-  version: d52ffa061726911f47fcd3d9e8b9b55f22794772
+  version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
 - name: github.com/uber-go/atomic
   version: 0c9e689d64f004564b79d9a663634756df322902
 - name: github.com/uber/tchannel-go
@@ -46,15 +49,22 @@ imports:
   subpackages:
   - json
   - raw
-  - thrift
-  - thrift/thrift-gen
   - relay
+  - thrift
+  - thrift/gen-go/meta
+  - thrift/thrift-gen
   - tnet
   - trand
   - typed
-  - thrift/gen-go/meta
 - name: golang.org/x/net
-  version: 6250b412798208e6c90b03b7c4f226de5aa299e2
+  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
   - context
-devImports: []
+- name: golang.org/x/sys
+  version: d4feaf1a7e61e1d9e79e6c4e76c6349e9cab0a03
+  subpackages:
+  - unix
+  - windows
+- name: gopkg.in/yaml.v2
+  version: a83829b6f1293c91addabc89d0571c246397bbf4
+testImports: []

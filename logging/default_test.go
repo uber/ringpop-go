@@ -25,15 +25,16 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/test/mocks/logger"
 )
 
 type DefaultLoggingTestSuite struct {
 	suite.Suite
-	mockLogger *MockLogger
+	mockLogger *mocklogger.Logger
 }
 
 func (s *DefaultLoggingTestSuite) SetupTest() {
-	s.mockLogger = &MockLogger{}
+	s.mockLogger = &mocklogger.Logger{}
 	SetLogger(s.mockLogger)
 	// Set expected calls
 	s.mockLogger.On("Warn", mock.Anything)
