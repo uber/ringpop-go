@@ -1,5 +1,5 @@
-hash: 60719735c3b3f4ef31eceb974a9324557c52327d93560d0ab0ea2771bceb6fe0
-updated: 2017-07-26T16:58:09.376964357-07:00
+hash: 81dea72207381ddfa6c441ae89ae4a7c93b597ded0912f972fdb11298130b8d6
+updated: 2017-07-26T17:10:07.640390059-07:00
 imports:
 - name: github.com/apache/thrift
   version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
@@ -65,8 +65,6 @@ imports:
   subpackages:
   - unix
   - windows
-- name: gopkg.in/check.v1
-  version: 20d25e2804050c1cd24a7eea1e7a6447dd0e74ec
 - name: gopkg.in/yaml.v2
   version: a83829b6f1293c91addabc89d0571c246397bbf4
 testImports: []
