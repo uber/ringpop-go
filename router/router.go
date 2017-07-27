@@ -122,7 +122,7 @@ func (r *router) GetNClients(key string, n int) ([]ClientResult, error) {
 		return nil, err
 	}
 
-	clients make([]ClientResult, 0, n)
+	clients := make([]ClientResult, n, n)
 
 	for i, dest := range dests {
 		client, isRemote, err := r.getClientByHost(dest)
