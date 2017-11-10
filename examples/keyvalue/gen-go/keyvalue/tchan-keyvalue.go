@@ -45,6 +45,10 @@ func (c *tchanKeyValueServiceClient) Get(ctx thrift.Context, key string) (string
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "Get", &args, &resp)
 	if err == nil && !success {
+		switch {
+		default:
+			err = fmt.Errorf("received no result or unknown exception for Get")
+		}
 	}
 
 	return resp.GetSuccess(), err
@@ -57,6 +61,10 @@ func (c *tchanKeyValueServiceClient) GetAll(ctx thrift.Context, keys []string) (
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "GetAll", &args, &resp)
 	if err == nil && !success {
+		switch {
+		default:
+			err = fmt.Errorf("received no result or unknown exception for GetAll")
+		}
 	}
 
 	return resp.GetSuccess(), err
@@ -70,6 +78,10 @@ func (c *tchanKeyValueServiceClient) Set(ctx thrift.Context, key string, value s
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "Set", &args, &resp)
 	if err == nil && !success {
+		switch {
+		default:
+			err = fmt.Errorf("received no result or unknown exception for Set")
+		}
 	}
 
 	return err

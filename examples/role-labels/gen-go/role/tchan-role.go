@@ -44,6 +44,10 @@ func (c *tchanRoleServiceClient) GetMembers(ctx thrift.Context, role string) ([]
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "GetMembers", &args, &resp)
 	if err == nil && !success {
+		switch {
+		default:
+			err = fmt.Errorf("received no result or unknown exception for GetMembers")
+		}
 	}
 
 	return resp.GetSuccess(), err
@@ -56,6 +60,10 @@ func (c *tchanRoleServiceClient) SetRole(ctx thrift.Context, role string) error 
 	}
 	success, err := c.client.Call(ctx, c.thriftService, "SetRole", &args, &resp)
 	if err == nil && !success {
+		switch {
+		default:
+			err = fmt.Errorf("received no result or unknown exception for SetRole")
+		}
 	}
 
 	return err

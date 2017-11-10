@@ -33,6 +33,7 @@ import (
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/raw"
+	"github.com/uber/tchannel-go/thrift"
 )
 
 // errDestinationsDiverged is an error that is returned from AttemptRetry
@@ -60,6 +61,7 @@ type requestSender struct {
 	rerouteRetries      bool
 
 	headers []byte
+	ctx     thrift.Context
 
 	startTime, retryStartTime time.Time
 
@@ -90,12 +92,21 @@ func newRequestSender(sender Sender, emitter events.EventEmitter, channel shared
 		retrySchedule:  opts.RetrySchedule,
 		rerouteRetries: opts.RerouteRetries,
 		headers:        opts.Headers,
+		ctx:            opts.Ctx,
 		logger:         logger,
 	}
 }
 
 func (s *requestSender) Send() (res []byte, err error) {
-	ctx, cancel := shared.NewTChannelContext(s.timeout)
+	var cancel context.CancelFunc
+	var ctx thrift.Context
+	if s.ctx == nil {
+		ctx, cancel = shared.NewTChannelContext(s.timeout)
+	} else {
+		var c context.Context
+		c, cancel = context.WithTimeout(s.ctx, s.timeout)
+		ctx = tchannel.Wrap(c)
+	}
 	defer cancel()
 
 	var forwardError, applicationError error
