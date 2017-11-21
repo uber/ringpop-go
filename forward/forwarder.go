@@ -47,6 +47,7 @@ type Sender interface {
 
 // Options for the creation of a forwarder
 type Options struct {
+	Ctx            thrift.Context
 	MaxRetries     int
 	RerouteRetries bool
 	RetrySchedule  []time.Duration
@@ -80,6 +81,7 @@ func (f *Forwarder) mergeDefaultOptions(opts *Options) *Options {
 		merged.RetrySchedule = def.RetrySchedule
 	}
 	merged.Headers = opts.Headers
+	merged.Ctx = opts.Ctx
 
 	return &merged
 }

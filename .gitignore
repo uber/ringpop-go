@@ -7,3 +7,4 @@ lint.log
 /_venv/
 README.md.err
 tick-cluster.log
+.idea/

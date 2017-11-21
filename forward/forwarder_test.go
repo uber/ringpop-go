@@ -41,6 +41,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+type ContextKey string
+
 type ForwarderTestSuite struct {
 	suite.Suite
 	sender    *MockSender
@@ -76,6 +78,16 @@ func (s *ForwarderTestSuite) registerPong(address string, channel *tchannel.Chan
 	s.Require().NoError(json.Register(channel, hmap, func(ctx context.Context, err error) {}))
 
 	thriftHandler := &pingpong.MockTChanPingPong{}
+
+	// successful request with context
+	thriftHandler.On("Ping", mock.MatchedBy(
+		func(c thrift.Context) bool {
+			return true
+		}), &pingpong.Ping{
+		Key: "ctxTest",
+	}).Return(&pingpong.Pong{
+		Source: address,
+	}, nil)
 
 	// successful request
 	thriftHandler.On("Ping", mock.Anything, &pingpong.Ping{
@@ -184,6 +196,37 @@ func (s *ForwarderTestSuite) TestForwardThrift() {
 
 	res, err := s.forwarder.ForwardRequest(bytes, dest, "test", "PingPong::Ping", []string{"reachable"},
 		tchannel.Thrift, nil)
+	s.NoError(err, "expected request to be forwarded")
+
+	var response pingpong.PingPongPingResult
+
+	err = DeserializeThrift(res, &response)
+	s.NoError(err)
+
+	s.Equal("correct pinging host", response.Success.Source)
+}
+
+func (s *ForwarderTestSuite) TestForwardThriftWithCtxOption() {
+	dest, err := s.sender.Lookup("reachable")
+	s.NoError(err)
+
+	request := &pingpong.PingPongPingArgs{
+		Request: &pingpong.Ping{
+			Key: "ctxTest",
+		},
+	}
+
+	bytes1, err := SerializeThrift(request)
+	s.NoError(err, "expected ping to be serialized")
+
+
+	k := ContextKey("key")
+	ctx := thrift.Wrap(context.WithValue(context.Background(), k, "val"))
+
+	res, err := s.forwarder.ForwardRequest(bytes1, dest, "test", "PingPong::Ping", []string{"reachable"},
+		tchannel.Thrift, &Options{
+			Ctx: ctx,
+		})
 	s.NoError(err, "expected request to be forwarded")
 
 	var response pingpong.PingPongPingResult
