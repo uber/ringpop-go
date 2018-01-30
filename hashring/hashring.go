@@ -198,6 +198,7 @@ func (r *HashRing) replicaPointForServer(server membership.Member, replica int) 
 		// Due to backwards compatibility it's only used when we got an identity.
 		replicaStr = fmt.Sprintf("%s#%v", identity, replica)
 	}
+	fmt.Printf("Address:%s, Identity:%s, ReplicaStr: %s\n", server.GetAddress(), server.Identity(), replicaStr)
 	return replicaPoint{
 		hash:     r.hashfunc(replicaStr),
 		identity: identity,
