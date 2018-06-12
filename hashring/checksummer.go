@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/dgryski/go-farm"
 )
@@ -20,7 +19,9 @@ type Checksummer interface {
 	Checksum(ring *HashRing) (checksum uint32)
 }
 
-type identityChecksummer struct{}
+type identityChecksummer struct {
+	buf bytes.Buffer
+}
 
 func (i *identityChecksummer) Checksum(ring *HashRing) uint32 {
 	identitySet := make(map[string]struct{})
@@ -35,22 +36,30 @@ func (i *identityChecksummer) Checksum(ring *HashRing) uint32 {
 	}
 
 	sort.Strings(identities)
-	bytes := []byte(strings.Join(identities, ";"))
-	return farm.Fingerprint32(bytes)
+	i.buf.Reset()
+	for idi, id := range identities {
+		if idi > 0 {
+			i.buf.WriteByte(';')
+		}
+		i.buf.WriteString(id)
+	}
+	return farm.Fingerprint32(i.buf.Bytes())
 }
 
-type replicaPointChecksummer struct{}
+type replicaPointChecksummer struct {
+	buf bytes.Buffer
+}
 
 func (r *replicaPointChecksummer) Checksum(ring *HashRing) uint32 {
-	buffer := bytes.Buffer{}
+	r.buf.Reset()
 
 	ring.tree.root.traverseWhile(func(node *redBlackNode) bool {
-		buffer.WriteString(strconv.Itoa(node.key.(replicaPoint).hash))
-		buffer.WriteString("-")
-		buffer.WriteString(node.value.(string))
-		buffer.WriteString(";")
+		r.buf.WriteString(strconv.Itoa(node.key.(replicaPoint).hash))
+		r.buf.WriteByte('-')
+		r.buf.WriteString(node.value.(string))
+		r.buf.WriteByte(';')
 		return true
 	})
 
-	return farm.Fingerprint32(buffer.Bytes())
+	return farm.Fingerprint32(r.buf.Bytes())
 }

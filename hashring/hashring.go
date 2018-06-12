@@ -93,7 +93,9 @@ type HashRing struct {
 	legacyChecksum uint32
 
 	// checksummers is map of named Checksum calculators for the hashring
-	checksummers map[string]Checksummer
+	checksummers      map[string]Checksummer
+	legacyChecksummer identityChecksummer
+
 	// checksums is a map containing the checksums that are representing this
 	// hashring. The map should never be altered in place so it is safe to pass
 	// a copy to components that need the checksums
@@ -160,9 +162,8 @@ func (r *HashRing) computeChecksumsNoLock() {
 	}
 
 	// calculate the legacy identity only based checksum
-	legacyChecksummer := identityChecksummer{}
 	oldChecksum := r.legacyChecksum
-	newChecksum := legacyChecksummer.Checksum(r)
+	newChecksum := r.legacyChecksummer.Checksum(r)
 	r.legacyChecksum = newChecksum
 
 	if oldChecksum != newChecksum {
