@@ -26,6 +26,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -158,6 +159,24 @@ func (s *requestSender) Send() (res []byte, err error) {
 	}
 }
 
+type _bufPool struct {
+	sync.Pool
+}
+
+func (bp *_bufPool) Get() *bytes.Buffer {
+	val := bp.Pool.Get()
+	if buf, ok := val.(*bytes.Buffer); ok {
+		return buf
+	}
+	return bytes.NewBuffer(make([]byte, 0, 64*1024))
+}
+
+func (bp *_bufPool) Put(buf *bytes.Buffer) {
+	bp.Pool.Put(buf)
+}
+
+var bufPool = _bufPool{}
+
 // calls remote service and writes response to s.response
 func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *error, appError *error) <-chan bool {
 	done := make(chan bool, 1)
@@ -227,7 +246,8 @@ func forwardArgs(call *tchannel.OutboundCall, arg2, arg3 []byte, res *[]byte) er
 		return err
 	}
 
-	buf := bytes.NewBuffer(make([]byte, 0, 64*1024))
+	buf := bufPool.Get()
+	defer bufPool.Put(buf)
 	if err := copyArg(buf, resp.Arg3Reader); err != nil {
 		return err
 	}
