@@ -21,8 +21,11 @@
 package forward
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
+	"io/ioutil"
 	"time"
 
 	"golang.org/x/net/context"
@@ -32,7 +35,6 @@ import (
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/tchannel-go"
-	"github.com/uber/tchannel-go/raw"
 	"github.com/uber/tchannel-go/thrift"
 )
 
@@ -173,26 +175,24 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *err
 			return
 		}
 
-		var arg3 []byte
 		headers := s.headers
 		if s.format == tchannel.Thrift {
 			if headers == nil {
 				headers = []byte{0, 0}
 			}
-			_, arg3, _, err = raw.WriteArgs(call, headers, s.request)
+			err = forwardArgs(call, headers, s.request, res)
 		} else {
-			var resp *tchannel.OutboundCallResponse
-			_, arg3, resp, err = raw.WriteArgs(call, headers, s.request)
+			err = forwardArgs(call, headers, s.request, res)
 
 			// check if the response is an application level error
-			if err == nil && resp.ApplicationError() {
+			if err == nil && call.Response().ApplicationError() {
 				// parse the json from the application level error
 				errResp := struct {
 					Type    string `json:"type"`
 					Message string `json:"message"`
 				}{}
 
-				err = json.Unmarshal(arg3, &errResp)
+				err = json.Unmarshal(*res, &errResp)
 
 				// if parsing succeeded return the error as an application error
 				if err == nil {
@@ -208,11 +208,59 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *err
 			return
 		}
 
-		*res = arg3
 		done <- true
 	}()
 
 	return done
+}
+
+func forwardArgs(call *tchannel.OutboundCall, arg2, arg3 []byte, res *[]byte) error {
+	if err := writeArg(call.Arg2Writer, arg2); err != nil {
+		return err
+	}
+	if err := writeArg(call.Arg3Writer, arg3); err != nil {
+		return err
+	}
+
+	resp := call.Response()
+	if err := copyArg(ioutil.Discard, resp.Arg2Reader); err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, 64*1024))
+	if err := copyArg(buf, resp.Arg3Reader); err != nil {
+		return err
+	}
+
+	if res == nil {
+		*res = []byte{}
+	}
+	*res = append(*res, buf.Bytes()...)
+	return nil
+}
+
+func writeArg(writable func() (tchannel.ArgWriter, error), bs []byte) error {
+	aw, err := writable()
+	if err != nil {
+		return err
+	}
+	_, err = aw.Write(bs)
+	if err == nil {
+		err = aw.Close()
+	}
+	return err
+}
+
+func copyArg(w io.Writer, readable func() (tchannel.ArgReader, error)) error {
+	ar, err := readable()
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, ar)
+	if err == nil {
+		err = ar.Close()
+	}
+	return err
 }
 
 func (s *requestSender) ScheduleRetry() ([]byte, error) {
