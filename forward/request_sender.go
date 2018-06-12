@@ -261,9 +261,6 @@ func forwardArgs(call *tchannel.OutboundCall, arg2, arg3 []byte, res *[]byte) er
 		return err
 	}
 
-	if res == nil {
-		*res = []byte{}
-	}
 	*res = append(*res, buf.Bytes()...)
 	return nil
 }
