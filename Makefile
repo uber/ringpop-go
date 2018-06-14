@@ -55,7 +55,7 @@ dev_deps:
 	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps
-	glide install --cache
+	glide install
 	@if ! which thrift | grep -q /; then \
 		echo "thrift not in PATH. (brew install thrift?)" >&2; \
  		exit 1; \
