@@ -11,7 +11,7 @@ export PATH := $(GOPATH)/bin:$(PATH)
 
 
 # Automatically gather packages
-PKGS = $(shell find . -type d -maxdepth 3 \
+PKGS = $(shell find . -maxdepth 3 -type d \
 	! -path '*/.git*' \
 	! -path '*/_*' \
 	! -path '*/vendor*' \
