@@ -54,7 +54,7 @@ dev_deps:
 	go get -u github.com/golang/lint/golint/...
 
 setup: dev_deps
-	glide install --cache
+	glide install
 	@if ! which thrift | grep -q /; then \
 		echo "thrift not in PATH. (brew install thrift?)" >&2; \
  		exit 1; \
