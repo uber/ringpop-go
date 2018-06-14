@@ -229,7 +229,7 @@ func (rp *Ringpop) startTimers() {
 		ticker := rp.clock.Ticker(rp.config.MembershipChecksumStatPeriod)
 		rp.tickers <- ticker
 		go func() {
-			for _ = range ticker.C {
+			for range ticker.C {
 				rp.statter.UpdateGauge(
 					rp.getStatKey("membership.checksum-periodic"),
 					nil,
@@ -243,7 +243,7 @@ func (rp *Ringpop) startTimers() {
 		ticker := rp.clock.Ticker(rp.config.RingChecksumStatPeriod)
 		rp.tickers <- ticker
 		go func() {
-			for _ = range ticker.C {
+			for range ticker.C {
 				rp.statter.UpdateGauge(
 					rp.getStatKey("ring.checksum-periodic"),
 					nil,

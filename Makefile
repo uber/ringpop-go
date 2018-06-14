@@ -11,7 +11,7 @@ export PATH := $(GOPATH)/bin:$(PATH)
 
 
 # Automatically gather packages
-PKGS = $(shell find . -type d -maxdepth 3 \
+PKGS = $(shell find . -maxdepth 3 -type d \
 	! -path '*/.git*' \
 	! -path '*/_*' \
 	! -path '*/vendor*' \
@@ -55,7 +55,7 @@ dev_deps:
 	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps
-	glide install --cache
+	glide install
 	@if ! which thrift | grep -q /; then \
 		echo "thrift not in PATH. (brew install thrift?)" >&2; \
  		exit 1; \
