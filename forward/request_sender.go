@@ -243,6 +243,8 @@ func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *err
 	return done
 }
 
+var discarderFrom = ioutil.Discard.(io.ReaderFrom)
+
 func forwardArgs(call *tchannel.OutboundCall, arg2, arg3 []byte, res *[]byte) error {
 	if err := writeArg(call.Arg2Writer, arg2); err != nil {
 		return err
@@ -252,13 +254,13 @@ func forwardArgs(call *tchannel.OutboundCall, arg2, arg3 []byte, res *[]byte) er
 	}
 
 	resp := call.Response()
-	if err := copyArg(ioutil.Discard, resp.Arg2Reader); err != nil {
+	if err := readArgInto(discarderFrom, resp.Arg2Reader); err != nil {
 		return err
 	}
 
 	buf := bufPool.Get()
 	defer bufPool.Put(buf)
-	if err := copyArg(buf, resp.Arg3Reader); err != nil {
+	if err := readArgInto(buf, resp.Arg3Reader); err != nil {
 		return err
 	}
 
@@ -278,12 +280,12 @@ func writeArg(writable func() (tchannel.ArgWriter, error), bs []byte) error {
 	return err
 }
 
-func copyArg(w io.Writer, readable func() (tchannel.ArgReader, error)) error {
+func readArgInto(rf io.ReaderFrom, readable func() (tchannel.ArgReader, error)) error {
 	ar, err := readable()
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(w, ar)
+	_, err = rf.ReadFrom(ar)
 	if err == nil {
 		err = ar.Close()
 	}
