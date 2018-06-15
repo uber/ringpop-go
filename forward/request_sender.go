@@ -27,7 +27,6 @@ import (
 	"io"
 	"io/ioutil"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/context"
@@ -162,30 +161,22 @@ func (s *requestSender) Send() (res []byte, err error) {
 
 type _bufPool struct {
 	sync.Pool
-	maxCap int64
 }
 
 func (bp *_bufPool) Get() *bytes.Buffer {
-	const allocLimit = 100 * 1024 * 1024 // cap initial allocations at 100MiB
+	const allocSize = 4 * 1024 * 1024 // 4 MiB
 	val := bp.Pool.Get()
 	if buf, ok := val.(*bytes.Buffer); ok {
 		return buf
 	}
-	n := atomic.LoadInt64(&bp.maxCap)
-	if n > allocLimit {
-		n = allocLimit
-	}
-	return bytes.NewBuffer(make([]byte, 0, n))
+	return bytes.NewBuffer(make([]byte, 0, allocSize))
 }
 
 func (bp *_bufPool) Put(buf *bytes.Buffer) {
-	if n, m := int64(buf.Cap()), atomic.LoadInt64(&bp.maxCap); n > m {
-		atomic.CompareAndSwapInt64(&bp.maxCap, m, n)
-	}
 	bp.Pool.Put(buf)
 }
 
-var bufPool = _bufPool{maxCap: 64 * 1024}
+var bufPool = _bufPool{}
 
 // calls remote service and writes response to s.response
 func (s *requestSender) MakeCall(ctx context.Context, res *[]byte, fwdError *error, appError *error) <-chan bool {
