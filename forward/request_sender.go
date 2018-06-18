@@ -173,6 +173,7 @@ func (bp *_bufPool) Get() *bytes.Buffer {
 }
 
 func (bp *_bufPool) Put(buf *bytes.Buffer) {
+	buf.Reset()
 	bp.Pool.Put(buf)
 }
 
