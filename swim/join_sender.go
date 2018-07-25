@@ -135,7 +135,6 @@ func newJoinSender(node *Node, opts *joinOpts) (*joinSender, error) {
 	// there. If the host list is empty, this will create a single-node
 	// cluster.
 	if !util.StringInSlice(bootstrapHosts, node.Address()) {
-		node.logger.WithField("address", node.Address()).Warn("inserting self into bootstrap hosts list")
 		bootstrapHosts = append(bootstrapHosts, node.Address())
 	}
 
@@ -291,8 +290,6 @@ func (j *joinSender) JoinCluster() ([]string, error) {
 		j.logger.Info("got single node cluster to join")
 		return nodesJoined, nil
 	}
-
-	j.logger.WithField("address", j.node.address).WithField("hostsMap", j.bootstrapHostsMap).Info("joining multi-node cluster")
 
 	for {
 		if j.node.Destroyed() {
