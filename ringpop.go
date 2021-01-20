@@ -123,7 +123,7 @@ type state uint
 
 const (
 	// created means the Ringpop instance has been created but the swim node,
-	// stats and hasring haven't been set up. The listen address has not been
+	// stats and hashring haven't been set up. The listen address has not been
 	// resolved yet either.
 	created state = iota
 	// initialized means the listen address has been resolved and the swim
@@ -190,14 +190,16 @@ func (rp *Ringpop) init() error {
 	rp.subChannel = rp.channel.GetSubChannel("ringpop", tchannel.Isolated)
 	rp.registerHandlers()
 
-	rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
-		StateTimeouts:     rp.config.StateTimeouts,
-		Clock:             rp.clock,
-		LabelLimits:       rp.config.LabelLimits,
-		InitialLabels:     rp.config.InitialLabels,
-		SelfEvict:         rp.config.SelfEvict,
-		RequiresAppInPing: rp.config.RequiresAppInPing,
-	})
+	if rp.node == nil {
+		rp.node = swim.NewNode(rp.config.App, address, rp.subChannel, &swim.Options{
+			StateTimeouts:     rp.config.StateTimeouts,
+			Clock:             rp.clock,
+			LabelLimits:       rp.config.LabelLimits,
+			InitialLabels:     rp.config.InitialLabels,
+			SelfEvict:         rp.config.SelfEvict,
+			RequiresAppInPing: rp.config.RequiresAppInPing,
+		})
+	}
 	rp.node.AddListener(rp)
 
 	rp.ring = hashring.New(farm.Fingerprint32, rp.configHashRing.ReplicaPoints)
