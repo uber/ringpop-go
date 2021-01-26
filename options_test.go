@@ -349,16 +349,20 @@ func (s *RingpopOptionsTestSuite) TestSelfEvictOptions() {
 // TestNodeOverride tests that the swim.NodeInterface implementation that is
 // provided to NodeOverride is correctly set on the Ringpop instance.
 func (s *RingpopOptionsTestSuite) TestNodeOverride() {
-	mockNode := &struct {
+	type mockNode struct {
 		events.SyncEventEmitter
 		mocks.SwimNode
-	}{}
+	}
 
-	rp, err := New("test", Channel(s.channel), NodeOverride(mockNode))
+	mockNode1 := &mockNode{}
+	mockNode2 := &mockNode{}
+
+	rp, err := New("test", Channel(s.channel), NodeOverride(mockNode1))
 	s.Require().NotNil(rp)
 	s.Require().NoError(err)
 
-	s.Exactly(mockNode, rp.node)
+	s.Same(mockNode1, rp.node)
+	s.NotSame(mockNode2, rp.node)
 }
 
 func TestRingpopOptionsTestSuite(t *testing.T) {
