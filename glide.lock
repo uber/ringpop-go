@@ -1,8 +1,8 @@
-hash: 817fc2593a62fb630719d72c41e784ae6bed059238785076e5764fe90fb4b26a
-updated: 2017-11-10T15:29:25.849080805-08:00
+hash: 5298d118233757c1f9458e841651d33b8e70bbee5f60f458ae64503e030cb674
+updated: 2021-01-28T18:40:42.708687-08:00
 imports:
 - name: github.com/apache/thrift
-  version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
+  version: b2a4d4ae21c789b689dd162deb819665567f481c
   subpackages:
   - lib/go/thrift
 - name: github.com/benbjohnson/clock
@@ -18,7 +18,7 @@ imports:
 - name: github.com/dgryski/go-farm
   version: fc41e106ee0e4394f69a56046e5c5adbaf29d912
 - name: github.com/opentracing/opentracing-go
-  version: 1949ddbfd147afd4d964a9f00b24eb291e0e7c38
+  version: d34af3eaa63c4d08ab54863a4bdd0daa45212e12
   subpackages:
   - ext
   - log
@@ -44,7 +44,7 @@ imports:
 - name: github.com/uber-common/bark
   version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
 - name: github.com/uber-go/atomic
-  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
+  version: 12f27ba2637fa0e13772a4f05fa46a5d18d53182
   subpackages:
   - utils
 - name: github.com/uber/tchannel-go
