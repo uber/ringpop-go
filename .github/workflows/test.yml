@@ -34,19 +34,6 @@ jobs:
       with:
         fetch-depth: 1
         path: go/src/github.com/uber/ringpop-go
-
-    - name: Install dependencies
-      run: |
-        go get -u github.com/Masterminds/glide
-        go get github.com/axw/gocov/gocov
-        go get github.com/mattn/goveralls
-        go get golang.org/x/tools/cmd/cover
-        python -m pip install --upgrade pip
-        pip install virtualenv
-        ./scripts/travis/get-thrift.sh
-        ./scripts/travis/get-thrift-gen.sh
-        ./scripts/travis/get-cram.sh
-        npm install -g tcurl@v4.22.2
         
     - name: Debug
       run: |
@@ -57,6 +44,19 @@ jobs:
         echo ${GOROOT}
       env:
         GOPATH: /home/runner/work/ringpop-go/go
+        
+    - name: Install dependencies
+      run: |
+        go get -u github.com/Masterminds/glide
+        go get github.com/axw/gocov/gocov
+        go get github.com/mattn/goveralls
+        go get golang.org/x/tools/cmd/cover
+        python -m pip install --upgrade pip
+        pip install virtualenv
+        /home/runner/work/ringpop-go/go/github.com/uber/ringpop-go/scripts/travis/get-thrift.sh
+        /home/runner/work/ringpop-go/go/github.com/uber/ringpop-go/scripts/travis/get-thrift-gen.sh
+        /home/runner/work/ringpop-go/go/github.com/uber/ringpop-go/scripts/travis/get-cram.sh
+        npm install -g tcurl@v4.22.2
         
     - name: Run Setup
       run: make setup
