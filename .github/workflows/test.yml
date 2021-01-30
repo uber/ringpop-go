@@ -24,6 +24,11 @@ jobs:
       with:
         python-version: 2.7
         
+    - name: Use Node.js 15.x
+      uses: actions/setup-node@v1
+      with:
+        node-version: 15.x
+        
     - name: Checkout code
       uses: actions/checkout@v2
 
