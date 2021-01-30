@@ -35,16 +35,10 @@ coveralls:
 	test/update-coveralls
 
 lint:
-	@:>lint.log
-
-	@-golint ./... | grep -Ev '(^vendor|test|gen-go)/' | tee -a lint.log
-
-	@for pkg in $(PKGS); do \
-		scripts/lint/run-vet "$$pkg" | tee -a lint.log; \
+	golint ./... | grep -Ev '(^vendor|test|gen-go)/' | tee -a lint.log
+	for pkg in $(PKGS); do \
+		scripts/lint/run-vet "$$pkg"
 	done;
-
-	@[ ! -s lint.log ]
-	@rm -f lint.log
 
 mocks:
 	test/gen-testfiles
