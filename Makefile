@@ -35,9 +35,9 @@ coveralls:
 	test/update-coveralls
 
 lint:
-	golint ./... | grep -Ev '(^vendor|test|gen-go)/' | tee -a lint.log
+	golint -set_exit_status ./... | grep -Ev '(^vendor|test|gen-go)/'
 	for pkg in $(PKGS); do \
-		scripts/lint/run-vet "$$pkg"
+		scripts/lint/run-vet "$$pkg"; \
 	done;
 
 mocks:
