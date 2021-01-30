@@ -3,6 +3,7 @@
 # Same as `go get` but you can specify a git commit ref.
 #
 set -e
+SHELL = /bin/bash
 
 #
 # Resolve the path to the Go workspace from GOPATH.
@@ -98,7 +99,7 @@ _main() {
 		_usage
 		exit 99
 	fi
-
+	
 	local package_repo
 	local package_path
 	local package_version
