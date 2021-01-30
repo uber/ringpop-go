@@ -1,0 +1,60 @@
+name: test
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+
+jobs:
+  test:
+    name: Run tests
+    
+    runs-on: ubuntu-latest
+    
+    steps:
+    
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+
+    - name: Set up Python 2.7
+      uses: actions/setup-python@v2
+      with:
+        python-version: 2.7
+        
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies and run setup
+      run: |
+        go get -u github.com/Masterminds/glide
+        go get github.com/axw/gocov/gocov
+        go get github.com/mattn/goveralls
+        go get golang.org/x/tools/cmd/cover
+        python -m pip install --upgrade pip
+        pip install virtualenv
+        ./scripts/travis/get-thrift.sh
+        ./scripts/travis/get-thrift-gen.sh
+        ./scripts/travis/get-cram.sh
+        npm install -g tcurl@v4.22.2
+        make setup
+      
+    - name: Lint
+      run: make lint
+      
+    - name: Unit Tests
+      run: make test-unit
+     
+    - name: Race Tests
+      run: make test-examples
+     
+    - name: Example Tests
+      run: make test-race
+      
+    - name: Code Coverage
+      run: make coveralls
+      
+    - name: Test
+      run: go test -v ./...
