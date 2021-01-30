@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate thrift-gen --generateThrift --outputDir gen-go --template github.com/uber/ringpop-go/ringpop.thrift-gen --inputFile keyvalue.thrift
+//go:generate thrift-gen --generateThrift --outputDir gen-go --template ../../ringpop.thrift-gen --inputFile keyvalue.thrift
 
 package main
 
