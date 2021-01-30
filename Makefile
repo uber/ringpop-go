@@ -34,6 +34,12 @@ clean-mocks:
 coveralls:
 	test/update-coveralls
 
+lint:
+	golint -set_exit_status $(glide novendor | grep -Ev 'test|examples')
+	for pkg in $(PKGS); do \
+		scripts/lint/run-vet "$$pkg"; \
+	done;
+
 mocks:
 	test/gen-testfiles
 
