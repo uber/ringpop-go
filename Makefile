@@ -65,14 +65,14 @@ test-integration: vendor
 	test/run-integration-tests
 
 test-unit:
-	go generate $(NOVENDOR)
+	go generate -v ./...
 	test/go-test-prettify $(NOVENDOR)
 
 test-examples: vendor _venv/bin/cram
 	. _venv/bin/activate && ./test/run-example-tests
 
 test-race: vendor
-	go generate $(NOVENDOR)
+	go generate -v ./...
 	test/go-test-prettify -race $(NOVENDOR)
 
 vendor:
