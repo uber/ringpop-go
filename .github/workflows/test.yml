@@ -1,9 +1,8 @@
-name: test
+name: Build and Test
 
 on:
   push:
     branches: ['*']
-    
   pull_request:
     branches: ['*']
 
