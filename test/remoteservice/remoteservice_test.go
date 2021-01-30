@@ -21,7 +21,7 @@ var _ = shared.GoUnusedProtection__
 
 //go:generate mkdir -p .gen/go
 //go:generate thrift-gen --generateThrift --outputDir .gen/go --inputFile remoteservice.thrift --template ../../ringpop.thrift-gen -packagePrefix github.com/uber/ringpop-go/test/remoteservice/.gen/go/
-//go:generate mockery --dir=.gen/go/remoteservice --name=TChanRemoteService
+//go:generate mockery -dir=.gen/go/remoteservice -name=TChanRemoteService
 
 func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 	rp := &mocks.Ringpop{}
