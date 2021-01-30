@@ -32,7 +32,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Install dependencies and run setup
+    - name: Install dependencies
       run: |
         go get -u github.com/Masterminds/glide
         go get github.com/axw/gocov/gocov
@@ -44,7 +44,9 @@ jobs:
         ./scripts/travis/get-thrift-gen.sh
         ./scripts/travis/get-cram.sh
         npm install -g tcurl@v4.22.2
-        make setup
+        
+    - name: Run Setup
+      run: make setup
       
     - name: Lint
       run: make lint
@@ -60,6 +62,3 @@ jobs:
       
     - name: Code Coverage
       run: make coveralls
-      
-    - name: Test
-      run: go test -v ./...
