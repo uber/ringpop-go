@@ -34,12 +34,6 @@ clean-mocks:
 coveralls:
 	test/update-coveralls
 
-lint:
-	golint -set_exit_status ./... | grep -Ev '(^vendor|test|gen-go)/'
-	for pkg in $(PKGS); do \
-		scripts/lint/run-vet "$$pkg"; \
-	done;
-
 mocks:
 	test/gen-testfiles
 
