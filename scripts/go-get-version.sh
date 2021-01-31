@@ -3,7 +3,6 @@
 # Same as `go get` but you can specify a git commit ref.
 #
 set -e
-SHELL = /bin/bash
 
 #
 # Resolve the path to the Go workspace from GOPATH.
