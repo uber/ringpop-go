@@ -30,11 +30,4 @@ do
   fi
 done
 
-# Failures have incomplete results, so don't send
-if [ "$FAIL" -eq 0 ]; then
-  goveralls -service=travis-ci -v -coverprofile=acc.out
-fi
-
-rm -f acc.out
-
 exit $FAIL
