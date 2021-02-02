@@ -68,7 +68,7 @@ func (w *worker) RegisterPing() error {
 	hmap := map[string]interface{}{"/ping": w.PingHandler}
 
 	return json.Register(w.channel, hmap, func(ctx context.Context, err error) {
-		w.logger.Debug("error occured: %v", err)
+		w.logger.Debugf("error occured: %v", err)
 	})
 }
 

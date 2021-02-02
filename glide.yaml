@@ -2,6 +2,7 @@ package: github.com/uber/ringpop-go
 import:
 - package: github.com/sirupsen/logrus
 - package: github.com/apache/thrift
+  version: '>=0.9.3,<0.11.0'
   subpackages:
   - lib/go/thrift
 - package: github.com/benbjohnson/clock

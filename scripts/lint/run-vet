@@ -10,7 +10,7 @@ declare script_dir="${0%/*}"
 
 _go-vet() {
 	find "$@" -maxdepth 1 -mindepth 1 -type f -name '*.go' \
-		-exec go tool vet -printfuncs Logf:3 {} + 2>&1 ; \
+		-exec go vet -printfuncs Logf:3 {} + 2>&1 ; \
 }
 
 _lint-warn() {

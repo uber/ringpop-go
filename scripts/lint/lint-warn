@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# lint-warn takes the output of `go tool vet` and matches lines against an
+# lint-warn takes the output of `go vet` and matches lines against an
 # exclude file. If an output line matches an exclude, it is printed to stdout,
 # otherwise it is printed to stderr.
 #
