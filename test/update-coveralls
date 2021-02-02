@@ -17,6 +17,8 @@ packages="$(find . -type d -maxdepth 3 \
   ! -path './vendor*' \
 )"
 
+pwd
+
 # Standard go tooling behavior is to ignore dirs with leading underscores
 for dir in $packages;
 do
