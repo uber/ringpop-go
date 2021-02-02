@@ -62,6 +62,8 @@ jobs:
         
     - name: Run Setup
       run: make setup
+      env:
+        GOPATH: /home/runner/work/ringpop-go/go
       
 #    - name: Lint
 #      run: make lint
