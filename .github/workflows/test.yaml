@@ -1,0 +1,67 @@
+name: Test
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest    
+
+    env:
+      GOPATH: ${{ github.workspace }}
+      GO111MODULE: off
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
+
+    steps:   
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+    - name: Setup Python 2.7
+      uses: actions/setup-python@v2
+      with:
+        python-version: 2.7
+    - name: Setup Node.js 15.x
+      uses: actions/setup-node@v1
+      with:
+        node-version: 15.x
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+        path: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
+    - name: Debug
+      run: |
+        pwd
+        echo ${HOME}
+        echo ${GITHUB_WORKSPACE}
+        echo ${GOPATH}
+        echo ${GOROOT}
+    - name: Install dependencies
+      run: |
+        go get -u github.com/Masterminds/glide
+        go get github.com/axw/gocov/gocov
+        go get github.com/mattn/goveralls
+        go get golang.org/x/tools/cmd/cover
+        python -m pip install --upgrade pip
+        pip install virtualenv
+        ./scripts/travis/get-thrift.sh
+        ./scripts/travis/get-thrift-gen.sh
+        ./scripts/travis/get-cram.sh
+        npm install -g tcurl@v4.22.2
+    - name: Run Setup
+      run: make setup      
+#    - name: Lint
+#      run: make lint
+    - name: Unit Tests
+      run: make test-unit
+    - name: Race Tests
+      run: make test-examples
+    - name: Example Tests
+      run: make test-race
+    - name: Code Coverage
+      run: make coveralls
