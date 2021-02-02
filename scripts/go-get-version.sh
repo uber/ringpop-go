@@ -117,8 +117,6 @@ _main() {
 		echo go_workspace: ${go_workspace}
 		echo GOPATH: $GOPATH
 		# exit
-		pwd
-		ls -alR ../go
 
 		# Download package
 		run go get -v -d "${package_repo}${package_path}"
