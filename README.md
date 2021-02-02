@@ -1,4 +1,4 @@
-ringpop-go [![Build Status](https://github.com/uber/ringpop-go/workflows/Test/badge.svg)](https://github.com/uber/ringpop-go/actions?query=workflow%3ATest) [![Coverage Status](https://coveralls.io/repos/uber/ringpop-go/badge.svg?branch=master&service=github)](https://coveralls.io/github/uber/ringpop-go?branch=master)
+ringpop-go [![Build Status](https://travis-ci.org/uber/ringpop-go.svg?branch=master)](https://travis-ci.org/uber/ringpop-go) [![Coverage Status](https://coveralls.io/repos/uber/ringpop-go/badge.svg?branch=master&service=github)](https://coveralls.io/github/uber/ringpop-go?branch=master)
 ==========
 
 **(This project is no longer under active development.)**
