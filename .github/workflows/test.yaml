@@ -63,5 +63,9 @@ jobs:
       run: make test-race
     - name: Example Tests
       run: make test-examples
-    - name: Code Coverage
+    - name: Generate coverage report
       run: make coveralls
+    - name: Upload coverage report
+      uses: shogo82148/actions-goveralls@v1
+      with:
+        path-to-profile: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}/acc.out
