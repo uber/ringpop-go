@@ -26,12 +26,13 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/uber/ringpop-go/events"
 	"github.com/uber/ringpop-go/hashring"
 	"github.com/uber/ringpop-go/logging"
 	"github.com/uber/ringpop-go/membership"
 	"github.com/uber/ringpop-go/swim"
 	"github.com/uber/ringpop-go/test/mocks"
-	"github.com/uber/ringpop-go/test/mocks/logger"
+	mocklogger "github.com/uber/ringpop-go/test/mocks/logger"
 	"github.com/uber/tchannel-go"
 )
 
@@ -343,6 +344,25 @@ func (s *RingpopOptionsTestSuite) TestSelfEvictOptions() {
 		s.Equal(test.result, rp.config.SelfEvict)
 	}
 
+}
+
+// TestNodeOverride tests that the swim.NodeInterface implementation that is
+// provided to NodeOverride is correctly set on the Ringpop instance.
+func (s *RingpopOptionsTestSuite) TestNodeOverride() {
+	type mockNode struct {
+		events.SyncEventEmitter
+		mocks.SwimNode
+	}
+
+	mockNode1 := &mockNode{}
+	mockNode2 := &mockNode{}
+
+	rp, err := New("test", Channel(s.channel), NodeOverride(mockNode1))
+	s.Require().NotNil(rp)
+	s.Require().NoError(err)
+
+	s.Same(mockNode1, rp.node)
+	s.NotSame(mockNode2, rp.node)
 }
 
 func TestRingpopOptionsTestSuite(t *testing.T) {

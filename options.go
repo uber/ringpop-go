@@ -368,6 +368,15 @@ func RequiresAppInPing(requiresAppInPing bool) Option {
 	}
 }
 
+// NodeOverride is used to optionally override the default SWIM-based
+// gossip-style node membership protocol used for membership management.
+func NodeOverride(node swim.NodeInterface) Option {
+	return func(r *Ringpop) error {
+		r.node = node
+		return nil
+	}
+}
+
 // Default options
 
 // defaultClock sets the ringpop clock interface to use the system clock
