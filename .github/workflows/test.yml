@@ -9,32 +9,31 @@ on:
 jobs:
   test:
     name: Run tests
-    
-    runs-on: ubuntu-latest
-    
-    steps:
-    
+    runs-on: ubuntu-latest    
+    env:
+      GOPATH: ${{ github.workspace }}
+      GO111MODULE: off
+    defaults:
+      run:
+        working-directory: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
+    steps:   
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
         go-version: 1.15
-
     - name: Set up Python 2.7
       uses: actions/setup-python@v2
       with:
         python-version: 2.7
-        
     - name: Use Node.js 15.x
       uses: actions/setup-node@v1
       with:
         node-version: 15.x
-        
     - name: Checkout code
       uses: actions/checkout@v2
-#      with:
-#        fetch-depth: 1
-#        path: go/src/github.com/uber/ringpop-go
-        
+      with:
+        fetch-depth: 1
+        path: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
     - name: Debug
       run: |
         pwd
@@ -42,9 +41,6 @@ jobs:
         echo ${GITHUB_WORKSPACE}
         echo ${GOPATH}
         echo ${GOROOT}
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
-        
     - name: Install dependencies
       run: |
         go get -u github.com/Masterminds/glide
@@ -57,35 +53,15 @@ jobs:
         ./scripts/travis/get-thrift-gen.sh
         ./scripts/travis/get-cram.sh
         npm install -g tcurl@v4.22.2
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
-        
     - name: Run Setup
-      run: make setup
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
-      
+      run: make setup      
 #    - name: Lint
 #      run: make lint
-#      env:
-#        GOPATH: /home/runner/work/ringpop-go/go
-      
     - name: Unit Tests
       run: make test-unit
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
-     
     - name: Race Tests
       run: make test-examples
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
-     
     - name: Example Tests
       run: make test-race
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
-      
     - name: Code Coverage
       run: make coveralls
-      env:
-        GOPATH: /home/runner/work/ringpop-go/go
