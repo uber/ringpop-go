@@ -115,12 +115,13 @@ _main() {
 		echo package_path: $package_path
 		echo package_version: $package_version
 		echo go_workspace: ${go_workspace}
+		echo GOPATH: $GOPATH
 		# exit
 		pwd
-		ls -alR
+		ls -alR ../go
 
 		# Download package
-		run go get -d "${package_repo}${package_path}"
+		run go get -v -d "${package_repo}${package_path}"
 
 		pushd "${go_workspace}/src/${package_repo}" > /dev/null
 
