@@ -9,6 +9,7 @@ import:
 - package: github.com/dgryski/go-farm
 - package: github.com/rcrowley/go-metrics
 - package: github.com/stretchr/testify
+  version: 1.7.0
   subpackages:
   - assert
   - mock

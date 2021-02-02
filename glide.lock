@@ -1,5 +1,5 @@
-hash: 5298d118233757c1f9458e841651d33b8e70bbee5f60f458ae64503e030cb674
-updated: 2021-01-28T18:40:42.708687-08:00
+hash: d7f727adfbed6411c3101d53bedf5e237ffeab311d161c8c5f8b514f4b4eb3d3
+updated: 2021-01-28T18:59:07.841684-08:00
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
@@ -35,7 +35,7 @@ imports:
 - name: github.com/stretchr/objx
   version: cbeaeb16a013161a98496fad62933b1d21786672
 - name: github.com/stretchr/testify
-  version: 05e8a0eda380579888eb53c394909df027f06991
+  version: acba37e5db06f0093b465a7d47822bf13644b66c
   subpackages:
   - assert
   - mock
@@ -77,4 +77,6 @@ imports:
   - windows
 - name: gopkg.in/yaml.v2
   version: a83829b6f1293c91addabc89d0571c246397bbf4
+- name: gopkg.in/yaml.v3
+  version: 496545a6307b2a7d7a710fd516e5e16e8ab62dbc
 testImports: []

@@ -8,14 +8,12 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-latest    
-
     env:
       GOPATH: ${{ github.workspace }}
       GO111MODULE: off
     defaults:
       run:
         working-directory: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
-
     steps:   
     - name: Setup Go
       uses: actions/setup-go@v2
