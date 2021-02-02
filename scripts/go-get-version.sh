@@ -111,15 +111,18 @@ _main() {
 		package_path=$(_parse_path "$package_spec")
 		package_version=$(_parse_version "$package_spec")
 
-		# echo package_repo: $package_repo
-		# echo package_path: $package_path
-		# echo package_version: $package_version
+		echo package_repo: $package_repo
+		echo package_path: $package_path
+		echo package_version: $package_version
+		echo go_workspace: ${go_workspace}
 		# exit
+		pwd
+		ls -alR
 
 		# Download package
 		run go get -d "${package_repo}${package_path}"
 
-		cd "${go_workspace}/src/${package_repo}"
+		pushd "${go_workspace}/src/${package_repo}" > /dev/null
 
 		if [ ! -z "$package_version" ]; then
 			echo "# cd $PWD" >&2
@@ -131,7 +134,7 @@ _main() {
 		# Generate list of sub packages
 		subpackages=$(_go_list "$package_path")
 
-		cd -
+		popd > /dev/null
 
 		# Build and install each package
 		for subpackage in $subpackages; do
