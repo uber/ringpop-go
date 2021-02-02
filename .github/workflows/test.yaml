@@ -68,4 +68,4 @@ jobs:
     - name: Upload coverage report
       uses: shogo82148/actions-goveralls@v1
       with:
-        path-to-profile: acc.out
+        path-to-profile: ${HOME}/acc.out
