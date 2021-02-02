@@ -68,4 +68,4 @@ jobs:
     - name: Upload coverage report
       uses: shogo82148/actions-goveralls@v1
       with:
-        path-to-profile: /home/runner/work/ringpop-go/ringpop-go/src/github.com/uber/ringpop-go/acc.out
+        path-to-profile: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}/acc.out
