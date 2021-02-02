@@ -42,8 +42,8 @@ jobs:
         echo ${GITHUB_WORKSPACE}
         echo ${GOPATH}
         echo ${GOROOT}
-     env:
-       GOPATH: /home/runner/work/ringpop-go/go
+      env:
+        GOPATH: /home/runner/work/ringpop-go/go
         
     - name: Install dependencies
       run: |
