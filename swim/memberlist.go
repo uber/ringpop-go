@@ -142,7 +142,7 @@ func (m *memberlist) genChecksumString() string {
 	return buffer.String()
 }
 
-// returns the member at a specific address
+// Member returns the member at a specific address
 func (m *memberlist) Member(address string) (*Member, bool) {
 	var memberCopy *Member
 	m.members.RLock()
@@ -207,14 +207,14 @@ func (m *memberlist) NumMembers() int {
 	return n
 }
 
-// returns whether or not a member is pingable
+// Pingable returns whether or not a member is pingable
 func (m *memberlist) Pingable(member Member) bool {
 	return member.Address != m.local.Address &&
 		(member.Status == Alive || member.Status == Suspect)
 
 }
 
-// returns the number of pingable members in the memberlist
+// NumPingableMembers returns the number of pingable members in the memberlist
 func (m *memberlist) NumPingableMembers() (n int) {
 	m.members.RLock()
 	for _, member := range m.members.list {
@@ -227,7 +227,7 @@ func (m *memberlist) NumPingableMembers() (n int) {
 	return n
 }
 
-// returns n pingable members in the member list
+// RandomPingableMembers returns n pingable members in the member list
 func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []Member {
 	members := make([]Member, 0, n)
 
@@ -246,7 +246,7 @@ func (m *memberlist) RandomPingableMembers(n int, excluding map[string]bool) []M
 	return members
 }
 
-// returns an slice of (copied) members representing the current state of the
+// GetMembers returns an slice of (copied) members representing the current state of the
 // membership. The membership will be filtered by the predicates provided.
 func (m *memberlist) GetMembers(predicates ...MemberPredicate) (members []Member) {
 	m.members.RLock()

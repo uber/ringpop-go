@@ -161,7 +161,7 @@ func (g *gossip) Stop() {
 	g.logger.Debug("stopped gossip protocol")
 }
 
-// returns whether or not the gossip sub-protocol is stopped
+// Stopped returns whether or not the gossip sub-protocol is stopped
 func (g *gossip) Stopped() bool {
 	g.state.RLock()
 	stopped := !g.state.running
