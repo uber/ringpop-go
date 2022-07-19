@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest    
     env:
       GOPATH: ${{ github.workspace }}
-      GO111MODULE: on
+      GO111MODULE: off
     defaults:
       run:
         working-directory: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}
