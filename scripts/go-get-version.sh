@@ -117,29 +117,16 @@ _main() {
 		# exit
 
 		# Download package
-		run go get -d "${package_repo}${package_path}"
+		run go install "${package_repo}@${package_version}"
 
-		pushd "${go_workspace}/pkg/mod/${package_repo}" >/dev/null
-
-		if [ ! -z "$package_version" ]; then
-			echo "# cd $PWD" >&2
-			run git checkout -q $package_version
-			# install dependencies for checked out version
-			run go get ./...
-		fi
+		#pushd "${go_workspace}/pkg/mod/${package_repo}" >/dev/null
 
 		# Generate list of sub packages
 		subpackages=$(_go_list "$package_path")
 
-		popd >/dev/null
-
 		# Build and install each package
 		for subpackage in $subpackages; do
-			pushd "${go_workspace}/pkg/mod/${subpackage}" >/dev/null
-			echo "# cd $PWD" >&2
-			run go build
-			run go install
-			popd >/dev/null
+		    run go install "${subpackage}"
 		done
 	done
 }
