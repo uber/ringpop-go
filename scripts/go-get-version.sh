@@ -106,7 +106,7 @@ _main() {
 	local go_workspace="$(_go_workspace)"
 
 	for package_spec in "$@"; do
-
+        run export GO111MODULE=on
 		package_repo=$(_parse_repo "$package_spec")
 		package_path=$(_parse_path "$package_spec")
 		package_version=$(_parse_version "$package_spec")
