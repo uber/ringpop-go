@@ -25,3 +25,5 @@ import:
   - package: golang.org/x/net
     subpackages:
       - context
+  - package: github.com/hashicorp/hcl
+    version: 1.0.0

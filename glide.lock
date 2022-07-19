@@ -1,5 +1,5 @@
-hash: 8489ae50fd04a36117515181b77af53fec9d85533ae8cb0d4efb6f5eca3980d7
-updated: 2022-07-19T22:54:22.509149+05:30
+hash: 351b45f595718043453202b4c1046d902a2d2cd7a268ac860b0b61101e80afc8
+updated: 2022-07-20T00:31:17.386574+05:30
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
@@ -17,6 +17,8 @@ imports:
   - spew
 - name: github.com/dgryski/go-farm
   version: fc41e106ee0e4394f69a56046e5c5adbaf29d912
+- name: github.com/hashicorp/hcl
+  version: 8cb6e5b959231cc1119e43259c4a608f9c51a241
 - name: github.com/opentracing/opentracing-go
   version: d34af3eaa63c4d08ab54863a4bdd0daa45212e12
   subpackages:
