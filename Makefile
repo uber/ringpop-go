@@ -52,7 +52,7 @@ mocks:
 dev_deps:
 	go get -u github.com/uber/tchannel-go/thrift/thrift-gen
 	go get -u golang.org/x/lint/golint/...
-	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
+	./scripts/go-get-version.sh github.com/vektra/mockery/.../@2494ad6
 
 setup: dev_deps
 	glide install
