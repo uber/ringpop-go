@@ -1,3 +1,2 @@
-*.go
 !*_test.go
 .gen/
