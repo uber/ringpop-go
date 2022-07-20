@@ -1,5 +1,5 @@
-hash: d7f727adfbed6411c3101d53bedf5e237ffeab311d161c8c5f8b514f4b4eb3d3
-updated: 2021-01-28T18:59:07.841684-08:00
+hash: 8489ae50fd04a36117515181b77af53fec9d85533ae8cb0d4efb6f5eca3980d7
+updated: 2022-07-20T18:49:25.670166+05:30
 imports:
 - name: github.com/apache/thrift
   version: b2a4d4ae21c789b689dd162deb819665567f481c
@@ -22,8 +22,6 @@ imports:
   subpackages:
   - ext
   - log
-- name: github.com/pkg/errors
-  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
@@ -43,24 +41,26 @@ imports:
   - suite
 - name: github.com/uber-common/bark
   version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
-- name: github.com/uber-go/atomic
-  version: 12f27ba2637fa0e13772a4f05fa46a5d18d53182
-  subpackages:
-  - utils
 - name: github.com/uber/tchannel-go
-  version: cc230a2942d078a8b01f4a79895dad62e6c572f1
+  version: 9c59f882872b168087fff34c2f249f28ad24aff8
   subpackages:
   - internal/argreader
   - json
   - raw
   - relay
+  - thirdparty/github.com/apache/thrift/lib/go/thrift
   - thrift
+  - thrift/arg2
   - thrift/gen-go/meta
   - thrift/thrift-gen
   - tnet
   - tos
   - trand
   - typed
+- name: go.uber.org/atomic
+  version: 3504dfaa1fa414923b1c8693f45d2f6931daf229
+- name: go.uber.org/multierr
+  version: 10aaa3c357ad64ddee0ffb8313fa499279473d05
 - name: golang.org/x/net
   version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
@@ -75,8 +75,6 @@ imports:
   subpackages:
   - unix
   - windows
-- name: gopkg.in/yaml.v2
-  version: a83829b6f1293c91addabc89d0571c246397bbf4
 - name: gopkg.in/yaml.v3
   version: 496545a6307b2a7d7a710fd516e5e16e8ab62dbc
 testImports: []
