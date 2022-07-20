@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/uber/ringpop-go/router"
 	"github.com/uber/ringpop-go/test/mocks"
-	shared "github.com/uber/ringpop-go/test/remoteservice/gen-go/shared"
+	"github.com/uber/ringpop-go/test/remoteservice/gen-go/remoteservice"
+	"github.com/uber/ringpop-go/test/remoteservice/gen-go/shared"
 	servicemocks "github.com/uber/ringpop-go/test/remoteservice/mocks"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
@@ -24,8 +25,8 @@ func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 	rp.On("AddListener", mock.Anything).Return(false)
 	serviceImpl := &servicemocks.TChanRemoteService{}
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -40,12 +41,12 @@ func TestNewRingpopRemoteServiceAdapterInputValidation(t *testing.T) {
 	rp.On("AddListener", mock.Anything).Return(false)
 	serviceImpl := &servicemocks.TChanRemoteService{}
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{})
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{})
 	assert.Equal(t, err, nil, "creation of adator gave an error")
 	assert.NotEqual(t, adapter, nil, "adapter not created")
 
-	adapter, err = NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err = remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: nil,
 		},
 	})
@@ -70,8 +71,8 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -113,8 +114,8 @@ func TestRingpopRemoteServiceAdapterCallLocalPreservingHeaders(t *testing.T) {
 		"baz":   "42",
 	})
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -150,8 +151,8 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	ch, err := tchannel.NewChannel("remote", nil)
 	assert.Equal(t, err, nil, "could not create tchannel")
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -207,8 +208,8 @@ func TestRingpopRemoteServiceAdapterCallRemotePreservingHeaders(t *testing.T) {
 	ch, err := tchannel.NewChannel("remote", nil)
 	assert.Equal(t, err, nil, "could not create tchannel")
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -241,8 +242,8 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCall(t *testing.T) {
 	ctx, _ := thrift.NewContext(0 * time.Second)
 	ctx = forward.SetForwardedHeader(ctx, []string{"hello"})
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -288,8 +289,8 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCallPreservingHeaders(t *t
 	// add the forwarding header
 	ctx = forward.SetForwardedHeader(ctx, []string{"hello"})
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -316,8 +317,8 @@ func TestGetLocalClient(t *testing.T) {
 	ch, err := tchannel.NewChannel("remote", nil)
 	assert.Equal(t, err, nil, "could not create tchannel")
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -325,7 +326,7 @@ func TestGetLocalClient(t *testing.T) {
 	})
 
 	cf := adapter.(router.ClientFactory)
-	localClient := cf.GetLocalClient().(TChanRemoteService)
+	localClient := cf.GetLocalClient().(remoteservice.TChanRemoteService)
 	err = localClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the local client gave an error")
 	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
@@ -344,8 +345,8 @@ func TestMakeRemoteClient(t *testing.T) {
 	ch, err := tchannel.NewChannel("remote", nil)
 	assert.Equal(t, err, nil, "could not create tchannel")
 
-	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, RemoteServiceConfiguration{
-		RemoteCall: &RemoteServiceRemoteCallConfiguration{
+	adapter, err := remoteservice.NewRingpopRemoteServiceAdapter(serviceImpl, rp, ch, remoteservice.RemoteServiceConfiguration{
+		RemoteCall: &remoteservice.RemoteServiceRemoteCallConfiguration{
 			Key: func(ctx thrift.Context, name shared.Name) (string, error) {
 				return string(name), nil
 			},
@@ -353,12 +354,12 @@ func TestMakeRemoteClient(t *testing.T) {
 	})
 
 	tchanClient := &mocks.TChanClient{}
-	tchanClient.On("Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything).Return(true, nil)
+	tchanClient.On("Call", mock.Anything, "RemoteService", "RemoteCall", &remoteservice.RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything).Return(true, nil)
 
 	cf := adapter.(router.ClientFactory)
-	remoteClient := cf.MakeRemoteClient(tchanClient).(TChanRemoteService)
+	remoteClient := cf.MakeRemoteClient(tchanClient).(remoteservice.TChanRemoteService)
 	err = remoteClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the remote client gave an error")
 
-	tchanClient.AssertCalled(t, "Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything)
+	tchanClient.AssertCalled(t, "Call", mock.Anything, "RemoteService", "RemoteCall", &remoteservice.RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything)
 }
