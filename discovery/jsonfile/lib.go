@@ -25,7 +25,7 @@ import (
 	"io/ioutil"
 )
 
-// HostList is a DiscoverProvider that reads a list of hosts from a JSON file.
+// HostList is a DiscoverProvider that reads a list of hosts from a JSON file .
 type HostList struct {
 	filePath string
 }
