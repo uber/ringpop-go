@@ -1,6 +1,7 @@
 package remoteservice
 
 import (
+	mocks2 "github.com/uber/ringpop-go/test/remoteservice/mocks"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ var _ = shared.GoUnusedProtection__
 func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 	rp := &mocks.Ringpop{}
 	rp.On("AddListener", mock.Anything).Return(false)
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{
 		RemoteCall: &RemoteServiceRemoteCallConfiguration{
@@ -41,7 +42,7 @@ func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 func TestNewRingpopRemoteServiceAdapterInputValidation(t *testing.T) {
 	rp := &mocks.Ringpop{}
 	rp.On("AddListener", mock.Anything).Return(false)
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 
 	adapter, err := NewRingpopRemoteServiceAdapter(serviceImpl, rp, nil, RemoteServiceConfiguration{})
 	assert.Equal(t, err, nil, "creation of adator gave an error")
@@ -62,7 +63,7 @@ func TestRingpopRemoteServiceAdapterCallLocal(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
 		ctx := args[0].(thrift.Context)
 		headers := ctx.Headers()
@@ -94,7 +95,7 @@ func TestRingpopRemoteServiceAdapterCallLocalPreservingHeaders(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
 		ctx := args[0].(thrift.Context)
 		headers := ctx.Headers()
@@ -137,7 +138,7 @@ func TestRingpopRemoteServiceAdapterCallRemote(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	// THIS IS NOT CALLED AS IT IS THE LOCAL IMPLEMENTATION, NEED TO FIND A WAY TO MOCK THE REMOTE CLIENT TO TEST THIS
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
 		t.Fail()
@@ -177,7 +178,7 @@ func TestRingpopRemoteServiceAdapterCallRemotePreservingHeaders(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	// THIS IS NOT CALLED AS IT IS THE LOCAL IMPLEMENTATION, NEED TO FIND A WAY TO MOCK THE REMOTE CLIENT TO TEST THIS
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
 		t.Fail()
@@ -232,7 +233,7 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCall(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
 		ctx := args[0].(thrift.Context)
 		headers := ctx.Headers()
@@ -265,7 +266,7 @@ func TestRingpopRemoteServiceAdapterReceivingForwardedCallPreservingHeaders(t *t
 	rp.On("Lookup", "hello").Return("127.0.0.1:3000", nil)
 	rp.On("WhoAmI").Return("127.0.0.1:3000", nil)
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Run(func(args mock.Arguments) {
 		ctx := args[0].(thrift.Context)
 		headers := ctx.Headers()
@@ -312,7 +313,7 @@ func TestGetLocalClient(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
 	rp.On("WhoAmI").Return("127.0.0.1:3000")
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
@@ -328,7 +329,7 @@ func TestGetLocalClient(t *testing.T) {
 	})
 
 	cf := adapter.(router.ClientFactory)
-	localClient := cf.GetLocalClient().(TChanRemoteService)
+	localClient := cf.GetLocalClient().(&mocks2.TChanRemoteService)
 	err = localClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the local client gave an error")
 	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
@@ -340,7 +341,7 @@ func TestMakeRemoteClient(t *testing.T) {
 	rp.On("Lookup", "hello").Return("127.0.0.1:3001")
 	rp.On("WhoAmI").Return("127.0.0.1:3000")
 
-	serviceImpl := &TChanRemoteService{}
+	serviceImpl := &mocks2.TChanRemoteService{}
 	serviceImpl.On("RemoteCall", mock.Anything, shared.Name("hello")).Return(nil)
 	ctx, _ := thrift.NewContext(0 * time.Second)
 
@@ -359,7 +360,7 @@ func TestMakeRemoteClient(t *testing.T) {
 	tchanClient.On("Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything).Return(true, nil)
 
 	cf := adapter.(router.ClientFactory)
-	remoteClient := cf.MakeRemoteClient(tchanClient).(TChanRemoteService)
+	remoteClient := cf.MakeRemoteClient(tchanClient).(&mocks2.TChanRemoteService)
 	err = remoteClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the remote client gave an error")
 
