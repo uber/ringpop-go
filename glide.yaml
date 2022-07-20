@@ -25,3 +25,5 @@ import:
 - package: golang.org/x/net
   subpackages:
   - context
+- package: golang.org/x/sys
+  version: master
