@@ -1,4 +1,2 @@
-*.go
 !*_test.go
-mocks/
 .gen/
