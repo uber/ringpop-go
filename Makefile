@@ -50,7 +50,7 @@ mocks:
 	test/gen-testfiles
 
 dev_deps:
-	go get -u github.com/vektra/mockery@v0.0.0-20160406211542-130a05e1b51a
+	go install github.com/vektra/mockery@v0.0.0-20160406211542-130a05e1b51a
 	go get -u github.com/uber/tchannel-go/thrift/thrift-gen
 	go get -u golang.org/x/lint/golint/...
 
