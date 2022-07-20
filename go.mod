@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/benbjohnson/clock v0.0.0-20160125162948-a620c1cc9866
-	github.com/cactus/go-statsd-client v3.1.0+incompatible
+	github.com/cactus/go-statsd-client/statsd v0.0.0-20190922033735-5ca90424ceb7
 	github.com/dgryski/go-farm v0.0.0-20140601200337-fc41e106ee0e
 	github.com/rcrowley/go-metrics v0.0.0-20141108142129-dee209f2455f
 	github.com/sirupsen/logrus v1.0.2-0.20170726183946-abee6f9b0679
