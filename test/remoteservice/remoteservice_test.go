@@ -329,7 +329,7 @@ func TestGetLocalClient(t *testing.T) {
 	})
 
 	cf := adapter.(router.ClientFactory)
-	localClient := cf.GetLocalClient().(&mocks2.TChanRemoteService)
+	localClient := cf.GetLocalClient().(mocks2.TChanRemoteService)
 	err = localClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the local client gave an error")
 	serviceImpl.AssertCalled(t, "RemoteCall", mock.Anything, shared.Name("hello"))
@@ -360,7 +360,7 @@ func TestMakeRemoteClient(t *testing.T) {
 	tchanClient.On("Call", mock.Anything, "RemoteService", "RemoteCall", &RemoteServiceRemoteCallArgs{Name: shared.Name("hello")}, mock.Anything).Return(true, nil)
 
 	cf := adapter.(router.ClientFactory)
-	remoteClient := cf.MakeRemoteClient(tchanClient).(&mocks2.TChanRemoteService)
+	remoteClient := cf.MakeRemoteClient(tchanClient).(mocks2.TChanRemoteService)
 	err = remoteClient.RemoteCall(ctx, shared.Name("hello"))
 	assert.Equal(t, err, nil, "calling the remote client gave an error")
 
