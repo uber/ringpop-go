@@ -27,3 +27,5 @@ require (
 )
 
 replace github.com/uber-go/atomic => go.uber.org/atomic v1.7.0
+
+replace github.com/codegangsta/cli => github.com/urfave/cli v1.22.9
