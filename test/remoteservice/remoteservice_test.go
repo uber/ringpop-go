@@ -14,6 +14,7 @@ import (
 	servicemocks "github.com/uber/ringpop-go/test/remoteservice/mocks"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
+	_ "github.com/vektra/mockery"
 )
 
 var _ = shared.GoUnusedProtection__

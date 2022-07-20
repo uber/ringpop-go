@@ -11,6 +11,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/uber-common/bark v1.0.0
 	github.com/uber/tchannel-go v1.32.0
+	github.com/vektra/mockery v0.0.0-20160406211542-130a05e1b51a
 	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
 )
 
