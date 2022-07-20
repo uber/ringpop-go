@@ -1,8 +1,8 @@
-hash: 4ccda5624a1c3a632cb019d8e2e953856637534b7dba0b735a8f729f23778750
-updated: 2016-08-30T14:48:58.602347073+02:00
+hash: 8489ae50fd04a36117515181b77af53fec9d85533ae8cb0d4efb6f5eca3980d7
+updated: 2022-07-20T18:49:25.670166+05:30
 imports:
 - name: github.com/apache/thrift
-  version: 5bc8b5a3a5da507b6f87436ca629be664496a69f
+  version: b2a4d4ae21c789b689dd162deb819665567f481c
   subpackages:
   - lib/go/thrift
 - name: github.com/benbjohnson/clock
@@ -12,49 +12,69 @@ imports:
   subpackages:
   - statsd
 - name: github.com/davecgh/go-spew
-  version: 6cf5744a041a0022271cefed95ba843f6d87fd51
+  version: 04cdfd42973bb9c8589fd6a731800cf222fde1a9
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
   version: fc41e106ee0e4394f69a56046e5c5adbaf29d912
 - name: github.com/opentracing/opentracing-go
-  version: 77a31d686003349e89c89e58408aafcd20003f41
+  version: d34af3eaa63c4d08ab54863a4bdd0daa45212e12
   subpackages:
   - ext
+  - log
 - name: github.com/pmezard/go-difflib
-  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
 - name: github.com/rcrowley/go-metrics
   version: dee209f2455f101a5e4e593dea94872d2c62d85d
-- name: github.com/Sirupsen/logrus
-  version: 82c8de1af23b25ba5a468d801f29077f4f483bce
+- name: github.com/sirupsen/logrus
+  version: abee6f9b0679f8044f5fca552eb6a9691a55d4ac
 - name: github.com/stretchr/objx
-  version: 1a9d0bb9f541897e62256577b352fdbc1fb4fd94
+  version: cbeaeb16a013161a98496fad62933b1d21786672
 - name: github.com/stretchr/testify
-  version: d77da356e56a7428ad25149ca77381849a6a5232
+  version: acba37e5db06f0093b465a7d47822bf13644b66c
   subpackages:
   - assert
   - mock
   - require
+  - suite
 - name: github.com/uber-common/bark
-  version: d52ffa061726911f47fcd3d9e8b9b55f22794772
-- name: github.com/uber-go/atomic
-  version: 0c9e689d64f004564b79d9a663634756df322902
+  version: dbf558e8a7b65e2b54e1e01c14ee0e4207a865f5
 - name: github.com/uber/tchannel-go
-  version: 1a0e35378f6f721bc07f6c4466bc9701ed70b506
+  version: 9c59f882872b168087fff34c2f249f28ad24aff8
   subpackages:
+  - internal/argreader
   - json
   - raw
-  - thrift
-  - thrift/thrift-gen
   - relay
+  - thirdparty/github.com/apache/thrift/lib/go/thrift
+  - thrift
+  - thrift/arg2
+  - thrift/gen-go/meta
+  - thrift/thrift-gen
   - tnet
+  - tos
   - trand
   - typed
-  - thrift/gen-go/meta
+- name: go.uber.org/atomic
+  version: 3504dfaa1fa414923b1c8693f45d2f6931daf229
+- name: go.uber.org/multierr
+  version: 10aaa3c357ad64ddee0ffb8313fa499279473d05
 - name: golang.org/x/net
-  version: 6250b412798208e6c90b03b7c4f226de5aa299e2
+  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
+  - bpf
   - context
-devImports: []
+  - internal/iana
+  - internal/socket
+  - ipv4
+  - ipv6
+- name: golang.org/x/sys
+  version: d4feaf1a7e61e1d9e79e6c4e76c6349e9cab0a03
+  subpackages:
+  - unix
+  - windows
+- name: gopkg.in/yaml.v3
+  version: 496545a6307b2a7d7a710fd516e5e16e8ab62dbc
+testImports: []

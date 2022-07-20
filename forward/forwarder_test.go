@@ -31,12 +31,12 @@ import (
 	events "github.com/uber/ringpop-go/events/test/mocks"
 	"github.com/uber/ringpop-go/test/thrift/pingpong"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/json"
+	athrift "github.com/uber/tchannel-go/thirdparty/github.com/apache/thrift/lib/go/thrift"
 	"github.com/uber/tchannel-go/thrift"
 	"golang.org/x/net/context"
 )

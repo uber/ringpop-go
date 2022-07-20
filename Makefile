@@ -52,7 +52,6 @@ mocks:
 dev_deps:
 	go get -u github.com/uber/tchannel-go/thrift/thrift-gen
 	go get -u github.com/golang/lint/golint/...
-	./scripts/go-get-version.sh github.com/vektra/mockery/.../@130a05e
 
 setup: dev_deps
 	glide install --cache
