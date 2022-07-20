@@ -1,4 +1,4 @@
-package remoteservice
+package remoteservicetest
 
 import (
 	"testing"
@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/uber/ringpop-go/router"
 	"github.com/uber/ringpop-go/test/mocks"
-	"github.com/uber/ringpop-go/test/remoteservice/gen-go/remoteservice"
-	"github.com/uber/ringpop-go/test/remoteservice/gen-go/shared"
-	servicemocks "github.com/uber/ringpop-go/test/remoteservice/mocks"
+	"github.com/uber/ringpop-go/test/remoteservicetest/gen-go/remoteservice"
+	"github.com/uber/ringpop-go/test/remoteservicetest/gen-go/shared"
+	servicemocks "github.com/uber/ringpop-go/test/remoteservicetest/mocks"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 	_ "github.com/vektra/mockery"
