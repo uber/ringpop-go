@@ -39,6 +39,7 @@ import (
 	"github.com/uber/ringpop-go/swim"
 
 	"github.com/benbjohnson/clock"
+	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
 	athrift "github.com/uber/tchannel-go/thirdparty/github.com/apache/thrift/lib/go/thrift"
