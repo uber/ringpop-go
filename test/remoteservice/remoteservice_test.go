@@ -10,18 +10,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/uber/ringpop-go/router"
 	"github.com/uber/ringpop-go/test/mocks"
-	. "github.com/uber/ringpop-go/test/remoteservice/.gen/go/remoteservice"
-	shared "github.com/uber/ringpop-go/test/remoteservice/.gen/go/shared"
+	shared "github.com/uber/ringpop-go/test/remoteservice/gen-go/shared"
 	servicemocks "github.com/uber/ringpop-go/test/remoteservice/mocks"
 	"github.com/uber/tchannel-go"
 	"github.com/uber/tchannel-go/thrift"
 )
 
 var _ = shared.GoUnusedProtection__
-
-//go:generate mkdir -p .gen/go
-//go:generate thrift-gen --generateThrift --outputDir .gen/go --inputFile remoteservice.thrift --template github.com/uber/ringpop-go/ringpop.thrift-gen -packagePrefix github.com/uber/ringpop-go/test/remoteservice/.gen/go/
-//go:generate mockery -dir=.gen/go/remoteservice -name=TChanRemoteService
 
 func TestNewRingpopRemoteServiceAdapter(t *testing.T) {
 	rp := &mocks.Ringpop{}

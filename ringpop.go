@@ -38,11 +38,10 @@ import (
 	"github.com/uber/ringpop-go/shared"
 	"github.com/uber/ringpop-go/swim"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/benbjohnson/clock"
-	"github.com/dgryski/go-farm"
 	log "github.com/uber-common/bark"
 	"github.com/uber/tchannel-go"
+	athrift "github.com/uber/tchannel-go/thirdparty/github.com/apache/thrift/lib/go/thrift"
 )
 
 // Interface specifies the public facing methods a user of ringpop is able to

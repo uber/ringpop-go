@@ -3,7 +3,7 @@ package mocks
 import "github.com/uber/tchannel-go/thrift"
 import "github.com/stretchr/testify/mock"
 
-import athrift "github.com/apache/thrift/lib/go/thrift"
+import athrift "github.com/uber/tchannel-go/thirdparty/github.com/apache/thrift/lib/go/thrift"
 
 type TChanClient struct {
 	mock.Mock
