@@ -50,7 +50,7 @@ _parse_repo() {
 
 
 #
-# Extract the package path from the given package path.
+# Extract the package path from the given package path .
 #
 # The path means the bit after the base (repo) name, for example given the
 # following package name:
