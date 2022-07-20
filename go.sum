@@ -33,6 +33,8 @@ github.com/uber/jaeger-client-go v2.30.0+incompatible/go.mod h1:WVhlPFC8FDjOFMMW
 github.com/uber/jaeger-lib v2.4.1+incompatible h1:td4jdvLcExb4cBISKIpHuGoVXh+dVKhn2Um6rjCsSsg=
 github.com/uber/tchannel-go v1.32.0 h1:k56L3bRrWGRITRn8GRHd4C9tjwIcGP7M3b3DlPnzjOs=
 github.com/uber/tchannel-go v1.32.0/go.mod h1:yT2EUp6YperZ0Tb/jwDX9gVEeiSG74r/L3CjF7zNJHs=
+github.com/vektra/mockery v0.0.0-20160406211542-130a05e1b51a h1:rHb2+sJhEIP01uRTfURpzcEr+KgKWVcuixhDT1AOInc=
+github.com/vektra/mockery v0.0.0-20160406211542-130a05e1b51a/go.mod h1:3LHOhl7yhnq4Wov6IXX3laolKx4NiYRqPgER/wSC2TQ=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
 go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 go.uber.org/multierr v1.2.0 h1:6I+W7f5VwC5SV9dNrZ3qXrDB9mD0dyGOi/ZJmYw03T4=
