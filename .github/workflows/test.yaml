@@ -53,6 +53,8 @@ jobs:
         npm install -g tcurl@v4.22.2
     - name: Run Setup
       run: make setup
+    - name: Lint
+      run: make lint
     - name: Unit Tests
       run: make test-unit
     - name: Race Tests
