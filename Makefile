@@ -50,7 +50,7 @@ mocks:
 	test/gen-testfiles
 
 dev_deps:
-	go get -u github.com/uber/tchannel-go/thrift/thrift-gen
+	go get -u github.com/uber/tchannel-go/thrift/thrift-gen@v1.22.3
 	go get -u golang.org/x/lint/golint/...
 
 setup: dev_deps
