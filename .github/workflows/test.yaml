@@ -18,7 +18,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.15
+        go-version: 1.16.6
     - name: Setup Python 2.7
       uses: actions/setup-python@v2
       with:
@@ -52,7 +52,7 @@ jobs:
         ./scripts/travis/get-cram.sh
         npm install -g tcurl@v4.22.2
     - name: Run Setup
-      run: make setup      
+      run: make setup
     - name: Lint
       run: make lint
     - name: Unit Tests
@@ -64,6 +64,6 @@ jobs:
     - name: Generate coverage report
       run: make coveralls
     - name: Upload coverage report
-      uses: shogo82148/actions-goveralls@v1
+      uses: shogo82148/actions-goveralls@02a150c2be8d92067983c74e9be237da98abfaad
       with:
         path-to-profile: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}/acc.out
