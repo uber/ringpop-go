@@ -59,14 +59,14 @@ type Options struct {
 
 	// When started, the partition healing algorithm attempts a partition heal
 	// every PartitionHealPeriod with a probability of:
-	// PartitionHealBaseProbabillity / # Nodes in discoverProvider.
+	// PartitionHealBaseProbability / # Nodes in discoverProvider.
 	//
-	// When in a 100 node cluster BaseProbabillity = 3 and Period = 30s,
+	// When in a 100 node cluster BaseProbability = 3 and Period = 30s,
 	// every 30 seconds a node will have a probability of 3/100 to start the
 	// partition healing procedure. This means that for the entire cluster
 	// the discover provider receives 6 calls per minute on average.
 	PartitionHealPeriod           time.Duration
-	PartitionHealBaseProbabillity float64
+	PartitionHealBaseProbability float64
 
 	LabelLimits   LabelOptions
 	InitialLabels LabelMap
@@ -99,7 +99,7 @@ func defaultOptions() *Options {
 		RollupMaxUpdates:    250,
 
 		PartitionHealPeriod:           30 * time.Second,
-		PartitionHealBaseProbabillity: 3,
+		PartitionHealBaseProbability: 3,
 
 		LabelLimits: DefaultLabelOptions,
 
@@ -132,7 +132,7 @@ func mergeDefaultOptions(opts *Options) *Options {
 
 	opts.PartitionHealPeriod = util.SelectDuration(opts.PartitionHealPeriod, def.PartitionHealPeriod)
 
-	opts.PartitionHealBaseProbabillity = util.SelectFloat(opts.PartitionHealBaseProbabillity, def.PartitionHealBaseProbabillity)
+	opts.PartitionHealBaseProbability = util.SelectFloat(opts.PartitionHealBaseProbability, def.PartitionHealBaseProbability)
 
 	opts.JoinTimeout = util.SelectDuration(opts.JoinTimeout, def.JoinTimeout)
 	opts.PingTimeout = util.SelectDuration(opts.PingTimeout, def.PingTimeout)
@@ -262,7 +262,7 @@ func NewNode(app, address string, channel shared.SubChannel, opts *Options) *Nod
 
 	node.healer = newDiscoverProviderHealer(
 		node,
-		opts.PartitionHealBaseProbabillity,
+		opts.PartitionHealBaseProbability,
 		opts.PartitionHealPeriod,
 	)
 	node.gossip = newGossip(node, opts.MinProtocolPeriod)

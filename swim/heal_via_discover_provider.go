@@ -38,7 +38,7 @@ import (
 type discoverProviderHealer struct {
 	node *Node
 
-	baseProbabillity float64
+	baseProbability float64
 	period           time.Duration
 
 	previousHostListSize int
@@ -53,7 +53,7 @@ type discoverProviderHealer struct {
 func newDiscoverProviderHealer(n *Node, baseProbability float64, period time.Duration) *discoverProviderHealer {
 	return &discoverProviderHealer{
 		node:             n,
-		baseProbabillity: baseProbability,
+		baseProbability: baseProbability,
 		period:           period,
 		logger:           logging.Logger("healer").WithField("local", n.Address()),
 		started:          make(chan struct{}, 1),
@@ -111,7 +111,7 @@ func (h *discoverProviderHealer) Probability() float64 {
 	if h.previousHostListSize < 1 {
 		h.previousHostListSize = 1
 	}
-	return h.baseProbabillity / float64(h.previousHostListSize)
+	return h.baseProbability / float64(h.previousHostListSize)
 }
 
 // Heal iterates over the hostList that the discoverProvider provides. If the
