@@ -64,6 +64,6 @@ jobs:
     - name: Generate coverage report
       run: make coveralls
     - name: Upload coverage report
-      uses: shogo82148/actions-goveralls@02a150c2be8d92067983c74e9be237da98abfaad
+      uses: shogo82148/actions-goveralls@25f5320d970fb565100cf1993ada29be1bb196a1  # v1.10.0
       with:
         path-to-profile: ${{ env.GOPATH }}/src/github.com/${{ github.repository }}/acc.out
